@@ -1,0 +1,43 @@
+{
+  "name": "mtagentprism-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "fuser -k 7395/tcp 2>/dev/null || true; next dev -p 7395",
+    "build": "next build",
+    "lint": "eslint .",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5",
+    "@tanstack/react-virtual": "^3.14.2",
+    "framer-motion": "^12",
+    "lucide-react": "^0.400",
+    "next": "^16",
+    "react": "^19",
+    "react-dom": "^19",
+    "three": "^0.184.0",
+    "zustand": "^5"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
+    "@next/eslint-plugin-next": "^16.2.6",
+    "@playwright/test": "^1.60.0",
+    "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "^0.184.0",
+    "eslint": "^9",
+    "eslint-config-next": "^16",
+    "jsdom": "^29.1.1",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^4.1.7"
+  }
+}

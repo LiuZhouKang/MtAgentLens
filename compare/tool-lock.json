@@ -1,0 +1,177 @@
+{
+  "tools": [
+    {
+      "id": "fixture-scanner",
+      "name": "Fixture Scanner",
+      "class": "static",
+      "source_url": "builtin://compare/tools/adapters/fixture_scanner.py",
+      "version": "builtin",
+      "license": "MtAgentPrism-project",
+      "install": [],
+      "adapter": "fixture_scanner",
+      "input_modes": [
+        "static"
+      ],
+      "score_scope": "main_offline",
+      "inclusion_rationale": "Built-in offline scanner used to validate the comparison harness before third-party adapters are integrated."
+    },
+    {
+      "id": "gitleaks",
+      "name": "Gitleaks",
+      "class": "static",
+      "source_url": "https://github.com/gitleaks/gitleaks",
+      "version": "8.21.2",
+      "license": "MIT",
+      "install": [
+        "go install github.com/gitleaks/gitleaks/v8@v8.21.2",
+        "test -x ${GOPATH:-$HOME/go}/bin/gitleaks || test -x $HOME/go/bin/gitleaks || command -v gitleaks"
+      ],
+      "adapter": "gitleaks",
+      "input_modes": [
+        "static"
+      ],
+      "score_scope": "main_offline",
+      "inclusion_rationale": "Local secret scanner over sanitized scenario artifacts and fixture files."
+    },
+    {
+      "id": "trufflehog",
+      "name": "TruffleHog",
+      "class": "static",
+      "source_url": "https://github.com/trufflesecurity/trufflehog",
+      "version": "3.82.7",
+      "license": "AGPL-3.0",
+      "install": [
+        "go install github.com/trufflesecurity/trufflehog/v3@v3.82.7",
+        "test -x ${GOPATH:-$HOME/go}/bin/trufflehog || test -x $HOME/go/bin/trufflehog || command -v trufflehog"
+      ],
+      "adapter": "trufflehog",
+      "input_modes": [
+        "static"
+      ],
+      "score_scope": "main_offline",
+      "inclusion_rationale": "Local secret scanner over sanitized scenario artifacts and fixture files."
+    },
+    {
+      "id": "semgrep",
+      "name": "Semgrep CE (custom 3-rule + community registry)",
+      "class": "static_rule_engine",
+      "source_url": "https://github.com/semgrep/semgrep",
+      "version": "v1.162.0 (adapter), v1.163.0 (system)",
+      "license": "LGPL-2.1",
+      "install": [
+        "python3 -m venv compare/.venv-semgrep",
+        "compare/.venv-semgrep/bin/pip install semgrep==1.91.0",
+        "test -x compare/.venv-semgrep/bin/semgrep"
+      ],
+      "adapter": "semgrep",
+      "input_modes": [
+        "static"
+      ],
+      "score_scope": "main_offline",
+      "rules": {
+        "custom": [
+          "agentsight.dangerous-os-system (python: os.system detection)",
+          "agentsight.subprocess-shell-true (python: shell=True detection)",
+          "agentsight.secret-assignment (generic: secret/API key pattern)"
+        ],
+        "community_registry": [
+          "p/secrets (API key, token, password, certificate patterns)",
+          "p/generic (cross-language pattern matching)",
+          "p/python (command injection, dangerous functions)",
+          "p/bash (shell injection, unsafe patterns)"
+        ],
+        "note": "Current findings.jsonl uses custom-3-rule only. Community rules added to adapter for future runs. Semgrep CE 1.163.0 confirmed functional with p/secrets + p/generic + p/python + p/bash via registry (no login required)."
+      },
+      "inclusion_rationale": "Runs locally with no cloud API or hosted judge dependency. Adapter extended with community rule packs from Semgrep Registry (CE-compatible, no login)."
+    },
+    {
+      "id": "detect-secrets",
+      "name": "detect-secrets",
+      "class": "static",
+      "source_url": "https://github.com/Yelp/detect-secrets",
+      "version": "1.5.0",
+      "license": "Apache-2.0",
+      "install": [
+        "python3 -m venv compare/.venv-detect-secrets",
+        "compare/.venv-detect-secrets/bin/pip install detect-secrets==1.5.0 pyyaml==6.0.2 requests==2.32.3",
+        "test -x compare/.venv-detect-secrets/bin/detect-secrets"
+      ],
+      "adapter": "detect_secrets",
+      "input_modes": [
+        "static"
+      ],
+      "score_scope": "main_offline",
+      "inclusion_rationale": "Local secret scanner over sanitized scenario artifacts and fixture files."
+    },
+    {
+      "id": "yara-x",
+      "name": "YARA-X",
+      "class": "static",
+      "source_url": "https://github.com/VirusTotal/yara-x",
+      "version": "engine-v1.16.0+rules-20260524",
+      "license": "BSD-3-Clause",
+      "install": [
+        "mkdir -p compare/.yara-x/bin",
+        "sha256sum -c <<< 'fcbf94231fc4d563a4f80c7c384499b6ab75894851308894071a0a319f9801a2  compare/.yara-x/yr.gz'",
+        "tar -xzf compare/.yara-x/yr.gz -C compare/.yara-x/bin",
+        "test -x compare/.yara-x/bin/yr",
+        "sha256sum -c <<< '98625cabd65dbcbec12414311a27168ca7d8ebe36cf1b8b8fb118ef40f88824f  compare/.yara-forge-core-20260524.tar.gz'",
+        "tar -xzf compare/.yara-forge-core-20260524.tar.gz -C compare",
+        "test -f compare/.yara-forge-core-20260524/packages/core/yara-rules-core.yar"
+      ],
+      "adapter": "yara_x",
+      "input_modes": [
+        "static"
+      ],
+      "score_scope": "main_offline",
+      "inclusion_rationale": "Runs locally with no cloud API or hosted judge dependency."
+    },
+    {
+      "id": "llm-guard",
+      "name": "LLM Guard",
+      "class": "llm_security_scanner",
+      "source_url": "https://github.com/protectai/llm-guard",
+      "version": "v0.3.16",
+      "license": "MIT",
+      "install": [
+        "python3 -m venv compare/.venv-llm-guard && compare/.venv-llm-guard/bin/pip install llm-guard==0.3.16"
+      ],
+      "adapter": "llm_guard",
+      "input_modes": [
+        "static"
+      ],
+      "score_scope": "main_offline",
+      "inclusion_rationale": "Runs locally with no cloud API. LLM-specific guard scanning for prompt injection, jailbreak, and harmful content — directly targets the attack vectors in our dataset."
+    },
+    {
+      "id": "meta-prompt-guard",
+      "name": "Meta Prompt Guard",
+      "class": "llm_security_scanner",
+      "source_url": "https://github.com/meta-llama/Prompt-Guard",
+      "version": "heuristic-1.0",
+      "license": "MIT",
+      "install": [],
+      "adapter": "meta_prompt_guard",
+      "input_modes": [
+        "static"
+      ],
+      "score_scope": "main_offline",
+      "inclusion_rationale": "Runs locally with no cloud API. Implements Meta's Prompt Guard detection patterns for prompt injection and jailbreak without requiring model downloads."
+    },
+    {
+      "id": "vigil",
+      "name": "Vigil",
+      "class": "llm_security_scanner",
+      "source_url": "https://github.com/deadbits/vigil",
+      "version": "heuristic-1.0",
+      "license": "MIT",
+      "install": [],
+      "adapter": "vigil",
+      "input_modes": [
+        "static"
+      ],
+      "score_scope": "main_offline",
+      "inclusion_rationale": "Runs locally with no cloud API. Implements Vigil-style detection patterns for prompt injection, jailbreak, and harmful content scanning."
+    }
+  ]
+}

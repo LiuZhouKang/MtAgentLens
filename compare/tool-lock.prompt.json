@@ -1,0 +1,74 @@
+{
+  "tools": [
+    {
+      "id": "llm-guard",
+      "name": "LLM Guard",
+      "class": "prompt-baseline",
+      "source_url": "https://github.com/protectai/llm-guard",
+      "version": "0.3.16+heuristic-fallback",
+      "license": "Apache-2.0",
+      "install": [
+        "python3 -m venv compare/.venv-llm-guard",
+        "compare/.venv-llm-guard/bin/pip install llm-guard==0.3.16 || true"
+      ],
+      "adapter": "llm_guard",
+      "input_modes": [
+        "prompt_text"
+      ],
+      "score_scope": "main_offline",
+      "inclusion_rationale": "Prompt-level guard baseline over frozen raw agent-task and fixture text inputs."
+    },
+    {
+      "id": "meta-prompt-guard",
+      "name": "Meta Prompt Guard",
+      "class": "prompt-baseline",
+      "source_url": "https://github.com/meta-llama/PurpleLlama",
+      "version": "Prompt-Guard-v1+heuristic-patterns",
+      "license": "Meta Llama materials; heuristic adapter is project-local",
+      "install": [
+        "test -f compare/tools/adapters/meta_prompt_guard.py"
+      ],
+      "adapter": "meta_prompt_guard",
+      "input_modes": [
+        "prompt_text"
+      ],
+      "score_scope": "main_offline",
+      "inclusion_rationale": "Prompt injection and jailbreak baseline representing Meta Prompt Guard style prompt-only analysis."
+    },
+    {
+      "id": "vigil",
+      "name": "Vigil",
+      "class": "prompt-baseline",
+      "source_url": "https://github.com/deadbits/vigil-llm",
+      "version": "2024-10-heuristic-fallback",
+      "license": "MIT",
+      "install": [
+        "test -f compare/tools/adapters/vigil.py"
+      ],
+      "adapter": "vigil",
+      "input_modes": [
+        "prompt_text"
+      ],
+      "score_scope": "main_offline",
+      "inclusion_rationale": "Prompt security scanner baseline over frozen prompt text inputs."
+    },
+    {
+      "id": "agent-sentinel",
+      "name": "AgentSentinel",
+      "class": "llm-auditor",
+      "source_url": "https://github.com/m4p1e/agent-sentinel",
+      "license": "unknown",
+      "install": [
+        "builtin://compare/tools/adapters/agent_sentinel.py"
+      ],
+      "adapter": "agent_sentinel",
+      "input_modes": [
+        "prompt_text"
+      ],
+      "score_scope": "main_offline",
+      "inclusion_rationale": "AgentSentinel is an eBPF-based LLM agent security monitor from a peer-reviewed venue. Its AuditWithoutTrace mode uses LLM-based safety judgment. Including it demonstrates the incremental value of MtAgentPrism's kernel-level behavioral evidence over LLM-judgment.",
+      "round1_static_only": true,
+      "version": "paper-version"
+    }
+  ]
+}

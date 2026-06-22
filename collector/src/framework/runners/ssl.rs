@@ -1,0 +1,316 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 eunomia-bpf org.
+
+use super::common::{AnalyzerProcessor, BinaryExecutor};
+use super::{EventStream, Runner, RunnerError, SslConfig};
+use crate::framework::analyzers::Analyzer;
+use crate::framework::core::Event;
+use async_trait::async_trait;
+use futures::stream::StreamExt;
+use log::warn;
+use std::path::Path;
+
+/// Runner for collecting SSL/TLS events
+pub struct SslRunner {
+    config: SslConfig,
+    analyzers: Vec<Box<dyn Analyzer>>,
+    executor: BinaryExecutor,
+    additional_args: Vec<String>,
+}
+
+impl SslRunner {
+    /// Create from binary extractor (real execution mode)
+    pub fn from_binary_extractor(binary_path: impl AsRef<Path>) -> Self {
+        let path_str = binary_path.as_ref().to_string_lossy().to_string();
+        Self {
+            config: SslConfig::default(),
+            analyzers: Vec::new(),
+            executor: BinaryExecutor::new(path_str).with_runner_name("SSL".to_string()),
+            additional_args: Vec::new(),
+        }
+    }
+
+    /// Add additional command-line arguments to pass to the binary
+    pub fn with_args<I, S>(mut self, args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        self.additional_args = args.into_iter().map(|s| s.as_ref().to_string()).collect();
+        // Update the executor with the additional args
+        self.executor = self
+            .executor
+            .with_args(&self.additional_args)
+            .with_runner_name("SSL".to_string());
+        self
+    }
+
+    /// Set the TLS version filter
+    #[allow(dead_code)]
+    pub fn tls_version(mut self, version: String) -> Self {
+        self.config.tls_version = Some(version);
+        self
+    }
+
+    fn json_to_event(json_value: serde_json::Value) -> Event {
+        let timestamp = json_value
+            .get("timestamp_ns")
+            .or_else(|| json_value.get("timestamp"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or_else(|| {
+                warn!(
+                    "Missing timestamp in ssl event, defaulting to 0: {}",
+                    json_value
+                );
+                0
+            });
+
+        let pid = json_value
+            .get("pid")
+            .and_then(|v| v.as_u64())
+            .and_then(|p| {
+                if p <= u32::MAX as u64 {
+                    Some(p as u32)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| {
+                warn!(
+                    "Missing or invalid pid in ssl event, defaulting to 0: {}",
+                    json_value
+                );
+                0
+            });
+
+        let comm = json_value
+            .get("comm")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .or_else(|| {
+                json_value
+                    .get("event")
+                    .and_then(|v| v.as_str())
+                    .map(|event| format!("ssl:{}", event))
+            })
+            .unwrap_or_else(|| {
+                warn!(
+                    "Missing comm in ssl event, defaulting to 'ssl': {}",
+                    json_value
+                );
+                "ssl".to_string()
+            });
+
+        Event::new_with_timestamp(timestamp, "ssl".to_string(), pid, comm, json_value)
+    }
+}
+
+#[async_trait]
+impl Runner for SslRunner {
+    async fn run(&mut self) -> Result<EventStream, RunnerError> {
+        // Get raw JSON stream from the binary executor
+        let json_stream = self.executor.get_json_stream().await?;
+
+        // Convert JSON values directly to framework Events
+        let event_stream = json_stream.map(Self::json_to_event);
+
+        AnalyzerProcessor::process_through_analyzers(Box::pin(event_stream), &mut self.analyzers)
+            .await
+    }
+
+    fn add_analyzer(mut self, analyzer: Box<dyn Analyzer>) -> Self {
+        self.analyzers.push(analyzer);
+        self
+    }
+
+    fn name(&self) -> &str {
+        "ssl"
+    }
+
+    fn id(&self) -> String {
+        "ssl".to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_ssl_runner_creation() {
+        let runner = SslRunner::from_binary_extractor("/fake/path/sslsniff");
+        assert_eq!(runner.name(), "ssl");
+        assert_eq!(runner.id(), "ssl");
+    }
+
+    #[test]
+    fn test_ssl_runner_with_custom_config() {
+        let runner =
+            SslRunner::from_binary_extractor("/fake/path/sslsniff").tls_version("1.2".to_string());
+
+        assert_eq!(runner.id(), "ssl");
+    }
+
+    #[test]
+    fn test_ssl_runner_missing_pid_comm_fallback() {
+        let json_value = json!({
+            "timestamp_ns": 999u64,
+            "event": "CONTROL"
+        });
+
+        let event = SslRunner::json_to_event(json_value.clone());
+
+        assert_eq!(event.source, "ssl");
+        assert_eq!(event.timestamp, 999u64);
+        assert_eq!(event.pid, 0);
+        assert_eq!(event.comm, "ssl:CONTROL");
+        assert_eq!(event.data, json_value);
+    }
+
+    /// Test that actually runs the real SSL binary
+    ///
+    /// This test is ignored by default and only runs when specifically requested.
+    /// To run this test: `cargo test test_ssl_runner_with_real_binary -- --ignored`
+    ///
+    /// Prerequisites:
+    /// - The sslsniff binary must be built and available at ../src/sslsniff
+    /// - Sufficient privileges to run eBPF programs (usually requires sudo)
+    ///
+    /// Note: This test may fail if:
+    /// - The binary doesn't exist
+    /// - Insufficient privileges
+    /// - No SSL/TLS traffic occurs during the execution window
+    #[tokio::test]
+    #[ignore = "requires real binary and may need sudo privileges"]
+    async fn test_ssl_runner_with_real_binary() {
+        use std::path::Path;
+        use std::time::{Duration, Instant};
+        use tokio::time::{interval, timeout};
+
+        // Initialize debug logging for the test
+        let _ = env_logger::Builder::from_default_env()
+            .filter_level(log::LevelFilter::Debug)
+            .is_test(true)
+            .try_init();
+
+        let binary_path = "../src/sslsniff";
+
+        // Check if binary exists before attempting to run
+        if !Path::new(binary_path).exists() {
+            eprintln!("SSL binary not found at {}", binary_path);
+            eprintln!("   Build the binary first: cd ../src && make sslsniff");
+            return;
+        }
+
+        let start_time = Instant::now();
+        println!("Testing SslRunner with real binary at {}", binary_path);
+        println!("   Runtime: 30 seconds with live streaming output");
+        println!("   Will terminate the process automatically after timeout");
+        println!("   Generate SSL traffic: curl -s https://httpbin.org/get > /dev/null");
+        println!("{}", "=".repeat(60));
+
+        // Create runner with real binary
+        let mut runner = SslRunner::from_binary_extractor(binary_path)
+            .add_analyzer(Box::new(crate::framework::analyzers::OutputAnalyzer::new()));
+
+        // Run the binary and collect events for 30 seconds
+        match runner.run().await {
+            Ok(mut stream) => {
+                println!(
+                    "SslRunner started successfully! ({}s)",
+                    start_time.elapsed().as_secs()
+                );
+                println!("Streaming SSL/TLS events live for 30 seconds...");
+                println!();
+
+                let mut event_count = 0;
+                let mut status_interval = interval(Duration::from_secs(5));
+                let mut last_event_time = Instant::now();
+
+                // Run for 30 seconds with streaming output
+                let result = timeout(Duration::from_secs(30), async {
+                    loop {
+                        tokio::select! {
+                            event_opt = futures::StreamExt::next(&mut stream) => {
+                                match event_opt {
+                                    Some(event) => {
+                                        event_count += 1;
+                                        last_event_time = Instant::now();
+                                        let runtime = start_time.elapsed().as_secs();
+
+                                        // Print event as JSON
+                                        println!("[{:02}s] Event #{}: {}",
+                                            runtime,
+                                            event_count,
+                                            serde_json::to_string(&event).unwrap()
+                                        );
+                                    }
+                                    None => {
+                                        println!("[{:02}s] Event stream ended naturally", start_time.elapsed().as_secs());
+                                        break;
+                                    }
+                                }
+                            }
+                            _ = status_interval.tick() => {
+                                let runtime = start_time.elapsed().as_secs();
+                                let time_since_last = last_event_time.elapsed().as_secs();
+                                println!("[{:02}s] Status: {} SSL events collected, last event {}s ago",
+                                    runtime, event_count, time_since_last);
+                            }
+                        }
+                    }
+                }).await;
+
+                let total_runtime = start_time.elapsed();
+                println!();
+
+                match result {
+                    Ok(_) => println!(
+                        "SSL event stream completed naturally after {:.1}s",
+                        total_runtime.as_secs_f32()
+                    ),
+                    Err(_) => {
+                        println!("30-second timeout reached - terminating process");
+                        println!("Process killed automatically");
+                    }
+                }
+
+                println!("{}", "=".repeat(60));
+                println!("SslRunner test completed!");
+                println!("   Total SSL events: {}", event_count);
+                println!("   Total runtime: {:.2}s", total_runtime.as_secs_f32());
+                println!(
+                    "   Event rate: {:.1} events/sec",
+                    event_count as f32 / total_runtime.as_secs_f32()
+                );
+
+                if event_count == 0 {
+                    println!();
+                    println!("No SSL events captured during test period!");
+                    println!("   Try generating HTTPS traffic in another terminal:");
+                    println!("   curl -s https://httpbin.org/get");
+                    println!("   wget -q -O /dev/null https://example.com");
+                    println!("   firefox (browse HTTPS sites)");
+                }
+            }
+            Err(e) => {
+                let runtime = start_time.elapsed();
+                eprintln!(
+                    "SslRunner failed after {:.2}s: {}",
+                    runtime.as_secs_f32(),
+                    e
+                );
+                eprintln!("   Possible causes:");
+                eprintln!("   - Insufficient privileges (try: sudo cargo test ...)");
+                eprintln!("   - Binary compilation failed");
+                eprintln!("   - eBPF/kernel support missing");
+                eprintln!("   - Missing kernel headers");
+                eprintln!("   - SSL/TLS hooks not available");
+
+                // Don't panic - allow test to pass even with environmental issues
+                return;
+            }
+        }
+    }
+}

@@ -1,0 +1,86 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+interface HomeGlobeIntroProps {
+  src: string;
+  onComplete: () => void;
+  minimumVisibleMs?: number;
+  maxVisibleMs?: number;
+  exitDurationMs?: number;
+}
+
+export default function HomeGlobeIntro({
+  src,
+  onComplete,
+  exitDurationMs = 520,
+}: HomeGlobeIntroProps) {
+  const [exiting, setExiting] = useState(false);
+  const completedRef = useRef(false);
+  const exitTimerRef = useRef<number | null>(null);
+
+  const complete = useCallback(() => {
+    if (completedRef.current || exitTimerRef.current != null) {
+      return;
+    }
+
+    setExiting(true);
+    exitTimerRef.current = window.setTimeout(() => {
+      completedRef.current = true;
+      onComplete();
+    }, exitDurationMs);
+  }, [exitDurationMs, onComplete]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (!event.data || typeof event.data !== 'object') {
+        return;
+      }
+
+      const messageType = 'type' in event.data ? event.data.type : null;
+      if (
+        messageType === 'agentsight:intro-enter-main-stage' ||
+        messageType === 'agentsight:intro-skip'
+      ) {
+        complete();
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      if (exitTimerRef.current != null) {
+        window.clearTimeout(exitTimerRef.current);
+      }
+    };
+  }, [complete]);
+
+  return (
+    <div
+      aria-label="MtAgentPrism 开场序章"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 60,
+        background: '#000',
+        opacity: exiting ? 0 : 1,
+        transform: exiting ? 'scale(1.015)' : 'scale(1)',
+        transition: `opacity ${exitDurationMs}ms cubic-bezier(0.16, 1, 0.3, 1), transform ${exitDurationMs}ms cubic-bezier(0.16, 1, 0.3, 1)`,
+      }}
+    >
+      <iframe
+        title="MtAgentPrism 开场地球"
+        src={src}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          border: 'none',
+          background: '#000',
+        }}
+      />
+    </div>
+  );
+}

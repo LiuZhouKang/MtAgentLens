@@ -1,0 +1,69 @@
+{
+  "ci": {
+    "collect": {
+      "numberOfRuns": 3,
+      "startServerCommand": "npm run dev",
+      "startServerReadyPattern": "Ready",
+      "settings": {
+        "preset": "desktop",
+        "chromeFlags": "--headless=new --no-sandbox"
+      },
+      "url": [
+        "http://localhost:7395/?audit=headless",
+        "http://localhost:7395/investigations?alertId=demo-alert-1"
+      ]
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": [
+          "warn",
+          {
+            "minScore": 0.95
+          }
+        ],
+        "categories:accessibility": [
+          "warn",
+          {
+            "minScore": 0.95
+          }
+        ],
+        "categories:best-practices": [
+          "warn",
+          {
+            "minScore": 0.95
+          }
+        ],
+        "largest-contentful-paint": [
+          "warn",
+          {
+            "maxNumericValue": 2000
+          }
+        ],
+        "cumulative-layout-shift": [
+          "warn",
+          {
+            "maxNumericValue": 0.1
+          }
+        ],
+        "interaction-to-next-paint": [
+          "warn",
+          {
+            "maxNumericValue": 200
+          }
+        ],
+        "first-contentful-paint": [
+          "warn",
+          {
+            "maxNumericValue": 1500
+          }
+        ],
+        "interactive": [
+          "warn",
+          {
+            "maxNumericValue": 3000
+          }
+        ]
+      }
+    }
+  }
+}

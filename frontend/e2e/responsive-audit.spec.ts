@@ -1,0 +1,85 @@
+import { test, expect, type Page } from '@playwright/test';
+
+const viewports = [
+  { name: 'desktop', width: 1920, height: 1080 },
+  { name: 'tablet', width: 1024, height: 768 },
+  { name: 'mobile', width: 375, height: 667 },
+];
+
+const routes = [
+  { name: 'home', path: '/?audit=headless' },
+  { name: 'investigation', path: '/investigations#alertId=demo-alert-1' },
+  { name: 'handoff', path: '/handoff' },
+];
+
+async function collectWebVitals(page: Page) {
+  return page.evaluate(async () => {
+    const win = window as Window & {
+      __mtagentAuditVitals?: {
+        lcp: number;
+        cls: number;
+      };
+    };
+
+    win.__mtagentAuditVitals = { lcp: 0, cls: 0 };
+
+    const lcpObserver = new PerformanceObserver((entryList) => {
+      const entries = entryList.getEntries();
+      const last = entries[entries.length - 1];
+      if (last) {
+        win.__mtagentAuditVitals!.lcp = last.startTime;
+      }
+    });
+    lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
+
+    const clsObserver = new PerformanceObserver((entryList) => {
+      for (const entry of entryList.getEntries() as Array<PerformanceEntry & { hadRecentInput?: boolean; value?: number }>) {
+        if (!entry.hadRecentInput) {
+          win.__mtagentAuditVitals!.cls += entry.value ?? 0;
+        }
+      }
+    });
+    clsObserver.observe({ type: 'layout-shift', buffered: true });
+
+    await new Promise((resolve) => window.setTimeout(resolve, 2200));
+
+    lcpObserver.disconnect();
+    clsObserver.disconnect();
+    return win.__mtagentAuditVitals;
+  });
+}
+
+for (const viewport of viewports) {
+  test.describe(`${viewport.name} responsive audit`, () => {
+    test.use({ viewport: { width: viewport.width, height: viewport.height } });
+
+    for (const route of routes) {
+      test(`${route.name} renders without critical regressions`, async ({ page }, testInfo) => {
+        const consoleErrors: string[] = [];
+
+        page.on('console', (msg) => {
+          if (msg.type() === 'error') {
+            consoleErrors.push(msg.text());
+          }
+        });
+
+        await page.goto(route.path, { waitUntil: 'domcontentloaded' });
+        await page.waitForLoadState('networkidle');
+
+        const heading = page.getByRole('heading').first();
+        await expect(heading).toBeVisible();
+
+        const vitals = await collectWebVitals(page);
+
+        await expect.soft(vitals.lcp, `${route.name} ${viewport.name} LCP should stay under 2500ms`).toBeLessThanOrEqual(2500);
+        await expect.soft(vitals.cls, `${route.name} ${viewport.name} CLS should stay under 0.1`).toBeLessThanOrEqual(0.1);
+        await expect.soft(consoleErrors, `${route.name} ${viewport.name} should not emit console errors`).toEqual([]);
+
+        await page.screenshot({
+          path: testInfo.outputPath(`${route.name}-${viewport.name}.png`),
+          fullPage: true,
+        });
+      });
+    }
+  });
+}

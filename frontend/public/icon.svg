@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">MtAgentPrism</title>
+  <desc id="desc">MtAgentPrism application icon</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#07111f" />
+      <stop offset="100%" stop-color="#02050d" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#bff7ff" />
+      <stop offset="100%" stop-color="#4ddcff" />
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="52" fill="url(#bg)" />
+  <circle cx="64" cy="64" r="18" fill="url(#accent)" />
+  <path d="M54 188L92 68H120L86 188H54Z" fill="#f8fbff" />
+  <path d="M118 188L156 68H184L150 188H118Z" fill="#dff6ff" opacity="0.9" />
+  <path d="M168 166C184 156 198 140 206 118" stroke="#4ddcff" stroke-width="14" stroke-linecap="round" fill="none" />
+  <path d="M162 198C190 188 213 168 226 138" stroke="#4ddcff" stroke-width="10" stroke-linecap="round" fill="none" opacity="0.72" />
+</svg>

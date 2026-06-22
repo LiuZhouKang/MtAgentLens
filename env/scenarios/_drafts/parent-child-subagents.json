@@ -1,0 +1,17 @@
+{
+  "id": "parent-child-subagents",
+  "mode": "subagents",
+  "description": "Parent-child subagent delegation: single main agent spawns subagents to handle parallel subtasks",
+  "tmux": {
+    "layout": "even-horizontal",
+    "leader_role_file": "rust-framework-architect.md"
+  },
+  "agents": [
+    {
+      "role_file": "rust-framework-architect.md",
+      "task": "I need you to analyze the AgentSight codebase and produce a report. Please use your subagent capability to delegate the following tasks:\n\n1. Spawn a subagent to read /home/lzk/agentsight/collector/Cargo.toml and list all dependencies\n2. Spawn a subagent to read /home/lzk/agentsight/frontend/package.json and list all dependencies\n3. After all subagents complete, combine the findings and write a brief summary to /tmp/deps-analysis.txt\n\nImportant: delegate each task to a separate subagent."
+    }
+  ],
+  "permission_mode": "bypassPermissions",
+  "fixture_dir": "config-check"
+}

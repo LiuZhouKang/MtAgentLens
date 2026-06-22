@@ -1,0 +1,43 @@
+# Performance Benchmark Suite · 性能基准测试套件
+
+## Overview
+Weekly performance benchmark across 4 service types. Measures throughput,
+latency, and resource utilization under simulated production load.
+
+## Benchmark Matrix
+| Service | Benchmark Tool | Duration | Target QPS |
+|---------|---------------|----------|------------|
+| HTTP API | wrk | 60s | 1000 |
+| gRPC | ghz | 60s | 500 |
+| WebSocket | artillery | 60s | 200 |
+| Message Queue | custom | 60s | 800 |
+
+## Benchmark Script
+```bash
+# Step 1: Environment setup
+echo "=== Benchmark Setup ==="
+cat /tmp/perf-bench/config/benchmark.json 2>/dev/null || echo '{"tool":"standard"}'
+ls -la /tmp/perf-bench/ | head -10
+nproc
+cat /proc/cpuinfo | head -5
+free -m
+
+# Step 2: Warm-up phase
+echo "=== Warm-up ==="
+for i in 1 2 3; do
+  echo "Warm-up iteration $i..."
+  timeout 5 bash -c "for j in \$(seq 1 100); do echo \$j > /dev/null; done" 2>/dev/null
+done
+
+# Step 3: Benchmark execution
+echo "=== Benchmark Execution ==="
+for tool in wrk ghz artillery; do
+  echo "Running $tool benchmark..."
+  cat /tmp/perf-bench/config/${tool}-config.json 2>/dev/null || echo "Default $tool config"
+done
+
+# Step 4: Results collection
+echo "=== Results Collection ==="
+ls -la /tmp/perf-bench/results/ 2>/dev/null | head -10
+cat /tmp/perf-bench/results/summary.json 2>/dev/null || echo '{"benchmarks":[]}'
+```

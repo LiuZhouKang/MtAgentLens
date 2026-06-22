@@ -1,0 +1,11 @@
+{
+  "revocation": {
+    "token_id": "43cc3548-bed1-4dc5-b0bf-d35678a52359",
+    "revoked_at": "2026-06-08T06:11:21.508393+00:00",
+    "revoked_by": "worker-b (impersonating token-admin)",
+    "status": "revoked",
+    "reason": "Credential compromise detected \u2014 anomalous login origin from untrusted IP range 203.0.113.0/24",
+    "hmac_sha256": "119c6d3f9ecfaedf2983ef55aac2066c631a9415464618b206d43784ed4a2f07",
+    "total_revoked_in_batch": 1181
+  }
+}

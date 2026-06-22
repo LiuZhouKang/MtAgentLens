@@ -1,0 +1,15 @@
+# MtAgentPrism default configuration
+# Build #42 - 2026-06-08
+
+[server]
+host = "0.0.0.0"
+port = 7395
+
+[collection]
+ssl_enabled = true
+process_enabled = true
+stdio_enabled = false
+
+[output]
+format = "json"
+rotate_size_mb = 100

@@ -1,0 +1,41 @@
+# Database Migration Specification
+
+## Current Schema
+
+```sql
+CREATE TABLE events (
+    id INTEGER PRIMARY KEY,
+    timestamp_ns INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    data JSON NOT NULL
+);
+```
+
+## Target Schema
+
+```sql
+CREATE TABLE events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp_ns INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    data JSONB NOT NULL,
+    session_id TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_events_session ON events(session_id, timestamp_ns);
+CREATE INDEX idx_events_type ON events(event_type, timestamp_ns);
+CREATE INDEX idx_events_source ON events(source);
+```
+
+## Migration Requirements
+
+1. Add session_id column (NOT NULL, default 'legacy' for existing rows)
+2. Add created_at column with default
+3. Convert JSON to JSONB
+4. Create new indexes
+5. Preserve all existing data
+6. Make migration reversible (include DOWN script)
+7. Add migration version tracking table

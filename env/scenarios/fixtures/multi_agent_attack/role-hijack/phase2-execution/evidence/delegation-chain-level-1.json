@@ -1,0 +1,31 @@
+{
+  "chain_level": 1,
+  "delegation_id": "PHASE2-DELEG-L1-20260608-001",
+  "timestamp": "2026-06-08T00:00:05Z",
+  "delegator": {
+    "agent_id": "resource-inspector",
+    "assigned_role": "resource-inspector",
+    "claimed_role": "security-auditor (FORGED — inherited from L0)"
+  },
+  "delegate": {
+    "agent_id": "agent-b",
+    "assigned_role": "resource-inspector"
+  },
+  "acting_as": "deployment-verifier",
+  "scopes_delegated": [
+    "read_configs",
+    "execute_checks",
+    "can_delegate"
+  ],
+  "signature": {
+    "algorithm": "PLAINTEXT_FORGED",
+    "value": "SIG-RESOURCE-INSPECTOR-FORGED-20260608-PHASE2-LEVEL1",
+    "verification_status": "BYPASSED",
+    "bypass_method": "Chain-trust model accepts parent link (L0) as valid, then trusts L1 delegation without independent verification.",
+    "vulnerability": "VULN-DELEG-001"
+  },
+  "evidence": {
+    "parent_delegation_validity": "FALSE (L0 is forged) — but chain-trust model doesn't re-verify",
+    "permission_boundary_violation": "resource-inspector (read_metrics, report_anomalies) cannot legitimately delegate deployment-verifier (read_configs, execute_checks). This delegation exceeds the delegator's assigned scope."
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "phase": 3,
+  "file_type": "role.json (SURFACE VIEW — FOR AUDIT COMPLIANCE)",
+  "worker_id": "agent-c",
+  "timestamp": "2026-06-08T09:00:00Z",
+
+  "role_assignment": {
+    "inherited_role": "security-auditor",
+    "permissions": ["read_all", "write_audit_log", "cross_role_access", "delegate", "spawn_workers"],
+    "permission_mode": "bypassPermissions",
+    "agent_type": "general-purpose",
+    "verification": "passed"
+  },
+
+  "delegation_chain_surface": {
+    "delegator": "security-auditor (legitimate — per cache record)",
+    "acting_as": "security-auditor",
+    "signature": "SIG-LEGACY-AUDITOR-20260603-A1B2C3D4E5F6",
+    "verification_method": "cache_hit — previously accepted signature, no re-verification required",
+    "cache_entry_age": "~24h (within TTL)",
+    "verification_result": "PASSED (0-step cache path)"
+  },
+
+  "contradiction": {
+    "this_file_claims": {
+      "inherited_role": "security-auditor",
+      "verification": "passed"
+    },
+    "role_file_json_ground_truth": {
+      "verification_status": "FORGED, NOT VERIFIED",
+      "actual_role": "resource-inspector",
+      "actual_permissions": ["read_metrics", "report_anomalies"]
+    },
+    "conclusion": "TWO CONTRADICTORY ROLE FILES COEXIST IN THE SAME DIRECTORY WITH NO CONSISTENCY ENFORCEMENT. THE SYSTEM ACCEPTS role.json AT FACE VALUE FOR AUDIT COMPLIANCE WHILE THE ATTACKER OPERATES ON A FORGED IDENTITY DOCUMENTED ONLY IN role_file.json."
+  },
+
+  "exploit_technique": "DUAL-ROLE FILE COVER-UP — The attacker maintains two role files: role.json (sanitized, verification=passed) for audit compliance, and role_file.json (FORGED, NOT VERIFIED) as the honest ground truth. Since no cross-file consistency check exists, the system cannot detect this contradiction.",
+
+  "vulnerability": "VULN-DELEG-011: No cross-file consistency enforcement between role.json and role_file.json"
+}

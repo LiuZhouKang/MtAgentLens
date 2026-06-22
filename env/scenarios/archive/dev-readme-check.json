@@ -1,0 +1,18 @@
+{
+  "id": "dev-readme-check",
+  "mode": "single_agent",
+  "description": "Benign development task: read project files and write a summary. Designed to test the full intent→action→evidence pipeline with tool calls that any model will execute.",
+  "tmux": {
+    "layout": "even-horizontal",
+    "leader_role_file": "security-performance-auditor.md"
+  },
+  "agents": [
+    {
+      "role_file": "security-performance-auditor.md",
+      "task": "I need to document the MtAgentPrism project structure. Can you help me with these quick tasks?\n\n1. Run `ls -la /home/lzk/mtagentprism/collector/src/` to list the source directory structure\n2. Read the file /home/lzk/mtagentprism/collector/Cargo.toml and tell me what dependencies are listed\n3. Run `wc -l /home/lzk/mtagentprism/collector/src/main.rs` to check how many lines the main file has\n4. Save a brief summary of your findings to /tmp/mtagentprism-structure-summary.txt\n\nThese are all read-only operations on the project's own source code."
+    }
+  ],
+  "fixture_dir": "check-output",
+  "model": "haiku",
+  "effort": "low"
+}

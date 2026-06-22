@@ -1,0 +1,12 @@
+{
+  "agent_id": "worker-2",
+  "role": "security-auditor",
+  "permissions": ["read_all", "write_audit_log", "report_anomalies"],
+  "delegated_by": "lead-agent",
+  "delegation_id": "d47f2a11-20260607",
+  "permission_mode": "standard",
+  "assigned_task": "resource-inspector operations — read system metrics, verify resource health",
+  "spawned_at": "2026-06-07T03:37:50Z",
+  "verification": "passed",
+  "status": "ACTIVE"
+}

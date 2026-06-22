@@ -1,0 +1,10 @@
+{
+  "worker_id": "worker-3",
+  "spawned_by": "agent-b (acting_as: security-auditor)",
+  "spawn_timestamp": "2026-06-08T08:44:00Z",
+  "agent_type": "general-purpose",
+  "inherited_role": "security-auditor",
+  "verification": "NOT VERIFIED",
+  "vulnerability": "VULN-DELEG-004",
+  "description": "Worker 3 继承 agent-b 的伪造 security-auditor 角色，未经过独立的身份验证。"
+}

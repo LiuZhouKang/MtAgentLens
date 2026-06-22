@@ -1,0 +1,51 @@
+url	run	http_code	dns_s	tcp_connect_s	ttfb_s	total_s	remote_ip	error
+http://example.com:4444/ping	1	curl: (28) Connection timed out after 5001 milliseconds
+000	0.006824	0.000000	0.000000	5.001896		Connection timed out after 5001 milliseconds
+http://example.com:4444/ping	2	curl: (28) Connection timed out after 5001 milliseconds
+000	0.000541	0.000000	0.000000	5.001242		Connection timed out after 5001 milliseconds
+http://example.com:4444/ping	3	curl: (28) Connection timed out after 5001 milliseconds
+000	0.000464	0.000000	0.000000	5.001687		Connection timed out after 5001 milliseconds
+http://example.com:31337/status	1	curl: (28) Connection timed out after 5001 milliseconds
+000	0.000936	0.000000	0.000000	5.001874		Connection timed out after 5001 milliseconds
+http://example.com:31337/status	2	curl: (28) Connection timed out after 5001 milliseconds
+000	0.000864	0.000000	0.000000	5.001931		Connection timed out after 5001 milliseconds
+http://example.com:31337/status	3	curl: (28) Connection timed out after 5001 milliseconds
+000	0.000893	0.000000	0.000000	5.001585		Connection timed out after 5001 milliseconds
+http://example.com:8081/probe	1	curl: (28) Connection timed out after 5001 milliseconds
+000	0.000758	0.000000	0.000000	5.001466		Connection timed out after 5001 milliseconds
+http://example.com:8081/probe	2	curl: (28) Connection timed out after 5001 milliseconds
+000	0.000840	0.000000	0.000000	5.001814		Connection timed out after 5001 milliseconds
+http://example.com:8081/probe	3	curl: (28) Connection timed out after 5002 milliseconds
+000	0.000902	0.000000	0.000000	5.002231		Connection timed out after 5002 milliseconds
+https://pastebin.com/raw/AAAAAAAA	1	404	0.006957	0.218431	0.939471	0.939502	2606:4700:10::ac42:ab49	
+https://pastebin.com/raw/AAAAAAAA	2	404	0.000426	0.214232	0.654569	0.654612	2606:4700:10::ac42:ab49	
+https://pastebin.com/raw/AAAAAAAA	3	404	0.000793	0.213000	0.650133	0.650168	2606:4700:10::6814:1d96	
+https://paste.ee/r/BBBBBBBB	1	curl: (28) Connection timed out after 5002 milliseconds
+000	0.032238	0.000000	0.000000	5.002571		Connection timed out after 5002 milliseconds
+https://paste.ee/r/BBBBBBBB	2	curl: (28) Connection timed out after 5002 milliseconds
+000	0.000766	0.000000	0.000000	5.002858		Connection timed out after 5002 milliseconds
+https://paste.ee/r/BBBBBBBB	3	curl: (28) Connection timed out after 5002 milliseconds
+000	0.000864	0.000000	0.000000	5.002103		Connection timed out after 5002 milliseconds
+https://hastebin.com/raw/CCCCCCCC	1	401	0.206976	0.415641	1.111759	1.111836	2606:4700::6812:1249	
+https://hastebin.com/raw/CCCCCCCC	2	401	0.000566	0.213372	0.922706	1.769500	2606:4700::6812:1349	
+https://hastebin.com/raw/CCCCCCCC	3	401	0.000669	0.213086	0.726929	0.726966	2606:4700::6812:1349	
+http://203.0.113.10:9000/beacon	1	curl: (28) Connection timed out after 5003 milliseconds
+000	0.000013	0.000000	0.000000	5.003132		Connection timed out after 5003 milliseconds
+http://203.0.113.10:9000/beacon	2	curl: (28) Connection timed out after 5002 milliseconds
+000	0.000015	0.000000	0.000000	5.002234		Connection timed out after 5002 milliseconds
+http://203.0.113.10:9000/beacon	3	curl: (28) Connection timed out after 5001 milliseconds
+000	0.000014	0.000000	0.000000	5.001953		Connection timed out after 5001 milliseconds
+http://198.51.100.42:7777/hello	1	curl: (28) Connection timed out after 5002 milliseconds
+000	0.000010	0.000000	0.000000	5.002555		Connection timed out after 5002 milliseconds
+http://198.51.100.42:7777/hello	2	curl: (28) Connection timed out after 5002 milliseconds
+000	0.000020	0.000000	0.000000	5.002884		Connection timed out after 5002 milliseconds
+http://198.51.100.42:7777/hello	3	curl: (28) Connection timed out after 5002 milliseconds
+000	0.000010	0.000000	0.000000	5.002898		Connection timed out after 5002 milliseconds
+http://192.0.2.55:5555/ack	1	curl: (28) Connection timed out after 5002 milliseconds
+000	0.000015	0.000000	0.000000	5.002966		Connection timed out after 5002 milliseconds
+http://192.0.2.55:5555/ack	2	curl: (28) Connection timed out after 5002 milliseconds
+000	0.000015	0.000000	0.000000	5.002781		Connection timed out after 5002 milliseconds
+http://192.0.2.55:5555/ack	3	curl: (28) Connection timed out after 5002 milliseconds
+000	0.000015	0.000000	0.000000	5.002271		Connection timed out after 5002 milliseconds
+http://example.com:6667/irc	1	curl: (28) Connection timed out after 5001 milliseconds
+000	0.000847	0.000000	0.000000	5.001804		Connection timed out after 5001 milliseconds

@@ -1,0 +1,113 @@
+{
+  "name": "agentsight-multi-mode-lab",
+  "workspace_root": "",
+  "collaboration_mode": "",
+  "collaboration_scenarios": {
+    "single_agent": [
+      "prompt-injection",
+      "workspace-setup",
+      "reasoning-loop",
+      "privilege-escalation",
+      "network-anomaly"
+    ],
+    "agent_teams": [
+      "collaborative-dev",
+      "agent-teams-context-pollution",
+      "agent-teams-race-conflict",
+      "agent-teams-coordination-deadlock",
+      "agent-teams-role-hijack",
+      "agent-teams-resource-starvation",
+      "combo-multi-anomaly"
+    ],
+    "subagents": [
+      "subagents-collaborative",
+      "subagents-security-response",
+      "subagents-handoff-injection",
+      "subagents-context-loss",
+      "subagents-infinite-recursion",
+      "subagents-identity-confusion",
+      "subagents-privilege-leak",
+      "parent-child-subagents"
+    ]
+  },
+  "collaboration_env": {
+    "single_agent": {
+      "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0",
+      "TEAMMATE_MODE": "",
+      "CLAUDE_SUBAGENTS_MODE": "0",
+      "AGENTSIGHT_COLLABORATION_MODE": "single_agent"
+    },
+    "agent_teams": {
+      "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+      "TEAMMATE_MODE": "tmux",
+      "CLAUDE_SUBAGENTS_MODE": "0",
+      "AGENTSIGHT_COLLABORATION_MODE": "agent_teams"
+    },
+    "subagents": {
+      "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0",
+      "TEAMMATE_MODE": "subagents",
+      "CLAUDE_SUBAGENTS_MODE": "1",
+      "AGENTSIGHT_COLLABORATION_MODE": "subagents"
+    }
+  },
+  "execution_mode": "tmux",
+  "timeouts": {
+    "task_seconds": 300,
+    "graceful_shutdown_seconds": 5
+  },
+  "claude": {
+    "runner": "claude",
+    "permission_mode": "default",
+    "model": "haiku",
+    "effort": "low",
+    "extra_args": [],
+    "env_file": "env/config/claude.env",
+    "scenario_permission_mode_overrides": {
+      "prompt-injection": "bypassPermissions",
+      "workspace-setup": "bypassPermissions",
+      "collaborative-dev": "bypassPermissions",
+      "reasoning-loop": "bypassPermissions",
+      "privilege-escalation": "bypassPermissions",
+      "network-anomaly": "bypassPermissions",
+      "agent-teams-context-pollution": "bypassPermissions",
+      "agent-teams-race-conflict": "bypassPermissions",
+      "agent-teams-coordination-deadlock": "bypassPermissions",
+      "agent-teams-role-hijack": "bypassPermissions",
+      "agent-teams-resource-starvation": "bypassPermissions",
+      "combo-multi-anomaly": "bypassPermissions",
+      "subagents-collaborative": "bypassPermissions",
+      "subagents-security-response": "bypassPermissions",
+      "subagents-handoff-injection": "bypassPermissions",
+      "subagents-context-loss": "bypassPermissions",
+      "subagents-infinite-recursion": "bypassPermissions",
+      "subagents-identity-confusion": "bypassPermissions",
+      "subagents-privilege-leak": "bypassPermissions",
+      "parent-child-subagents": "bypassPermissions"
+    }
+  },
+  "role_prompt_dir": "env/scenarios/roles",
+  "collector": {
+    "enabled": true,
+    "sudo": true,
+    "binary": "./collector/build/release/mtagentprism",
+    "subcommand": "trace",
+    "comm": "claude",
+    "binary_path": "",
+    "auto_detect_binary_path": true,
+    "attach_wait_seconds": 5,
+    "server_port": 7395,
+    "auto_increment_port": true,
+    "log_file": "trace.log",
+    "trace_args": [
+      "--ssl",
+      "true",
+      "--ssl-http",
+      "true",
+      "--process",
+      "true",
+      "--server"
+    ],
+    "enable_system": true,
+    "extra_args": []
+  }
+}

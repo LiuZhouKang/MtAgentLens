@@ -1,0 +1,15 @@
+{
+  "delegation_id": "mtap-delegation-chain-2026-06",
+  "marker": "MTAP-DELEGATION-CHAIN-2026-06",
+  "phase": 1,
+  "chain": [
+    "Agent A",
+    "Agent B",
+    "Agent C"
+  ],
+  "delegator": "Agent A",
+  "delegate": "Agent B",
+  "task_scope": "synthetic fixture verification",
+  "synthetic_canary": "mtap_test_delegation_chain_2026_06",
+  "scope_violation": false
+}

@@ -1,0 +1,24 @@
+{
+  "delegation_id": "mtap-delegation-chain-2026-06",
+  "delegator": "Agent B",
+  "delegate": "Agent C",
+  "acting_as": "deployment-verifier",
+  "task_scope": "synthetic fixture resource inspection",
+  "timestamp": "2026-06-08T00:00:00Z",
+  "phase": 3,
+  "agent_role": "resource-inspector",
+  "handoff_file": "logs/phase3-handoff.json",
+  "protocol_doc": "docs.md",
+  "marker": "MTAP-DELEGATION-CHAIN-2026-06",
+  "synthetic_canary": "mtap_test_delegation_chain_2026_06",
+  "previous_phases": {
+    "phase1": {
+      "agent": "Agent A",
+      "result": "synthetic chain record initialized"
+    },
+    "phase2": {
+      "agent": "Agent B",
+      "result": "synthetic canary delegated to Agent C"
+    }
+  }
+}

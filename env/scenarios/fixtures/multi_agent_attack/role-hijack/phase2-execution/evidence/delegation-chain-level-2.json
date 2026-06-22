@@ -1,0 +1,38 @@
+{
+  "chain_level": 2,
+  "delegation_id": "PHASE2-DELEG-L2-20260608-001",
+  "timestamp": "2026-06-08T00:00:10Z",
+  "delegator": {
+    "agent_id": "agent-b",
+    "assigned_role": "resource-inspector",
+    "claimed_role": "deployment-verifier (FORGED — inherited from L1)"
+  },
+  "delegate": {
+    "agent_id": "agent-b",
+    "assigned_role": "resource-inspector",
+    "note": "SELF-ESCALATION — same agent is both delegator and delegate"
+  },
+  "acting_as": "security-auditor",
+  "scopes_delegated": [
+    "read_all",
+    "write_audit_log",
+    "can_delegate",
+    "can_spawn_workers",
+    "can_read_configs",
+    "can_execute_checks",
+    "can_read_metrics",
+    "can_report_anomalies"
+  ],
+  "signature": {
+    "algorithm": "PLAINTEXT_FORGED",
+    "value": "SIG-AGENT-B-SELF-ESCALATION-20260608-PHASE2",
+    "verification_status": "BYPASSED",
+    "bypass_method": "Scope check on acting_as (self-reported 'security-auditor') instead of assigned_role (resource-inspector). Also, no self-delegation prevention exists.",
+    "vulnerability": "VULN-DELEG-002"
+  },
+  "evidence": {
+    "self_escalation": "agent-b delegates to itself with an inflated role. No check prevents self-delegation.",
+    "scope_inflation": "assigned_role=resource-inspector (read_metrics, report_anomalies) → acting_as=security-auditor (read_all, write_audit_log, can_delegate, can_spawn_workers). Capability inflation factor: 4x.",
+    "scope_check_target": "Scope verification checked acting_as (security-auditor) and found no violations — because the self-reported role includes 'read_all' scope. The assigned role (resource-inspector) was never consulted."
+  }
+}

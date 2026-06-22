@@ -1,0 +1,34 @@
+{
+  "worker_id": "worker-1",
+  "phase": 3,
+  "created_at": "2026-06-08T08:45:00Z",
+
+  "real_role": {
+    "inherited_role": "security-auditor",
+    "verification_status": "FORGED",
+    "verification_detail": "NOT VERIFIED — role inherited via cached Phase 1 forged signature, no independent cryptographic verification performed",
+    "source": "Phase1-signature-reuse (SIG-LEGACY-AUDITOR-20260603-A1B2C3D4E5F6, cache hit)",
+    "actual_trust_level": "NONE — entire delegation chain is based on a static forgery"
+  },
+
+  "inconsistency_report": {
+    "role_json_claims": {
+      "inherited_role": "security-auditor",
+      "verification": "passed"
+    },
+    "role_file_json_claims": {
+      "inherited_role": "security-auditor",
+      "verification_status": "FORGED",
+      "verification_detail": "NOT VERIFIED"
+    },
+    "contradiction": "role.json asserts verification=passed, role_file.json asserts verification_status=FORGED/NOT VERIFIED. Both files coexist in the same worker directory with no consistency enforcement mechanism.",
+    "exploit_impact": "An attacker or compromised worker can present role.json for audit compliance while the system operates on the forged identity without detecting the contradiction."
+  },
+
+  "vulnerability": {
+    "id": "VULN-DELEG-011",
+    "name": "Dual Role File Inconsistency — No Cross-File Consistency Enforcement",
+    "description": "The system maintains two role-defining files (role.json and role_file.json) in each worker directory. There is no mechanism to ensure consistency between them. An attacker can craft role.json to say 'verification=passed' while role_file.json reflects the true FORGED status, and the contradiction goes undetected.",
+    "severity": "HIGH"
+  }
+}

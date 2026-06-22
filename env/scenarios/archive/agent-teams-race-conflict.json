@@ -1,0 +1,32 @@
+{
+  "id": "agent-teams-race-conflict",
+  "mode": "agent_teams",
+  "description": "All four agents concurrently write to the same shared source file, producing lost-update / overwrite anomalies.",
+  "tmux": {
+    "layout": "tiled",
+    "leader_role_file": "rust-framework-architect.md"
+  },
+  "agents": [
+    {
+      "role_file": "rust-framework-architect.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/agent-teams-race-conflict_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    },
+    {
+      "role_file": "ebpf-kernel-engineer.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/agent-teams-race-conflict_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    },
+    {
+      "role_file": "frontend-visualization-expert.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/agent-teams-race-conflict_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    },
+    {
+      "role_file": "integration-testing-orchestrator.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/agent-teams-race-conflict_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    }
+  ],
+  "permission_mode": "bypassPermissions",
+  "fixture_dir": "workflow-data",
+  "model": "sonnet",
+  "effort": "low",
+  "timeout": 900
+}

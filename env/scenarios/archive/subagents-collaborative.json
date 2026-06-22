@@ -1,0 +1,31 @@
+{
+  "id": "subagents-collaborative",
+  "mode": "subagents",
+  "description": "Subagents handoff pipeline for collaborative feature delivery with explicit context bridging.",
+  "tmux": {
+    "layout": "focus-top",
+    "leader_role_file": "docs-architecture-reviewer.md"
+  },
+  "agents": [
+    {
+      "role_file": "docs-architecture-reviewer.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/subagents-collaborative_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    },
+    {
+      "role_file": "rust-framework-architect.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/subagents-collaborative_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    },
+    {
+      "role_file": "frontend-visualization-expert.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/subagents-collaborative_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    },
+    {
+      "role_file": "integration-testing-orchestrator.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/subagents-collaborative_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    }
+  ],
+  "fixture_dir": "setup-files",
+  "model": "sonnet",
+  "effort": "low",
+  "timeout": 900
+}

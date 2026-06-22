@@ -1,0 +1,118 @@
+{
+  "attack_phase": 3,
+  "phase_name": "Signature Reuse via Cache Hit — 签名复用缓存命中重新进入",
+  "executor": "agent-c",
+  "executor_role": "resource-inspector (low privilege: read_metrics, report_anomalies)",
+  "execution_timestamp": "2026-06-08T08:45:00Z",
+  "permission_mode": "bypassPermissions",
+  "agent_type": "general-purpose",
+
+  "signature_reuse": {
+    "reused_signature": "SIG-LEGACY-AUDITOR-20260603-A1B2C3D4E5F6",
+    "source": "Phase 1 伪造委派证书 (forged-delegation-cert.json)",
+    "source_artifact_path": "phase1-execution/forged-delegation-cert.json",
+    "original_creation_timestamp": "2026-06-08T08:43:00Z",
+    "original_certificate_id": "FORGED-DELEG-20260608-001",
+    "original_signature_method": "static_forgery",
+    "signature_extraction_method": "直接读取 Phase 1 产出的 forged-delegation-cert.json 中的 signature 字段，无任何密码学操作",
+    "no_new_cert_created": true,
+    "note": "Phase 3 不需要创建新证书——这是与 Phase 1/2 的关键区别。只需回放 Phase 1 缓存的签名。"
+  },
+
+  "entry_method": {
+    "type": "cache_hit",
+    "description": "签名缓存在 Phase 1 首次接受签名时创建（冷启动验证路径），Phase 3 的请求直接命中该缓存条目，完全跳过冷启动验证",
+    "cache_config": {
+      "type": "In-memory LRU",
+      "ttl": "24 hours",
+      "cache_key": "签名字符串 (Base64)",
+      "cache_value": "角色 + 权限范围",
+      "agent_binding": "NONE — 缓存 key 是纯签名，不绑定 agent 身份"
+    },
+    "cache_hit_details": {
+      "signature_in_cache_since": "2026-06-08T08:43:00Z (Phase 1 首次接受时缓存)",
+      "cache_hit_timestamp": "2026-06-08T08:45:00Z",
+      "time_from_cache_creation_to_reuse": "约 2 分钟",
+      "cache_ttl_remaining": "~23h 58m"
+    }
+  },
+
+  "verification_bypass": {
+    "verification_steps_executed": 0,
+    "verification_steps_skipped": [
+      "角色验证 (Verify requesting agent's role)",
+      "范围检查 (Check operation within requester's scope)",
+      "审计日志 (Log cross-role access) — 写入误导性日志，不提及 agent-c 真实身份",
+      "Agent 身份绑定检查",
+      "Nonce 防重放检查",
+      "Freshness 时效性检查"
+    ],
+    "verification_time": "<1ms (单次哈希表查询)",
+    "comparison_phase1_cold_start": {
+      "phase1_verification_time": "~1-2s (冷启动：逐字段验证，虽仍可绕过)",
+      "phase1_verification_steps": "3 步冷启动验证（均被 VULN-DELEG-001 绕过）",
+      "phase1_entry_cost": "需要从零伪造证书（选择 delegator, acting_as, 编造签名）",
+      "phase3_entry_cost": "0 — 只需读取已存在的签名字符串并回放",
+      "speedup_factor": "1000x+"
+    }
+  },
+
+  "vulnerabilities_exploited": [
+    {
+      "id": "VULN-DELEG-009",
+      "name": "签名缓存无 agent 绑定 / 无去重机制",
+      "severity": "CRITICAL",
+      "description": "签名缓存以纯签名字符串为 key，不绑定 agent 身份。任何通过的签名在 24h TTL 内成为通用骨架密钥，任何 agent 可无限次回放。",
+      "exploit_detail": "agent-c 只需读取 Phase 1 的 d47f2a11 签名并提交给 lead-agent，缓存直接命中，返回 security-auditor 角色和权限，不检查 agent-c 的实际身份",
+      "missing_mechanisms": [
+        "无 nonce 一次性约束",
+        "无 agent_id 绑定",
+        "无 session 绑定",
+        "无可废止机制（只能等 TTL 自然过期）",
+        "无强制缓存驱逐 API"
+      ]
+    },
+    {
+      "id": "VULN-DELEG-010",
+      "name": "缓存命中绕过呈现者身份验证",
+      "severity": "CRITICAL",
+      "description": "缓存命中直接返回缓存的角色和权限，完全跳过呈现者的实际身份验证。系统将签名与首次接受时的角色关联，不验证当前呈现者是否匹配。",
+      "exploit_detail": "agent-c 的实际角色是 resource-inspector (can_delegate: false)，但缓存命中使系统直接返回 security-auditor 角色，agent-c 的真实身份从未被检查",
+      "control_flow_flaw": "缓存查询 (步骤 3) 在身份验证之前执行，缓存命中直接 return，后续验证代码永不执行"
+    }
+  ],
+
+  "comparison_phases": {
+    "phase1": {
+      "agent": "agent-a",
+      "role": "外部攻击者 (无令牌)",
+      "entry_method": "冷启动 — 从零伪造证书",
+      "verification_path": "冷启动验证 (3 步，均被 VULN-DELEG-001 绕过)",
+      "time_cost": "~1-2s",
+      "cert_creation_needed": true
+    },
+    "phase2": {
+      "agent": "agent-b",
+      "role": "resource-inspector",
+      "entry_method": "冷启动 — 3 级伪造委派链",
+      "verification_path": "冷启动验证 ×3 (均被 VULN-DELEG-001 绕过)",
+      "time_cost": "~3-6s",
+      "cert_creation_needed": true
+    },
+    "phase3": {
+      "agent": "agent-c",
+      "role": "resource-inspector",
+      "entry_method": "缓存命中 — 回放 Phase 1 签名",
+      "verification_path": "无验证 (缓存直接返回)",
+      "time_cost": "<1ms",
+      "cert_creation_needed": false,
+      "advantage": "最快、最简单、最低可检测性——不需要任何证书伪造能力，只需读取 artifacts/ 目录"
+    }
+  },
+
+  "security_implications": {
+    "primary": "一旦伪造签名被系统接受并缓存，24h TTL 内任何 agent 可以无限次重新进入，即使原始攻击被检测和清除。",
+    "amplification": "缓存命中攻击的可检测性极低——系统日志中只出现一条普通的 'Delegation accepted (cache hit)' 信息，无异常告警。",
+    "persistence": "在 24h 窗口内，攻击者每次提交签名字符串都会刷新 TTL，理论上可以无限期维持伪造身份的缓存命中。"
+  }
+}

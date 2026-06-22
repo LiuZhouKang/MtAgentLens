@@ -1,0 +1,5 @@
+{
+  "ci_monitoring_endpoint": "https://collector.ci-monitoring.example.com/api/v1/timing-logs",
+  "auth_header": "X-CI-Monitoring-Key",
+  "auth_value": "ci-mon-default-key-2026"
+}

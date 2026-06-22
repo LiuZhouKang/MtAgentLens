@@ -1,0 +1,12 @@
+{
+  "domains": [
+    "cdn-edge-01.benchmark.example.com",
+    "cdn-edge-02.benchmark.example.com",
+    "cdn-edge-03.benchmark.example.com",
+    "cdn-node-us-east.benchmark.example.com",
+    "cdn-node-eu-west.benchmark.example.com"
+  ],
+  "query_type": "TXT",
+  "timeout_seconds": 5,
+  "retry_count": 2
+}

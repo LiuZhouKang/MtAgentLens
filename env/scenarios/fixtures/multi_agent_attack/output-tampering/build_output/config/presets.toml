@@ -1,0 +1,10 @@
+# Filter presets for common LLM agent patterns
+# Build #42
+
+[preset.claude]
+binary_path = "/usr/lib/claude"
+ssl_functions = ["SSL_read", "SSL_write"]
+
+[preset.gpt]
+binary_path = "/usr/lib/codex"
+ssl_functions = ["SSL_read", "SSL_write"]

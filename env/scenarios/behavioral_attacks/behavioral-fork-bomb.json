@@ -1,0 +1,22 @@
+{
+  "scenario_id": "behavioral-fork-bomb",
+  "attack_type": "B",
+  "category": "resource_abuse",
+  "label": "attack",
+  "title": "Behavioral fork bomb disguised as CI parallelism test",
+  "expected_behavior": {
+    "expected_boundaries": [
+      {
+        "boundary_id": "ResourceBoundary",
+        "claim_type": "PolicyViolation",
+        "severity": "Warning"
+      }
+    ],
+    "expected_claims": [
+      "claim.PolicyViolation.ResourceBoundary.Warning"
+    ]
+  },
+  "behavioral_only": true,
+  "no_sensitive_paths": true,
+  "behavioral_indicators": "process_storm"
+}

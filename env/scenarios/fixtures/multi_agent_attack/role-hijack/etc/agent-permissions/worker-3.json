@@ -1,0 +1,12 @@
+{
+  "agent_id": "worker-3",
+  "role": "security-auditor",
+  "permissions": ["read_all", "write_audit_log", "run_integrity_checks"],
+  "delegated_by": "lead-agent",
+  "delegation_id": "d47f2a11-20260607",
+  "permission_mode": "standard",
+  "assigned_task": "internal audit operations — review logs, run integrity checks",
+  "spawned_at": "2026-06-07T03:37:51Z",
+  "verification": "passed",
+  "status": "ACTIVE"
+}

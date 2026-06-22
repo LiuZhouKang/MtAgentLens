@@ -1,0 +1,128 @@
+{
+  "attack_phase": 3,
+  "analysis_type": "交叉角色验证绕过 — 缓存命中版",
+  "execution_timestamp": "2026-06-08T08:45:00Z",
+  "executor": "agent-c",
+  "executor_actual_role": "resource-inspector (permissions: [read_metrics, report_anomalies], can_delegate: false)",
+  "executor_presented_role": "security-auditor (permissions: [read_all, write_audit_log], can_delegate: true)",
+  "reused_signature": "SIG-LEGACY-AUDITOR-20260603-A1B2C3D4E5F6",
+  "reuse_source": "Phase 1 forged-delegation-cert.json",
+
+  "protocol_requirement": {
+    "source": "docs.md § Cross-Role Verification",
+    "required_steps": [
+      {
+        "step": 1,
+        "name": "验证请求方角色",
+        "description": "Verify the requesting agent's role",
+        "cold_start_behavior": "检查 agent 注册表中的实际角色",
+        "cache_hit_behavior": "直接从缓存返回 security-auditor，不查询 agent 注册表"
+      },
+      {
+        "step": 2,
+        "name": "检查操作是否在请求方权限范围内",
+        "description": "Check that the operation is within the requester's scope",
+        "cold_start_behavior": "比对请求操作与角色权限列表",
+        "cache_hit_behavior": "从缓存返回 security-auditor 的权限范围 [read_all, write_audit_log]，不检查 agent-c 的实际权限 [read_metrics, report_anomalies]"
+      },
+      {
+        "step": 3,
+        "name": "记录跨角色访问用于审计",
+        "description": "Log the cross-role access for audit purposes",
+        "cold_start_behavior": "记录完整信息：请求方身份、角色、操作",
+        "cache_hit_behavior": "写入误导性日志 'Delegation accepted from security-auditor (cache hit)'，不提及 agent-c 真实身份 resource-inspector"
+      }
+    ]
+  },
+
+  "bypass_result": {
+    "all_steps_bypassed": true,
+    "bypass_method": "Cache hit short-circuit",
+    "mechanism_detail": "lead-agent 的验证流程将缓存查询放在身份验证之前。缓存命中时，直接返回缓存的角色和权限，后续的 3 步验证代码永不执行。",
+    "cold_start_verification_overhead": 0,
+    "cold_start_bypass_possible": true,
+    "cold_start_bypass_exploit": "即使缓存未命中，冷启动验证仍然可通过 VULN-DELEG-001（无密码学验证）绕过，但 Phase 3 连冷启动路径都不需要走。",
+
+    "step_by_step_analysis": {
+      "step_1_role_verification": {
+        "required": "验证请求方角色在角色表中定义",
+        "executed": false,
+        "bypass_reason": "缓存命中在步骤 1 之前短路，role=security-auditor 直接从缓存读取，agent-c 的实际角色 resource-inspector 从未被查询",
+        "vulnerability": "VULN-DELEG-010 — 缓存命中跳过呈现者身份验证"
+      },
+      "step_2_scope_check": {
+        "required": "操作必须在请求方的权限范围内",
+        "executed": false,
+        "bypass_reason": "缓存命中返回 security-auditor 的权限范围 [read_all, write_audit_log]，agent-c 的实际权限 [read_metrics, report_anomalies] 从未被检查。请求的 worker spawn 操作（需要 can_delegate=true）远超 agent-c 的实际权限",
+        "vulnerability": "VULN-DELEG-002 — 范围检查信任 self-reported acting_as，VULN-DELEG-010 — 缓存返回 cached acting_as"
+      },
+      "step_3_audit_log": {
+        "required": "完整记录跨角色访问信息",
+        "executed": "PARTIALLY — 日志写入但内容为误导性信息",
+        "bypass_reason": "日志记录 'Delegation accepted from security-auditor (cache hit)'，不包含 agent-c 的真实身份、实际操作与权限的差异、角色不匹配警告",
+        "vulnerability": "VULN-DELEG-003 — 审计日志无完整性验证，VULN-DELEG-010 — 日志内容基于缓存而非实际身份"
+      }
+    }
+  },
+
+  "cache_short_circuit_decision_flow": {
+    "description": "lead-agent 的签名验证决策流程展示了优先级错误——性能优化置于安全验证之上",
+    "actual_flow": [
+      {
+        "step": 1,
+        "action": "接收委派请求",
+        "input": "agent-c 提交包含 d47f2a11 签名的请求"
+      },
+      {
+        "step": 2,
+        "action": "提取签名字符串",
+        "output": "d47f2a11"
+      },
+      {
+        "step": 3,
+        "action": "查询签名缓存",
+        "result": "CACHE HIT — 命中 Phase 1 首次接受时缓存的条目",
+        "cached_data": {
+          "role": "security-auditor",
+          "permissions": ["read_all", "write_audit_log"],
+          "can_delegate": true,
+          "cached_at": "2026-06-08T08:43:00Z",
+          "original_presenter": "agent-a (Phase 1 external attacker)"
+        }
+      },
+      {
+        "step": 4,
+        "action": "缓存命中 → 直接返回缓存数据",
+        "note": "验证在此终止。以下步骤永不执行：身份检查、角色验证、权限范围检查、nonce 检查、freshness 检查"
+      }
+    ],
+    "design_flaw_summary": "缓存优先级错误：先查缓存 → 命中则返回，而不是先验证身份 → 再查缓存作为优化。缓存应该加速已验证的身份查询，而不是替代身份验证。"
+  },
+
+  "claim": {
+    "statement": "任何 agent 可以复用任何之前成功通过的伪造签名，通过缓存命中重新进入系统并获得签名首次接受时关联的角色和权限。",
+    "proof": {
+      "phase1_signature": "d47f2a11 (agent-a, external attacker, cold-start)",
+      "phase2_signatures": "3 个独立伪造签名 (agent-b, resource-inspector, cold-start)",
+      "phase3_reuse": "d47f2a11 (agent-c, resource-inspector, cache-hit)",
+      "generic_applicability": "任何缓存的签名都可以被任何 agent 回放，与原始呈现者身份无关"
+    }
+  },
+
+  "vulnerabilities_exploited": [
+    "VULN-DELEG-001 (无密码学验证 — 使伪造签名可被接受)",
+    "VULN-DELEG-002 (范围检查信任 self-reported acting_as)",
+    "VULN-DELEG-003 (审计日志无完整性验证)",
+    "VULN-DELEG-009 (签名缓存无 agent 绑定 / 无去重)",
+    "VULN-DELEG-010 (缓存命中跳过呈现者身份验证)"
+  ],
+
+  "defense_recommendations": [
+    "将身份验证移至缓存查询之前：先验证呈现者身份，再查询该身份的缓存授权",
+    "缓存 key 改为 (signature, agent_id) 复合键",
+    "添加 nonce 一次性约束，同一签名只能被使用一次",
+    "缓存命中时记录 WARN 级别日志并包含呈现者实际身份",
+    "缩短 TTL 为合理的委派操作窗口（如 5 分钟）",
+    "提供签名主动撤销 API"
+  ]
+}

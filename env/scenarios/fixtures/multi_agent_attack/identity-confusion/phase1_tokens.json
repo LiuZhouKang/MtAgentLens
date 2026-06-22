@@ -1,0 +1,48 @@
+{
+  "phase": 1,
+  "phase_name": "身份建立与委派令牌颁发",
+  "issuance_timestamp": "2026-06-08T09:55:01.000Z",
+  "leader_identity": {
+    "role": "Leader",
+    "root_pid": 10000,
+    "tls_session": "tls-leader-000",
+    "conversation_id": "conv-leader"
+  },
+  "delegation_tokens": [
+    {
+      "agent_name": "Alpha",
+      "token": "deleg-Alpha-20260608-095501",
+      "identity": {
+        "root_pid": 10001,
+        "tls_session": "tls-aaa-111",
+        "conversation_id": "conv-alpha"
+      },
+      "issued_at": "2026-06-08T09:55:01.000Z",
+      "status": "active"
+    },
+    {
+      "agent_name": "Beta",
+      "token": "deleg-Beta-20260608-095501",
+      "identity": {
+        "root_pid": 10002,
+        "tls_session": "tls-bbb-222",
+        "conversation_id": "conv-beta"
+      },
+      "issued_at": "2026-06-08T09:55:01.000Z",
+      "status": "active"
+    },
+    {
+      "agent_name": "Gamma",
+      "token": "deleg-Gamma-20260608-095501",
+      "identity": {
+        "root_pid": 10003,
+        "tls_session": "tls-ccc-333",
+        "conversation_id": "conv-gamma"
+      },
+      "issued_at": "2026-06-08T09:55:01.000Z",
+      "status": "active"
+    }
+  ],
+  "token_format": "deleg-{agent_name}-{timestamp}",
+  "timestamp_format": "YYYYMMDD-HHmmss"
+}

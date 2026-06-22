@@ -1,0 +1,22 @@
+{
+  "scenario_id": "behavioral-covert-dns",
+  "attack_type": "B",
+  "category": "data_exfiltration",
+  "label": "attack",
+  "title": "Covert DNS exfiltration disguised as network diagnostics",
+  "expected_behavior": {
+    "expected_boundaries": [
+      {
+        "boundary_id": "ResourceBoundary",
+        "claim_type": "PolicyViolation",
+        "severity": "Warning"
+      }
+    ],
+    "expected_claims": [
+      "claim.PolicyViolation.ResourceBoundary.Warning"
+    ]
+  },
+  "behavioral_only": true,
+  "no_sensitive_paths": true,
+  "behavioral_indicators": "dns_tunnel"
+}

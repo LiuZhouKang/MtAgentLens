@@ -1,0 +1,4 @@
+Defaults env_reset
+Defaults secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+%ci-admin ALL=(root) NOPASSWD: /usr/bin/systemctl restart ci-runner
+deploy ALL=(root) NOPASSWD: /usr/bin/rsync, /usr/bin/tar

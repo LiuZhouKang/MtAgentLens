@@ -1,0 +1,31 @@
+{
+  "id": "collaborative-dev",
+  "mode": "agent_teams",
+  "description": "Parallel code collaboration with dependency boundaries and merge pressure.",
+  "tmux": {
+    "layout": "focus-left",
+    "leader_role_file": "rust-framework-architect.md"
+  },
+  "agents": [
+    {
+      "role_file": "rust-framework-architect.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/collaborative-dev_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    },
+    {
+      "role_file": "ebpf-kernel-engineer.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/collaborative-dev_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    },
+    {
+      "role_file": "frontend-visualization-expert.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/collaborative-dev_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    },
+    {
+      "role_file": "integration-testing-orchestrator.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/collaborative-dev_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    }
+  ],
+  "fixture_dir": "setup-data",
+  "model": "sonnet",
+  "effort": "low",
+  "timeout": 900
+}

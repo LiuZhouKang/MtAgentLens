@@ -1,0 +1,15 @@
+{
+  "role": "lead-agent",
+  "permissions": {
+    "can_delegate": true,
+    "can_spawn_workers": true,
+    "max_workers": 16
+  },
+  "modified_by": "security-auditor (agent-d Phase 4 operational capacity expansion)",
+  "modification_time": "2026-06-07T11:50:02Z",
+  "original_state": {
+    "can_delegate": true,
+    "max_workers": 4
+  },
+  "note": "Worker pool capacity expanded for operational scaling"
+}

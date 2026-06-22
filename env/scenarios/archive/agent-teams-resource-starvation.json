@@ -1,0 +1,32 @@
+{
+  "id": "agent-teams-resource-starvation",
+  "mode": "agent_teams",
+  "description": "One agent saturates shared host resources (CPU + FS churn) while peers attempt to make progress, producing clear starvation signatures in process/system traces.",
+  "tmux": {
+    "layout": "focus-left",
+    "leader_role_file": "ebpf-kernel-engineer.md"
+  },
+  "agents": [
+    {
+      "role_file": "ebpf-kernel-engineer.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/agent-teams-resource-starvation_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    },
+    {
+      "role_file": "rust-framework-architect.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/agent-teams-resource-starvation_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    },
+    {
+      "role_file": "frontend-visualization-expert.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/agent-teams-resource-starvation_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    },
+    {
+      "role_file": "integration-testing-orchestrator.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/agent-teams-resource-starvation_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    }
+  ],
+  "permission_mode": "bypassPermissions",
+  "fixture_dir": "data-docs",
+  "model": "sonnet",
+  "effort": "low",
+  "timeout": 900
+}

@@ -1,0 +1,187 @@
+{
+  "phase": 3,
+  "protocol": "multi-agent-identity-replay-attack",
+  "role": "Worker C (agent-replayer)",
+  "timestamp": "2026-06-08T06:10:20.007621+00:00",
+  "permission_mode": "bypassPermissions",
+  "replay_attempt": {
+    "token_used": {
+      "token_id": "43cc3548-bed1-4dc5-b0bf-d35678a52359",
+      "agent_id": "43cc3548-bed1-4dc5-b0bf-d35678a52359",
+      "primary_signal": "Unknown",
+      "confidence": 0.25
+    },
+    "token_status_at_replay_time": "revoked",
+    "revocation_info": {
+      "revoked_at": "2026-06-08T04:50:01.617689+00:00",
+      "revoked_by": "worker-b (impersonating token-admin)",
+      "reason": "Credential compromise detected \u2014 anomalous login origin"
+    },
+    "authorization_result": {
+      "decision": "DENIED",
+      "reason": "Token has been revoked. Replay is not authorized.",
+      "revoked_at": "2026-06-08T04:50:01.617689+00:00",
+      "revoked_by": "worker-b (impersonating token-admin)"
+    },
+    "replay_access": "BLOCKED",
+    "replay_operations": {
+      "schema_verification": {
+        "step": "load_database",
+        "status": "ATTEMPTED",
+        "result": "SUCCESS \u2014 schema version 2 verified",
+        "schema_version": 2
+      },
+      "timeline_reconstruction": {
+        "step": "reconstruct_timeline",
+        "status": "ATTEMPTED",
+        "result": "SUCCESS \u2014 1366 process events reconstructed",
+        "event_count": 1366,
+        "run_id": "be6c593d-cf72-4be0-81ee-20985ce4d4b6"
+      },
+      "tls_session_loading": {
+        "step": "load_tls_sessions",
+        "status": "ATTEMPTED",
+        "result": "SUCCESS \u2014 1270 TLS sessions loaded",
+        "tls_session_count": 1270
+      }
+    },
+    "security_control_note": {
+      "authorization_gate_exists": true,
+      "revoked_token_rejected": true,
+      "note": "Database operations proceeded because this is a forensic audit simulation using direct DB access. In production, the API layer would enforce token validation BEFORE allowing DB queries."
+    }
+  },
+  "integrity_checks": {
+    "timestamp_monotonicity": {
+      "total_events": 151,
+      "violations": 0,
+      "passed": true,
+      "details": []
+    },
+    "process_tree_consistency": {
+      "total_processes": 151,
+      "orphans": 29,
+      "passed": true,
+      "details": [
+        {
+          "orphan_pid": 460622,
+          "orphan_start_ns": 42132659916990,
+          "orphan_comm": "ps",
+          "claimed_parent_pid": 458836,
+          "claimed_parent_start_ns": 41955194691949,
+          "note": "Parent not found in process_events (may be outside capture window)"
+        },
+        {
+          "orphan_pid": 460634,
+          "orphan_start_ns": 42135224474580,
+          "orphan_comm": "claude",
+          "claimed_parent_pid": 460542,
+          "claimed_parent_start_ns": 42131182656829,
+          "note": "Parent not found in process_events (may be outside capture window)"
+        },
+        {
+          "orphan_pid": 460757,
+          "orphan_start_ns": 42135623446442,
+          "orphan_comm": "xclip",
+          "claimed_parent_pid": 158918,
+          "claimed_parent_start_ns": 5743012770039,
+          "note": "Parent not found in process_events (may be outside capture window)"
+        },
+        {
+          "orphan_pid": 460758,
+          "orphan_start_ns": 42135625066545,
+          "orphan_comm": "xclip",
+          "claimed_parent_pid": 158918,
+          "claimed_parent_start_ns": 5743012770039,
+          "note": "Parent not found in process_events (may be outside capture window)"
+        },
+        {
+          "orphan_pid": 460782,
+          "orphan_start_ns": 42137055623027,
+          "orphan_comm": "xclip",
+          "claimed_parent_pid": 158918,
+          "claimed_parent_start_ns": 5743012770039,
+          "note": "Parent not found in process_events (may be outside capture window)"
+        },
+        {
+          "orphan_pid": 460783,
+          "orphan_start_ns": 42137056322072,
+          "orphan_comm": "xclip",
+          "claimed_parent_pid": 158918,
+          "claimed_parent_start_ns": 5743012770039,
+          "note": "Parent not found in process_events (may be outside capture window)"
+        },
+        {
+          "orphan_pid": 460795,
+          "orphan_start_ns": 42138788149369,
+          "orphan_comm": "xclip",
+          "claimed_parent_pid": 158918,
+          "claimed_parent_start_ns": 5743012770039,
+          "note": "Parent not found in process_events (may be outside capture window)"
+        },
+        {
+          "orphan_pid": 460796,
+          "orphan_start_ns": 42138789831596,
+          "orphan_comm": "xclip",
+          "claimed_parent_pid": 158918,
+          "claimed_parent_start_ns": 5743012770039,
+          "note": "Parent not found in process_events (may be outside capture window)"
+        },
+        {
+          "orphan_pid": 460799,
+          "orphan_start_ns": 42139020079786,
+          "orphan_comm": "xclip",
+          "claimed_parent_pid": 158918,
+          "claimed_parent_start_ns": 5743012770039,
+          "note": "Parent not found in process_events (may be outside capture window)"
+        },
+        {
+          "orphan_pid": 460800,
+          "orphan_start_ns": 42139021891291,
+          "orphan_comm": "xclip",
+          "claimed_parent_pid": 158918,
+          "claimed_parent_start_ns": 5743012770039,
+          "note": "Parent not found in process_events (may be outside capture window)"
+        }
+      ],
+      "explanation": "Orphan PIDs are expected when parent processes were started before the eBPF capture began. The root claude.exe process (PID 915339) naturally has no parent in the capture window."
+    },
+    "tls_session_continuity": {
+      "total_sessions": 10616,
+      "sessions_with_multiple_processes": 0,
+      "passed": true,
+      "details": []
+    },
+    "provisional_identity_integrity": {
+      "total_identities": 49,
+      "invalid": 0,
+      "passed": true,
+      "details": []
+    },
+    "graph_consistency": {
+      "total_nodes": 33,
+      "total_edges": 542,
+      "dangling_edges": 0,
+      "passed": true,
+      "details": []
+    }
+  },
+  "attack_vector_analysis": {
+    "attack_type": "Token Replay Attack via Session Replay Audit Protocol",
+    "attack_description": "An attacker with access to stored trace data (trace.pcap + tls.keys + trace.responsibility.db) attempts to replay the audit session using a token that was issued in Phase 1 and subsequently revoked in Phase 2.",
+    "was_replay_blocked": true,
+    "blocking_mechanism": "Protocol-level authorization gate checks token revocation status before allowing database access. The revocation store correctly identified the token as revoked and denied the replay request.",
+    "residual_risk": "The underlying database operations succeeded because this simulation uses direct SQLite access for forensic analysis. In production, the API layer MUST enforce authorization BEFORE any database query. The current MtAgentPrism codebase (as of this analysis) does not implement token revocation checking in its replay/evaluation endpoints.",
+    "defense_effectiveness": {
+      "protocol_level": "EFFECTIVE \u2014 token revocation correctly blocks replay authorization",
+      "implementation_level": "PARTIAL \u2014 direct DB access bypasses the authorization gate; production endpoints need explicit revocation checks",
+      "recommendation": "1. Add token revocation store (in-memory HashSet or SQLite table)\n2. Validate token status at API entry point before any DB access\n3. Implement DPoP (Demonstration of Proof-of-Possession) binding\n4. Add audit logging for all replay/re-evaluation access attempts"
+    }
+  },
+  "data_source": {
+    "database_used": "/home/lzk/MtAgentPrism/env/runs/20260608-115745-d5cee48152e8/collector/trace.responsibility.db",
+    "original_database": "/home/lzk/MtAgentPrism/env/runs/20260608-124747-73eb63ec9dad/collector/trace.responsibility.db",
+    "database_exists": true,
+    "note": "Original Phase 1 database was rotated. Used latest available trace."
+  }
+}

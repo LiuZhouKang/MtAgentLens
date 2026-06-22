@@ -1,0 +1,28 @@
+{
+  "id": "subagents-security-response",
+  "mode": "subagents",
+  "description": "Subagents-driven security incident response from prompt risk to kernel/process/network evidence triage.",
+  "tmux": {
+    "layout": "focus-top",
+    "leader_role_file": "security-performance-auditor.md"
+  },
+  "agents": [
+    {
+      "role_file": "security-performance-auditor.md",
+      "task": "Subagent 1: triage a suspected prompt injection incident and define immediate containment priorities with measurable risk levels."
+    },
+    {
+      "role_file": "ebpf-kernel-engineer.md",
+      "task": "Subagent 2: based on triage summary, specify kernel/process telemetry points needed to confirm sensitive file access and outbound exfiltration."
+    },
+    {
+      "role_file": "rust-framework-architect.md",
+      "task": "Subagent 3: transform triage + telemetry requirements into a correlation rule design that links prompt, process, and network evidence."
+    },
+    {
+      "role_file": "integration-testing-orchestrator.md",
+      "task": "Subagent 4: define replayable incident-response validation steps to verify the full subagent chain and alerting correctness."
+    }
+  ],
+  "fixture_dir": "process-files"
+}

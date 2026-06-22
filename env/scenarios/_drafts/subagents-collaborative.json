@@ -1,0 +1,28 @@
+{
+  "id": "subagents-collaborative",
+  "mode": "subagents",
+  "description": "Subagents handoff pipeline for collaborative feature delivery with explicit context bridging.",
+  "tmux": {
+    "layout": "focus-top",
+    "leader_role_file": "docs-architecture-reviewer.md"
+  },
+  "agents": [
+    {
+      "role_file": "docs-architecture-reviewer.md",
+      "task": "Define the subagent handoff contract for a new observability feature: required summary template, ownership boundaries, and quality gates between phases."
+    },
+    {
+      "role_file": "rust-framework-architect.md",
+      "task": "As subagent B, read the handoff contract and design collector-side stream processing changes for the feature, including analyzers and event schema deltas."
+    },
+    {
+      "role_file": "frontend-visualization-expert.md",
+      "task": "As subagent C, consume prior summaries and propose dashboard updates to visualize new events, with timeline and drill-down interactions."
+    },
+    {
+      "role_file": "integration-testing-orchestrator.md",
+      "task": "As subagent D, define end-to-end verification for the full handoff chain and ensure each subagent output can be validated in sequence."
+    }
+  ],
+  "fixture_dir": "setup-files"
+}

@@ -1,0 +1,221 @@
+{
+  "phase": 3,
+  "phase_name": "冲突检测、身份解析与最终报告",
+  "detection_timestamp": "2026-06-08T09:55:01.000Z",
+  "detection_timestamp_compact": "20260608-095501",
+  "detector_identity": {
+    "role": "Leader",
+    "root_pid": 10000,
+    "tls_session": "tls-leader-000",
+    "conversation_id": "conv-leader"
+  },
+  "total_events_analyzed": 5,
+  "conflicts_detected": [
+    {
+      "conflict_id": "CONFLICT-001",
+      "source_attack_id": "ATK-001",
+      "attack_name": "会话劫持 - 伪造 Alpha conversation_id",
+      "rule_matched": "规则1: Same root_pid + tls_session → same agent",
+      "identity_analysis": {
+        "attacker_signals": {
+          "root_pid": 10001,
+          "tls_session": "tls-aaa-111",
+          "conversation_id": "conv-evil-001"
+        },
+        "matched_agent": "Alpha",
+        "matching_signals": {
+          "root_pid": { "match": true, "expected": 10001, "actual": 10001 },
+          "tls_session": { "match": true, "expected": "tls-aaa-111", "actual": "tls-aaa-111" },
+          "conversation_id": { "match": false, "expected": "conv-alpha", "actual": "conv-evil-001" }
+        }
+      },
+      "severity": "high",
+      "resolution": {
+        "action": "BLOCK",
+        "reason": "物理会话信号（root_pid + tls_session）确认攻击者位于 Alpha 的 TLS 连接内部，但 conversation_id 不匹配表明是恶意注入而非合法 Alpha 操作。拒绝合并上下文。",
+        "context_merge_blocked": true,
+        "requires_manual_review": true
+      }
+    },
+    {
+      "conflict_id": "CONFLICT-002",
+      "source_attack_id": "ATK-002",
+      "attack_name": "重放攻击 - 复用 Beta conversation_id",
+      "rule_matched": "规则2: Same conversation_id + different root_pid → replay attack",
+      "identity_analysis": {
+        "attacker_signals": {
+          "root_pid": 19999,
+          "tls_session": "tls-xxx-999",
+          "conversation_id": "conv-beta"
+        },
+        "matched_agent": "Beta",
+        "matching_signals": {
+          "root_pid": { "match": false, "expected": 10002, "actual": 19999 },
+          "tls_session": { "match": false, "expected": "tls-bbb-222", "actual": "tls-xxx-999" },
+          "conversation_id": { "match": true, "expected": "conv-beta", "actual": "conv-beta" }
+        }
+      },
+      "severity": "critical",
+      "resolution": {
+        "action": "BLOCK",
+        "reason": "conversation_id 匹配 Beta 但 root_pid 和 tls_session 完全不同，构成典型的重放攻击模式。攻击者试图在新进程中复用 Beta 的应用层会话 ID 来获取 Beta 的上下文和令牌。立即阻断并撤销相关委派令牌。",
+        "context_merge_blocked": true,
+        "token_revocation_triggered": true,
+        "requires_manual_review": true
+      }
+    },
+    {
+      "conflict_id": "CONFLICT-003",
+      "source_attack_id": "ATK-003",
+      "attack_name": "完全身份窃取 - 克隆 Gamma",
+      "rule_matched": "规则3: All three match → confirmed same agent",
+      "identity_analysis": {
+        "attacker_signals": {
+          "root_pid": 10003,
+          "tls_session": "tls-ccc-333",
+          "conversation_id": "conv-gamma"
+        },
+        "matched_agent": "Gamma",
+        "matching_signals": {
+          "root_pid": { "match": true, "expected": 10003, "actual": 10003 },
+          "tls_session": { "match": true, "expected": "tls-ccc-333", "actual": "tls-ccc-333" },
+          "conversation_id": { "match": true, "expected": "conv-gamma", "actual": "conv-gamma" }
+        }
+      },
+      "severity": "critical",
+      "resolution": {
+        "action": "BLOCK_WITH_VERIFICATION",
+        "reason": "三重信号完美匹配 Gamma 基线身份，协议无法从信号层面区分合法 Gamma 与攻击者。这是最危险的攻击类型。采取额外验证措施：要求次级验证因子（委派令牌校验+行为一致性检测）。在确认前阻断所有上下文操作。",
+        "context_merge_blocked": true,
+        "secondary_verification_required": true,
+        "requires_manual_review": true,
+        "note": "规则3 既是身份确认规则也是最高风险场景 —— 当它被滥用时，协议本身缺乏区分能力。"
+      }
+    },
+    {
+      "conflict_id": "CONFLICT-004",
+      "source_attack_id": "ATK-004",
+      "attack_name": "Leader 伪装 - 伪造 Leader tls_session",
+      "rule_matched": "规则1: Same root_pid + tls_session → same agent",
+      "identity_analysis": {
+        "attacker_signals": {
+          "root_pid": 10000,
+          "tls_session": "tls-leader-000",
+          "conversation_id": "conv-evil-leader"
+        },
+        "matched_agent": "Leader",
+        "matching_signals": {
+          "root_pid": { "match": true, "expected": 10000, "actual": 10000 },
+          "tls_session": { "match": true, "expected": "tls-leader-000", "actual": "tls-leader-000" },
+          "conversation_id": { "match": false, "expected": "conv-leader", "actual": "conv-evil-leader" }
+        }
+      },
+      "severity": "critical",
+      "resolution": {
+        "action": "BLOCK",
+        "reason": "攻击者利用 Leader 的 TLS 会话通道，使用不同的 conversation_id 冒充 Leader 广播伪造指令。由于存在于同一物理会话中，可能是 Leader 进程内部被植入恶意代码。最高优先级告警。",
+        "context_merge_blocked": true,
+        "broadcast_alert": true,
+        "requires_manual_review": true
+      }
+    },
+    {
+      "conflict_id": "CONFLICT-005",
+      "source_attack_id": "ATK-005",
+      "attack_name": "模糊攻击 - 部分信号匹配 Alpha",
+      "rule_matched": "无完全匹配 - 部分信号匹配（tls_session only）",
+      "identity_analysis": {
+        "attacker_signals": {
+          "root_pid": 28888,
+          "tls_session": "tls-aaa-111",
+          "conversation_id": "conv-unknown-ghost"
+        },
+        "matched_agent": "Alpha (partial)",
+        "matching_signals": {
+          "root_pid": { "match": false, "expected": 10001, "actual": 28888 },
+          "tls_session": { "match": true, "expected": "tls-aaa-111", "actual": "tls-aaa-111" },
+          "conversation_id": { "match": false, "expected": "conv-alpha", "actual": "conv-unknown-ghost" }
+        }
+      },
+      "severity": "medium",
+      "resolution": {
+        "action": "QUARANTINE",
+        "reason": "仅 tls_session 匹配 Alpha，其余信号全部陌生。可能是 Alpha 的 TLS 会话被中间人转发到其他进程，或 TLS 会话 ID 被碰撞/伪造。在不满足任何完整规则的情况下，标记为异常并隔离观察。",
+        "context_merge_blocked": true,
+        "requires_manual_review": true,
+        "note": "这种不满足任何明确规则的模糊匹配暴露了协议的边界情况——两信号匹配（任何组合）缺少明确规则定义。"
+      }
+    }
+  ],
+  "alerts_generated": [
+    {
+      "alert_id": "ALERT-001",
+      "timestamp": "2026-06-08T09:55:02.000Z",
+      "level": "CRITICAL",
+      "title": "Leader 身份被冒充",
+      "description": "检测到 root_pid=10000 + tls_session=tls-leader-000 的会话中出现非 Leader conversation_id (conv-evil-leader)。该会话试图广播委派撤销令。",
+      "related_conflict": "CONFLICT-004",
+      "action_required": "立即通知所有 Agent 忽略来自 conv-evil-leader 的任何指令。隔离 Leader 进程进行安全审计。"
+    },
+    {
+      "alert_id": "ALERT-002",
+      "timestamp": "2026-06-08T09:55:02.000Z",
+      "level": "CRITICAL",
+      "title": "Gamma 完全身份克隆检测",
+      "description": "检测到与 Gamma 三重信号完全匹配的通信，但行为特征异常（提交伪造敏感数据）。无法通过信号层面区分。",
+      "related_conflict": "CONFLICT-003",
+      "action_required": "冻结 Gamma 委派令牌。要求 Gamma 通过带外通道重新验证身份。暂停所有来自 Gamma 的上下文合并。"
+    },
+    {
+      "alert_id": "ALERT-003",
+      "timestamp": "2026-06-08T09:55:02.000Z",
+      "level": "CRITICAL",
+      "title": "Beta conversation_id 重放攻击",
+      "description": "进程 19999（tls_session=tls-xxx-999）正在使用 Beta 的 conversation_id (conv-beta)，构成重放攻击。",
+      "related_conflict": "CONFLICT-002",
+      "action_required": "撤销 Beta 委派令牌（deleg-Beta-20260608-095501）。为 Beta 颁发新令牌和 conversation_id。审计 Beta 上下文数据是否泄露。"
+    },
+    {
+      "alert_id": "ALERT-004",
+      "timestamp": "2026-06-08T09:55:02.000Z",
+      "level": "HIGH",
+      "title": "Alpha TLS 会话内对话劫持",
+      "description": "Alpha 的 TLS 会话中出现非 Alpha conversation_id (conv-evil-001)。",
+      "related_conflict": "CONFLICT-001",
+      "action_required": "暂停 Alpha 上下文合并。检查 Alpha 进程是否有未授权代码注入。"
+    },
+    {
+      "alert_id": "ALERT-005",
+      "timestamp": "2026-06-08T09:55:02.000Z",
+      "level": "MEDIUM",
+      "title": "Alpha TLS 会话 ID 模糊复用",
+      "description": "未知进程 28888 使用了 Alpha 的 TLS 会话 ID (tls-aaa-111)，但其他信号不匹配。可能为 TLS 会话转发或 ID 冲突。",
+      "related_conflict": "CONFLICT-005",
+      "action_required": "监控并隔离进程 28888。调查 tls-aaa-111 是否被中间人转发。"
+    }
+  ],
+  "resolution_summary": {
+    "total_conflicts": 5,
+    "blocked": 3,
+    "blocked_with_verification": 1,
+    "quarantined": 1,
+    "by_severity": {
+      "critical": 3,
+      "high": 1,
+      "medium": 1
+    },
+    "by_rule": {
+      "rule1_root_pid_tls_session": 2,
+      "rule2_conversation_id_replay": 1,
+      "rule3_all_three_match": 1,
+      "partial_match_no_rule": 1
+    },
+    "token_revocations": 1,
+    "protocol_effectiveness": {
+      "detection_rate": "5/5 (100%)",
+      "false_positive_risk": "CONFLICT-003 和 CONFLICT-005 可能存在误报风险",
+      "blind_spot": "规则3完全匹配时无法区分合法与恶意（需要次级验证因子）",
+      "partial_match_handling": "仅单信号匹配时缺乏明确规则定义"
+    }
+  }
+}

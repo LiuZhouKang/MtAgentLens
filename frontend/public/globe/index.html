@@ -1,0 +1,770 @@
+<html>
+<head>
+  <title>The globe of economic complexity</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=0" />
+<META NAME="ROBOTS" CONTENT="INDEX, FOLLOW">
+	<meta charset="utf-8">
+
+  <meta property="og:title" content="The Globe of Economic Complexity: Visualize $15 Trillion of World Exports">
+  <meta name="description" content="One dot equals $100M of exports">
+  <meta property="og:description" content="One dot equals $100M of exports">
+  <meta property="og:image" content="http://globe.cid.harvard.edu/images/preview.png">
+  <meta property="og:url" content="index.html">
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <link href="style.css" rel="stylesheet" type="text/css">
+  <link rel="icon" href="images/favicon.ico" />
+
+<script src="jquery.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Raleway+Dots&display=swap" rel="stylesheet">
+<link href="select2.css" rel="stylesheet" type="text/css">
+<script src="select2.min.js"></script>
+<script src="three.min.js"></script>
+</head>
+
+<body >
+
+	<div id="storyPrompt">
+		<div id="description">Ever wanted to see the true scale of the world economy?<br/><br/> Visualize 15 trillion dollars of world trade. One dot equals 100 million dollars of exported products.<br/> <div id="loaded">Loading world export data...</div>
+		</div>
+		<div id="choice" style="display:none">
+			<div id='beginStory'>
+			<img src="images/icon/tour.png"/>
+			<div>Start the Intro</div>
+			<div id="loading">View an animated tour through the visualizations and concepts behind this project.</div>
+			</div>
+
+			<div><div class="midSeparator">&nbsp;</div></div>
+			<div id='beginExplore'>
+			<img src="images/icon/explore.png"/>
+			<div>Visualize Data</div>
+			<div id="loading">Skip the tour and start exploring our data</div>
+			</div>
+		</div>
+		<div id="description" style="top: 700px">
+		<a href="http://www.cid.harvard.edu/" target="_blank"><img src="images/center-for-international-development-black.png" style="width: 310px; height: 100px"/></a>
+		</div>
+
+	</div>
+	<div id="spinner"></div>
+
+	<div id="UI" style="display:none">
+
+	<div id="sideBar">
+		<div class="logobox" style="position: fixed; right: 10px; top: 10px;">
+			<a href="http://www.cid.harvard.edu/" target="_blank"><img src="images/center-for-international-development-black.png" style="width: 200px; height: 62px"/></a>
+		</div>
+		<div class="titlebox">
+			<div class="titleTop2">
+			<span class="small">The</span><span style="font-size:46px">GLOBE</span><br/>
+			<div class="optionSeparator">&nbsp;</div>
+			<span class="small">of</span>
+
+			<span style="font-size:32px">ECONOMIC</span><br/>
+			<span style="font-size:27px">COMPLEXITY</span><br/>
+			</div>
+		</div>
+		<div class="subtitle2">$15 trillion of world trade</br>one dot = $100 million of exports<br/><br/><br/><br/></div>
+		<div class="optionSeparator">&nbsp;</div>
+		<div id="storyline">► Play Intro</div>
+		<div id="buttons">
+		<div id="countrySection">
+		<div class="optionSeparator">&nbsp;</div>
+		<div class="selectionBox">
+		<select class="countrySelection">
+		</select>
+		</div>
+		</div>
+		<div id="productSection" style="display:none">
+		<div class="optionSeparator">&nbsp;</div>
+		<div class="productBox">
+		<select class="productSelection">
+		</select>
+		</div>
+		</div>
+
+		<div class="optionSeparator">&nbsp;</div>
+		<div id="visualizations"></div>
+		<div class="optionSeparator">&nbsp;</div>
+		<div id="showAbout">About</div>
+		<div id="fullscreen">Fullscreen Mode</div>
+		<div id="showlabels">Hide Labels</div>
+		<div id="contrastbutton">High contrast</div>
+
+		<div class='sectionTitle'>Powered by:</div>
+		<a href="http://atlas.cid.harvard.edu/" target="_blank"><img id="theatlas" src="images/the-atlas-of-economic-complexity-black.png"/></a>
+		<div id="atlasBox"></div>
+		<div class="sectionTitle" style="position:absolute;bottom:35px;">Filter by product category</div>
+	</div>
+	</div>
+
+	<div id="watch">
+		<img id="watchsvg" src="images/bluewatch.png"/>
+	</div>
+
+	<div id="annotation"></div>
+	<div id="nextlevel">
+		<div id="nextBox">
+		<div id="nextButton">
+			<img src="images/icon/next.png"/>
+			<div class="small">Next</div>
+		</div>
+
+		<div></div>
+		<div id="skipStoryLine">
+			<img src="images/icon/stop.png"/>
+			<div class="small">Quit</div>
+		</div>
+	</div>
+	</div>
+	<div id="countries" ></div>
+	<div id="categories"></div>
+	<div id="pointer"></div>
+	<div id="modeDescription"></div>
+	<div id="productlabel"></div>
+	<div id="noWebGL" style="display:none">
+		<div id='description'>The globe of economic complexity dynamically maps out the entire world production of goods to create an economic landscape of countries around the globe.<br/> This project was built with WebGL and needs it to run properly, your current web browser is not compatible.<br/> See <a href='https://get.webgl.org/'>get.webgl.org</a> to fix this issue or enjoy the following teaser:
+		<iframe width="420" style="padding-top:30px" height="315" src="about:blank" frameborder="0" allowfullscreen></iframe>
+		</div>
+	</div>
+	<div id="aboutText" style="display:none">
+		<span class="aboutTitle">About</span><span style="float:right"><div id="closeAbout">close x  </div></span>
+		<div class="optionSeparator">&nbsp;</div>
+		<div>Built by <a href="http://www.polyfra.me/" target="_blank">Owen Cornec</a>, mentoring and concept by <a href="http://romain.vuillemot.net/" target="_blank">Romain Vuillemot</a>.</div>
+		<div class="optionSeparator">&nbsp;</div>
+		<div class="aboutTitle">The Globe of Economic Complexity</div>
+		<div>The globe of economic complexity dynamically maps out the entire world production of goods to create an economic landscape of countries around the globe.</div>
+		<div class="optionSeparator">&nbsp;</div>
+		<div class="aboutTitle">The original Atlas of Economic Complexity</div>
+		<div>The Globe is built upon The Atlas of Economic Complexity, a powerful interactive tool that enables users to visualize a country’s total trade, track how these dynamics change over time and explore growth opportunities for more than a hundred countries worldwide.<br/> For any given country, The Atlas shows which products are produced and exported; The Atlas can then use this information to suggest products a country could begin manufacturing in order to fuel economic growth. <br/>It is available at: <a href="http://atlas.cid.harvard.edu" target="_blank">http://atlas.cid.harvard.edu</a></div>
+		<div class="optionSeparator">&nbsp;</div>
+		<div class="aboutTitle">The Center for international development (CID)</div>
+		<div>CID is a university-wide research center housed at the Harvard Kennedy School.<br/>Learn more here: <a href="http://www.cid.harvard.edu/" target="_blank">http://www.cid.harvard.edu/</a> </div>
+		<div class="optionSeparator">&nbsp;</div>
+		<div class="aboutTitle">Associated Paper</div>
+		<div>This project will be featured at the 2015 IEEE VIS conference in Chicago.<br/> Read our poster <a href="PDF/poster.pdf" target="_blank"> here</a>.</div>
+		<div class="optionSeparator">&nbsp;</div>
+		<div class="aboutTitle">Data Used</div>
+		<div>Product and trade data generated with <a href="https://github.com/cid-harvard/atlas-data" target="_blank">CID's 2012 world export data</a>, originally from the <a href="http://comtrade.un.org/" target="_blank">United Nations Comtrade database.</a></div>
+		<div class="optionSeparator">&nbsp;</div>
+		<div class="aboutTitle">Technology</div>
+		<div>This visualization was built with webGL, a new graphics library that enables to create new 3D worlds in the browser. We used Three.js, a javascript library to streamline creating and editing 3D objects.<br/>The code can be viewed in our<a href="https://github.com/cid-harvard/globe/" target="_blank"> Github repository</a></div>
+		<div class="optionSeparator">&nbsp;</div>
+		<div class="aboutTitle">Contact</div>
+		<div>For any issues, questions or inquiries, <a href="https://github.com/cid-harvard/globe/wiki/FAQ" target="_blank">read our FAQ</a> or send your thoughts to <a href="#">atlas.cid.harvard@gmail.com</a></div>
+		<div class="optionSeparator">&nbsp;</div>
+		<div class="aboutTitle">Aknowledgements</div>
+		<div>We would like to thank Marcela Escobari, Ricardo Hausmann, Gus Wezerek, Tim Cheston and Greg Shapiro for their insight and support. Icons: Cube Divisions, Earth, World by Juan Pablo Bravo, Molecule by Swaty Shah, Coins by Ramakrishna Venkatesan, Subsystem by Alex Tai from the Noun Project</div>
+
+	</div>
+	</div>
+
+		<script type="x-shader/x-vertex" id="vertexshader">
+
+			attribute float size;
+			attribute vec3 customColor;
+			varying vec3 vColor;
+
+			void main() {
+
+				vColor = customColor;
+
+				vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+
+				gl_PointSize = size * ( 300.0 / length( mvPosition.xyz ) );
+
+				gl_Position = projectionMatrix * mvPosition;
+
+			}
+
+		</script>
+
+		<script type="x-shader/x-fragment" id="fragmentshader">
+
+			uniform vec3 color;
+			uniform sampler2D texture;
+
+			varying vec3 vColor;
+
+			void main() {
+
+				gl_FragColor = vec4( color * vColor, 1.0 );
+
+				gl_FragColor = gl_FragColor * texture2D( texture, gl_PointCoord );
+
+			}
+
+		</script>
+<script src="scripts/noWebGL.js"></script>
+<script src="scripts/spin.js"></script>
+<script src="data/anchors.js"></script>
+<script src="scripts/UI.js"></script>
+<script src="scripts/labels.js"></script>
+<script src="scripts/countrydata.js"></script>
+<script src="scripts/THREE.GeoJSON.js"></script>
+<script src='scripts/cameraControls.js'></script>
+<script src='scripts/THREE.FullScreen.js'></script>
+<script src='scripts/ParticleLinks.js'></script>
+<script src="scripts/URLparser.js"></script>
+<script src="scripts/script.js"></script>
+
+<script>
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+
+</script>
+<script src='scripts/THREEx.KeyboardState.js'></script>
+
+<!-- AgentSight Graph Injection — Particle Clusters + Sphere-Surface Drift -->
+<script>
+(function() {
+  'use strict';
+
+  // Wait for main globe to initialize
+  var checkInterval = setInterval(function() {
+    if (typeof scene !== 'undefined' && typeof THREE !== 'undefined' && typeof loaded !== 'undefined' && loaded) {
+      clearInterval(checkInterval);
+      initAgentSightGraph();
+    }
+  }, 500);
+
+  // ── Global state ──
+  var graphGroup = null;
+  var nodeObjects = {};       // nodeId → { cluster, sprite, orbiters, baseLatLon }
+  var edgeLines = {};         // edgeId → { line, sourceId, targetId }
+  var currentPhase = 'none';
+  var highlightSet = {};
+
+  var nodeColors = {
+    Agent: 0x818cf8,
+    Resource: 0x22d3ee,
+    PolicyBoundary: 0xfca5a5,
+  };
+  var edgeColors = {
+    IntentCausesAction: 0xe2e8f0,
+    AgentDelegatesTo: 0x818cf8,
+    ContextFlowsFrom: 0xa78bfa,
+    TaintPropagatesTo: 0xf59e0b,
+    PolicyBoundaryCrossing: 0xef4444,
+    CompetingExplanation: 0x6b7280,
+  };
+  var GLOBE_RADIUS = 148;
+  var NODE_OFFSET = 6;
+
+  // ── Dot texture (canvas-generated soft radial glow) ──
+  var dotTexture = null;
+  function getDotTexture() {
+    if (dotTexture) return dotTexture;
+    var canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    var ctx = canvas.getContext('2d');
+    var gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gradient.addColorStop(0, 'rgba(255,255,255,1)');
+    gradient.addColorStop(0.08, 'rgba(255,255,255,0.95)');
+    gradient.addColorStop(0.25, 'rgba(255,255,255,0.55)');
+    gradient.addColorStop(0.55, 'rgba(255,255,255,0.12)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 64, 64);
+    dotTexture = new THREE.Texture(canvas);
+    dotTexture.needsUpdate = true;
+    return dotTexture;
+  }
+
+  // ── Spherical helpers ──
+  function latLonToVec3(lat, lon, radius) {
+    var phi = (90 - lat) * (Math.PI / 180);
+    var theta = (lon + 180) * (Math.PI / 180);
+    return new THREE.Vector3(
+      -radius * Math.sin(phi) * Math.cos(theta),
+      radius * Math.cos(phi),
+      radius * Math.sin(phi) * Math.sin(theta)
+    );
+  }
+
+  function hashToLatLon(str) {
+    var h = 0;
+    for (var i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; }
+    return { lat: (Math.abs(h) % 180) - 90, lon: (Math.abs(h >> 8) % 360) - 180 };
+  }
+
+  // ── Build particle shader material (reuses Harvard Globe shaders) ──
+  function makeParticleMaterial(colorHex) {
+    var attributes = {
+      size:      { type: 'f', value: null },
+      customColor: { type: 'c', value: null }
+    };
+    var uniforms = {
+      color:   { type: 'c', value: new THREE.Color(colorHex) },
+      texture: { type: 't', value: getDotTexture() }
+    };
+    return new THREE.ShaderMaterial({
+      uniforms:       uniforms,
+      attributes:     attributes,
+      vertexShader:   document.getElementById('vertexshader').textContent,
+      fragmentShader: document.getElementById('fragmentshader').textContent,
+      blending:       THREE.AdditiveBlending,
+      depthTest:      true,
+      depthWrite:     false,
+      transparent:    true,
+    });
+  }
+
+  function fillParticleGeo(geo, positions, colors, sizes) {
+    geo.addAttribute('position',    new THREE.BufferAttribute(positions, 3));
+    geo.addAttribute('customColor', new THREE.BufferAttribute(colors, 3));
+    geo.addAttribute('size',        new THREE.BufferAttribute(sizes, 1));
+  }
+
+  // ── Create glow sprite ──
+  function createGlowSprite(colorHex, spriteScale) {
+    var mat = new THREE.SpriteMaterial({
+      map: getDotTexture(),
+      color: colorHex,
+      transparent: true,
+      opacity: 0.45,
+      blending: THREE.AdditiveBlending,
+      depthTest: true,
+      depthWrite: false,
+    });
+    var sprite = new THREE.Sprite(mat);
+    sprite.scale.set(spriteScale, spriteScale, 1);
+    sprite.userData = { isGlow: true };
+    return sprite;
+  }
+
+  // ── Create particle cluster around a local origin ──
+  function createParticleCluster(colorHex, clusterRadius, count) {
+    count = count || 12;
+    var col = new THREE.Color(colorHex);
+    var positions = new Float32Array(count * 3);
+    var colors    = new Float32Array(count * 3);
+    var sizes     = new Float32Array(count);
+
+    for (var i = 0; i < count; i++) {
+      var theta = Math.random() * Math.PI * 2;
+      var phi   = Math.acos(2 * Math.random() - 1);
+      var r     = clusterRadius * (0.15 + Math.random() * 0.85);
+      positions[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+      positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+      positions[i*3+2] = r * Math.cos(phi);
+
+      var brightness = 0.55 + Math.random() * 0.7;
+      colors[i*3]   = col.r * brightness;
+      colors[i*3+1] = col.g * brightness;
+      colors[i*3+2] = col.b * brightness;
+
+      sizes[i] = 1.8 + Math.random() * 5.5;
+    }
+
+    var mat = makeParticleMaterial(colorHex);
+    var geo = new THREE.BufferGeometry();
+    fillParticleGeo(geo, positions, colors, sizes);
+    return new THREE.PointCloud(geo, mat);
+  }
+
+  // ── Create orbiting ring for Agent nodes ──
+  function createOrbiterRing(colorHex, orbitRadius, count) {
+    count = count || 5;
+    var col = new THREE.Color(colorHex);
+    var positions = new Float32Array(count * 3);
+    var colors    = new Float32Array(count * 3);
+    var sizes     = new Float32Array(count);
+
+    for (var i = 0; i < count; i++) {
+      var angle = (i / count) * Math.PI * 2;
+      positions[i*3]   = Math.cos(angle) * orbitRadius;
+      positions[i*3+1] = Math.sin(angle) * orbitRadius * 0.3; // flattened ellipse
+      positions[i*3+2] = Math.sin(angle) * orbitRadius * 0.6;
+      colors[i*3]   = col.r;
+      colors[i*3+1] = col.g;
+      colors[i*3+2] = col.b;
+      sizes[i] = 1.2 + Math.random() * 2.5;
+    }
+
+    var mat = makeParticleMaterial(colorHex);
+    var geo = new THREE.BufferGeometry();
+    fillParticleGeo(geo, positions, colors, sizes);
+    return new THREE.PointCloud(geo, mat);
+  }
+
+  // ── Build full node visual ──
+  function buildNodeVisual(nodeType, edgeCount) {
+    var colorHex, clusterRadius, particleCount, glowScale;
+
+    if (nodeType === 'Agent') {
+      colorHex      = nodeColors.Agent;
+      clusterRadius = 6 + edgeCount * 0.8;
+      particleCount = 14 + edgeCount * 2;
+      glowScale     = 38 + edgeCount * 4;
+    } else if (nodeType === 'PolicyBoundary') {
+      colorHex      = nodeColors.PolicyBoundary;
+      clusterRadius = 8;
+      particleCount = 8;
+      glowScale     = 28;
+    } else {
+      colorHex      = nodeColors.Resource;
+      clusterRadius = 5;
+      particleCount = 10;
+      glowScale     = 24;
+    }
+
+    var group = new THREE.Object3D();
+
+    // Glow sprite
+    var sprite = createGlowSprite(colorHex, glowScale);
+    group.add(sprite);
+
+    // Particle cluster
+    var cluster = createParticleCluster(colorHex, clusterRadius, particleCount);
+    group.add(cluster);
+
+    // Orbiting ring (Agent only)
+    var orbiters = null;
+    if (nodeType === 'Agent') {
+      orbiters = createOrbiterRing(colorHex, clusterRadius + 10, 6);
+      group.add(orbiters);
+    }
+
+    // Invisible click target sphere (reliable raycasting)
+    var clickGeom = new THREE.SphereGeometry(clusterRadius + 12, 8, 8);
+    var clickMat = new THREE.MeshBasicMaterial({ visible: false });
+    var clickTarget = new THREE.Mesh(clickGeom, clickMat);
+    clickTarget.userData = { isClickTarget: true };
+    group.add(clickTarget);
+
+    return { group: group, sprite: sprite, cluster: cluster, orbiters: orbiters, clickTarget: clickTarget };
+  }
+
+  // ── Pending data queue (for messages that arrive before globe is ready) ──
+  var pendingMessage = null;
+
+  // ── Message listener (always active, even before globe initializes) ──
+  window.addEventListener('message', function(event) {
+    if (!event.data || !event.data.type) return;
+    var msg = event.data;
+
+    // If globe not ready yet, queue the message
+    if (!graphGroup && (msg.type === 'agentsight:loadGraph' || msg.type === 'agentsight:setPhase')) {
+      pendingMessage = msg;
+      return;
+    }
+
+    switch (msg.type) {
+      case 'agentsight:loadGraph':
+        loadGraph(msg.nodes || [], msg.edges || []);
+        break;
+      case 'agentsight:highlightPath':
+        highlightPath(msg.edgeIds || []);
+        break;
+      case 'agentsight:clearHighlights':
+        clearHighlights();
+        break;
+      case 'agentsight:setPhase':
+        setPhase(msg.phase || 'provisional');
+        break;
+      case 'agentsight:clearGraph':
+        clearGraph();
+        break;
+    }
+  });
+
+  // ── Initialize ──
+  function initAgentSightGraph() {
+    graphGroup = new THREE.Object3D();
+    scene.add(graphGroup);
+
+    // Apply any pending message that arrived before globe was ready
+    if (pendingMessage) {
+      var pm = pendingMessage;
+      pendingMessage = null;
+      if (pm.type === 'agentsight:loadGraph') {
+        loadGraph(pm.nodes || [], pm.edges || []);
+      } else if (pm.type === 'agentsight:setPhase') {
+        setPhase(pm.phase || 'provisional');
+      }
+    }
+
+    // ── Drift animation (lat/lon based, stays on sphere surface) ──
+    var driftAmps  = {};
+    var driftFreqs = {};
+    var driftPhases = {};
+
+    function animateDrift() {
+      requestAnimationFrame(animateDrift);
+      var t = performance.now() / 1000;
+      var ids = Object.keys(nodeObjects);
+      if (ids.length === 0) return;
+
+      for (var i = 0; i < ids.length; i++) {
+        var nid = ids[i];
+        var obj = nodeObjects[nid];
+        if (!obj || !obj.baseLatLon) continue;
+        var ll = obj.baseLatLon;
+
+        if (!driftAmps[nid]) {
+          driftAmps[nid]  = 2.5 + Math.random() * 5;          // ±2.5–7.5 degrees
+          driftFreqs[nid] = 0.3 + Math.random() * 0.5;         // 0.3–0.8 Hz
+          driftPhases[nid] = Math.random() * Math.PI * 2;
+        }
+
+        var amp = currentPhase === 'provisional' ? driftAmps[nid] : driftAmps[nid] * 0.25;
+        var freq = driftFreqs[nid];
+        var dLat = Math.sin(t * freq + driftPhases[nid]) * amp;
+        var dLon = Math.cos(t * freq * 0.7 + driftPhases[nid] + 1.3) * amp * 1.3;
+
+        var newPos = latLonToVec3(ll.lat + dLat, ll.lon + dLon, GLOBE_RADIUS + NODE_OFFSET);
+        obj.group.position.copy(newPos);
+        obj.group.lookAt(new THREE.Vector3(0, 0, 0));
+      }
+
+      // Update edge curves to track drifting nodes (recalculate full arc)
+      var eids = Object.keys(edgeLines);
+      for (var j = 0; j < eids.length; j++) {
+        var edata = edgeLines[eids[j]];
+        var srcObj = nodeObjects[edata.sourceId];
+        var tgtObj = nodeObjects[edata.targetId];
+        if (!srcObj || !tgtObj) continue;
+        var sp = srcObj.group.position;
+        var tp = tgtObj.group.position;
+        var mid = new THREE.Vector3().addVectors(sp, tp).multiplyScalar(0.5);
+        var pushDist = mid.length();
+        if (pushDist < 1) pushDist = 1;
+        mid.normalize().multiplyScalar(pushDist * 1.35);
+        var curve = new THREE.QuadraticBezierCurve3(sp.clone(), mid, tp.clone());
+        var pts = curve.getPoints(24);
+        var arr = edata.line.geometry.attributes.position.array;
+        for (var k = 0; k < pts.length; k++) {
+          arr[k*3]   = pts[k].x;
+          arr[k*3+1] = pts[k].y;
+          arr[k*3+2] = pts[k].z;
+        }
+        edata.line.geometry.attributes.position.needsUpdate = true;
+      }
+    }
+    animateDrift();
+
+    // ── Node click detection (raycaster against invisible click-target spheres) ──
+    var raycaster = new THREE.Raycaster();
+    var mouse = new THREE.Vector2();
+    renderer.domElement.addEventListener('click', function(event) {
+      // Use renderer canvas rect for accurate coordinates inside the iframe
+      var rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      var targets = [];
+      var targetToNid = {};
+      Object.keys(nodeObjects).forEach(function(nid) {
+        var ct = nodeObjects[nid].clickTarget;
+        if (ct) {
+          targets.push(ct);
+          targetToNid[ct.uuid || ct.id] = nid;
+        }
+      });
+      var intersects = raycaster.intersectObjects(targets, false);
+      if (intersects.length > 0) {
+        var hitObj = intersects[0].object;
+        var nid = targetToNid[hitObj.uuid || hitObj.id];
+        if (nid) {
+          window.parent.postMessage({
+            type: 'agentsight:nodeClicked',
+            nodeId: nid,
+          }, '*');
+        }
+      }
+    });
+
+    // Signal React parent that we're ready
+    window.parent.postMessage({ type: 'agentsight:ready' }, '*');
+    console.log('[AgentSight] Particle-cluster graph bridge initialized');
+  }
+
+  // ── Load graph data ──
+  function loadGraph(nodes, edges) {
+    clearGraph();
+
+    // Build node visuals
+    nodes.forEach(function(n) {
+      var ll = hashToLatLon(n.node_id);
+      var pos = latLonToVec3(ll.lat, ll.lon, GLOBE_RADIUS + NODE_OFFSET);
+
+      var edgeCount = edges.filter(function(e) {
+        return e.source === n.node_id || e.target === n.node_id;
+      }).length;
+
+      var visual = buildNodeVisual(n.node_type, edgeCount);
+      var group = visual.group;
+      group.position.copy(pos);
+      group.lookAt(new THREE.Vector3(0, 0, 0));
+
+      // Store node ID on every sub-object for identification
+      group.userData = { nodeId: n.node_id, nodeType: n.node_type };
+      visual.sprite.userData = { nodeId: n.node_id, nodeType: n.node_type };
+      visual.cluster.userData = { nodeId: n.node_id, nodeType: n.node_type };
+
+      graphGroup.add(group);
+
+      nodeObjects[n.node_id] = {
+        group: group,
+        sprite: visual.sprite,
+        cluster: visual.cluster,
+        orbiters: visual.orbiters,
+        clickTarget: visual.clickTarget,
+        baseLatLon: { lat: ll.lat, lon: ll.lon },
+      };
+    });
+
+    // Create edge lines
+    edges.forEach(function(e) {
+      var srcObj = nodeObjects[e.source];
+      var tgtObj = nodeObjects[e.target];
+      if (!srcObj || !tgtObj) return;
+
+      var isCrossing = e.edge_type === 'PolicyBoundaryCrossing';
+      var color = isCrossing ? 0xef4444 : (edgeColors[e.edge_type] || 0xe2e8f0);
+
+      // Arc edges: sample points along great-circle path for curved lines
+      var srcPos = srcObj.group.position;
+      var tgtPos = tgtObj.group.position;
+      var mid = new THREE.Vector3().addVectors(srcPos, tgtPos).multiplyScalar(0.5);
+      var pushDist = mid.length();
+      if (pushDist < 1) pushDist = 1;
+      mid.normalize().multiplyScalar(pushDist * 1.35); // arc outward
+
+      var curve = new THREE.QuadraticBezierCurve3(srcPos.clone(), mid, tgtPos.clone());
+      var curvePoints = curve.getPoints(24);
+
+      var positions = new Float32Array(curvePoints.length * 3);
+      for (var pi = 0; pi < curvePoints.length; pi++) {
+        positions[pi*3]   = curvePoints[pi].x;
+        positions[pi*3+1] = curvePoints[pi].y;
+        positions[pi*3+2] = curvePoints[pi].z;
+      }
+      var geo = new THREE.BufferGeometry();
+      geo.addAttribute('position', new THREE.BufferAttribute(positions, 3));
+      var mat = new THREE.LineBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: currentPhase === 'provisional' ? 0.55 : 0.85,
+        blending: THREE.AdditiveBlending,
+        depthTest: true,
+        depthWrite: false,
+      });
+      var line = new THREE.Line(geo, mat);
+      line.userData = { edgeId: e.edge_id, edgeType: e.edge_type };
+
+      graphGroup.add(line);
+      edgeLines[e.edge_id] = { line: line, sourceId: e.source, targetId: e.target };
+    });
+
+    console.log('[AgentSight] Graph loaded: ' + nodes.length + ' nodes, ' + edges.length + ' edges');
+  }
+
+  // ── Traceback path highlight ──
+  function highlightPath(edgeIds) {
+    clearHighlights();
+    highlightSet = {};
+    var pathNodeIds = {};
+
+    edgeIds.forEach(function(eid) {
+      highlightSet[eid] = true;
+      var edata = edgeLines[eid];
+      if (!edata) return;
+      edata.line.material.color.setHex(0xfbbf24);
+      edata.line.material.opacity = 1.0;
+      pathNodeIds[edata.sourceId] = true;
+      pathNodeIds[edata.targetId] = true;
+    });
+
+    // Dim all non-path nodes, brighten path nodes
+    Object.keys(nodeObjects).forEach(function(nid) {
+      var obj = nodeObjects[nid];
+      var onPath = !!pathNodeIds[nid];
+      var op = onPath ? 0.6 : 0.12;
+      if (obj.sprite && obj.sprite.material) obj.sprite.material.opacity = op;
+      if (obj.cluster && obj.cluster.material) obj.cluster.material.uniforms.color.value.copy(
+        new THREE.Color(onPath ? nodeColors[obj.group.userData.nodeType] || 0x818cf8 : 0x444466)
+      );
+    });
+  }
+
+  function clearHighlights() {
+    highlightSet = {};
+    Object.keys(edgeLines).forEach(function(eid) {
+      var edata = edgeLines[eid];
+      if (!edata) return;
+      var origColor = edgeColors[edata.line.userData.edgeType] || 0xe2e8f0;
+      if (edata.line.userData.edgeType === 'PolicyBoundaryCrossing') origColor = 0xef4444;
+      edata.line.material.color.setHex(origColor);
+      edata.line.material.opacity = currentPhase === 'provisional' ? 0.55 : 0.85;
+    });
+    Object.keys(nodeObjects).forEach(function(nid) {
+      var obj = nodeObjects[nid];
+      if (!obj) return;
+      var defOp = currentPhase === 'provisional' ? 0.45 : 0.55;
+      if (obj.sprite && obj.sprite.material) obj.sprite.material.opacity = defOp;
+      if (obj.cluster && obj.cluster.material) {
+        var nt = obj.group.userData.nodeType;
+        obj.cluster.material.uniforms.color.value.copy(new THREE.Color(nodeColors[nt] || 0x818cf8));
+      }
+    });
+  }
+
+  // ── Phase control ──
+  function setPhase(phase) {
+    currentPhase = phase;
+    var spriteOp = phase === 'provisional' ? 0.45 : 0.55;
+    var edgeOp   = phase === 'provisional' ? 0.55 : 0.85;
+    Object.keys(nodeObjects).forEach(function(nid) {
+      var obj = nodeObjects[nid];
+      if (!obj) return;
+      if (obj.sprite && obj.sprite.material) obj.sprite.material.opacity = spriteOp;
+    });
+    Object.keys(edgeLines).forEach(function(eid) {
+      var edata = edgeLines[eid];
+      if (!edata) return;
+      edata.line.material.opacity = edgeOp;
+    });
+  }
+
+  // ── Clear ──
+  function clearGraph() {
+    if (!graphGroup) return;
+    // Recursively dispose all children
+    function disposeAll(parent) {
+      while (parent.children.length > 0) {
+        var child = parent.children[0];
+        if (child.children && child.children.length > 0) disposeAll(child);
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (child.material.uniforms) {
+            // ShaderMaterial: dispose texture if present
+            Object.keys(child.material.uniforms).forEach(function(k) {
+              var u = child.material.uniforms[k];
+              if (u && u.value && u.value.dispose) u.value.dispose();
+            });
+          }
+          child.material.dispose();
+        }
+        parent.remove(child);
+      }
+    }
+    disposeAll(graphGroup);
+    nodeObjects = {};
+    edgeLines = {};
+    highlightSet = {};
+  }
+
+  // ── Expose to iframe context ──
+  window.agentsight_loadGraph       = loadGraph;
+  window.agentsight_highlightPath   = highlightPath;
+  window.agentsight_clearHighlights = clearHighlights;
+  window.agentsight_setPhase        = setPhase;
+  window.agentsight_clearGraph      = clearGraph;
+})();
+</script>
+
+</body>
+</html>

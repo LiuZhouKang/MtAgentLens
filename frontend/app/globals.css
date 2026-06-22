@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+:root {
+  --bg-deep: #000108;
+  --bg-cosmic: #080c18;
+  --bg-panel: rgba(8, 12, 24, 0.78);
+  --bg-card: rgba(14, 18, 36, 0.85);
+  --text-primary: #e8e8ed;
+  --text-secondary: #9898a8;
+  --text-tertiary: #68687a;
+  --intent: #a78bfa;
+  --exec: #60a5fa;
+  --alert: #f43f5e;
+  --normal: #34d399;
+  --accent-indigo: #818cf8;
+}

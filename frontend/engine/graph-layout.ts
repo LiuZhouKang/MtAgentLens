@@ -26,11 +26,21 @@ const STIFFNESS: Record<string, number> = {
 
 const REPEL = 5000;
 const CENTER = 0.001;
+const MAX_VELOCITY = 14;
+const MAX_COORDINATE = 220;
 const LAYER_Z: Record<string, number> = {
   Agent: -30,
   Resource: 0,
   PolicyBoundary: 30,
 };
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function finite(value: number, fallback = 0): number {
+  return Number.isFinite(value) ? value : fallback;
+}
 
 export function forceLayout3D(
   nodes: LayoutNode[],
@@ -39,7 +49,15 @@ export function forceLayout3D(
 ): LayoutNode[] {
   if (nodes.length === 0) return [];
 
-  const result = nodes.map((n) => ({ ...n, vx: 0, vy: 0, vz: 0 }));
+  const result = nodes.map((n) => ({
+    ...n,
+    x: clamp(finite(n.x), -MAX_COORDINATE, MAX_COORDINATE),
+    y: clamp(finite(n.y), -MAX_COORDINATE, MAX_COORDINATE),
+    z: clamp(finite(n.z), -MAX_COORDINATE, MAX_COORDINATE),
+    vx: 0,
+    vy: 0,
+    vz: 0,
+  }));
   const nodeMap = new Map(result.map((n) => [n.id, n]));
   const adjacency = new Map<string, string[]>();
   for (const n of result) adjacency.set(n.id, []);
@@ -95,14 +113,22 @@ export function forceLayout3D(
 
     // Apply velocities with temperature
     for (const n of result) {
-      n.x += (n.vx ?? 0) * temp;
-      n.y += (n.vy ?? 0) * temp;
-      n.z += (n.vz ?? 0) * temp;
+      n.vx = clamp(finite(n.vx ?? 0), -MAX_VELOCITY, MAX_VELOCITY);
+      n.vy = clamp(finite(n.vy ?? 0), -MAX_VELOCITY, MAX_VELOCITY);
+      n.vz = clamp(finite(n.vz ?? 0), -MAX_VELOCITY, MAX_VELOCITY);
+      n.x = clamp(n.x + n.vx * temp, -MAX_COORDINATE, MAX_COORDINATE);
+      n.y = clamp(n.y + n.vy * temp, -MAX_COORDINATE, MAX_COORDINATE);
+      n.z = clamp(n.z + n.vz * temp, -MAX_COORDINATE, MAX_COORDINATE);
       n.vx = 0; n.vy = 0; n.vz = 0;
     }
 
     temp *= 0.995;
   }
 
-  return result;
+  return result.map((node) => ({
+    ...node,
+    x: clamp(finite(node.x), -MAX_COORDINATE, MAX_COORDINATE),
+    y: clamp(finite(node.y), -MAX_COORDINATE, MAX_COORDINATE),
+    z: clamp(finite(node.z), -MAX_COORDINATE, MAX_COORDINATE),
+  }));
 }

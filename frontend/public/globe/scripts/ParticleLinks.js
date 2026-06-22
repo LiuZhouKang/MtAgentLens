@@ -6,7 +6,7 @@ function ParticleLinks(count,clock){
 	this.ordered=false;
     this.linkGeometry = new THREE.BufferGeometry();
     var attributes = {size:{ type: 'f', value: null },customColor: { type: 'c', value: null }};
-	var uniforms = {color:     { type: "c", value: new THREE.Color( 0xffffff ) },texture:   { type: "t", value: THREE.ImageUtils.loadTexture( "images/dot.png" ) }};
+	var uniforms = {color:     { type: "c", value: new THREE.Color( 0xffffff ) },texture:   { type: "t", value: THREE.ImageUtils.loadTexture( "images/dot7.png" ) }};
 
     var shaderMaterial = new THREE.ShaderMaterial( {
                 uniforms:       uniforms,

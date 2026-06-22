@@ -46,6 +46,499 @@ body {
     background-color: #000;
     -webkit-font-smoothing: subpixel-antialiased;
 }
+html.agentsight-embed body {
+    background: #000;
+}
+html.agentsight-embed.agentsight-audit body {
+    background:
+      radial-gradient(circle at 72% 42%, rgba(77, 227, 255, 0.12), transparent 20%),
+      radial-gradient(circle at 64% 58%, rgba(94, 92, 230, 0.14), transparent 26%),
+      radial-gradient(circle at 78% 32%, rgba(248, 113, 113, 0.08), transparent 18%),
+      linear-gradient(180deg, #040814 0%, #01050d 100%);
+}
+html.agentsight-embed.agentsight-audit body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 140px 140px;
+    opacity: 0.08;
+    pointer-events: none;
+}
+html.agentsight-embed.agentsight-audit body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(circle at 72% 44%, rgba(125, 211, 252, 0.18) 0, rgba(125, 211, 252, 0.08) 10%, transparent 28%),
+      radial-gradient(circle at 78% 66%, rgba(167, 139, 250, 0.12) 0, transparent 22%);
+    filter: blur(18px);
+    pointer-events: none;
+}
+html.agentsight-hero body #storyPrompt,
+html.agentsight-hero body #sideBar,
+html.agentsight-hero body #watch,
+html.agentsight-hero body #annotation,
+html.agentsight-hero body #nextlevel,
+html.agentsight-hero body #categories,
+html.agentsight-hero body #pointer,
+html.agentsight-hero body #modeDescription,
+html.agentsight-hero body #productlabel,
+html.agentsight-hero body #aboutText,
+html.agentsight-embed body #sideBar,
+html.agentsight-embed body #watch,
+html.agentsight-embed body #annotation,
+html.agentsight-embed body #nextlevel,
+html.agentsight-embed body #categories,
+html.agentsight-embed body #pointer,
+html.agentsight-embed body #modeDescription,
+html.agentsight-embed body #productlabel,
+html.agentsight-embed body #aboutText {
+    display: none !important;
+}
+html.agentsight-embed body #UI {
+    display: block !important;
+}
+html.agentsight-intro body #UI {
+    display: none !important;
+}
+html.agentsight-embed.agentsight-audit body #UI {
+    display: none !important;
+}
+html.agentsight-embed body #countries {
+    display: none !important;
+}
+html.agentsight-embed body .chosenCountry {
+    display: none !important;
+}
+html.agentsight-embed body canvas {
+    cursor: default !important;
+}
+html.agentsight-intro body::before,
+html.agentsight-intro body::after {
+    display: none;
+}
+html.agentsight-intro body {
+    background: #000;
+}
+html.agentsight-intro body canvas {
+    filter: none;
+}
+html.agentsight-intro body #storyPrompt {
+    display: block !important;
+    background:
+      radial-gradient(circle at 50% 18%, rgba(174, 229, 255, 0.06), transparent 20%),
+      radial-gradient(circle at 50% 38%, rgba(255,255,255,0.03), transparent 22%),
+      linear-gradient(180deg, rgba(0,0,0,0.14) 0%, rgba(0,0,0,0.34) 32%, rgba(0,0,0,0.72) 100%);
+    z-index: 90;
+}
+html.agentsight-intro body #description,
+html.agentsight-intro body #choice {
+    color: #f4f7fb;
+    text-shadow: none;
+}
+html.agentsight-intro body .intro-stage-shell {
+    position: relative;
+    width: min(980px, calc(100vw - 56px));
+    min-height: 100vh;
+    margin: 0 auto;
+    padding: 26px 0 24px;
+    display: grid;
+    grid-template-rows: auto 1fr auto auto;
+    gap: 24px;
+    z-index: 92;
+}
+html.agentsight-intro body .intro-brand-lockup {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    pointer-events: none;
+}
+html.agentsight-intro body .intro-brand-panel {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0;
+}
+html.agentsight-intro body .intro-brand-mark {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+}
+html.agentsight-intro body .intro-brand-mark__glyph {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.96;
+}
+html.agentsight-intro body .intro-brand-lockup__text {
+    display: grid;
+    gap: 2px;
+    text-align: left;
+}
+html.agentsight-intro body .intro-brand-lockup__kicker {
+    font: 500 8px/1 "Rajdhani", sans-serif;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    color: rgba(212, 226, 239, 0.42);
+}
+html.agentsight-intro body .intro-brand-lockup__name {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font: 600 30px/0.86 "Rajdhani", sans-serif;
+    letter-spacing: 0.016em;
+    color: #f7fbff;
+    text-shadow: 0 8px 18px rgba(0,0,0,0.14);
+}
+html.agentsight-intro body .intro-brand-lockup__name-prefix {
+    font-weight: 500;
+    font-size: 0.78em;
+    letter-spacing: 0.05em;
+    color: rgba(240, 247, 255, 0.78);
+}
+html.agentsight-intro body .intro-brand-lockup__name-divider {
+    width: 3px;
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(195, 231, 255, 0.64);
+    box-shadow: 0 0 12px rgba(125, 220, 255, 0.22);
+    transform: translateY(1px);
+}
+html.agentsight-intro body .intro-brand-lockup__name-core {
+    font-weight: 600;
+    font-size: 1.12em;
+    letter-spacing: 0.075em;
+    text-transform: uppercase;
+    color: rgba(247, 251, 255, 0.98);
+}
+html.agentsight-intro body .intro-brand-lockup__descriptor {
+    font: 500 8px/1.1 "Rajdhani", sans-serif;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: rgba(212, 226, 239, 0.24);
+}
+html.agentsight-intro body .intro-hero-grid {
+    display: block;
+    margin-top: 46px;
+}
+html.agentsight-intro body #description {
+    position: static;
+    width: auto;
+    max-width: 760px;
+    height: auto;
+    margin: 0 auto;
+    font-size: 18px;
+    line-height: 1.45;
+    text-align: center;
+}
+html.agentsight-intro body .intro-copy {
+    display: block;
+}
+html.agentsight-intro body .intro-copy--eyebrow {
+    margin-bottom: 18px;
+    font: 500 10px/1.1 "Rajdhani", sans-serif;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    color: rgba(214, 228, 241, 0.62);
+}
+html.agentsight-intro body .intro-copy--title {
+    max-width: 760px;
+    margin: 0 auto;
+    font: 650 clamp(34px, 5vw, 68px)/0.9 "Rajdhani", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    letter-spacing: -0.025em;
+    color: #fbfdff;
+    text-wrap: balance;
+    text-shadow: 0 12px 32px rgba(0,0,0,0.3);
+}
+html.agentsight-intro body .intro-copy--body {
+    margin: 18px auto 0;
+    max-width: 620px;
+    font: 400 14px/1.72 "Rajdhani", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    color: rgba(218, 230, 240, 0.76);
+}
+html.agentsight-intro body .intro-copy--manifesto {
+    margin-top: 16px;
+    font: 500 11px/1.2 "Rajdhani", sans-serif;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: rgba(224, 236, 244, 0.42);
+}
+html.agentsight-intro body .intro-signal-strip {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+}
+html.agentsight-intro body .intro-signal-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.012) 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    font: 500 10px/1 "Rajdhani", sans-serif;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(230, 239, 247, 0.74);
+}
+html.agentsight-intro body .intro-signal-pill__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, #90e1ff 0%, #b894ff 100%);
+    box-shadow: 0 0 14px rgba(144, 225, 255, 0.42);
+}
+html.agentsight-intro body #loaded {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 18px;
+    padding-top: 0;
+    gap: 12px;
+    font: 500 11px/1 "Rajdhani", sans-serif;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(222, 232, 242, 0.84);
+}
+html.agentsight-intro body .intro-loaded-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, #d5f4ff 0%, #85d7ff 65%, rgba(133, 215, 255, 0) 100%);
+    box-shadow: 0 0 18px rgba(133, 215, 255, 0.72);
+}
+html.agentsight-intro body #loaded::before,
+html.agentsight-intro body #loaded::after {
+    display: none;
+}
+html.agentsight-intro body .intro-side-atlas {
+    display: none;
+}
+html.agentsight-intro body .intro-side-atlas__label {
+    font: 500 10px/1.1 "Rajdhani", sans-serif;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: rgba(213, 227, 240, 0.5);
+}
+html.agentsight-intro body .intro-side-atlas__title {
+    margin-top: 12px;
+    font: 600 22px/1.08 "Rajdhani", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    color: #f8fbff;
+}
+html.agentsight-intro body .intro-side-atlas__row {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    gap: 10px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    font: 400 12px/1.55 "Rajdhani", sans-serif;
+    color: rgba(214, 228, 240, 0.74);
+}
+html.agentsight-intro body .intro-side-atlas__row span:first-child {
+    color: rgba(143, 214, 255, 0.64);
+    letter-spacing: 0.14em;
+}
+html.agentsight-intro body #beginExplore,
+html.agentsight-intro body #beginStory {
+    opacity: 1;
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    gap: 10px;
+    width: min(286px, 100%);
+    max-width: none;
+}
+html.agentsight-intro body #choice {
+    position: static;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    margin: 8px auto 0;
+    padding-top: 0;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0;
+}
+html.agentsight-intro body .midSeparator {
+    width: 1px;
+    height: 100%;
+    min-height: 250px;
+    margin-left: 24px;
+    margin-right: 24px;
+    background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.18), transparent);
+}
+html.agentsight-intro body .intro-choice-card {
+    position: relative;
+    padding: 0;
+    border-radius: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    transition: transform 180ms ease, opacity 180ms ease;
+}
+html.agentsight-intro body .intro-choice-card:hover {
+    transform: translateY(-2px);
+    opacity: 1;
+}
+html.agentsight-intro body .intro-choice-icon {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    border-radius: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+html.agentsight-intro body .intro-choice-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    opacity: 0.94;
+}
+html.agentsight-intro body .intro-choice-eyebrow {
+    font: 500 10px/1.1 "Rajdhani", sans-serif;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: rgba(213, 227, 240, 0.56);
+}
+html.agentsight-intro body .intro-choice-title {
+    margin-top: 2px;
+    font: 500 30px/0.96 "Rajdhani", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    letter-spacing: -0.01em;
+    color: #f9fcff;
+    text-align: center;
+}
+html.agentsight-intro body .intro-choice-copy {
+    max-width: 240px;
+    font: 400 12px/1.58 "Rajdhani", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    color: rgba(217, 229, 239, 0.68);
+    text-align: center;
+}
+html.agentsight-intro body .intro-choice-meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+    font: 500 9px/1 "Rajdhani", sans-serif;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(210, 224, 236, 0.42);
+}
+html.agentsight-intro body .intro-footer-lockup {
+    position: relative;
+    width: min(520px, 100%);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    z-index: 92;
+}
+html.agentsight-intro body .intro-footer-lockup__rule {
+    flex: 1 1 auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+}
+html.agentsight-intro body .intro-footer-lockup__text {
+    display: grid;
+    gap: 4px;
+    text-align: center;
+    min-width: 320px;
+}
+html.agentsight-intro body .intro-footer-lockup__label {
+    font: 600 12px/1.1 "Rajdhani", sans-serif;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: rgba(244, 248, 252, 0.68);
+}
+html.agentsight-intro body .intro-footer-lockup__subline {
+    font: 400 11px/1.4 "Rajdhani", sans-serif;
+    letter-spacing: 0.08em;
+    color: rgba(203, 217, 228, 0.44);
+}
+html.agentsight-intro body .intro-footer-lockup__edition {
+    font: 500 10px/1.2 "Rajdhani", sans-serif;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(203, 217, 228, 0.28);
+}
+
+@media (max-width: 900px) {
+    html.agentsight-intro body .intro-stage-shell {
+        width: min(900px, calc(100vw - 34px));
+        gap: 26px;
+    }
+    html.agentsight-intro body #choice {
+        flex-wrap: wrap;
+    }
+    html.agentsight-intro body .midSeparator {
+        display: none;
+    }
+    html.agentsight-intro body #beginExplore,
+    html.agentsight-intro body #beginStory {
+        width: min(420px, calc(50vw - 32px));
+    }
+}
+
+@media (max-width: 720px) {
+    html.agentsight-intro body .intro-stage-shell {
+        width: calc(100vw - 28px);
+        padding-top: 18px;
+        gap: 22px;
+    }
+    html.agentsight-intro body .intro-brand-lockup {
+        gap: 12px;
+    }
+    html.agentsight-intro body .intro-brand-mark {
+        width: 38px;
+        height: 38px;
+    }
+    html.agentsight-intro body .intro-brand-lockup__name {
+        gap: 6px;
+        font-size: 24px;
+    }
+    html.agentsight-intro body .intro-brand-lockup__name-divider {
+        width: 3px;
+        height: 3px;
+    }
+    html.agentsight-intro body .intro-copy--title {
+        font-size: clamp(30px, 9vw, 46px);
+    }
+    html.agentsight-intro body .intro-copy--body {
+        font-size: 13px;
+        max-width: 100%;
+    }
+    html.agentsight-intro body #beginExplore,
+    html.agentsight-intro body #beginStory {
+        width: 100%;
+    }
+    html.agentsight-intro body #choice {
+        flex-direction: column;
+        gap: 14px;
+    }
+    html.agentsight-intro body .intro-footer-lockup__text {
+        min-width: 0;
+    }
+    html.agentsight-intro body .midSeparator {
+        display: none;
+    }
+}
 input{
     font-size: 14px;
     font-weight: 200;
@@ -112,7 +605,7 @@ span{
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
-    cursor: pointer;x
+    cursor: pointer;
     z-index:2;
     position: absolute;
     bottom:0px;

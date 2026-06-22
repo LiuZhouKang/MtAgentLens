@@ -5,13 +5,8 @@ import EngineSection from './engine-section';
 import ObserverVerdicts from './observer-verdicts';
 import BehaviorTimeline from './behavior-timeline';
 import { useState, useRef } from 'react';
-import { ChevronRight, AlertTriangle, Info, ShieldCheck } from 'lucide-react';
-
-const sev = {
-  Critical: { color: '#f87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.25)' },
-  Warning: { color: '#fbbf24', bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.25)' },
-  Info: { color: '#818cf8', bg: 'rgba(129,140,248,0.08)', border: 'rgba(129,140,248,0.20)' },
-};
+import { ChevronRight, AlertTriangle, Info } from 'lucide-react';
+import { getSeverityPalette } from '@/lib/severity-palette';
 
 const decisionLabel: Record<string, string> = { Safe: 'Safe', Unsafe: 'Unsafe', Uncertain: 'Uncertain' };
 const authLabel: Record<string, string> = { Authoritative: 'Authoritative', Supporting: 'Supporting', Unavailable: 'Unavailable' };
@@ -19,7 +14,7 @@ const authLabel: Record<string, string> = { Authoritative: 'Authoritative', Supp
 export default function AlertCard({ alert }: { alert: ResponsibilityAlert }) {
   const [expanded, setExpanded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
-  const s = sev[alert.severity] || sev.Info;
+  const s = getSeverityPalette(alert.severity);
   const Icon = alert.severity === 'Critical' || alert.severity === 'Warning' ? AlertTriangle : Info;
   const showObserver = alert.display_profile === 'ObserverJudged';
 

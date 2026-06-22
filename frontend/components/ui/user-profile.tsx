@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
@@ -136,10 +137,13 @@ export function UserProfile({ userId }: UserProfileProps) {
     <div className="user-profile max-w-2xl mx-auto p-6">
       {/* User Info Section */}
       <div className="user-info flex items-center gap-4 mb-6">
-        <img
+        <Image
           src={processedAvatar}
           alt={`${data.user.name}'s avatar`}
+          width={64}
+          height={64}
           className="w-16 h-16 rounded-full"
+          unoptimized
         />
         <div>
           <h1 className="text-2xl font-bold">{data.user.name}</h1>

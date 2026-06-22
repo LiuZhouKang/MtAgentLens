@@ -1,16 +1,11 @@
 function LabelManager(countries){
-	this.showlabels=true;
+	this.showlabels=false;
     myThis=this;
     this.globeSize=150;
 
     $("#showlabels").click(function() {
-    if (!myThis.showlabels) {
-        $("#showlabels").html('<a href="#">Hide labels</a>');
-        myThis.showlabels = true;
-    } else {
-        $("#showlabels").html('<a href="#">Show labels</a>');
-        myThis.showlabels = false;
-    }
+    myThis.showlabels = false;
+    $("#showlabels").html('<a href="#">Labels hidden</a>');
     });
 
     countryHTML="";
@@ -60,7 +55,7 @@ LabelManager.prototype.toScreenXYZ = function(id,country,geometry){
 };
 
 LabelManager.prototype.setLabels = function(show){
-    this.showlabels=show;
+    this.showlabels=false;
 };
 
 LabelManager.prototype.animateLabels = function(countries,geometry,currentSetup,particleSystem){

@@ -4,7 +4,7 @@
 
 import { create } from 'zustand';
 import { handoffApi } from './handoff-api';
-import { emptyMetrics, getDemoDelegationTreeResponse, demoDependencyEdges } from './handoff-demo-data';
+import { getDemoDelegationTreeResponse, demoDependencyEdges } from './handoff-demo-data';
 import type {
   DelegationNode,
   HandoffObsMetrics,
@@ -36,15 +36,18 @@ export interface HandoffStore {
   loadDemoData: () => void;
   selectNode: (nodeId: string | null) => void;
   pushEvent: (event: HandoffObservabilityEvent) => void;
+  handleSseEvent: (payload: unknown) => void;
   setUseBackend: (v: boolean) => void;
   reset: () => void;
 }
 
+const demoSeed = getDemoDelegationTreeResponse();
+
 const initialState = {
-  delegationTree: null as DelegationNode | null,
-  metrics: emptyMetrics as HandoffObsMetrics,
+  delegationTree: demoSeed.tree as DelegationNode | null,
+  metrics: demoSeed.metrics as HandoffObsMetrics,
   recentEvents: [] as HandoffObservabilityEvent[],
-  dependencyEdges: [] as Array<{ from_spawn_id: string; artifact_path: string; is_orphaned: boolean; to_spawn_id: string }>,
+  dependencyEdges: demoDependencyEdges as Array<{ from_spawn_id: string; artifact_path: string; is_orphaned: boolean; to_spawn_id: string }>,
   selectedNodeId: null as string | null,
   loading: false,
   error: null as string | null,
@@ -68,7 +71,7 @@ export const useHandoffStore = create<HandoffStore>((set, get) => ({
       const tree = treeResp.tree as unknown as DelegationNode | null;
       const metrics = treeResp.metrics as unknown as HandoffObsMetrics;
       const events = (eventsResp.events ?? []) as unknown as HandoffObservabilityEvent[];
-      const edges = (edgesResp.edges ?? []).map((e: Record<string, unknown>) => ({
+      const edges = (edgesResp.edges ?? []).map((e) => ({
         from_spawn_id: String(e.from_spawn_id ?? ''),
         to_spawn_id: String(e.to_spawn_id ?? ''),
         artifact_path: String(e.artifact_path ?? ''),
@@ -109,6 +112,41 @@ export const useHandoffStore = create<HandoffStore>((set, get) => ({
 
   pushEvent: (event) => {
     set({ recentEvents: [event, ...get().recentEvents].slice(0, 200) });
+  },
+
+  handleSseEvent: (payload) => {
+    const data = (payload ?? {}) as Record<string, unknown>;
+
+    if (data.tree || data.metrics || data.edges) {
+      set((state) => ({
+        delegationTree: (data.tree as DelegationNode | undefined) ?? state.delegationTree,
+        metrics: (data.metrics as HandoffObsMetrics | undefined) ?? state.metrics,
+        dependencyEdges: (data.edges as typeof state.dependencyEdges | undefined) ?? state.dependencyEdges,
+        loading: false,
+        error: null,
+        useBackend: true,
+      }));
+      return;
+    }
+
+    if (Array.isArray(data.events)) {
+      set({
+        recentEvents: (data.events as HandoffObservabilityEvent[]).slice(0, 200),
+        loading: false,
+        error: null,
+        useBackend: true,
+      });
+      return;
+    }
+
+    if (typeof data.sub_type === 'string') {
+      set({
+        recentEvents: [data as unknown as HandoffObservabilityEvent, ...get().recentEvents].slice(0, 200),
+        loading: false,
+        error: null,
+        useBackend: true,
+      });
+    }
   },
 
   setUseBackend: (v) => set({ useBackend: v }),

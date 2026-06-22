@@ -1,25 +1,48 @@
 import * as THREE from 'three';
 
-const GLOBE_RADIUS = 150;
+export const GLOBE_RADIUS = 150;
+export const GLOBE_OUTLINE_RADIUS = GLOBE_RADIUS * 1.018;
 
 export function createGlobe(scene: THREE.Scene): THREE.Group {
   const globe = new THREE.Group();
+  globe.rotation.z = THREE.MathUtils.degToRad(-18);
 
-  // Dark inner sphere — pure black, depthWrite: false so transparent particles
-  // behind it (sparkles, graph nodes) can render through.
-  const innerSphere = new THREE.Mesh(
-    new THREE.SphereGeometry(GLOBE_RADIUS - 2, 48, 48),
-    new THREE.MeshBasicMaterial({ color: 0x000000, depthWrite: false })
+  const body = new THREE.Mesh(
+    new THREE.SphereGeometry(GLOBE_RADIUS, 64, 64),
+    new THREE.MeshBasicMaterial({
+      color: 0x0a1a2d,
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+    })
   );
-  globe.add(innerSphere);
+  globe.add(body);
 
-  // Add a subtle wireframe icosahedron to give the globe structure
-  // (matching the original Harvard Globe's commented-out wireframe)
-  const wireframe = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(GLOBE_RADIUS - 1, 6),
-    new THREE.MeshBasicMaterial({ color: 0x080808, wireframe: true })
+  const atmosphere = new THREE.Mesh(
+    new THREE.SphereGeometry(GLOBE_RADIUS * 1.06, 40, 40),
+    new THREE.MeshBasicMaterial({
+      color: 0x67b8ff,
+      transparent: true,
+      opacity: 0.12,
+      side: THREE.BackSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    })
   );
-  globe.add(wireframe);
+  globe.add(atmosphere);
+
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(GLOBE_RADIUS * 1.13, 32, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0x90ddff,
+      transparent: true,
+      opacity: 0.045,
+      side: THREE.BackSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    })
+  );
+  globe.add(halo);
 
   scene.add(globe);
   return globe;
@@ -34,21 +57,29 @@ export async function addGlobeOutlines(
 
   const outlineGroup = new THREE.Group();
   const lineMaterial = new THREE.LineBasicMaterial({
-    color: 0x3a3a5a,
+    color: 0x6eb8ff,
     transparent: true,
-    opacity: 0.4,
-    blending: THREE.AdditiveBlending,
+    opacity: 0.08,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
   });
 
   for (const feature of geoJson.features) {
-    if (feature.geometry.type === 'Polygon') {
-      for (const ring of feature.geometry.coordinates) {
-        const points = ring.map(
-          ([lon, lat]: [number, number]) =>
-            latLonToVec3(lat, lon, GLOBE_RADIUS * 1.48)
+    const coordinateSets =
+      feature.geometry.type === 'Polygon'
+        ? [feature.geometry.coordinates]
+        : feature.geometry.type === 'MultiPolygon'
+          ? feature.geometry.coordinates
+          : [];
+
+    for (const polygon of coordinateSets) {
+      for (const ring of polygon) {
+        const points = ring.map(([lon, lat]: [number, number]) =>
+          latLonToVec3(lat, lon, GLOBE_OUTLINE_RADIUS)
         );
         const geom = new THREE.BufferGeometry().setFromPoints(points);
         const line = new THREE.Line(geom, lineMaterial);
+        line.renderOrder = 2;
         outlineGroup.add(line);
       }
     }
@@ -68,5 +99,5 @@ function latLonToVec3(lat: number, lon: number, radius: number): THREE.Vector3 {
 }
 
 export function animateGlobe(globe: THREE.Group, delta: number): void {
-  globe.rotation.y += delta * 0.05;
+  globe.rotation.y += delta * 0.018;
 }

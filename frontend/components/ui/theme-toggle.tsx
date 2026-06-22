@@ -2,113 +2,135 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Sun, Moon, Monitor } from 'lucide-react';
+import {
+  THEME_STORAGE_KEY,
+  applyThemeToDocument,
+  readStoredTheme,
+  resolveEffectiveTheme,
+  type ThemePreference,
+} from '@/lib/theme';
 
 export interface ThemeToggleProps {
-  initialTheme?: 'light' | 'dark' | 'system';
+  initialTheme?: ThemePreference;
   onChange?: (theme: 'light' | 'dark') => void;
 }
 
-type Theme = 'light' | 'dark' | 'system';
-
-const THEME_KEY = 'app-theme';
-const THEME_CYCLE: Theme[] = ['light', 'dark', 'system'];
-
-/** Apply or remove `dark` class on <html> based on effective theme */
-function applyTheme(effective: 'light' | 'dark') {
-  if (effective === 'dark') {
-    document.documentElement.classList.add('dark');
-  } else {
-    document.documentElement.classList.remove('dark');
-  }
-}
-
-/** Resolve 'system' to 'light'|'dark' using prefers-color-scheme */
-function resolveSystem(): 'light' | 'dark' {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
+const THEME_CYCLE: ThemePreference[] = ['light', 'dark', 'system'];
 
 export default function ThemeToggle({ initialTheme, onChange }: ThemeToggleProps) {
-  const [theme, setTheme] = useState<Theme>(initialTheme ?? 'system');
-  const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState<ThemePreference>(initialTheme ?? 'dark');
+  const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(false);
   const mqlRef = useRef<MediaQueryList | null>(null);
+  const systemChangeRef = useRef<((e: MediaQueryListEvent) => void) | null>(null);
 
-  // ── On mount: read localStorage, fall back to system preference ──
   useEffect(() => {
-    const localTheme = localStorage.getItem(THEME_KEY) as Theme | null;
-
-    // Use localStorage or navigator preference
-    const resolved = localTheme ?? 'system';
-    setTheme(resolved as Theme);
-    const effective = resolved === 'system' ? resolveSystem() : resolved;
-    applyTheme(effective);
-    setLoading(false);
+    setMounted(true);
+    const resolved = readStoredTheme(window.localStorage);
+    setTheme(resolved);
+    const effective = resolveEffectiveTheme(
+      resolved,
+      window.matchMedia('(prefers-color-scheme: dark)').matches,
+    );
+    applyThemeToDocument(document, effective);
   }, []);
 
-  // ── Listen for prefers-color-scheme changes when in 'system' mode ──
   useEffect(() => {
     if (theme !== 'system') {
-      mqlRef.current?.removeEventListener('change', handleSystemChange);
+      if (mqlRef.current && systemChangeRef.current) {
+        mqlRef.current.removeEventListener('change', systemChangeRef.current);
+      }
       return;
     }
 
     const mql = window.matchMedia('(prefers-color-scheme: dark)');
     mqlRef.current = mql;
 
-    function handleSystemChange(e: MediaQueryListEvent) {
-      applyTheme(e.matches ? 'dark' : 'light');
-    }
+    const handleSystemChange = (event: MediaQueryListEvent) => {
+      const effective = resolveEffectiveTheme('system', event.matches);
+      applyThemeToDocument(document, effective);
+      onChange?.(effective);
+    };
+    systemChangeRef.current = handleSystemChange;
 
     mql.addEventListener('change', handleSystemChange);
     return () => mql.removeEventListener('change', handleSystemChange);
-  }, [theme]);
+  }, [theme, onChange]);
 
-  // ── Toggle handler: cycle light → dark → system → light ──
   const handleToggle = useCallback(() => {
     setLoading(true);
     const nextIndex = (THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length;
     const nextTheme = THEME_CYCLE[nextIndex];
 
-    // Persist to localStorage
-    localStorage.setItem(THEME_KEY, nextTheme);
+    localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
 
-    // Apply to DOM
-    const effective = nextTheme === 'system' ? resolveSystem() : nextTheme;
-    applyTheme(effective);
+    const effective = resolveEffectiveTheme(
+      nextTheme,
+      window.matchMedia('(prefers-color-scheme: dark)').matches,
+    );
+    applyThemeToDocument(document, effective);
 
     setTheme(nextTheme);
     setLoading(false);
-
-    // Notify parent if onChange provided
-    if (onChange) {
-      onChange(effective);
-    }
+    onChange?.(effective);
   }, [theme, onChange]);
 
-  // ── Icons for each theme state ──
-  const icons: Record<Theme, React.ReactNode> = {
+  const icons: Record<ThemePreference, React.ReactNode> = {
     light: <Sun size={14} />,
     dark: <Moon size={14} />,
     system: <Monitor size={14} />,
   };
 
-  const labels: Record<Theme, string> = {
+  const labels: Record<ThemePreference, string> = {
     light: '浅色模式',
     dark: '深色模式',
     system: '跟随系统',
   };
+  const nextTheme = THEME_CYCLE[(THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length];
+  const fallbackTheme = initialTheme ?? 'dark';
+  const fallbackNextTheme = THEME_CYCLE[(THEME_CYCLE.indexOf(fallbackTheme) + 1) % THEME_CYCLE.length];
+
+  if (!mounted) {
+    return (
+      <button
+        type="button"
+        data-testid="theme-toggle"
+        disabled
+        aria-label={`当前主题: ${labels[fallbackTheme]}。点击切换到${labels[fallbackNextTheme]}。`}
+        aria-live="polite"
+        title={`当前: ${labels[fallbackTheme]}，下一个: ${labels[fallbackNextTheme]}`}
+        className="prism-button prism-button--ghost"
+        style={{
+          minHeight: 36,
+          padding: '8px 12px',
+          fontSize: 11,
+          opacity: 0.56,
+          cursor: 'wait',
+        }}
+      >
+        {icons[fallbackTheme]}
+        <span className="hidden sm:inline">{labels[fallbackTheme]}</span>
+      </button>
+    );
+  }
 
   return (
     <button
+      type="button"
       data-testid="theme-toggle"
       onClick={handleToggle}
       disabled={loading}
-      aria-label={`当前主题: ${labels[theme]}。点击切换`}
-      title={`当前: ${labels[theme]}`}
-      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
-                 text-gray-600 hover:text-gray-900 dark:text-white/60 dark:hover:text-white/90
-                 border border-gray-200 hover:border-gray-400 dark:border-white/[0.06] dark:hover:border-white/[0.15]
-                 bg-transparent hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-all duration-150
-                 disabled:opacity-50 disabled:cursor-wait cursor-pointer"
+      aria-label={`当前主题: ${labels[theme]}。点击切换到${labels[nextTheme]}。`}
+      aria-live="polite"
+      title={`当前: ${labels[theme]}，下一个: ${labels[nextTheme]}`}
+      className="prism-button prism-button--ghost"
+      style={{
+        minHeight: 36,
+        padding: '8px 12px',
+        fontSize: 11,
+        opacity: loading ? 0.56 : 1,
+        cursor: loading ? 'wait' : 'pointer',
+      }}
     >
       {icons[theme]}
       <span className="hidden sm:inline">{labels[theme]}</span>

@@ -1,31 +1,25 @@
 "use client";
 
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { DelegationNode, HandoffObsMetrics } from "@/lib/handoff-observability-contract";
 import { ChevronRight, Circle, Layers, Users, GitForkIcon, AlertTriangle } from "lucide-react";
+import PrismPanel from "@/components/ui/prism-panel";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 常量：深度色彩映射
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const DEPTH_COLORS: Record<number, { dot: string; bg: string; border: string; text: string }> = {
-  0: { dot: "bg-indigo-500", bg: "bg-indigo-50", border: "border-indigo-300", text: "text-indigo-700" },
-  1: { dot: "bg-blue-500", bg: "bg-blue-50", border: "border-blue-300", text: "text-blue-700" },
-  2: { dot: "bg-cyan-500", bg: "bg-cyan-50", border: "border-cyan-300", text: "text-cyan-700" },
-  3: { dot: "bg-teal-500", bg: "bg-teal-50", border: "border-teal-300", text: "text-teal-700" },
-  4: { dot: "bg-emerald-500", bg: "bg-emerald-50", border: "border-emerald-300", text: "text-emerald-700" },
-  5: { dot: "bg-amber-500", bg: "bg-amber-50", border: "border-amber-300", text: "text-amber-700" },
+  0: { dot: "#818cf8", bg: "rgba(129, 140, 248, 0.12)", border: "rgba(129, 140, 248, 0.24)", text: "#a5b4fc" },
+  1: { dot: "#60a5fa", bg: "rgba(96, 165, 250, 0.12)", border: "rgba(96, 165, 250, 0.24)", text: "#93c5fd" },
+  2: { dot: "#22d3ee", bg: "rgba(34, 211, 238, 0.12)", border: "rgba(34, 211, 238, 0.24)", text: "#67e8f9" },
+  3: { dot: "#2dd4bf", bg: "rgba(45, 212, 191, 0.12)", border: "rgba(45, 212, 191, 0.24)", text: "#5eead4" },
+  4: { dot: "#34d399", bg: "rgba(52, 211, 153, 0.12)", border: "rgba(52, 211, 153, 0.24)", text: "#6ee7b7" },
+  5: { dot: "#fbbf24", bg: "rgba(251, 191, 36, 0.12)", border: "rgba(251, 191, 36, 0.24)", text: "#fcd34d" },
 };
 
 function depthColor(depth: number) {
-  return DEPTH_COLORS[depth] ?? { dot: "bg-slate-400", bg: "bg-slate-50", border: "border-slate-300", text: "text-slate-600" };
-}
-
-function depthLabel(depth: number): string {
-  if (depth === 0) return "根代理";
-  if (depth === 1) return "第一层";
-  if (depth === 2) return "第二层";
-  return `第 ${depth} 层`;
+  return DEPTH_COLORS[depth] ?? { dot: "#94a3b8", bg: "rgba(148, 163, 184, 0.12)", border: "rgba(148, 163, 184, 0.2)", text: "var(--text-secondary)" };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -115,53 +109,91 @@ const TreeNodeRow: React.FC<{
   return (
     <button
       onClick={() => onSelect(node.node_id)}
-      className={`
-        w-full text-left flex items-center gap-2 px-3 py-2 rounded-md text-xs
-        transition-all duration-150 border
-        ${isSelected
-          ? "bg-indigo-50 border-indigo-300 shadow-sm"
-          : "border-transparent hover:bg-slate-50 hover:border-slate-200"
-        }
-      `}
+      className="prism-tree-row"
+      data-active={isSelected}
+      style={{
+        color: "var(--text-primary)",
+      }}
     >
-      {/* 深度缩进指示器 */}
       <span className="flex items-center gap-0.5 shrink-0">
         {Array.from({ length: depth }).map((_, i) => (
-          <span key={i} className="w-3 h-px bg-slate-200 last:hidden" />
+          <span
+            key={i}
+            style={{
+              width: 12,
+              height: 1,
+              background: "var(--border-soft)",
+              opacity: i === depth - 1 ? 0.35 : 0.72,
+            }}
+          />
         ))}
       </span>
 
-      {/* 展开/折叠图标 */}
-      <span className="w-4 h-4 shrink-0 flex items-center justify-center text-slate-400">
+      <span
+        className="w-4 h-4 shrink-0 flex items-center justify-center"
+        style={{ color: "var(--text-tertiary)" }}
+      >
         {hasChildren ? (
-          <ChevronRight size={12} className={isSelected ? "rotate-90 transition-transform" : ""} />
+          <ChevronRight
+            size={12}
+            style={{
+              transform: isSelected ? "rotate(90deg)" : "rotate(0deg)",
+              transition: "transform 160ms ease",
+            }}
+          />
         ) : (
-          <span className="w-2 h-px bg-slate-300" />
+          <span style={{ width: 8, height: 1, background: "var(--text-tertiary)", opacity: 0.8 }} />
         )}
       </span>
 
-      {/* 状态圆点 */}
-      <span className={`shrink-0 w-2 h-2 rounded-full ${isCompleted ? "bg-emerald-500" : "bg-amber-400 animate-pulse"}`} />
+      <span
+        className="shrink-0 rounded-full"
+        style={{
+          width: 8,
+          height: 8,
+          background: isCompleted ? "var(--tone-success-text)" : "var(--tone-warning-text)",
+          boxShadow: isCompleted
+            ? "0 0 0 4px rgba(52, 211, 153, 0.12)"
+            : "0 0 0 4px rgba(251, 191, 36, 0.12)",
+        }}
+      />
 
-      {/* 代理标识 */}
-      <span className={`font-mono truncate max-w-[120px] ${color.text}`}>
+      <span
+        className="font-mono truncate max-w-[120px]"
+        style={{ color: color.text, fontSize: 12, fontWeight: 600 }}
+      >
         {node.agent_id || node.node_id.slice(0, 8)}
       </span>
 
-      {/* 深度徽章 */}
-      <span className={`shrink-0 px-1 py-0.5 rounded text-[10px] font-medium ${color.bg} ${color.text}`}>
+      <span
+        className="shrink-0"
+        style={{
+          padding: "3px 7px",
+          borderRadius: 999,
+          fontSize: 10,
+          fontWeight: 600,
+          background: color.bg,
+          border: `1px solid ${color.border}`,
+          color: color.text,
+        }}
+      >
         L{depth}
       </span>
 
-      {/* 上下文饱和度指示 */}
       {!contextOk && (
-        <span className="shrink-0 flex items-center gap-0.5 text-amber-600" title={`上下文饱和度: ${(node.context_overhead_ratio * 100).toFixed(0)}%`}>
+        <span
+          className="shrink-0 flex items-center gap-0.5"
+          style={{ color: "var(--tone-warning-text)" }}
+          title={`上下文饱和度: ${(node.context_overhead_ratio * 100).toFixed(0)}%`}
+        >
           <AlertTriangle size={10} />
         </span>
       )}
 
-      {/* 完成状态 */}
-      <span className="ml-auto shrink-0 text-[10px] text-slate-400 font-mono">
+      <span
+        className="ml-auto shrink-0 font-mono"
+        style={{ fontSize: 10, color: "var(--text-tertiary)" }}
+      >
         {isCompleted ? `✓ ${Math.round((node.completed_at_ms! - node.spawned_at_ms) / 1000)}s` : "▶ 运行中"}
       </span>
     </button>
@@ -174,28 +206,28 @@ const TreeNodeRow: React.FC<{
 
 const MetricsBar: React.FC<{ metrics: HandoffObsMetrics }> = ({ metrics }) => {
   const items = [
-    { label: "生成", value: metrics.total_spawned, icon: GitForkIcon, color: "text-indigo-600" },
-    { label: "完成", value: metrics.total_completed, icon: Users, color: "text-emerald-600" },
-    { label: "活跃", value: metrics.active_count, icon: Circle, color: "text-amber-600" },
-    { label: "最大深度", value: metrics.max_chain_depth, icon: Layers, color: "text-blue-600" },
+    { label: "生成", value: metrics.total_spawned, icon: GitForkIcon, color: "#a5b4fc", tone: "info" },
+    { label: "完成", value: metrics.total_completed, icon: Users, color: "var(--tone-success-text)", tone: "success" },
+    { label: "活跃", value: metrics.active_count, icon: Circle, color: "var(--tone-warning-text)", tone: "warning" },
+    { label: "最大深度", value: metrics.max_chain_depth, icon: Layers, color: "#93c5fd", tone: "info" },
   ];
 
   return (
-    <div className="flex items-center gap-3 flex-wrap">
+    <div className="prism-pill-row">
       {items.map((item) => {
         const Icon = item.icon;
         return (
-          <div key={item.label} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-white border border-slate-200">
-            <Icon size={12} className={item.color} />
-            <span className="text-xs text-slate-500">{item.label}</span>
-            <span className={`font-mono text-sm font-semibold ${item.color}`}>
+          <div key={item.label} className="prism-pill" data-tone={item.tone}>
+            <Icon size={12} style={{ color: item.color }} />
+            <span>{item.label}</span>
+            <span className="font-mono" style={{ fontSize: 12, fontWeight: 700, color: item.color }}>
               {item.value}
             </span>
           </div>
         );
       })}
       {metrics.fan_out_critical && (
-        <span className="flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 border border-red-200 text-red-700 text-[11px] font-medium">
+        <span className="prism-pill" data-tone="danger">
           <AlertTriangle size={12} />
           扇出风暴: {metrics.fan_out_ratio.toFixed(1)}:1
         </span>
@@ -212,92 +244,136 @@ const NodeDetailPanel: React.FC<{
   node: TreeNode;
   onClose: () => void;
 }> = ({ node, onClose }) => {
+  const [liveNowMs, setLiveNowMs] = useState<number | null>(null);
   const color = depthColor(node.chain_depth);
   const isCompleted = node.completed_at_ms != null;
-  const latencyMs = isCompleted ? node.completed_at_ms! - node.spawned_at_ms : Date.now() - node.spawned_at_ms;
+  const latencyMs = isCompleted
+    ? node.completed_at_ms! - node.spawned_at_ms
+    : Math.max(0, (liveNowMs ?? node.spawned_at_ms) - node.spawned_at_ms);
   const idle = node.idle_breakdown;
 
   const contextPct = (node.context_overhead_ratio * 100).toFixed(1);
-  const contextColor = node.context_overhead_ratio > 0.85 ? "text-red-600" : node.context_overhead_ratio > 0.6 ? "text-amber-600" : "text-emerald-600";
+  const contextColor =
+    node.context_overhead_ratio > 0.85
+      ? "var(--tone-danger-text)"
+      : node.context_overhead_ratio > 0.6
+        ? "var(--tone-warning-text)"
+        : "var(--tone-success-text)";
+
+  useEffect(() => {
+    if (isCompleted) return;
+    setLiveNowMs(Date.now());
+    const timer = window.setInterval(() => {
+      setLiveNowMs(Date.now());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isCompleted]);
 
   return (
-    <div className="p-4 rounded-lg border border-slate-200 bg-white space-y-3">
-      {/* 标题 */}
-      <div className="flex items-center justify-between">
+    <div className="prism-detail-card">
+      <div className="flex items-center justify-between gap-10">
         <div className="flex items-center gap-2">
-          <span className={`inline-block w-2.5 h-2.5 rounded-full ${isCompleted ? "bg-emerald-500" : "bg-amber-400 animate-pulse"}`} />
-          <span className={`font-mono font-semibold text-sm ${color.text}`}>
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              background: isCompleted ? "var(--tone-success-text)" : "var(--tone-warning-text)",
+            }}
+          />
+          <span className="font-mono font-semibold text-sm" style={{ color: color.text }}>
             {node.agent_id || node.node_id.slice(0, 12)}
           </span>
-          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${color.bg} ${color.text}`}>
+          <span
+            style={{
+              padding: "3px 7px",
+              borderRadius: 999,
+              fontSize: 10,
+              fontWeight: 600,
+              background: color.bg,
+              border: `1px solid ${color.border}`,
+              color: color.text,
+            }}
+          >
             L{node.chain_depth}
           </span>
         </div>
-        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors text-xs">
+        <button
+          onClick={onClose}
+          style={{
+            border: "1px solid var(--border-soft)",
+            background: "var(--surface-soft)",
+            color: "var(--text-secondary)",
+            borderRadius: 999,
+            minWidth: 28,
+            height: 28,
+            cursor: "pointer",
+          }}
+        >
           ✕
         </button>
       </div>
 
-      {/* 指标网格 */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="p-2 rounded bg-slate-50">
-          <div className="text-[10px] text-slate-500 mb-0.5">延迟</div>
-          <div className="font-mono text-sm font-semibold text-slate-800">
+      <div className="prism-detail-grid">
+        <div className="prism-detail-metric">
+          <div className="prism-detail-metric__label">延迟</div>
+          <div className="prism-detail-metric__value font-mono">
             {latencyMs > 60_000 ? `${(latencyMs / 60_000).toFixed(1)}m` : `${(latencyMs / 1000).toFixed(1)}s`}
           </div>
         </div>
-        <div className="p-2 rounded bg-slate-50">
-          <div className="text-[10px] text-slate-500 mb-0.5">上下文饱和度</div>
-          <div className={`font-mono text-sm font-semibold ${contextColor}`}>
+        <div className="prism-detail-metric">
+          <div className="prism-detail-metric__label">上下文饱和度</div>
+          <div className="prism-detail-metric__value font-mono" style={{ color: contextColor }}>
             {contextPct}%
           </div>
         </div>
-        <div className="p-2 rounded bg-slate-50">
-          <div className="text-[10px] text-slate-500 mb-0.5">输入/输出</div>
-          <div className="font-mono text-sm font-semibold text-slate-800">
+        <div className="prism-detail-metric">
+          <div className="prism-detail-metric__label">输入/输出</div>
+          <div className="prism-detail-metric__value font-mono">
             {(node.bytes_in / 1024).toFixed(0)}k / {(node.bytes_out / 1024).toFixed(0)}k
           </div>
         </div>
-        <div className="p-2 rounded bg-slate-50">
-          <div className="text-[10px] text-slate-500 mb-0.5">Token 数</div>
-          <div className="font-mono text-sm font-semibold text-slate-800">
+        <div className="prism-detail-metric">
+          <div className="prism-detail-metric__label">Token 数</div>
+          <div className="prism-detail-metric__value font-mono">
             {node.token_count.toLocaleString()}
           </div>
         </div>
       </div>
 
-      {/* 空闲归因 */}
       {idle && (
         <div>
-          <div className="text-[10px] font-medium text-slate-500 mb-1.5">空闲归因 (ms)</div>
-          <div className="space-y-1">
-            <IdleBar label="排队等待派发" value={idle.queued_awaiting_dispatch_ms} max={4096} color="bg-slate-400" />
-            <IdleBar label="上下文注入 I/O" value={idle.context_injection_io_ms} max={4096} color="bg-blue-400" />
-            <IdleBar label="模型推理排队" value={idle.model_inference_queueing_ms} max={4096} color="bg-violet-400" />
-            <IdleBar label="工具调用往返" value={idle.tool_call_round_trip_ms} max={4096} color="bg-emerald-400" />
+          <div className="prism-detail-metric__label" style={{ marginBottom: 8 }}>空闲归因 (ms)</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            <IdleBar label="排队等待派发" value={idle.queued_awaiting_dispatch_ms} max={4096} color="rgba(148, 163, 184, 0.92)" />
+            <IdleBar label="上下文注入 I/O" value={idle.context_injection_io_ms} max={4096} color="rgba(96, 165, 250, 0.92)" />
+            <IdleBar label="模型推理排队" value={idle.model_inference_queueing_ms} max={4096} color="rgba(167, 139, 250, 0.92)" />
+            <IdleBar label="工具调用往返" value={idle.tool_call_round_trip_ms} max={4096} color="rgba(52, 211, 153, 0.92)" />
           </div>
         </div>
       )}
 
-      {/* 模型保真度 */}
       {node.model_assigned && (
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-500">模型:</span>
-          <code className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">{node.model_assigned}</code>
+        <div className="prism-pill-row" style={{ gap: 6 }}>
+          <span style={{ fontSize: 11, color: "var(--text-quaternary)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
+            模型
+          </span>
+          <code className="prism-pill" style={{ fontFamily: "var(--font-geist-mono), monospace" }}>{node.model_assigned}</code>
           {node.model_optimal && node.model_optimal !== node.model_assigned && (
             <>
-              <span className="text-slate-400">→ 推荐:</span>
-              <code className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">{node.model_optimal}</code>
-              <span className="text-amber-500" title="非最优模型分配">⚠</span>
+              <span style={{ color: "var(--text-tertiary)", fontSize: 11 }}>→ 推荐</span>
+              <code className="prism-pill" data-tone="warning" style={{ fontFamily: "var(--font-geist-mono), monospace" }}>
+                {node.model_optimal}
+              </code>
+              <span style={{ color: "var(--tone-warning-text)" }} title="非最优模型分配">⚠</span>
             </>
           )}
         </div>
       )}
 
-      {/* 子节点统计 */}
       {node.child_ids.length > 0 && (
-        <div className="text-xs text-slate-500">
-          子代理: <span className="font-mono font-semibold text-slate-700">{node.child_ids.length}</span> 个
+        <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          子代理: <span className="font-mono" style={{ fontWeight: 700, color: "var(--text-primary)" }}>{node.child_ids.length}</span> 个
         </div>
       )}
     </div>
@@ -308,12 +384,17 @@ const NodeDetailPanel: React.FC<{
 const IdleBar: React.FC<{ label: string; value: number; max: number; color: string }> = ({ label, value, max, color }) => {
   const pct = Math.min((value / max) * 100, 100);
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-[10px] text-slate-500 w-24 shrink-0">{label}</span>
-      <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+    <div className="prism-meter">
+      <span style={{ width: 96, flexShrink: 0, fontSize: 10, color: "var(--text-secondary)" }}>{label}</span>
+      <div className="prism-meter__track">
+        <div className="prism-meter__fill" style={{ width: `${pct}%`, background: color }} />
       </div>
-      <span className="font-mono text-[10px] text-slate-500 w-12 text-right">{value.toFixed(0)}</span>
+      <span
+        className="font-mono"
+        style={{ width: 42, textAlign: "right", fontSize: 10, color: "var(--text-secondary)" }}
+      >
+        {value.toFixed(0)}
+      </span>
     </div>
   );
 };
@@ -328,11 +409,18 @@ const TreeConnector: React.FC<{ depth: number; isLast: boolean }> = ({ depth, is
     <span className="shrink-0 flex items-center" style={{ width: depth * 16 }}>
       {Array.from({ length: depth - 1 }).map((_, i) => (
         <span key={i} className="w-4 h-full flex items-center">
-          <span className="w-4 h-px bg-slate-200" />
+          <span style={{ width: 16, height: 1, background: "var(--border-soft)" }} />
         </span>
       ))}
       <span className={`w-4 flex items-center ${isLast ? "h-px" : "h-4"}`}>
-        <span className={`w-2 h-px bg-slate-300 ${isLast ? "" : "-translate-y-1/2"}`} />
+        <span
+          style={{
+            width: 8,
+            height: 1,
+            background: "var(--text-tertiary)",
+            transform: isLast ? undefined : "translateY(-50%)",
+          }}
+        />
       </span>
     </span>
   );
@@ -350,7 +438,7 @@ export interface HandoffDelegationTreeProps {
   /** 当前选中的节点 ID */
   selectedNodeId: string | null;
   /** 节点选择回调 */
-  onSelectNode: (nodeId: string) => void;
+  onSelectNode: (nodeId: string | null) => void;
   /** 时间线回放时间戳 (ms, null = 实时) */
   replayTimestampMs: number | null;
   /** 依赖边 */
@@ -360,8 +448,6 @@ export interface HandoffDelegationTreeProps {
     artifact_path: string;
     is_orphaned: boolean;
   }>;
-  /** 按深度着色 */
-  colorByDepth?: boolean;
 }
 
 export const HandoffDelegationTree: React.FC<HandoffDelegationTreeProps> = ({
@@ -371,9 +457,8 @@ export const HandoffDelegationTree: React.FC<HandoffDelegationTreeProps> = ({
   onSelectNode,
   replayTimestampMs,
   dependencyEdges = [],
-  colorByDepth = true,
 }) => {
-  const [showDetail, setShowDetail] = useState(false);
+  const [showDetail, setShowDetail] = useState(true);
 
   // 构建内部树结构 + 展平行列表
   const { tree, flatRows } = useMemo(() => {
@@ -383,9 +468,10 @@ export const HandoffDelegationTree: React.FC<HandoffDelegationTreeProps> = ({
   }, [rootNode]);
 
   const selectedNode = useMemo(() => {
-    if (!selectedNodeId || !tree) return null;
+    const effectiveSelectedNodeId = selectedNodeId ?? (showDetail ? tree?.node_id ?? null : null);
+    if (!effectiveSelectedNodeId || !tree) return null;
     function find(n: TreeNode): TreeNode | null {
-      if (n.node_id === selectedNodeId) return n;
+      if (n.node_id === effectiveSelectedNodeId) return n;
       for (const c of n.children) {
         const found = find(c);
         if (found) return found;
@@ -393,46 +479,47 @@ export const HandoffDelegationTree: React.FC<HandoffDelegationTreeProps> = ({
       return null;
     }
     return find(tree);
-  }, [tree, selectedNodeId]);
+  }, [tree, selectedNodeId, showDetail]);
+
+  const effectiveSelectedNodeId = selectedNodeId ?? (showDetail ? tree?.node_id ?? null : null);
 
   const orphanCount = dependencyEdges.filter((e) => e.is_orphaned).length;
 
   // 空状态
   if (!tree) {
     return (
-      <div className="p-8 text-center text-slate-400">
-        <div className="text-2xl mb-2">🕸️</div>
-        <div className="text-sm">无委托数据</div>
-        <div className="text-xs mt-1 text-slate-300">
+      <PrismPanel size="lg" grid shimmer style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 24, marginBottom: 6 }}>🕸️</div>
+        <div style={{ fontSize: 14, color: "var(--text-primary)" }}>无委托数据</div>
+        <div style={{ fontSize: 12, marginTop: 4, color: "var(--text-tertiary)" }}>
           等待 AgentSight 后端推送 `delegation_tree` 事件
         </div>
-      </div>
+      </PrismPanel>
     );
   }
 
   return (
     <div className="space-y-4">
-      {/* 标题栏 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-slate-700">委托树</h3>
-          <span className="text-[10px] font-mono text-slate-400 px-1.5 py-0.5 rounded bg-slate-100">
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>委托树</h3>
+          <span className="prism-pill" style={{ minHeight: 26, padding: "4px 8px", fontFamily: "var(--font-geist-mono), monospace" }}>
             {metrics.total_spawned} 节点
           </span>
           {orphanCount > 0 && (
-            <span className="text-[10px] text-red-600 px-1.5 py-0.5 rounded bg-red-50 border border-red-200">
+            <span className="prism-pill" data-tone="danger" style={{ minHeight: 26, padding: "4px 8px" }}>
               {orphanCount} 孤立
             </span>
           )}
           {replayTimestampMs && (
-            <span className="text-[10px] text-indigo-600 px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200">
+            <span className="prism-pill" data-tone="info" style={{ minHeight: 26, padding: "4px 8px" }}>
               回放 T+{(replayTimestampMs / 1000).toFixed(0)}s
             </span>
           )}
         </div>
-        <span className="text-[10px] text-slate-400">
+        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
           {metrics.fan_out_critical ? (
-            <span className="text-red-600 font-medium flex items-center gap-1">
+            <span style={{ color: "var(--tone-danger-text)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}>
               <AlertTriangle size={10} /> 扇出 {metrics.fan_out_ratio.toFixed(1)}:1
             </span>
           ) : (
@@ -441,46 +528,64 @@ export const HandoffDelegationTree: React.FC<HandoffDelegationTreeProps> = ({
         </span>
       </div>
 
-      {/* 指标条 */}
       <MetricsBar metrics={metrics} />
 
-      {/* 树列表区域 */}
-      <div className="border border-slate-200 rounded-lg bg-white divide-y divide-slate-100 max-h-[50vh] overflow-y-auto">
-        {flatRows.map((row, i) => (
-          <div key={row.node.node_id || i} className="flex">
-            {/* 连接线 */}
-            <TreeConnector depth={row.depth} isLast={row.isLastChild} />
-            {/* 节点行 */}
-            <div className="flex-1 min-w-0">
-              <TreeNodeRow
-                node={row.node}
-                depth={row.depth}
-                isSelected={row.node.node_id === selectedNodeId}
-                onSelect={(id) => {
-                  onSelectNode(id);
-                  setShowDetail(true);
-                }}
-              />
+      <div className="prism-tree-shell">
+        <div className="prism-tree-shell__inner prism-premium-scroll">
+          {flatRows.map((row, i) => (
+            <div key={row.node.node_id || i} className="flex" style={{ marginBottom: 6 }}>
+              <TreeConnector depth={row.depth} isLast={row.isLastChild} />
+              <div className="flex-1 min-w-0">
+                <TreeNodeRow
+                  node={row.node}
+                  depth={row.depth}
+                  isSelected={row.node.node_id === effectiveSelectedNodeId}
+                  onSelect={(id) => {
+                    onSelectNode(id);
+                    setShowDetail(true);
+                  }}
+                />
+              </div>
             </div>
-          </div>
-        ))}
-        {flatRows.length === 0 && (
-          <div className="p-6 text-center text-slate-400 text-xs">
-            委托树为空
-          </div>
-        )}
+          ))}
+          {flatRows.length === 0 && (
+            <div style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)", fontSize: 12 }}>
+              委托树为空
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* 孤立工作提示 */}
       {dependencyEdges.filter((e) => e.is_orphaned).length > 0 && (
-        <div className="p-3 rounded-lg border border-amber-200 bg-amber-50">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 mb-1.5">
+        <div
+          style={{
+            padding: 14,
+            borderRadius: 18,
+            border: "1px solid var(--tone-warning-border)",
+            background: "var(--tone-warning-bg)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              marginBottom: 8,
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--tone-warning-text)",
+            }}
+          >
             <AlertTriangle size={12} />
             孤立工作
           </div>
-          <div className="space-y-1">
+          <div style={{ display: "grid", gap: 6 }}>
             {dependencyEdges.filter((e) => e.is_orphaned).slice(0, 5).map((edge, i) => (
-              <div key={i} className="text-[11px] text-amber-600 font-mono truncate">
+              <div
+                key={i}
+                className="font-mono truncate"
+                style={{ fontSize: 11, color: "var(--tone-warning-text)" }}
+              >
                 {edge.from_spawn_id.slice(0, 8)} → {edge.to_spawn_id.slice(0, 8)}: {edge.artifact_path}
               </div>
             ))}
@@ -488,11 +593,13 @@ export const HandoffDelegationTree: React.FC<HandoffDelegationTreeProps> = ({
         </div>
       )}
 
-      {/* 选中节点详情面板 */}
       {showDetail && selectedNode && (
         <NodeDetailPanel
           node={selectedNode}
-          onClose={() => { setShowDetail(false); onSelectNode(""); }}
+          onClose={() => {
+            setShowDetail(false);
+            onSelectNode(null);
+          }}
         />
       )}
     </div>

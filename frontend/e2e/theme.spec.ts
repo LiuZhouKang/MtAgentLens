@@ -1,77 +1,78 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+async function expectEffectiveTheme(page: Page, theme: 'light' | 'dark') {
+  await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+  await expect.poll(async () => {
+    return page.evaluate(() => document.documentElement.style.colorScheme);
+  }).toBe(theme);
+}
 
 test.beforeEach(async ({ page }) => {
-  // Mock the user preferences API so the ThemeToggle resolves immediately.
-  // Return 'light' as the initial theme so one click (light→dark) matches the spec.
-  await page.route('**/api/user/preferences', async (route) => {
-    if (route.request().method() === 'GET') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ theme: 'light' }),
-      });
-    } else if (route.request().method() === 'PUT') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true }),
-      });
-    } else {
-      await route.continue();
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.addInitScript(() => {
+    if (!window.localStorage.getItem('app-theme')) {
+      window.localStorage.setItem('app-theme', 'light');
     }
   });
 
-  await page.goto('/');
-
-  // Hide the globe iframe that overlaps the theme toggle
-  await page.evaluate(() => {
-    const iframe = document.querySelector('iframe[src*="globe"]');
-    if (iframe) (iframe as HTMLElement).style.display = 'none';
-  });
-
-  // Wait for the theme toggle to be enabled (after API call resolves)
+  await page.goto('/?audit=headless');
   await page.waitForSelector('[data-testid="theme-toggle"]:not([disabled])', { timeout: 5000 });
+  await expectEffectiveTheme(page, 'light');
 });
 
 test('theme-toggle button is rendered and clickable', async ({ page }) => {
   const toggle = page.locator('[data-testid="theme-toggle"]');
   await expect(toggle).toBeVisible();
   await expect(toggle).toBeEnabled();
+  await expect(toggle).toHaveAttribute('title', /浅色模式/);
 });
 
 test('dark mode toggle persists across reload', async ({ page }) => {
-  const html = page.locator('html');
-
-  // Click: light → dark
   await page.click('[data-testid="theme-toggle"]');
-  await expect(html).toHaveClass('dark');
+  await expectEffectiveTheme(page, 'dark');
+  await expect.poll(async () => page.evaluate(() => window.localStorage.getItem('app-theme'))).toBe('dark');
 
-  // Reload and verify persistence — localStorage retains the preference
   await page.reload();
   await page.waitForSelector('[data-testid="theme-toggle"]:not([disabled])', { timeout: 5000 });
-  await expect(html).toHaveClass('dark');
+  await expectEffectiveTheme(page, 'dark');
 });
 
 test('cycles through light → dark → system', async ({ page }) => {
-  const html = page.locator('html');
   const toggle = page.locator('[data-testid="theme-toggle"]');
 
-  // Click 1: light → dark
   await toggle.click();
-  await expect(html).toHaveClass('dark');
+  await expectEffectiveTheme(page, 'dark');
+  await expect(toggle).toHaveAttribute('title', /深色模式/);
 
-  // Click 2: dark → system
   await toggle.click();
   await expect(toggle).toBeEnabled();
+  await expectEffectiveTheme(page, 'light');
+  await expect(toggle).toHaveAttribute('title', /跟随系统/);
+  await expect.poll(async () => page.evaluate(() => window.localStorage.getItem('app-theme'))).toBe('system');
 });
 
 test('theme toggle works with keyboard', async ({ page }) => {
-  const html = page.locator('html');
   const toggle = page.locator('[data-testid="theme-toggle"]');
 
-  // Focus and press Enter to toggle light → dark
   await toggle.focus();
   await page.keyboard.press('Enter');
+  await expectEffectiveTheme(page, 'dark');
+});
 
-  await expect(html).toHaveClass('dark');
+test('investigation page exposes theme toggle and no fatal console errors', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      errors.push(message.text());
+    }
+  });
+
+  await page.goto('/investigations#alertId=demo-alert-1');
+  await expect(page.locator('[data-testid="theme-toggle"]')).toBeVisible();
+  expect(errors.filter((item) => !item.includes('favicon'))).toEqual([]);
+});
+
+test('handoff page keeps the shared theme toggle visible', async ({ page }) => {
+  await page.goto('/handoff');
+  await expect(page.locator('[data-testid="theme-toggle"]')).toBeVisible();
 });

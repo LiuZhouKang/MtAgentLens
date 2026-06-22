@@ -35,6 +35,9 @@ export function ActivityList({ activities }: ActivityListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(-1);
 
+  // TanStack Virtual intentionally returns imperative helpers that React Compiler
+  // cannot safely memoize today; the hook itself is still the supported API.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: activities.length,
     getScrollElement: () => parentRef.current,

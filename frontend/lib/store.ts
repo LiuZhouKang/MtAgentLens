@@ -1,8 +1,11 @@
 import { create } from 'zustand';
+import { api } from './api';
 import type { ResponsibilityAlert, GraphData, GraphMetrics, AppState, ZoomLevel } from './types';
+import { demoAlerts, demoGraph } from './demo-data';
+import { deriveGraphMetrics } from './large-agent-graph';
 
 interface EngineAPI {
-  setVisualizationMode(mode: 'globe' | 'graph3d' | 'graph2d' | 'map'): void;
+  setVisualizationMode(mode: 'globe' | 'graph3d' | 'graph2d' | 'map' | 'hero' | 'focus'): void;
   flyToAgent(agentId: string, duration?: number): void;
   flyToNode(nodeId: string, duration?: number): void;
   flyToLevel(level: number, duration?: number): void;
@@ -33,6 +36,7 @@ interface AppStore {
   engineRef: { current: EngineAPI | null };
 
   setAppState: (s: AppState) => void;
+  setActiveRunId: (runId: string | null) => void;
   setZoomLevel: (l: ZoomLevel) => void;
   setGraph: (nodes: GraphData['nodes'], edges: GraphData['edges']) => void;
   setAlerts: (alerts: ResponsibilityAlert[]) => void;
@@ -45,30 +49,38 @@ interface AppStore {
   flyToAgent: (id: string) => void;
   flyToNode: (id: string) => void;
   flyToLevel: (l: ZoomLevel) => void;
-  setVisualizationMode: (m: 'globe' | 'graph3d' | 'graph2d' | 'map') => void;
+  setVisualizationMode: (m: 'globe' | 'graph3d' | 'graph2d' | 'map' | 'hero' | 'focus') => void;
   highlightPath: (edgeIds: string[]) => void;
   clearHighlights: () => void;
+  loadRun: (runId: string) => Promise<void>;
   onAlertReceived: (alert: ResponsibilityAlert) => void;
   onRunActiveChanged: (active: boolean) => void;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
-  appState: 'init',
+  appState: 'replay',
   activeRunId: null,
   zoomLevel: 0,
   selectedNodeId: null,
   expandedNodeIds: new Set(),
-  alerts: [],
-  graph: { nodes: [], edges: [] },
-  graphMetrics: null,
+  alerts: demoAlerts,
+  graph: demoGraph,
+  graphMetrics: deriveGraphMetrics(demoGraph),
   timelinePosition: 0,
   errorMessage: null,
   engineRef: { current: null },
 
   setAppState: (s) => set({ appState: s }),
+  setActiveRunId: (runId) => set({ activeRunId: runId }),
   setZoomLevel: (l) => set({ zoomLevel: l }),
-  setGraph: (nodes, edges) => set({ graph: { nodes, edges } }),
-  setAlerts: (alerts) => set({ alerts }),
+  setGraph: (nodes, edges) => {
+    const graph = { nodes, edges };
+    set({ graph, graphMetrics: deriveGraphMetrics(graph) });
+  },
+  setAlerts: (alerts) => {
+    const snapshotMetrics = alerts[0]?.graph_snapshot?.metrics ?? null;
+    set({ alerts, graphMetrics: snapshotMetrics ?? get().graphMetrics });
+  },
   selectNode: (id) => set({ selectedNodeId: id }),
   deselectNode: () => set({ selectedNodeId: null }),
   expandNode: (id) => {
@@ -92,6 +104,27 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setVisualizationMode: (m) => get().engineRef.current?.setVisualizationMode(m),
   highlightPath: (edgeIds) => get().engineRef.current?.highlightPath(edgeIds),
   clearHighlights: () => get().engineRef.current?.clearHighlights(),
+  loadRun: async (runId) => {
+    if (!runId) return;
+    set({ activeRunId: runId, appState: 'replay', errorMessage: null });
+
+    try {
+      const [graph, alerts] = await Promise.all([
+        api.getGraph(runId),
+        api.getAlerts(runId),
+      ]);
+
+      set({
+        graph: { nodes: graph.nodes, edges: graph.edges },
+        graphMetrics: deriveGraphMetrics({ nodes: graph.nodes, edges: graph.edges }),
+        alerts,
+        selectedNodeId: null,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      set({ errorMessage: message, appState: 'error' });
+    }
+  },
 
   onAlertReceived: (alert) => {
     const existing = get().alerts.find((a) => a.alert_id === alert.alert_id);
@@ -108,6 +141,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
           edges: alert.graph_snapshot.edges || [],
         });
       }
+      set({
+        graph: {
+          nodes: alert.graph_snapshot.nodes,
+          edges: alert.graph_snapshot.edges || [],
+        },
+        graphMetrics: alert.graph_snapshot.metrics ?? deriveGraphMetrics({
+          nodes: alert.graph_snapshot.nodes,
+          edges: alert.graph_snapshot.edges || [],
+        }),
+      });
     }
   },
   onRunActiveChanged: (active) => {

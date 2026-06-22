@@ -1,25 +1,21 @@
 // Demo data simulating a real AgentSight monitoring session.
 // Used when /api/demo backend endpoint is unavailable.
 
-import type { ResponsibilityAlert, GraphData, GraphSnapshot } from './types';
+import type { CorrelationEvidence, ResponsibilityAlert, GraphData, GraphSnapshot } from './types';
+import { buildLargeAgentGraph, deriveGraphMetrics } from './large-agent-graph';
 
-const now = Date.now() * 1_000_000; // current ns
+// Keep demo fixtures deterministic across SSR and CSR to avoid hydration drift.
+const now = Date.parse('2026-06-20T09:30:00.000Z') * 1_000_000;
 
 function snapshot(nodes: any[], edges: any[]): GraphSnapshot {
+  const metrics = deriveGraphMetrics({ nodes, edges });
+
   return {
     snapshot_id: 'demo-snap-1',
     timestamp_ns: now - 5_000_000_000,
     nodes,
     edges,
-    metrics: {
-      node_counts: { Agent: 3, Resource: 4, PolicyBoundary: 2 },
-      edge_counts: { IntentCausesAction: 3, AgentDelegatesTo: 1, ContextFlowsFrom: 1, TaintPropagatesTo: 1, PolicyBoundaryCrossing: 1, CompetingExplanation: 0 },
-      agent_count: 3,
-      cross_agent_edges: 1,
-      delegation_depth: 1,
-      taint_chains: 1,
-      avg_confidence: 0.73,
-    },
+    metrics,
   };
 }
 
@@ -45,10 +41,83 @@ const demoEdges = [
   { edge_id: 'e-intent-3', edge_type: 'IntentCausesAction' as const, source: 'agent-frontend', target: 'res-api', evidence_refs: ['ev-1'], confidence: 0.91, phase: { Authoritative: { timestamp_ns: now - 29_000_000_000, overrides: null } } },
 ];
 
-export const demoGraph: GraphData = {
+const demoBaseGraph: GraphData = {
   nodes: demoNodes,
   edges: demoEdges,
 };
+
+export const demoGraph: GraphData = buildLargeAgentGraph(demoBaseGraph);
+
+export const demoEvidence: CorrelationEvidence[] = [
+  {
+    evidence_id: 'ev-1',
+    intent_id: 'intent-frontend-read',
+    action_id: 'action-frontend-read',
+    match_level: 'L1Exact',
+    confidence: 0.95,
+    matched_fields: {
+      canonical_path: '/src/components/Button.tsx',
+      host: null,
+      port: null,
+      command: 'read Button.tsx',
+      raw_args: ['Button.tsx'],
+    },
+    derivation_mode: 'demo',
+    phase: { Authoritative: { timestamp_ns: now - 29_000_000_000, overrides: null } },
+    timestamp_ns: now - 29_000_000_000,
+  },
+  {
+    evidence_id: 'ev-2',
+    intent_id: 'intent-frontend-write',
+    action_id: 'action-frontend-write',
+    match_level: 'L1Exact',
+    confidence: 0.88,
+    matched_fields: {
+      canonical_path: '/package.json',
+      host: null,
+      port: null,
+      command: 'write package.json',
+      raw_args: ['package.json'],
+    },
+    derivation_mode: 'demo',
+    phase: { Authoritative: { timestamp_ns: now - 22_000_000_000, overrides: null } },
+    timestamp_ns: now - 22_000_000_000,
+  },
+  {
+    evidence_id: 'ev-3',
+    intent_id: 'intent-shadow-read',
+    action_id: 'action-shadow-read',
+    match_level: 'L1Exact',
+    confidence: 0.91,
+    matched_fields: {
+      canonical_path: '/etc/shadow',
+      host: null,
+      port: null,
+      command: 'cat /etc/shadow',
+      raw_args: ['/etc/shadow'],
+    },
+    derivation_mode: 'demo',
+    phase: { Authoritative: { timestamp_ns: now - 15_000_000_000, overrides: null } },
+    timestamp_ns: now - 15_000_000_000,
+  },
+  {
+    evidence_id: 'ev-4',
+    intent_id: 'intent-delegation-security',
+    action_id: 'action-delegation-security',
+    match_level: 'L1Exact',
+    confidence: 0.77,
+    matched_fields: {
+      canonical_path: null,
+      host: null,
+      port: null,
+      command: 'delegate security-auditor',
+      raw_args: ['security-auditor'],
+    },
+    derivation_mode: 'demo',
+    phase: { Authoritative: { timestamp_ns: now - 20_000_000_000, overrides: null } },
+    timestamp_ns: now - 20_000_000_000,
+  },
+];
 
 export const demoAlerts: ResponsibilityAlert[] = [
   {
@@ -90,7 +159,7 @@ export const demoAlerts: ResponsibilityAlert[] = [
       ],
       total_duration_ms: 10500,
     },
-    graph_snapshot: snapshot(demoNodes, demoEdges),
+    graph_snapshot: snapshot(demoGraph.nodes, demoGraph.edges),
     phase: { Authoritative: { timestamp_ns: now - 10_000_000_000, overrides: null } },
     provisional_ref: null,
   },
@@ -122,7 +191,7 @@ export const demoAlerts: ResponsibilityAlert[] = [
       ],
       total_duration_ms: 2000,
     },
-    graph_snapshot: snapshot(demoNodes, demoEdges),
+    graph_snapshot: snapshot(demoGraph.nodes, demoGraph.edges),
     phase: { Authoritative: { timestamp_ns: now - 28_000_000_000, overrides: null } },
     provisional_ref: null,
   },

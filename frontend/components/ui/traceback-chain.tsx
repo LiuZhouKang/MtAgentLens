@@ -10,7 +10,7 @@ export default function TracebackChain({ nodeIds, edgeIds }: { nodeIds: string[]
   return (
     <div>
       <h4 className="text-[12px] uppercase tracking-wider text-[#68687a] mb-2">
-        责任追溯链 · {nodeIds.length} nodes
+        责任追溯链 · {nodeIds.length} nodes · {edgeIds.length} edges
       </h4>
       <div className="flex items-center flex-wrap gap-1">
         {nodeIds.map((id, i) => (

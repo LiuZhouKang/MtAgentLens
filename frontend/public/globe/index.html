@@ -11,39 +11,219 @@
   <meta property="og:image" content="http://globe.cid.harvard.edu/images/preview.png">
   <meta property="og:url" content="index.html">
   <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <script>
+    var __agentsightParams = new URLSearchParams(window.location.search);
+    window.__AGENTSIGHT_EMBED_MODE = __agentsightParams.get('embed') || '';
+    window.__AGENTSIGHT_EMBED_HERO = window.__AGENTSIGHT_EMBED_MODE === 'hero';
+    window.__AGENTSIGHT_EMBED_INTRO = window.__AGENTSIGHT_EMBED_MODE === 'intro';
+    window.__AGENTSIGHT_HEADLESS_AUDIT =
+      ((window.__AGENTSIGHT_EMBED_HERO || window.__AGENTSIGHT_EMBED_INTRO) && __agentsightParams.get('audit') === 'headless') ||
+      ((window.__AGENTSIGHT_EMBED_HERO || window.__AGENTSIGHT_EMBED_INTRO) &&
+        !!navigator.webdriver &&
+        /HeadlessChrome/i.test(navigator.userAgent));
+    if (window.__AGENTSIGHT_EMBED_HERO || window.__AGENTSIGHT_EMBED_INTRO) {
+      document.documentElement.className += ' agentsight-embed';
+    }
+    if (window.__AGENTSIGHT_EMBED_HERO) {
+      document.documentElement.className += ' agentsight-hero';
+    }
+    if (window.__AGENTSIGHT_EMBED_INTRO) {
+      document.documentElement.className += ' agentsight-intro';
+    }
+    if (window.__AGENTSIGHT_HEADLESS_AUDIT) {
+      document.documentElement.className += ' agentsight-audit';
+    }
+  </script>
   <link href="style.css" rel="stylesheet" type="text/css">
   <link rel="icon" href="images/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <script>
+    (function () {
+      function appendStylesheet(href) {
+        var link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        document.head.appendChild(link);
+      }
 
-<script src="jquery.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Raleway+Dots&display=swap" rel="stylesheet">
-<link href="select2.css" rel="stylesheet" type="text/css">
-<script src="select2.min.js"></script>
-<script src="three.min.js"></script>
+      function loadScript(src) {
+        return new Promise(function (resolve, reject) {
+          var script = document.createElement('script');
+          script.src = src;
+          script.async = false;
+          script.onload = resolve;
+          script.onerror = function () {
+            reject(new Error('Failed to load ' + src));
+          };
+          document.head.appendChild(script);
+        });
+      }
+
+      function registerHeadlessAuditBridge() {
+        var announced = false;
+        function announceReady() {
+          if (announced) return;
+          announced = true;
+          window.parent.postMessage({ type: 'agentsight:ready' }, '*');
+        }
+
+        window.agentsight_bootstrap = function () {};
+        window.agentsight_loadGraph = function () {};
+        window.agentsight_setPhase = function () {};
+        window.__agentsightSetHeroView = function () {};
+        window.__agentsightIsHeroViewReleased = function () { return false; };
+        window.addEventListener('DOMContentLoaded', announceReady, { once: true });
+        window.addEventListener('load', announceReady, { once: true });
+      }
+
+      if (window.__AGENTSIGHT_HEADLESS_AUDIT) {
+        registerHeadlessAuditBridge();
+        return;
+      }
+
+      appendStylesheet('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap');
+      appendStylesheet('select2.css');
+
+      [
+        'jquery.min.js',
+        'select2.min.js',
+        'three.min.js',
+        'scripts/noWebGL.js',
+        'scripts/spin.js',
+        'data/anchors.js',
+        'scripts/UI.js',
+        'scripts/labels.js',
+        'scripts/countrydata.js',
+        'scripts/THREE.GeoJSON.js',
+        'scripts/cameraControls.js',
+        'scripts/THREE.FullScreen.js',
+        'scripts/ParticleLinks.js',
+        'scripts/URLparser.js',
+        'scripts/script.js',
+        'scripts/THREEx.KeyboardState.js'
+      ].reduce(function (chain, src) {
+        return chain.then(function () {
+          return loadScript(src);
+        });
+      }, Promise.resolve()).catch(function (error) {
+        console.error('[AgentSight] Globe asset bootstrap failed', error);
+      });
+    })();
+  </script>
 </head>
 
 <body >
 
 	<div id="storyPrompt">
-		<div id="description">Ever wanted to see the true scale of the world economy?<br/><br/> Visualize 15 trillion dollars of world trade. One dot equals 100 million dollars of exported products.<br/> <div id="loaded">Loading world export data...</div>
-		</div>
-		<div id="choice" style="display:none">
-			<div id='beginStory'>
-			<img src="images/icon/tour.png"/>
-			<div>Start the Intro</div>
-			<div id="loading">View an animated tour through the visualizations and concepts behind this project.</div>
+		<div class="intro-stage-shell">
+			<div class="intro-brand-lockup">
+				<div class="intro-brand-panel">
+					<div class="intro-brand-mark">
+						<svg class="intro-brand-mark__glyph" viewBox="0 0 64 64" aria-hidden="true">
+							<circle cx="32" cy="32" r="20" fill="none" stroke="#f4fbff" stroke-width="1.7"/>
+							<path d="M32 12 L35.1 18.7 L28.9 18.7 Z" fill="#f4fbff"/>
+							<path d="M22 21.5 L32 16.3 L42 21.5 L42 32.7 L32 38 L22 32.7 Z" fill="none" stroke="#f4fbff" stroke-width="1.7" stroke-linejoin="round"/>
+							<path d="M32 16.3 V38" fill="none" stroke="#f4fbff" stroke-width="1.5" stroke-linecap="round"/>
+							<path d="M22 21.5 L32 27.2 L42 21.5" fill="none" stroke="#f4fbff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+							<path d="M24.8 42 L32 35.6 L39.2 42" fill="none" stroke="#f4fbff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+							<path d="M22.5 46 H41.5" fill="none" stroke="#f4fbff" stroke-width="1.7" stroke-linecap="round"/>
+							<path d="M17.5 23.8 C20.1 20.9 22.9 18.9 26.4 17.8" fill="none" stroke="rgba(244,251,255,0.54)" stroke-width="1.35" stroke-linecap="round"/>
+							<path d="M46.5 23.8 C43.9 20.9 41.1 18.9 37.6 17.8" fill="none" stroke="rgba(244,251,255,0.54)" stroke-width="1.35" stroke-linecap="round"/>
+						</svg>
+					</div>
+					<div class="intro-brand-lockup__text">
+						<div class="intro-brand-lockup__kicker">Responsibility Observatory</div>
+						<div class="intro-brand-lockup__name">
+							<span class="intro-brand-lockup__name-prefix">MtAgent</span>
+							<span class="intro-brand-lockup__name-divider" aria-hidden="true"></span>
+							<span class="intro-brand-lockup__name-core">Prism</span>
+						</div>
+						<div class="intro-brand-lockup__descriptor">Multi-Agent Responsibility Intelligence</div>
+					</div>
+				</div>
 			</div>
+			<div class="intro-hero-grid">
+				<div id="description">
+					<div class="intro-copy intro-copy--eyebrow">Responsibility Calibration Sequence</div>
+					<div class="intro-copy intro-copy--title">把多 Agent 的委派、越界与证据<br/>折成一张可直接定责的责任现场</div>
+					<div class="intro-copy intro-copy--body">MtAgentPrism 先在这段序章里校准责任尺度，再进入主舞台查看 authority、delegation、boundary 与 evidence 如何在 cluster、agent 与 investigation 里收束成可判断的现场。</div>
+					<div class="intro-copy intro-copy--manifesto">先校准尺度，再进入现场。</div>
+					<div class="intro-signal-strip">
+						<div class="intro-signal-pill"><span class="intro-signal-pill__dot"></span>Authority Surface</div>
+						<div class="intro-signal-pill"><span class="intro-signal-pill__dot"></span>Boundary Rupture</div>
+						<div class="intro-signal-pill"><span class="intro-signal-pill__dot"></span>Evidence Lock</div>
+					</div>
+					<div id="loaded"><span class="intro-loaded-dot"></span>Calibrating responsibility field</div>
+				</div>
+				<div class="intro-side-atlas">
+					<div class="intro-side-atlas__label">Field Readout</div>
+					<div class="intro-side-atlas__title">不是加载动画，而是进入判断之前的品牌化校准层。</div>
+					<div class="intro-side-atlas__row">
+						<span>01</span>
+						<span>Authority claims compress into one surface.</span>
+					</div>
+					<div class="intro-side-atlas__row">
+						<span>02</span>
+						<span>Boundary rupture becomes spatial, not textual.</span>
+					</div>
+					<div class="intro-side-atlas__row">
+						<span>03</span>
+						<span>Evidence lock determines what deserves investigation.</span>
+					</div>
+				</div>
+			</div>
+			<div id="choice" style="display:none">
+				<div id='beginStory' class="intro-choice-card intro-choice-card--story">
+				<div class="intro-choice-icon intro-choice-icon--story">
+					<svg viewBox="0 0 72 72" aria-hidden="true">
+						<path d="M16 20.5 H56" fill="none" stroke="#f6fbff" stroke-width="2" stroke-linecap="square"/>
+						<rect x="18" y="22.5" width="36" height="27" fill="none" stroke="#f6fbff" stroke-width="2"/>
+						<path d="M32.5 30.5 L43 36 L32.5 41.5 Z" fill="#f6fbff"/>
+						<path d="M30 50.5 L24.5 61.5" fill="none" stroke="#f6fbff" stroke-width="2" stroke-linecap="round"/>
+						<path d="M42 50.5 L47.5 61.5" fill="none" stroke="#f6fbff" stroke-width="2" stroke-linecap="round"/>
+						<path d="M36 50.5 V62.5" fill="none" stroke="#f6fbff" stroke-width="2" stroke-linecap="round"/>
+					</svg>
+				</div>
+				<div class="intro-choice-eyebrow">Cinematic Entry</div>
+				<div class="intro-choice-title">进入责任序章</div>
+				<div class="intro-choice-copy">按照叙事镜头进入 MtAgentPrism，先理解 authority、delegation、execution 与 evidence 如何在同一现场收束。</div>
+				<div class="intro-choice-meta"><span>Guided Sequence</span><span>90 sec narrative</span></div>
+				</div>
 
-			<div><div class="midSeparator">&nbsp;</div></div>
-			<div id='beginExplore'>
-			<img src="images/icon/explore.png"/>
-			<div>Visualize Data</div>
-			<div id="loading">Skip the tour and start exploring our data</div>
+				<div><div class="midSeparator">&nbsp;</div></div>
+				<div id='beginExplore' class="intro-choice-card intro-choice-card--explore">
+				<div class="intro-choice-icon intro-choice-icon--explore">
+					<svg viewBox="0 0 72 72" aria-hidden="true">
+						<circle cx="36" cy="36" r="22" fill="none" stroke="#f6fbff" stroke-width="2"/>
+						<circle cx="36" cy="36" r="16" fill="none" stroke="#f6fbff" stroke-width="2"/>
+						<path d="M36 9.5 L39.5 18.5 L32.5 18.5 Z" fill="#f6fbff"/>
+						<path d="M36 62.5 L39.5 53.5 L32.5 53.5 Z" fill="#f6fbff"/>
+						<path d="M9.5 36 L18.5 32.5 L18.5 39.5 Z" fill="#f6fbff"/>
+						<path d="M62.5 36 L53.5 32.5 L53.5 39.5 Z" fill="#f6fbff"/>
+						<path d="M17 17 L24 22" fill="none" stroke="#f6fbff" stroke-width="2" stroke-linecap="round"/>
+						<path d="M55 17 L48 22" fill="none" stroke="#f6fbff" stroke-width="2" stroke-linecap="round"/>
+						<path d="M17 55 L24 50" fill="none" stroke="#f6fbff" stroke-width="2" stroke-linecap="round"/>
+						<path d="M55 55 L48 50" fill="none" stroke="#f6fbff" stroke-width="2" stroke-linecap="round"/>
+						<path d="M36 20 L39.5 29.5 L49.5 30 L41.5 36 L44.5 46 L36 40.5 L27.5 46 L30.5 36 L22.5 30 L32.5 29.5 Z" fill="none" stroke="#f6fbff" stroke-width="1.7" stroke-linejoin="round"/>
+					</svg>
+				</div>
+				<div class="intro-choice-eyebrow">Direct Access</div>
+				<div class="intro-choice-title">直接进入主舞台</div>
+				<div class="intro-choice-copy">跳过序章，直接进入 MtAgentPrism 首页，立即查看总览、调查、cluster 与委派监测工作台。</div>
+				<div class="intro-choice-meta"><span>Direct Workspace</span><span>L0 -> L2 observatory</span></div>
+				</div>
+			</div>
+			<div class="intro-footer-lockup">
+				<div class="intro-footer-lockup__rule"></div>
+				<div class="intro-footer-lockup__text">
+					<div class="intro-footer-lockup__label">MtAgentPrism</div>
+					<div class="intro-footer-lockup__subline">Responsibility Observatory for Multi-Agent Systems</div>
+					<div class="intro-footer-lockup__edition">Field Calibration Sequence</div>
+				</div>
+				<div class="intro-footer-lockup__rule"></div>
 			</div>
 		</div>
-		<div id="description" style="top: 700px">
-		<a href="http://www.cid.harvard.edu/" target="_blank"><img src="images/center-for-international-development-black.png" style="width: 310px; height: 100px"/></a>
-		</div>
-
 	</div>
 	<div id="spinner"></div>
 
@@ -51,7 +231,7 @@
 
 	<div id="sideBar">
 		<div class="logobox" style="position: fixed; right: 10px; top: 10px;">
-			<a href="http://www.cid.harvard.edu/" target="_blank"><img src="images/center-for-international-development-black.png" style="width: 200px; height: 62px"/></a>
+			<a href="http://www.cid.harvard.edu/" target="_blank" style="display:inline-block;color:#8f9db3;font:600 14px/1.2 Rajdhani,sans-serif;letter-spacing:0.14em;text-decoration:none;">CENTER FOR INTERNATIONAL DEVELOPMENT</a>
 		</div>
 		<div class="titlebox">
 			<div class="titleTop2">
@@ -91,7 +271,7 @@
 		<div id="contrastbutton">High contrast</div>
 
 		<div class='sectionTitle'>Powered by:</div>
-		<a href="http://atlas.cid.harvard.edu/" target="_blank"><img id="theatlas" src="images/the-atlas-of-economic-complexity-black.png"/></a>
+		<a href="http://atlas.cid.harvard.edu/" target="_blank" id="theatlas" style="display:inline-block;color:#8f9db3;font:600 14px/1.2 Rajdhani,sans-serif;letter-spacing:0.14em;text-decoration:none;">THE ATLAS OF ECONOMIC COMPLEXITY</a>
 		<div id="atlasBox"></div>
 		<div class="sectionTitle" style="position:absolute;bottom:35px;">Filter by product category</div>
 	</div>
@@ -159,6 +339,8 @@
 	</div>
 
 		<script type="x-shader/x-vertex" id="vertexshader">
+			precision mediump float;
+			precision mediump int;
 
 			attribute float size;
 			attribute vec3 customColor;
@@ -179,6 +361,8 @@
 		</script>
 
 		<script type="x-shader/x-fragment" id="fragmentshader">
+			precision mediump float;
+			precision mediump int;
 
 			uniform vec3 color;
 			uniform sampler2D texture;
@@ -194,38 +378,33 @@
 			}
 
 		</script>
-<script src="scripts/noWebGL.js"></script>
-<script src="scripts/spin.js"></script>
-<script src="data/anchors.js"></script>
-<script src="scripts/UI.js"></script>
-<script src="scripts/labels.js"></script>
-<script src="scripts/countrydata.js"></script>
-<script src="scripts/THREE.GeoJSON.js"></script>
-<script src='scripts/cameraControls.js'></script>
-<script src='scripts/THREE.FullScreen.js'></script>
-<script src='scripts/ParticleLinks.js'></script>
-<script src="scripts/URLparser.js"></script>
-<script src="scripts/script.js"></script>
-
-<script>
-  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-
-</script>
-<script src='scripts/THREEx.KeyboardState.js'></script>
-
 <!-- AgentSight Graph Injection — Particle Clusters + Sphere-Surface Drift -->
 <script>
 (function() {
   'use strict';
+  var isEmbedHeroMode = !!window.__AGENTSIGHT_EMBED_HERO;
+  var isEmbedIntroMode = !!window.__AGENTSIGHT_EMBED_INTRO;
+  if (isEmbedIntroMode) return;
+  var bridgeBootAttempts = 0;
 
-  // Wait for main globe to initialize
-  var checkInterval = setInterval(function() {
-    if (typeof scene !== 'undefined' && typeof THREE !== 'undefined' && typeof loaded !== 'undefined' && loaded) {
-      clearInterval(checkInterval);
+  function bootstrapAgentSightGraph() {
+    if (graphGroup) return;
+    bridgeBootAttempts += 1;
+
+    if (typeof scene !== 'undefined' && typeof THREE !== 'undefined' && typeof renderer !== 'undefined' && typeof camera !== 'undefined') {
       initAgentSightGraph();
+      return;
     }
-  }, 500);
+
+    if (bridgeBootAttempts < 80) {
+      setTimeout(bootstrapAgentSightGraph, 250);
+    }
+  }
+
+  window.addEventListener('load', function() {
+    setTimeout(bootstrapAgentSightGraph, 150);
+  });
+  setTimeout(bootstrapAgentSightGraph, 300);
 
   // ── Global state ──
   var graphGroup = null;
@@ -267,6 +446,9 @@
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 64, 64);
     dotTexture = new THREE.Texture(canvas);
+    dotTexture.minFilter = THREE.LinearFilter;
+    dotTexture.magFilter = THREE.LinearFilter;
+    dotTexture.premultiplyAlpha = true;
     dotTexture.needsUpdate = true;
     return dotTexture;
   }
@@ -282,38 +464,111 @@
     );
   }
 
-  function hashToLatLon(str) {
+  function hashInt(str) {
     var h = 0;
-    for (var i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; }
-    return { lat: (Math.abs(h) % 180) - 90, lon: (Math.abs(h >> 8) % 360) - 180 };
+    for (var i = 0; i < str.length; i++) {
+      h = ((h << 5) - h) + str.charCodeAt(i);
+      h |= 0;
+    }
+    return Math.abs(h);
   }
 
-  // ── Build particle shader material (reuses Harvard Globe shaders) ──
-  function makeParticleMaterial(colorHex) {
-    var attributes = {
-      size:      { type: 'f', value: null },
-      customColor: { type: 'c', value: null }
+  var semanticAnchorPools = {
+    agent: [
+      { lat: -23.5505, lon: -46.6333 }, // Sao Paulo
+      { lat: 38.7223, lon: -9.1393 },   // Lisbon
+      { lat: 6.5244, lon: 3.3792 },     // Lagos
+      { lat: 41.0082, lon: 28.9784 }    // Istanbul
+    ],
+    resourceFile: [
+      { lat: -34.6037, lon: -58.3816 }, // Buenos Aires
+      { lat: 40.4168, lon: -3.7038 },   // Madrid
+      { lat: 33.5731, lon: -7.5898 },   // Casablanca
+      { lat: 14.7167, lon: -17.4677 }   // Dakar
+    ],
+    resourceNetwork: [
+      { lat: 37.7749, lon: -122.4194 }, // San Francisco
+      { lat: 47.6062, lon: -122.3321 }, // Seattle
+      { lat: 51.5072, lon: -0.1276 },   // London
+      { lat: 1.3521, lon: 103.8198 }    // Singapore
+    ],
+    boundaryWorkspace: [
+      { lat: 38.7223, lon: -9.1393 },   // Lisbon
+      { lat: 40.4168, lon: -3.7038 },   // Madrid
+      { lat: 52.3676, lon: 4.9041 }     // Amsterdam
+    ],
+    boundarySystem: [
+      { lat: 30.0444, lon: 31.2357 },   // Cairo
+      { lat: 24.7136, lon: 46.6753 },   // Riyadh
+      { lat: 25.2048, lon: 55.2708 }    // Dubai
+    ]
+  };
+
+  var explicitNodeAnchors = {
+    'agent-frontend':      { lat: 36.1699, lon: -115.1398 }, // Las Vegas
+    'agent-security':      { lat: 41.0082, lon: 28.9784 },   // Istanbul
+    'agent-builder':       { lat: 50.1109, lon: 8.6821 },    // Frankfurt
+    'res-components':      { lat: 40.4168, lon: -3.7038 },   // Madrid
+    'res-shadow':          { lat: 24.7136, lon: 46.6753 },   // Riyadh
+    'res-package':         { lat: 48.8566, lon: 2.3522 },    // Paris
+    'res-api':             { lat: 51.5072, lon: -0.1276 },   // London
+    'boundary-workspace':  { lat: 38.7223, lon: -9.1393 },   // Lisbon
+    'boundary-system':     { lat: 30.0444, lon: 31.2357 }    // Cairo
+  };
+
+  function clamp(v, min, max) {
+    return Math.max(min, Math.min(max, v));
+  }
+
+  function pickSemanticPool(node) {
+    var nodeId = (node.node_id || '').toLowerCase();
+    if (node.node_type === 'PolicyBoundary') {
+      return nodeId.indexOf('system') >= 0 ? semanticAnchorPools.boundarySystem : semanticAnchorPools.boundaryWorkspace;
+    }
+    if (node.node_type === 'Resource' && node.resource && node.resource.Network) {
+      return semanticAnchorPools.resourceNetwork;
+    }
+    if (node.node_type === 'Resource') {
+      return semanticAnchorPools.resourceFile;
+    }
+    return semanticAnchorPools.agent;
+  }
+
+  function resolveNodeLatLon(node, index) {
+    if (explicitNodeAnchors[node.node_id]) {
+      return explicitNodeAnchors[node.node_id];
+    }
+    var pool = pickSemanticPool(node);
+    var signature = [
+      node.node_id || '',
+      node.node_type || '',
+      node.agent_id || '',
+      node.resource && node.resource.File ? node.resource.File.canonical_path || '' : '',
+      node.resource && node.resource.Network ? node.resource.Network.host || '' : ''
+    ].join('|');
+    var h = hashInt(signature);
+    var anchor = pool[h % pool.length];
+    var latJitter = (((h >> 3) % 200) / 200 - 0.5) * 1.7;
+    var lonJitter = (((h >> 11) % 240) / 240 - 0.5) * 2.2;
+    var indexJitter = ((index || 0) % 3) - 1;
+    return {
+      lat: clamp(anchor.lat + latJitter + indexJitter * 0.45, -72, 78),
+      lon: clamp(anchor.lon + lonJitter + indexJitter * 0.55, -180, 180)
     };
-    var uniforms = {
-      color:   { type: 'c', value: new THREE.Color(colorHex) },
-      texture: { type: 't', value: getDotTexture() }
-    };
-    return new THREE.ShaderMaterial({
-      uniforms:       uniforms,
-      attributes:     attributes,
-      vertexShader:   document.getElementById('vertexshader').textContent,
-      fragmentShader: document.getElementById('fragmentshader').textContent,
-      blending:       THREE.AdditiveBlending,
-      depthTest:      true,
-      depthWrite:     false,
-      transparent:    true,
+  }
+
+  function makeRoundPointMaterial(size, opacity) {
+    return new THREE.PointCloudMaterial({
+      size: size,
+      transparent: true,
+      opacity: opacity,
+      vertexColors: THREE.VertexColors,
+      map: getDotTexture(),
+      blending: THREE.AdditiveBlending,
+      fog: false,
+      depthTest: true,
+      depthWrite: false
     });
-  }
-
-  function fillParticleGeo(geo, positions, colors, sizes) {
-    geo.addAttribute('position',    new THREE.BufferAttribute(positions, 3));
-    geo.addAttribute('customColor', new THREE.BufferAttribute(colors, 3));
-    geo.addAttribute('size',        new THREE.BufferAttribute(sizes, 1));
   }
 
   // ── Create glow sprite ──
@@ -333,58 +588,78 @@
     return sprite;
   }
 
+  function createHaloCluster(colorHex, haloRadius, count) {
+    count = count || 14;
+    var col = new THREE.Color(colorHex);
+    var geo = new THREE.Geometry();
+
+    for (var i = 0; i < count; i++) {
+      var theta = Math.random() * Math.PI * 2;
+      var phi = Math.acos(2 * Math.random() - 1);
+      var r = haloRadius * (0.22 + Math.random() * 0.48);
+      geo.vertices.push(new THREE.Vector3(
+        r * Math.sin(phi) * Math.cos(theta),
+        r * Math.sin(phi) * Math.sin(theta),
+        r * Math.cos(phi)
+      ));
+
+      var glowBoost = 0.72 + Math.random() * 0.2;
+      geo.colors.push(new THREE.Color(
+        Math.min(1.22, col.r * glowBoost + 0.08),
+        Math.min(1.22, col.g * glowBoost + 0.08),
+        Math.min(1.22, col.b * glowBoost + 0.08)
+      ));
+    }
+
+    var mat = makeRoundPointMaterial(isEmbedHeroMode ? 7.2 : 8.4, isEmbedHeroMode ? 0.18 : 0.24);
+    return new THREE.PointCloud(geo, mat);
+  }
+
   // ── Create particle cluster around a local origin ──
   function createParticleCluster(colorHex, clusterRadius, count) {
-    count = count || 12;
+    count = count || 10;
     var col = new THREE.Color(colorHex);
-    var positions = new Float32Array(count * 3);
-    var colors    = new Float32Array(count * 3);
-    var sizes     = new Float32Array(count);
+    var geo = new THREE.Geometry();
 
     for (var i = 0; i < count; i++) {
       var theta = Math.random() * Math.PI * 2;
       var phi   = Math.acos(2 * Math.random() - 1);
       var r     = clusterRadius * (0.15 + Math.random() * 0.85);
-      positions[i*3]   = r * Math.sin(phi) * Math.cos(theta);
-      positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
-      positions[i*3+2] = r * Math.cos(phi);
+      geo.vertices.push(new THREE.Vector3(
+        r * Math.sin(phi) * Math.cos(theta),
+        r * Math.sin(phi) * Math.sin(theta),
+        r * Math.cos(phi)
+      ));
 
-      var brightness = 0.55 + Math.random() * 0.7;
-      colors[i*3]   = col.r * brightness;
-      colors[i*3+1] = col.g * brightness;
-      colors[i*3+2] = col.b * brightness;
-
-      sizes[i] = 1.8 + Math.random() * 5.5;
+      var brightness = 0.45 + Math.random() * 0.42;
+      geo.colors.push(new THREE.Color(
+        col.r * brightness,
+        col.g * brightness,
+        col.b * brightness
+      ));
     }
 
-    var mat = makeParticleMaterial(colorHex);
-    var geo = new THREE.BufferGeometry();
-    fillParticleGeo(geo, positions, colors, sizes);
+    var mat = makeRoundPointMaterial(isEmbedHeroMode ? 4.1 : 4.8, isEmbedHeroMode ? 0.68 : 0.76);
     return new THREE.PointCloud(geo, mat);
   }
 
   // ── Create orbiting ring for Agent nodes ──
   function createOrbiterRing(colorHex, orbitRadius, count) {
-    count = count || 5;
+    count = count || 4;
     var col = new THREE.Color(colorHex);
-    var positions = new Float32Array(count * 3);
-    var colors    = new Float32Array(count * 3);
-    var sizes     = new Float32Array(count);
+    var geo = new THREE.Geometry();
 
     for (var i = 0; i < count; i++) {
       var angle = (i / count) * Math.PI * 2;
-      positions[i*3]   = Math.cos(angle) * orbitRadius;
-      positions[i*3+1] = Math.sin(angle) * orbitRadius * 0.3; // flattened ellipse
-      positions[i*3+2] = Math.sin(angle) * orbitRadius * 0.6;
-      colors[i*3]   = col.r;
-      colors[i*3+1] = col.g;
-      colors[i*3+2] = col.b;
-      sizes[i] = 1.2 + Math.random() * 2.5;
+      geo.vertices.push(new THREE.Vector3(
+        Math.cos(angle) * orbitRadius,
+        Math.sin(angle) * orbitRadius * 0.3,
+        Math.sin(angle) * orbitRadius * 0.6
+      ));
+      geo.colors.push(new THREE.Color(col.r, col.g, col.b));
     }
 
-    var mat = makeParticleMaterial(colorHex);
-    var geo = new THREE.BufferGeometry();
-    fillParticleGeo(geo, positions, colors, sizes);
+    var mat = makeRoundPointMaterial(isEmbedHeroMode ? 2.1 : 2.5, isEmbedHeroMode ? 0.34 : 0.46);
     return new THREE.PointCloud(geo, mat);
   }
 
@@ -394,25 +669,25 @@
 
     if (nodeType === 'Agent') {
       colorHex      = nodeColors.Agent;
-      clusterRadius = 6 + edgeCount * 0.8;
-      particleCount = 14 + edgeCount * 2;
-      glowScale     = 38 + edgeCount * 4;
+      clusterRadius = 4.4 + edgeCount * 0.45;
+      particleCount = 8 + edgeCount;
+      glowScale     = 19 + edgeCount * 1.8;
     } else if (nodeType === 'PolicyBoundary') {
       colorHex      = nodeColors.PolicyBoundary;
-      clusterRadius = 8;
-      particleCount = 8;
-      glowScale     = 28;
+      clusterRadius = 5.8;
+      particleCount = 6;
+      glowScale     = 14;
     } else {
       colorHex      = nodeColors.Resource;
-      clusterRadius = 5;
-      particleCount = 10;
-      glowScale     = 24;
+      clusterRadius = 4.1;
+      particleCount = 7;
+      glowScale     = 12;
     }
 
     var group = new THREE.Object3D();
 
-    // Glow sprite
-    var sprite = createGlowSprite(colorHex, glowScale);
+    // Replace legacy quad sprite halo with particle halo to avoid square artifacts.
+    var sprite = createHaloCluster(colorHex, glowScale * 0.34, Math.max(10, Math.round(glowScale * 0.42)));
     group.add(sprite);
 
     // Particle cluster
@@ -422,7 +697,7 @@
     // Orbiting ring (Agent only)
     var orbiters = null;
     if (nodeType === 'Agent') {
-      orbiters = createOrbiterRing(colorHex, clusterRadius + 10, 6);
+      orbiters = createOrbiterRing(colorHex, clusterRadius + 6.5, 4);
       group.add(orbiters);
     }
 
@@ -436,8 +711,9 @@
     return { group: group, sprite: sprite, cluster: cluster, orbiters: orbiters, clickTarget: clickTarget };
   }
 
-  // ── Pending data queue (for messages that arrive before globe is ready) ──
-  var pendingMessage = null;
+  // ── Pending data queue (for calls that arrive before globe is ready) ──
+  var pendingGraphPayload = null;
+  var pendingPhase = null;
 
   // ── Message listener (always active, even before globe initializes) ──
   window.addEventListener('message', function(event) {
@@ -445,9 +721,17 @@
     var msg = event.data;
 
     // If globe not ready yet, queue the message
-    if (!graphGroup && (msg.type === 'agentsight:loadGraph' || msg.type === 'agentsight:setPhase')) {
-      pendingMessage = msg;
-      return;
+    if (!graphGroup) {
+      if (msg.type === 'agentsight:loadGraph') {
+        pendingGraphPayload = { nodes: msg.nodes || [], edges: msg.edges || [] };
+        bootstrapAgentSightGraph();
+        return;
+      }
+      if (msg.type === 'agentsight:setPhase') {
+        pendingPhase = msg.phase || 'provisional';
+        bootstrapAgentSightGraph();
+        return;
+      }
     }
 
     switch (msg.type) {
@@ -474,15 +758,16 @@
     graphGroup = new THREE.Object3D();
     scene.add(graphGroup);
 
-    // Apply any pending message that arrived before globe was ready
-    if (pendingMessage) {
-      var pm = pendingMessage;
-      pendingMessage = null;
-      if (pm.type === 'agentsight:loadGraph') {
-        loadGraph(pm.nodes || [], pm.edges || []);
-      } else if (pm.type === 'agentsight:setPhase') {
-        setPhase(pm.phase || 'provisional');
-      }
+    // Apply any pending calls that arrived before globe was ready.
+    if (pendingGraphPayload) {
+      var pg = pendingGraphPayload;
+      pendingGraphPayload = null;
+      loadGraph(pg.nodes || [], pg.edges || []);
+    }
+    if (pendingPhase) {
+      var phase = pendingPhase;
+      pendingPhase = null;
+      setPhase(phase);
     }
 
     // ── Drift animation (lat/lon based, stays on sphere surface) ──
@@ -503,8 +788,8 @@
         var ll = obj.baseLatLon;
 
         if (!driftAmps[nid]) {
-          driftAmps[nid]  = 2.5 + Math.random() * 5;          // ±2.5–7.5 degrees
-          driftFreqs[nid] = 0.3 + Math.random() * 0.5;         // 0.3–0.8 Hz
+          driftAmps[nid]  = isEmbedHeroMode ? (0.18 + Math.random() * 0.26) : (0.45 + Math.random() * 0.7);
+          driftFreqs[nid] = isEmbedHeroMode ? (0.12 + Math.random() * 0.14) : (0.18 + Math.random() * 0.2);
           driftPhases[nid] = Math.random() * Math.PI * 2;
         }
 
@@ -552,7 +837,10 @@
       var rect = renderer.domElement.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(mouse, camera);
+      var projector = new THREE.Projector();
+      var vector = new THREE.Vector3(mouse.x, mouse.y, 0.5);
+      projector.unprojectVector(vector, camera);
+      raycaster.ray.set(camera.position, vector.sub(camera.position).normalize());
 
       var targets = [];
       var targetToNid = {};
@@ -583,11 +871,16 @@
 
   // ── Load graph data ──
   function loadGraph(nodes, edges) {
+    if (!graphGroup) {
+      pendingGraphPayload = { nodes: nodes || [], edges: edges || [] };
+      bootstrapAgentSightGraph();
+      return;
+    }
     clearGraph();
 
     // Build node visuals
-    nodes.forEach(function(n) {
-      var ll = hashToLatLon(n.node_id);
+    nodes.forEach(function(n, index) {
+      var ll = resolveNodeLatLon(n, index);
       var pos = latLonToVec3(ll.lat, ll.lon, GLOBE_RADIUS + NODE_OFFSET);
 
       var edgeCount = edges.filter(function(e) {
@@ -647,7 +940,7 @@
       var mat = new THREE.LineBasicMaterial({
         color: color,
         transparent: true,
-        opacity: currentPhase === 'provisional' ? 0.55 : 0.85,
+        opacity: isEmbedHeroMode ? 0 : (currentPhase === 'provisional' ? 0.55 : 0.85),
         blending: THREE.AdditiveBlending,
         depthTest: true,
         depthWrite: false,
@@ -684,9 +977,8 @@
       var onPath = !!pathNodeIds[nid];
       var op = onPath ? 0.6 : 0.12;
       if (obj.sprite && obj.sprite.material) obj.sprite.material.opacity = op;
-      if (obj.cluster && obj.cluster.material) obj.cluster.material.uniforms.color.value.copy(
-        new THREE.Color(onPath ? nodeColors[obj.group.userData.nodeType] || 0x818cf8 : 0x444466)
-      );
+      if (obj.cluster && obj.cluster.material) obj.cluster.material.opacity = onPath ? 0.92 : 0.18;
+      if (obj.orbiters && obj.orbiters.material) obj.orbiters.material.opacity = onPath ? 0.85 : 0.1;
     });
   }
 
@@ -698,25 +990,28 @@
       var origColor = edgeColors[edata.line.userData.edgeType] || 0xe2e8f0;
       if (edata.line.userData.edgeType === 'PolicyBoundaryCrossing') origColor = 0xef4444;
       edata.line.material.color.setHex(origColor);
-      edata.line.material.opacity = currentPhase === 'provisional' ? 0.55 : 0.85;
+      edata.line.material.opacity = isEmbedHeroMode ? 0 : (currentPhase === 'provisional' ? 0.55 : 0.85);
     });
     Object.keys(nodeObjects).forEach(function(nid) {
       var obj = nodeObjects[nid];
       if (!obj) return;
       var defOp = currentPhase === 'provisional' ? 0.45 : 0.55;
       if (obj.sprite && obj.sprite.material) obj.sprite.material.opacity = defOp;
-      if (obj.cluster && obj.cluster.material) {
-        var nt = obj.group.userData.nodeType;
-        obj.cluster.material.uniforms.color.value.copy(new THREE.Color(nodeColors[nt] || 0x818cf8));
-      }
+      if (obj.cluster && obj.cluster.material) obj.cluster.material.opacity = 0.92;
+      if (obj.orbiters && obj.orbiters.material) obj.orbiters.material.opacity = 0.85;
     });
   }
 
   // ── Phase control ──
   function setPhase(phase) {
     currentPhase = phase;
+    if (!graphGroup) {
+      pendingPhase = phase;
+      bootstrapAgentSightGraph();
+      return;
+    }
     var spriteOp = phase === 'provisional' ? 0.45 : 0.55;
-    var edgeOp   = phase === 'provisional' ? 0.55 : 0.85;
+    var edgeOp   = isEmbedHeroMode ? 0 : (phase === 'provisional' ? 0.55 : 0.85);
     Object.keys(nodeObjects).forEach(function(nid) {
       var obj = nodeObjects[nid];
       if (!obj) return;
@@ -758,6 +1053,7 @@
   }
 
   // ── Expose to iframe context ──
+  window.agentsight_bootstrap       = bootstrapAgentSightGraph;
   window.agentsight_loadGraph       = loadGraph;
   window.agentsight_highlightPath   = highlightPath;
   window.agentsight_clearHighlights = clearHighlights;

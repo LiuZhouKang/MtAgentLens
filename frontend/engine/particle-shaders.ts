@@ -20,12 +20,13 @@ void main() {
 const fragmentShader = /* glsl */ `
 uniform vec3 color;
 uniform sampler2D map;
+uniform float opacity;
 in vec3 vColor;
 out vec4 pc_fragColor;
 
 void main() {
-  pc_fragColor = vec4(color * vColor, 1.0);
-  pc_fragColor = pc_fragColor * texture(map, gl_PointCoord);
+  vec4 mask = texture(map, gl_PointCoord);
+  pc_fragColor = vec4(color * vColor, opacity) * mask;
 }`;
 
 export function createParticleMaterial(textureUrl: string): THREE.ShaderMaterial {
@@ -34,6 +35,7 @@ export function createParticleMaterial(textureUrl: string): THREE.ShaderMaterial
     uniforms: {
       color: { value: new THREE.Color(0xffffff) },
       map: { value: texture },
+      opacity: { value: 0.48 },
     },
     vertexShader,
     fragmentShader,
@@ -41,6 +43,6 @@ export function createParticleMaterial(textureUrl: string): THREE.ShaderMaterial
     transparent: true,
     depthTest: false,
     depthWrite: false,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
   });
 }

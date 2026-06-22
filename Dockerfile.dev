@@ -1,0 +1,56 @@
+# MtAgentPrism — Development Container
+# Full build environment with all dependencies pre-installed.
+#
+# Build:
+#   docker build -f Dockerfile.dev -t mtagentprism:dev .
+#
+# Run (interactive development shell):
+#   docker run --rm -it -v $(pwd):/workspace -w /workspace \
+#       --privileged --pid=host \
+#       -v /sys:/sys:ro -v /usr:/usr:ro -v /lib:/lib:ro \
+#       -p 7395:7395 \
+#       mtagentprism:dev bash
+#
+# VS Code Dev Container:
+#   Add to .devcontainer/devcontainer.json:
+#   { "image": "mtagentprism:dev", "mounts": [...] }
+
+FROM ubuntu:24.04
+
+ARG RUST_VERSION=1.92.0
+ARG NODE_VERSION=22
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    CARGO_HOME=/usr/local/cargo \
+    RUSTUP_HOME=/usr/local/rustup \
+    PATH="/usr/local/cargo/bin:${PATH}"
+
+# ── System packages ──
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # eBPF build
+    clang llvm libelf1 libelf-dev zlib1g-dev make pkg-config \
+    # Rust
+    curl ca-certificates build-essential \
+    # Node.js
+    xz-utils \
+    # Dev tools
+    git vim less gdb strace bash-completion \
+    # Cleanup
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Rust ──
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- \
+    --default-toolchain ${RUST_VERSION} --profile minimal \
+    --component rustfmt clippy rust-analyzer -y
+
+# ── Node.js ──
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pre-install commonly used Rust tools
+RUN cargo install cargo-watch cargo-edit 2>/dev/null || true
+
+WORKDIR /workspace
+
+CMD ["bash"]

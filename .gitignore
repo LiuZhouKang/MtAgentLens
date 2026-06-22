@@ -1,0 +1,90 @@
+# Build artifacts
+/build
+collector/build/
+agentsight
+
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+.direnv
+compare/.venv-*/
+compare/.yara-x/
+compare/.yara-forge-core-20260524/
+
+# Datasets (local only, not uploaded)
+compare/Dataset/
+compare/results/
+!compare/results/paper/
+!compare/results/perf/
+
+# Runtime data
+env/runs/
+
+# Dev tools (local only)
+.claude/
+.codegraph/
+.dbg/
+.gstack/
+
+# IDE config (local only)
+.vscode/
+.devcontainer/
+
+# Python
+.pytest_cache/
+
+# AI agent instruction files (local only)
+CLAUDE.md
+AGENTS.md
+
+
+
+# Project management & planning (local only)
+.planning/
+.kiro/
+
+# Browser automation artifacts
+.playwright-mcp/
+
+# External experiments (not part of core project)
+cc-bos/
+agent-sentinel/
+3d-force-graph/
+
+# Sensitive files
+.env
+.envrc
+
+# Logs
+*.log
+record.log
+record.log.*
+save.log
+res.txt
+ssl_analyzed.json
+ssl_timeline.json
+test_events.log
+
+# Third-party
+ecapture
+docs/blog
+
+# Debug artifacts
+debug-*.md
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Compiled benchmark binaries
+compare/scripts/perf/bench_targets/exec_loop
+compare/scripts/perf/bench_targets/file_loop
+compare/scripts/perf/bench_targets/ssl_loop
+compare/models/
+
+# Archived tests
+
+# Collector local models
+collector/models/

@@ -91,7 +91,7 @@ const lighthouseWarningsSection = lighthouseAssertions.length
       .join('\n')
   : '- 当前未检测到 Lighthouse 断言告警';
 
-const markdown = `# MtAgentPrism 前端质量检测报告
+const markdown = `# MtAgentLens 前端质量检测报告
 
 更新时间：${new Date().toISOString()}
 

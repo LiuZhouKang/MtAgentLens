@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""MtAgentPrism 全量 InjecAgent 评估 — 攻击 2108 + 良性 149，Observer 全量。
+"""MtAgentLens 全量 InjecAgent 评估 — 攻击 2108 + 良性 149，Observer 全量。
 
-不运行 Agent Sentinel，单独更新 MtAgentPrism 结果。
+不运行 Agent Sentinel，单独更新 MtAgentLens 结果。
 """
 import json, re, time, os, urllib.request, urllib.error, math, sys
 from pathlib import Path
@@ -176,7 +176,7 @@ all_prompts = attack_prompts + benign_prompts
 all_labels = ["attack"] * len(attack_prompts) + ["benign"] * len(benign_prompts)
 print(f"\nTotal: {len(all_prompts)} ({len(attack_prompts)} attack + {len(benign_prompts)} benign)")
 print(f"Observer: full evaluation, no sampling")
-print("Starting MtAgentPrism evaluation (rules + full Observer)...\n")
+print("Starting MtAgentLens evaluation (rules + full Observer)...\n")
 
 # 3. 运行
 preds = []; observer_calls = 0; start = time.time()
@@ -205,7 +205,7 @@ ben_labels = ["benign"]*len(benign_prompts)
 all_m = compute_metrics(preds, all_labels)
 fpr = ben_preds.count("attack") / len(benign_prompts) if benign_prompts else 0
 
-print(f"\n=== MtAgentPrism Results ===")
+print(f"\n=== MtAgentLens Results ===")
 print(f"Attacks ({len(attack_prompts)}): TPR={att_metrics['TPR']:.4f} F1={att_metrics['F1']:.4f}")
 print(f"Benign ({len(benign_prompts)}):  FPR={fpr:.4f} (FP={ben_preds.count('attack')})")
 print(f"Overall: F1={all_m['F1']:.4f} MCC={all_m['MCC']:.4f}")
@@ -213,13 +213,13 @@ print(f"Observer calls: {observer_calls}/{len(all_prompts)}")
 
 # 5. 保存
 results = json.loads(RESULTS_FILE.read_text()) if RESULTS_FILE.exists() else {}
-results["mtagentprism_full"] = att_metrics
-results["mtagentprism_benign"] = {"FPR": fpr, "FP": ben_preds.count("attack"),
+results["mtagentlens_full"] = att_metrics
+results["mtagentlens_benign"] = {"FPR": fpr, "FP": ben_preds.count("attack"),
                                    "TN": ben_preds.count("benign"), "n": len(benign_prompts)}
 results["config"] = {**results.get("config", {}),
-    "mtagentprism_model": safe_model_name(),
-    "mtagentprism_observer_calls": observer_calls,
-    "mtagentprism_total_samples": len(all_prompts),
+    "mtagentlens_model": safe_model_name(),
+    "mtagentlens_observer_calls": observer_calls,
+    "mtagentlens_total_samples": len(all_prompts),
 }
 RESULTS_FILE.write_text(json.dumps(results, indent=2, ensure_ascii=False))
 print(f"\nUpdated: {RESULTS_FILE}")

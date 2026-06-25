@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MtAgentPrism Performance Micro-Benchmarks — 3 experiments, conference-ready.
+MtAgentLens Performance Micro-Benchmarks — 3 experiments, conference-ready.
 
   1. eBPF Probe Latency    — kernel bpftool stats (run_time_ns / run_cnt)
   2. Memory Footprint       — RSS timeline via /proc/PID/statm
@@ -13,7 +13,7 @@ import json, os, statistics, subprocess, sys, time
 from pathlib import Path
 
 PROJECT = Path(__file__).resolve().parents[3]
-COLLECTOR = PROJECT / "collector/target/release/mtagentprism"
+COLLECTOR = PROJECT / "collector/target/release/mtagentlens"
 BENCH_DIR = Path(__file__).resolve().parent / "bench_targets"
 RESULTS = PROJECT / "compare/results/perf"
 RESULTS.mkdir(parents=True, exist_ok=True)
@@ -132,14 +132,14 @@ def run_memory_footprint(duration=60):
 
     pid = None
     for _ in range(15):
-        r = subprocess.run(["pgrep", "-f", "mtagentprism.*trace"], capture_output=True, text=True, shell=True)
+        r = subprocess.run(["pgrep", "-f", "mtagentlens.*trace"], capture_output=True, text=True, shell=True)
         pids = [int(x) for x in r.stdout.strip().split("\n") if x.isdigit()]
         if pids: pid = pids[0]; break
         time.sleep(1)
 
     if not pid:
-        # Fallback: find any mtagentprism process
-        r = subprocess.run(["pgrep", "mtagentprism"], capture_output=True, text=True)
+        # Fallback: find any mtagentlens process
+        r = subprocess.run(["pgrep", "mtagentlens"], capture_output=True, text=True)
         pids = [int(x) for x in r.stdout.strip().split("\n") if x.isdigit()]
         if pids: pid = pids[0]
 

@@ -11,7 +11,7 @@
     "head_commit": "22a9feec054b94460deeaf5b2d52fc3a960f9464",
     "head_commit_msg": "refactor: address code review feedback for UserProfile optimization",
     "head_commit_date": "2026-06-06T09:27:58+08:00",
-    "project": "MtAgentPrism — eBPF-based LLM Agent observability tool",
+    "project": "MtAgentLens — eBPF-based LLM Agent observability tool",
     "git_remote": "https://gitlink.org.cn/lzkk/agentsight.git",
     "recent_commits": [
       "22a9feec refactor: address code review feedback for UserProfile optimization",

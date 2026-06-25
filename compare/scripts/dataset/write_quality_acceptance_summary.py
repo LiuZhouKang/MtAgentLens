@@ -32,7 +32,7 @@ def build_summary(dataset: Path) -> dict[str, Any]:
     type_c = type_c_boundary_summary(dataset, manifest)
     noise = expected_claim_noise_count(dataset)
     return {
-        "schema": "mtagentprism.dataset_acceptance_summary.v1",
+        "schema": "mtagentlens.dataset_acceptance_summary.v1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "dataset": dataset.as_posix(),
         "quality_manifest": manifest.get("summary", {}),

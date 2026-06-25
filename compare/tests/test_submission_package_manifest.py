@@ -8,7 +8,7 @@ from compare.scripts.build.build_submission_package_manifest import build_manife
 def test_submission_manifest_binds_results_figures_tables_and_docs() -> None:
     manifest = build_manifest()
 
-    assert manifest["schema"] == "mtagentprism.paper_submission_package.v1"
+    assert manifest["schema"] == "mtagentlens.paper_submission_package.v1"
     assert manifest["status"] == "completed"
     assert manifest["dataset"]["total_scenarios"] == 67
     assert manifest["dataset"]["attack_scenarios"] == 54
@@ -90,7 +90,7 @@ def test_submission_manifest_keeps_claim_boundaries_and_outputs_explicit() -> No
     supported = set(manifest["claim_boundaries"]["supported_claims"])
     unsupported = set(manifest["claim_boundaries"]["unsupported_claims"])
 
-    assert "67-scenario frozen MtAgentPrism offline evaluation" in supported
+    assert "67-scenario frozen MtAgentLens offline evaluation" in supported
     assert "external benchmark validation" in unsupported
     assert "universal prompt-guard paradigm ceiling" in unsupported
     assert "production LLM-agent end-to-end latency" in unsupported

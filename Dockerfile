@@ -1,18 +1,18 @@
-# MtAgentPrism — Production Docker Image
+# MtAgentLens — Production Docker Image
 # Multi-stage build: BPF → Frontend → Rust → Runtime
 #
 # Usage:
-#   docker build -t mtagentprism .
+#   docker build -t mtagentlens .
 #   docker run --rm -it --privileged --pid=host \
 #       -v /sys:/sys:ro -v /usr:/usr:ro -v /lib:/lib:ro \
 #       -p 7395:7395 \
-#       mtagentprism record -c claude --binary-path /usr/bin/claude
+#       mtagentlens record -c claude --binary-path /usr/bin/claude
 #
 # For non-privileged mode (requires CAP_BPF + CAP_SYS_ADMIN):
 #   docker run --rm -it --cap-add=CAP_BPF --cap-add=CAP_SYS_ADMIN --pid=host \
 #       -v /sys:/sys:ro -v /usr:/usr:ro -v /lib:/lib:ro \
 #       -p 7395:7395 \
-#       mtagentprism trace --ssl --process --system
+#       mtagentlens trace --ssl --process --system
 
 # ============ Stage 1: Builder ============
 FROM ubuntu:24.04 AS builder
@@ -60,17 +60,17 @@ RUN cd collector && cargo build --release
 # ============ Stage 2: Runtime ============
 FROM ubuntu:24.04
 
-LABEL org.opencontainers.image.title="MtAgentPrism"
+LABEL org.opencontainers.image.title="MtAgentLens"
 LABEL org.opencontainers.image.description="eBPF-based zero-instrumentation LLM Agent observability"
-LABEL org.opencontainers.image.source="https://github.com/mtagentprism/mtagentprism"
+LABEL org.opencontainers.image.source="https://github.com/mtagentlens/mtagentlens"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libelf1 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /build/collector/build/release/mtagentprism /usr/local/bin/mtagentprism
+COPY --from=builder /build/collector/build/release/mtagentlens /usr/local/bin/mtagentlens
 
 EXPOSE 7395
 
-ENTRYPOINT ["/usr/local/bin/mtagentprism"]
+ENTRYPOINT ["/usr/local/bin/mtagentlens"]
 CMD ["--help"]

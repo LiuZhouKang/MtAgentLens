@@ -1,10 +1,10 @@
-# MtAgentPrism 系统架构
+# MtAgentLens 系统架构
 
 ## 概述
 
-MtAgentPrism 是一个基于 eBPF 的零插桩 LLM Agent 可观测性系统。它在 Linux 内核系统调用边界拦截 SSL/TLS 明文、进程生命周期、文件操作和网络连接，通过 Rust 流式引擎进行事件处理与因果分析，最终在 Next.js 前端呈现。
+MtAgentLens 是一个基于 eBPF 的零插桩 LLM Agent 可观测性系统。它在 Linux 内核系统调用边界拦截 SSL/TLS 明文、进程生命周期、文件操作和网络连接，通过 Rust 流式引擎进行事件处理与因果分析，最终在 Next.js 前端呈现。
 
-**核心设计原则**：所有攻击最终都表现为系统调用。MtAgentPrism 在攻击触碰 OS 之前就已经看到了它——而攻击者无法关闭内核。
+**核心设计原则**：所有攻击最终都表现为系统调用。MtAgentLens 在攻击触碰 OS 之前就已经看到了它——而攻击者无法关闭内核。
 
 ---
 
@@ -95,7 +95,7 @@ MtAgentPrism 是一个基于 eBPF 的零插桩 LLM Agent 可观测性系统。�
   +---------------------------------+-------------------------------+
   |                 FRONTEND + HTTP API (:7395)                     |
   |  Next.js 16 · React 19 · TypeScript 5 · Tailwind CSS 4          |
-  |  rust-embed: compiled into mtagentprism binary at build time    |
+  |  rust-embed: compiled into mtagentlens binary at build time    |
   |  /           Timeline (scrollable, 10+ event type renderers)    |
   |  /tree       Process tree (hierarchical)                        |
   |  /alerts     Alert panel (causal chain + evidence)              |
@@ -205,7 +205,7 @@ pub struct Event {
 
 ## 第三层：因果分析引擎（ResponsibilityRuntime）
 
-ResponsibilityRuntime 是 MtAgentPrism 的核心——它将原始事件流转化为结构化的责任归属。以全局 analyzer 身份注册到管道中。
+ResponsibilityRuntime 是 MtAgentLens 的核心——它将原始事件流转化为结构化的责任归属。以全局 analyzer 身份注册到管道中。
 
 ### 两阶段架构
 
@@ -284,7 +284,7 @@ FuxiBench 86 场景中仅触发 34 次（39.5% 调用率），方向准确率 84
 
 Next.js 16 + React 19 + TypeScript 5 + Tailwind CSS 4。
 
-通过 `rust-embed` 在 Rust 编译时内嵌静态资源（`frontend/out/`），编译为 `mtagentprism` 二进制的一部分——部署时无需独立的 Node.js 服务。
+通过 `rust-embed` 在 Rust 编译时内嵌静态资源（`frontend/out/`），编译为 `mtagentlens` 二进制的一部分——部署时无需独立的 Node.js 服务。
 
 **核心组件**：
 - `TimelinePanel`：可滚动时间线，每种事件类型有专门的行渲染器
@@ -313,7 +313,7 @@ Next.js 16 + React 19 + TypeScript 5 + Tailwind CSS 4。
 ### Agent 会话的完整生命周期
 
 ```
-1. 启动: mtagentprism record -c claude --binary-path <path>
+1. 启动: mtagentlens record -c claude --binary-path <path>
 2. eBPF 探针挂载到内核 hook 点
 3. Agent 进程产生系统调用 → eBPF 捕获 → JSON 事件 → stdout
 4. Runner 读取 stdout → EventStream

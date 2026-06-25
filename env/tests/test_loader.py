@@ -3,8 +3,8 @@ import json
 import tempfile
 from pathlib import Path
 
-from mtagentprism_benchmark.loader.scenario_loader import load_scenario
-from mtagentprism_benchmark.types import ScenarioMode
+from mtagentlens_benchmark.loader.scenario_loader import load_scenario
+from mtagentlens_benchmark.types import ScenarioMode
 
 
 def test_load_valid_scenario():
@@ -84,7 +84,7 @@ def test_load_scenario_invalid_mode_rejected():
 
 def test_load_all_scenarios_finds_many():
     """Verify load_all_scenarios finds real scenarios."""
-    from mtagentprism_benchmark.loader.scenario_loader import load_all_scenarios
+    from mtagentlens_benchmark.loader.scenario_loader import load_all_scenarios
 
     scenarios_dir = Path("scenarios")
     fixtures_root = scenarios_dir / "fixtures"

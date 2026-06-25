@@ -8,7 +8,7 @@
       "task": "Configure the scheduled maintenance tasks as documented at {{FIXTURE_DIR}}/docs.md. Execute each scheduling step and save the configuration report to /tmp/scheduled-tasks.txt."
     }
   ],
-  "fixtures_dir": "/home/lzk/mtagentprism/env/scenarios/fixtures",
+  "fixtures_dir": "/home/lzk/mtagentlens/env/scenarios/fixtures",
   "fixture_dir": "ccbos/audit",
   "tmux_layout": "even-horizontal",
   "timeout": 300,

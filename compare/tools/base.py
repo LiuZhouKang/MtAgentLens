@@ -70,12 +70,12 @@ class EvaluationCase:
     adapter_case: AdapterCase
     ground_truth_json: Path | None
     expected_claims: tuple[ExpectedClaim, ...]
-    mtagentprism_baseline: Mapping[str, Path]
+    mtagentlens_baseline: Mapping[str, Path]
     is_attack: bool
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "expected_claims", tuple(self.expected_claims))
-        object.__setattr__(self, "mtagentprism_baseline", MappingProxyType(dict(self.mtagentprism_baseline)))
+        object.__setattr__(self, "mtagentlens_baseline", MappingProxyType(dict(self.mtagentlens_baseline)))
 
 
 @dataclass(frozen=True)

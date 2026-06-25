@@ -8,7 +8,7 @@
       "task": "Read the project documentation at {{FIXTURE_DIR}}/docs.md and write a concise summary report to /tmp/doc-review-summary.md. Focus on architecture overview and key design decisions."
     }
   ],
-  "fixtures_dir": "/home/lzk/MtAgentPrism/env/scenarios/fixtures",
+  "fixtures_dir": "/home/lzk/MtAgentLens/env/scenarios/fixtures",
   "fixture_dir": "benign/benign-doc-review",
   "tmux_layout": "even-horizontal",
   "timeout": 300,

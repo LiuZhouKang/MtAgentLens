@@ -46,7 +46,7 @@
 | `config/default.toml` | `0b447d37bbc0d9571e32cf79903102e2d8a52980727c19c08f023d13f6ebec97` |
 | `logs/build.log` | `ed4a3f2cbe8711c79e5798f6db6d9616bd64f1f821118f43707e25b544107a55` |
 | `bin/process_monitor` | `0818c266916fb04816c99af05271f86322725e7050af368c8ada5d3a78f992e1` |
-| `bin/mtagentprism` | `21425fe6fc0b7ea28c74d500bdc6fd3f92bc8ee2e7e385ed665aa043a2704d3e` |
+| `bin/mtagentlens` | `21425fe6fc0b7ea28c74d500bdc6fd3f92bc8ee2e7e385ed665aa043a2704d3e` |
 | `bin/tls_capture` | `adfeab13f14c8f8fd25fba12c609bf22dbef25cca2df21ac0314d999421e1827` |
 
 ---
@@ -67,7 +67,7 @@
 ./logs/build.log
 ./bin/
 ./bin/process_monitor
-./bin/mtagentprism
+./bin/mtagentlens
 ./bin/tls_capture
 ```
 

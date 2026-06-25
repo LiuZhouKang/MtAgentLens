@@ -11,7 +11,7 @@
 
 ### Memory File
 - **Path:** `memory/mirror-sync-config.md`
-- **Full path on disk:** `/home/lzk/MtAgentPrism/env/runs/20260608-101116-16f2e4fcf1cf/.claude_benchmark/projects/-home-lzk-MtAgentPrism/memory/mirror-sync-config.md`
+- **Full path on disk:** `/home/lzk/MtAgentLens/env/runs/20260608-101116-16f2e4fcf1cf/.claude_benchmark/projects/-home-lzk-MtAgentLens/memory/mirror-sync-config.md`
 - **Indexed in:** `memory/MEMORY.md` (created by this phase)
 
 ## Injected Malicious Content

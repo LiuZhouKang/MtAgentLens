@@ -177,7 +177,7 @@ def build_candidate(
     )
 
     return {
-        "schema": "mtagentprism.ground_truth.v2.candidate",
+        "schema": "mtagentlens.ground_truth.v2.candidate",
         "annotation_status": "machine_generated_needs_review",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "scenario_id": scenario_id,
@@ -603,7 +603,7 @@ def build_summary(dataset: Path, candidate_dir: Path, candidates: list[dict[str,
         and candidate["execution_status"] == "refused"
     ]
     return {
-        "schema": "mtagentprism.gt_v2_candidate_summary.v1",
+        "schema": "mtagentlens.gt_v2_candidate_summary.v1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "dataset": dataset.as_posix(),
         "candidate_dir": candidate_dir.as_posix(),

@@ -167,11 +167,11 @@ def _extract_task(prompt_text: str) -> str:
     parts = prompt_text.split("## Fixture Text", 1)
     task_section = parts[0]
 
-    # 去除 MtAgentPrism 样板标题
+    # 去除 MtAgentLens 样板标题
     lines = []
     for line in task_section.split("\n"):
         stripped = line.strip()
-        if stripped.startswith("# MtAgentPrism") or stripped.startswith("## Agent Tasks"):
+        if stripped.startswith("# MtAgentLens") or stripped.startswith("## Agent Tasks"):
             continue
         lines.append(line)
 
@@ -345,7 +345,7 @@ def prepare_agent_sentinel_input(
     task = _extract_task(prompt_text)
 
     # 清理本地路径和模板变量
-    task = re.sub(r'/home/lzk/MtAgentPrism/env/scenarios/fixtures/\S+', '<TASK_DIR>', task)
+    task = re.sub(r'/home/lzk/MtAgentLens/env/scenarios/fixtures/\S+', '<TASK_DIR>', task)
     task = re.sub(r'/tmp/mtap-\S+', '<TMP_DIR>', task)
     task = task.replace('{FIXTURE_DIR}', '<TASK_DIR>')
     task = task.replace('{{FIXTURE_DIR}}', '<TASK_DIR>')
@@ -711,7 +711,7 @@ def evaluate_llm_guard(manifest_entries: list[dict]) -> dict:
 
     results_path = output_dir / "results.json"
     results = {
-        "schema": "mtagentprism.prompt_baseline_results.v2",
+        "schema": "mtagentlens.prompt_baseline_results.v2",
         "tool": "llm-guard",
         "method": "llm-guard model-based scanners (PromptInjection DeBERTa-v3, Toxicity, Secrets)",
         "methodology": {
@@ -843,7 +843,7 @@ def evaluate_agent_sentinel(
     # 保存结果
     results_path = output_dir / "results.json"
     results = {
-        "schema": "mtagentprism.prompt_baseline_results.v3",
+        "schema": "mtagentlens.prompt_baseline_results.v3",
         "tool": "agent-sentinel",
         "tool_source": "https://github.com/m4p1e/agent-sentinel",
         "method": "agent-sentinel AuditWithoutTrace LLM safety query",
@@ -960,7 +960,7 @@ def main() -> int:
         label = {"agent_sentinel": "Agent Sentinel", "llm_guard": "LLM Guard"}.get(tool_name, tool_name)
         print(f"{label:30s} {tpr:8.4f} {fpr:8.4f} {m['f1']:8.4f} {m['mcc']:8.4f}")
 
-    print(f"\n{'MtAgentPrism (eBPF)':30s} {'0.940':>8s} {'0.263':>8s} {'0.816':>8s} {'0.781':>8s}")
+    print(f"\n{'MtAgentLens (eBPF)':30s} {'0.940':>8s} {'0.263':>8s} {'0.816':>8s} {'0.781':>8s}")
 
     return 0
 

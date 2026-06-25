@@ -9,7 +9,7 @@ Annotators: 刘周康、唐浩钺、刘锦样
 import json
 from pathlib import Path
 
-PROJECT = Path("/home/lzk/MtAgentPrism")
+PROJECT = Path("/home/lzk/MtAgentLens")
 SCENARIOS_DIR = PROJECT / "env" / "scenarios"
 FIXTURES_DIR = PROJECT / "env" / "scenarios" / "fixtures"
 GT_DIR = PROJECT / "compare" / "Dataset" / "FuxiBench" / "ground_truth"
@@ -631,7 +631,7 @@ def make_gt(sc):
                         "policy_id": sc["policy"], "severity": "Warning"}]
 
     return {
-        "schema": "mtagentprism.ground_truth.v2",
+        "schema": "mtagentlens.ground_truth.v2",
         "scenario_id": sc["id"],
         "category": sc["category"],
         "attack_type": sc["attack_type"],

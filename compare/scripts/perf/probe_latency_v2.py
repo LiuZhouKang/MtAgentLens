@@ -28,8 +28,8 @@ import subprocess
 import time
 from pathlib import Path
 
-PROJECT = Path(__file__).resolve().parents[3]  # compare/scripts/perf/ → mtagentprism/
-COLLECTOR_BIN = PROJECT / "collector/build/release/mtagentprism"
+PROJECT = Path(__file__).resolve().parents[3]  # compare/scripts/perf/ → mtagentlens/
+COLLECTOR_BIN = PROJECT / "collector/build/release/mtagentlens"
 BENCH_DIR = Path(__file__).resolve().parent / "bench_targets"
 PERF_DIR = PROJECT / "compare/results/perf"
 

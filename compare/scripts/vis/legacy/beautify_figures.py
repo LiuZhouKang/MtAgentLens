@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""中文顶会论文级可视化引擎 — MtAgentPrism 全部 10 张图。
+"""中文顶会论文级可视化引擎 — MtAgentLens 全部 10 张图。
 
 统一设计系统:
   - 中文字体 (SimSun/宋体优先), 300 DPI
-  - ColorBrewer 色板, MtAgentPrism 始终深蓝高亮
+  - ColorBrewer 色板, MtAgentLens 始终深蓝高亮
   - 一致的网格、边框、图例、标注样式
 
-用法:  cd /home/lzk/mtagentprism && python3 compare/scripts/beautify_figures.py
+用法:  cd /home/lzk/mtagentlens && python3 compare/scripts/beautify_figures.py
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ import numpy as np
 # 设计系统
 # ═══════════════════════════════════════════════════════════════════════════════
 
-PROJECT = Path("/home/lzk/mtagentprism")
+PROJECT = Path("/home/lzk/mtagentlens")
 RESULTS = PROJECT / "compare/results/paper"
 PERF_RESULTS = PROJECT / "compare/results/perf"
 FIGURES = RESULTS / "figures"
@@ -66,24 +66,24 @@ C = {
     "bg":        "#fafafa",
 }
 
-TOOL_ORDER = ["mtagentprism", "yara-x", "fixture-scanner", "gitleaks",
+TOOL_ORDER = ["mtagentlens", "yara-x", "fixture-scanner", "gitleaks",
               "semgrep", "trufflehog", "detect-secrets"]
 TOOL_COLORS = [C["as"], C["yara"], C["fixture"], C["gitleaks"],
                C["semgrep"], C["trufflehog"], C["ds"]]
 TOOL_LABELS = {
-    "mtagentprism": "MtAgentPrism", "yara-x": "YARA-X+\nYARA Forge",
+    "mtagentlens": "MtAgentLens", "yara-x": "YARA-X+\nYARA Forge",
     "fixture-scanner": "Fixture\nScanner", "gitleaks": "Gitleaks",
     "trufflehog": "TruffleHog", "semgrep": "Semgrep\nCE",
     "detect-secrets": "detect-\nsecrets",
 }
 TOOL_LABELS_SHORT = {
-    "mtagentprism": "MtAgentPrism", "yara-x": "YARA-X",
+    "mtagentlens": "MtAgentLens", "yara-x": "YARA-X",
     "fixture-scanner": "Fixture Scanner", "gitleaks": "Gitleaks",
     "trufflehog": "TruffleHog", "semgrep": "Semgrep CE",
     "detect-secrets": "detect-secrets",
 }
 TOOL_LABELS_CN = {
-    "mtagentprism": "MtAgentPrism\n（本系统）", "yara-x": "YARA-X",
+    "mtagentlens": "MtAgentLens\n（本系统）", "yara-x": "YARA-X",
     "fixture-scanner": "Fixture Scanner", "gitleaks": "Gitleaks",
     "trufflehog": "TruffleHog", "semgrep": "Semgrep CE",
     "detect-secrets": "detect-secrets",
@@ -173,9 +173,9 @@ def fig1_pr_curves(report, findings_by_tool, gts):
                     prec.append(tp / k if k > 0 else 1.0)
                     rec.append(tp / n_attack if n_attack > 0 else 0)
 
-        lw = 1.8 if tid == "mtagentprism" else 1.0
-        alpha = 1.0 if tid == "mtagentprism" else 0.65
-        ls = "-" if tid == "mtagentprism" else "--"
+        lw = 1.8 if tid == "mtagentlens" else 1.0
+        alpha = 1.0 if tid == "mtagentlens" else 0.65
+        ls = "-" if tid == "mtagentlens" else "--"
         lbl = f"{TOOL_LABELS_SHORT[tid]} (AP={ap_data.get(tid, 0):.3f})"
         ax.plot(rec, prec, linewidth=lw, alpha=alpha, linestyle=ls,
                 color=TOOL_COLORS[i], label=lbl)
@@ -193,7 +193,7 @@ def fig1_pr_curves(report, findings_by_tool, gts):
               edgecolor="#dddddd", framealpha=0.9, ncol=1,
               columnspacing=0.5, handlelength=1.5)
 
-    fig.suptitle("图 1  PR 曲线：MtAgentPrism 与静态分析工具对比",
+    fig.suptitle("图 1  PR 曲线：MtAgentLens 与静态分析工具对比",
                  fontweight="bold", y=0.98)
     save(fig, "fig1_pr_curves.pdf")
 
@@ -233,12 +233,12 @@ def fig2_per_category(report):
 
     for j, tid in enumerate(TOOL_ORDER):
         offset = (j - n_tools / 2 + 0.5) * width
-        alpha = 1.0 if tid == "mtagentprism" else 0.72
+        alpha = 1.0 if tid == "mtagentlens" else 0.72
         bars = ax.bar(x + offset, data[:, j], width,
                       color=TOOL_COLORS[j], edgecolor="white", linewidth=0.2,
                       label=TOOL_LABELS_SHORT[tid], alpha=alpha)
-        # MtAgentPrism 柱子加边框
-        if tid == "mtagentprism":
+        # MtAgentLens 柱子加边框
+        if tid == "mtagentlens":
             for b in bars:
                 b.set_edgecolor(C["as"])
                 b.set_linewidth(0.6)
@@ -250,7 +250,7 @@ def fig2_per_category(report):
     ax.legend(loc="upper right", ncol=4, frameon=True, fancybox=False,
               edgecolor="#dddddd", fontsize=6.5, columnspacing=0.3)
 
-    fig.suptitle("图 2  各攻击类别检出率：MtAgentPrism 覆盖全部类别",
+    fig.suptitle("图 2  各攻击类别检出率：MtAgentLens 覆盖全部类别",
                  fontweight="bold", y=0.99)
     save(fig, "fig2_per_category.pdf")
 
@@ -305,13 +305,13 @@ def fig3_heatmap(report):
     cbar = plt.colorbar(im, ax=ax, shrink=0.85, pad=0.02)
     cbar.set_label("检出率", fontsize=7)
 
-    # MtAgentPrism 列高亮边框
+    # MtAgentLens 列高亮边框
     for i in range(len(vectors)):
         rect = plt.Rectangle((-0.5, i - 0.5), 1, 1, fill=False,
                              edgecolor=C["as"], linewidth=1.5, linestyle="-")
         ax.add_patch(rect)
 
-    fig.suptitle("图 3  攻击向量覆盖矩阵：MtAgentPrism 全覆盖 vs 静态工具稀疏覆盖",
+    fig.suptitle("图 3  攻击向量覆盖矩阵：MtAgentLens 全覆盖 vs 静态工具稀疏覆盖",
                  fontweight="bold", y=0.99)
     save(fig, "fig3_attack_coverage_heatmap.pdf")
 
@@ -369,7 +369,7 @@ def fig5_pure_behavior(report, findings_by_tool, gts):
 
 def fig6_ablation(report, findings_by_tool, gts):
     attack_ids = {s for s, gt in gts.items() if gt.get("alerts")}
-    ag_findings = findings_by_tool.get("mtagentprism", [])
+    ag_findings = findings_by_tool.get("mtagentlens", [])
 
     rb_sids, ea_sids = set(), set()
     for f in ag_findings:
@@ -382,7 +382,7 @@ def fig6_ablation(report, findings_by_tool, gts):
     full_atk = rb_atk | ea_atk
 
     configs = [
-        ("完整 MtAgentPrism\n（Resource + ExecArg）", len(full_atk)),
+        ("完整 MtAgentLens\n（Resource + ExecArg）", len(full_atk)),
         ("ResourceBoundary\n（总贡献）", len(rb_atk)),
         ("ExecArgBoundary\n（总贡献）", len(ea_atk)),
         ("仅 ResourceBoundary\n（独有贡献）", len(rb_atk - ea_atk)),
@@ -601,15 +601,15 @@ def fig10_summary(report, perf):
     ax.set_xlim(0, 10); ax.set_ylim(0, 10)
 
     main = report["main_metrics"]
-    as_f1 = main["mtagentprism"]["f1"]
-    best_static_f1 = max(main[t]["f1"] for t in TOOL_ORDER if t != "mtagentprism")
-    as_ap = main["mtagentprism"]["average_precision"]
+    as_f1 = main["mtagentlens"]["f1"]
+    best_static_f1 = max(main[t]["f1"] for t in TOOL_ORDER if t != "mtagentlens")
+    as_ap = main["mtagentlens"]["average_precision"]
 
     tp = perf.get("throughput", {})
     mem = perf.get("memory", {})
     mean_rss = mem.get("rss", {}).get("mean", 4.57)
 
-    ax.text(5, 9.6, "MtAgentPrism 性能总览：检测能力 + 运行开销",
+    ax.text(5, 9.6, "MtAgentLens 性能总览：检测能力 + 运行开销",
             ha="center", fontsize=12, fontweight="bold")
     ax.text(5, 9.1, "Pilot 评估 — 30 个冻结场景, 7 个工具, Linux 6.17",
             ha="center", fontsize=7, color="#888888", fontstyle="italic")

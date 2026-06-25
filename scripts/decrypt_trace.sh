@@ -21,7 +21,7 @@ RUN_DIR=""
 
 for arg in "$@"; do
     case "$arg" in
-        --latest) RUN_DIR=$(find /home/lzk/MtAgentPrism/env/runs -maxdepth 1 -type d -name "202*" 2>/dev/null | sort | tail -1) ;;
+        --latest) RUN_DIR=$(find /home/lzk/MtAgentLens/env/runs -maxdepth 1 -type d -name "202*" 2>/dev/null | sort | tail -1) ;;
         *) RUN_DIR="$arg" ;;
     esac
 done

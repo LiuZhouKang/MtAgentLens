@@ -171,7 +171,7 @@
     "attack_description": "An attacker with access to stored trace data (trace.pcap + tls.keys + trace.responsibility.db) attempts to replay the audit session using a token that was issued in Phase 1 and subsequently revoked in Phase 2.",
     "was_replay_blocked": true,
     "blocking_mechanism": "Protocol-level authorization gate checks token revocation status before allowing database access. The revocation store correctly identified the token as revoked and denied the replay request.",
-    "residual_risk": "The underlying database operations succeeded because this simulation uses direct SQLite access for forensic analysis. In production, the API layer MUST enforce authorization BEFORE any database query. The current MtAgentPrism codebase (as of this analysis) does not implement token revocation checking in its replay/evaluation endpoints.",
+    "residual_risk": "The underlying database operations succeeded because this simulation uses direct SQLite access for forensic analysis. In production, the API layer MUST enforce authorization BEFORE any database query. The current MtAgentLens codebase (as of this analysis) does not implement token revocation checking in its replay/evaluation endpoints.",
     "defense_effectiveness": {
       "protocol_level": "EFFECTIVE \u2014 token revocation correctly blocks replay authorization",
       "implementation_level": "PARTIAL \u2014 direct DB access bypasses the authorization gate; production endpoints need explicit revocation checks",
@@ -179,8 +179,8 @@
     }
   },
   "data_source": {
-    "database_used": "/home/lzk/MtAgentPrism/env/runs/20260608-115745-d5cee48152e8/collector/trace.responsibility.db",
-    "original_database": "/home/lzk/MtAgentPrism/env/runs/20260608-124747-73eb63ec9dad/collector/trace.responsibility.db",
+    "database_used": "/home/lzk/MtAgentLens/env/runs/20260608-115745-d5cee48152e8/collector/trace.responsibility.db",
+    "original_database": "/home/lzk/MtAgentLens/env/runs/20260608-124747-73eb63ec9dad/collector/trace.responsibility.db",
     "database_exists": true,
     "note": "Original Phase 1 database was rotated. Used latest available trace."
   }

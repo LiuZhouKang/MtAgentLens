@@ -16,7 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DATASET_ROOT = PROJECT_ROOT / "compare" / "Dataset" / "FuxiBench"
 PROMPT_INPUTS = DATASET_ROOT / "prompt_inputs"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "compare" / "results" / "paper" / "release" / "annotation_package"
-DEFAULT_SALT = "mtagentprism-frozen-v1.0.0-independent-annotation-2026-06-09"
+DEFAULT_SALT = "mtagentlens-frozen-v1.0.0-independent-annotation-2026-06-09"
 
 ANNOTATOR_FIELDS = {
     "sample_id": "",
@@ -120,7 +120,7 @@ def build_annotation_package(*, output_dir: Path, salt: str = DEFAULT_SALT) -> d
     _write_json(
         output_dir / "sample_key_private.json",
         {
-            "schema": "mtagentprism.annotation_sample_key.v1",
+            "schema": "mtagentlens.annotation_sample_key.v1",
             "status": "private_not_for_annotators",
             "mapping": key_mapping,
             "warning": "Do not share this file with annotators before both blinded annotation files are locked.",
@@ -129,7 +129,7 @@ def build_annotation_package(*, output_dir: Path, salt: str = DEFAULT_SALT) -> d
     _write_json(
         output_dir / "metrics.json",
         {
-            "schema": "mtagentprism.annotation_metrics.v1",
+            "schema": "mtagentlens.annotation_metrics.v1",
             "status": "not_computed",
             "claim_boundary": "blind_annotation_quality_not_claimed",
             "required_before_claiming": [
@@ -146,7 +146,7 @@ def build_annotation_package(*, output_dir: Path, salt: str = DEFAULT_SALT) -> d
     _write_json(
         output_dir / "provenance.json",
         {
-            "schema": "mtagentprism.annotation_package_provenance.v1",
+            "schema": "mtagentlens.annotation_package_provenance.v1",
             "status": "prepared_for_independent_annotation",
             "generated_at": _now_iso(),
             "dataset": "FuxiBench",
@@ -182,7 +182,7 @@ def _manifest(output_dir: Path, *, sample_count: int) -> dict[str, Any]:
             }
         )
     return {
-        "schema": "mtagentprism.annotation_package_manifest.v1",
+        "schema": "mtagentlens.annotation_package_manifest.v1",
         "status": "prepared_for_independent_annotation",
         "generated_at": _now_iso(),
         "dataset": "FuxiBench",
@@ -252,14 +252,14 @@ def _role(name: str) -> str:
 
 
 def _readme() -> str:
-    return """# MtAgentPrism Independent Annotation Package
+    return """# MtAgentLens Independent Annotation Package
 
 Status: prepared for independent annotation, not completed
 
 This package contains blinded samples for a second-annotator/adjudication study
 over the frozen 67-scenario benchmark. It is prepared from the label-leak-free
 prompt-input manifest and intentionally excludes current ground-truth labels,
-attack types, scenario IDs, MtAgentPrism outputs, prompt-baseline outputs and
+attack types, scenario IDs, MtAgentLens outputs, prompt-baseline outputs and
 paper metrics from `blinded_samples.jsonl`.
 
 Do not share `sample_key_private.json` with annotators before both annotator

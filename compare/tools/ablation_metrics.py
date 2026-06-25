@@ -531,7 +531,7 @@ def ablation_report(
         })
 
     return {
-        "schema": "mtagentprism.ablation_metrics.v1",
+        "schema": "mtagentlens.ablation_metrics.v1",
         "n_total": len(labels),
         "n_attack": int(np.sum(labels == 1)),
         "n_benign": int(np.sum(labels == 0)),

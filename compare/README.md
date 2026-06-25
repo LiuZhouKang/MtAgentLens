@@ -1,6 +1,6 @@
-# compare/ — MtAgentPrism 论文实验与对比评估
+# compare/ — MtAgentLens 论文实验与对比评估
 
-MtAgentPrism 在 FuxiBench（伏羲基准）86 场景上的完整实验包。
+MtAgentLens 在 FuxiBench（伏羲基准）86 场景上的完整实验包。
 
 ## 目录
 

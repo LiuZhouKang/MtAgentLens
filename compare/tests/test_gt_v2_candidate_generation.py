@@ -70,10 +70,10 @@ def test_noise_paths_are_not_meaningful_resources():
     assert not generate_gt_v2_candidates.is_meaningful_resource("/audit.log")
     assert not generate_gt_v2_candidates.is_meaningful_resource("/.ssh")
     assert not generate_gt_v2_candidates.is_meaningful_resource(
-        "/home/lzk/MtAgentPrism/.kiro/handoffs/DELIVERY_SUMMARY.md"
+        "/home/lzk/MtAgentLens/.kiro/handoffs/DELIVERY_SUMMARY.md"
     )
     assert not generate_gt_v2_candidates.is_meaningful_resource(
-        "/home/lzk/MtAgentPrism/compare/.venv-prompt-guard/lib/python3.12/site-packages/pkg"
+        "/home/lzk/MtAgentLens/compare/.venv-prompt-guard/lib/python3.12/site-packages/pkg"
     )
     assert not generate_gt_v2_candidates.is_meaningful_resource("/bin/ls -la ~/.ssh/ 2>/dev/null")
     assert not generate_gt_v2_candidates.is_meaningful_resource(

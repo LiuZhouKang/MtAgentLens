@@ -6,8 +6,8 @@
 //
 // 用法: cargo run --release --bin perf_throughput -- [events=100000]
 
-use mtagentprism::framework::analyzers::{HTTPParser, OutputAnalyzer};
-use mtagentprism::framework::runners::{FakeRunner, Runner};
+use mtagentlens::framework::analyzers::{HTTPParser, OutputAnalyzer};
+use mtagentlens::framework::runners::{FakeRunner, Runner};
 use futures::stream::StreamExt;
 use std::env;
 use std::time::Instant;

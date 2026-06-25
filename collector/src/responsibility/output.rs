@@ -145,7 +145,7 @@ impl OutputWriter {
 
     fn format_metrics(&self, summary: &EvaluationSummary) -> String {
         let mut out = String::new();
-        let prefix = "mtagentprism_responsibility";
+        let prefix = "mtagentlens_responsibility";
         out.push_str(&format!("# HELP {}_events_total Total events processed.\n", prefix));
         out.push_str(&format!("# TYPE {}_events_total counter\n", prefix));
         out.push_str(&format!("{}_events_total {}\n", prefix, summary.total_events));
@@ -259,8 +259,8 @@ mod tests {
         let summary = EvaluationSummary::new("test-3".into());
         let writer = OutputWriter::new(OutputFormat::Metrics);
         let output = writer.format_summary(&summary);
-        assert!(output.contains("mtagentprism_responsibility_events_total"));
-        assert!(output.contains("mtagentprism_responsibility_final_score"));
+        assert!(output.contains("mtagentlens_responsibility_events_total"));
+        assert!(output.contains("mtagentlens_responsibility_final_score"));
     }
 
     #[test]

@@ -8,6 +8,9 @@ const viewports = [
 
 const routes = [
   { name: 'home', path: '/?audit=headless' },
+  { name: 'traces', path: '/traces' },
+  { name: 'clusters', path: '/clusters' },
+  { name: 'agents', path: '/agents' },
   { name: 'investigation', path: '/investigations#alertId=demo-alert-1' },
   { name: 'handoff', path: '/handoff' },
 ];

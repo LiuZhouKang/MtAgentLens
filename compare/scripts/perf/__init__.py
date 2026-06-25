@@ -1,4 +1,4 @@
-"""MtAgentPrism 性能微基准测试套件 (Experiment 8).
+"""MtAgentLens 性能微基准测试套件 (Experiment 8).
 
 四个子实验:
   4.1 eBPF 探针延迟 (probe_latency)

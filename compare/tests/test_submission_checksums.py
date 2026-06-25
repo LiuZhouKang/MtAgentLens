@@ -10,7 +10,7 @@ def test_submission_checksums_match_manifest_hash_bound_files(tmp_path: Path) ->
 
     artifact = build_checksums(output_path=output)
 
-    assert artifact["schema"] == "mtagentprism.submission_checksums.v1"
+    assert artifact["schema"] == "mtagentlens.submission_checksums.v1"
     assert artifact["status"] == "completed"
     assert artifact["file_count"] >= 50
     assert artifact["output_path"] == str(output)

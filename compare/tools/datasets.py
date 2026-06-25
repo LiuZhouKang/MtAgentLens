@@ -29,7 +29,7 @@ _EVALUATOR_ONLY_KEYS = {
     "responsibilityclaims",
     "responsibilityalerts",
     "agentsightbaseline",
-    "mtagentprismbaseline",
+    "mtagentlensbaseline",
     "tracedb",
     "traces",
     "metrics",
@@ -46,7 +46,7 @@ _UNSAFE_SCENARIO_STRING_TOKENS = (
     "responsibilityclaims",
     "responsibilityalerts",
     "agentsightbaseline",
-    "mtagentprismbaseline",
+    "mtagentlensbaseline",
 )
 
 
@@ -78,7 +78,7 @@ class FrozenDatasetAdapter:
 
     def _generated_root_for(self, dataset_dir: Path, generated_root: Path | None) -> Path:
         if generated_root is None:
-            return Path(tempfile.mkdtemp(prefix="mtagentprism-frozen-dataset-")).resolve()
+            return Path(tempfile.mkdtemp(prefix="mtagentlens-frozen-dataset-")).resolve()
 
         resolved_dataset = dataset_dir.resolve()
         resolved_generated = generated_root.resolve()
@@ -119,7 +119,7 @@ class FrozenDatasetAdapter:
                 adapter_case=adapter_case,
                 ground_truth_json=ground_truth_path,
                 expected_claims=_expected_claims(ground_truth, expected_behavior_data),
-                mtagentprism_baseline=self._mtagentprism_baseline(scenario_id),
+                mtagentlens_baseline=self._mtagentlens_baseline(scenario_id),
                 is_attack=_is_attack_ground_truth(ground_truth, ground_truth_path, manifest_sample),
             )
             cases.append(evaluation_case)
@@ -274,7 +274,7 @@ class FrozenDatasetAdapter:
             return False
         return True
 
-    def _mtagentprism_baseline(self, scenario_id: str) -> dict[str, Path]:
+    def _mtagentlens_baseline(self, scenario_id: str) -> dict[str, Path]:
         manifest = self._load_quality_manifest()
         manifest_sample = manifest.get(scenario_id, {})
         trace_dir = self.traces_dir / scenario_id

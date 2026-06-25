@@ -47,7 +47,7 @@ def test_runner_writes_findings_metrics_status_and_summary(tmp_path: Path) -> No
     assert "No cloud APIs were used" in summary
     assert "No LLM Judge was used" in summary
     assert "No runtime replay was performed" in summary
-    assert "not MtAgentPrism-derived claims or alerts" in summary
+    assert "not MtAgentLens-derived claims or alerts" in summary
     assert "Frozen precision and F1 are not reported" in summary
     assert "Unsupported cases are excluded from metric denominators" in summary
 

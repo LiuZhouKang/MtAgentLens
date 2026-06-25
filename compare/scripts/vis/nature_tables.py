@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nature-style LaTeX tables for completed MtAgentPrism paper artifacts."""
+"""Nature-style LaTeX tables for completed MtAgentLens paper artifacts."""
 
 from __future__ import annotations
 
@@ -23,9 +23,9 @@ from compare.scripts.vis.paper_report import (  # noqa: E402
 RESULTS = PROJECT / "compare" / "results" / "paper"
 PERF_DIR = PROJECT / "compare" / "results" / "perf"
 BACKEND_HEALTH_DIR = PROJECT / "compare" / "results" / "backend_health"
-TOOL_ORDER = ["mtagentprism", "llm-guard", "meta-prompt-guard", "vigil"]
+TOOL_ORDER = ["mtagentlens", "llm-guard", "meta-prompt-guard", "vigil"]
 TOOL_SHORT = {
-    "mtagentprism": "MtAgentPrism",
+    "mtagentlens": "MtAgentLens",
     "llm-guard": "LLM Guard",
     "meta-prompt-guard": "Meta Prompt Guard",
     "vigil": "Vigil",
@@ -83,7 +83,7 @@ def table_main(report):
         m = metrics.get(tool_id)
         if m is None:
             continue
-        prefix = "\\asrow " if tool_id == "mtagentprism" else ""
+        prefix = "\\asrow " if tool_id == "mtagentlens" else ""
         if has_per_type:
             pt = per_type.get(tool_id, {})
             per_type_recalls = [
@@ -111,7 +111,7 @@ def table_main(report):
         rows,
         f"Completed main evaluation on FuxiBench ($n={total}$; {attack} attack, {benign} benign).",
         "tab:main_completed",
-        notes="Only completed frozen MtAgentPrism and prompt-baseline artifacts are included.",
+        notes="Only completed frozen MtAgentLens and prompt-baseline artifacts are included.",
     )
 
 
@@ -123,7 +123,7 @@ def table_mcnemar(report):
     headers = ["Comparison", "$b$", "$c$", "Yates statistic", "$p$ value"]
     rows = [
         [
-            f"MtAgentPrism vs {TOOL_SHORT.get(row['tool_id'], row['tool_id'])}",
+            f"MtAgentLens vs {TOOL_SHORT.get(row['tool_id'], row['tool_id'])}",
             str(row["b"]),
             str(row["c"]),
             f"{row['statistic']:.2f}",
@@ -136,7 +136,7 @@ def table_mcnemar(report):
         rows,
         "Scenario-level paired McNemar tests against prompt baselines.",
         "tab:mcnemar_completed",
-        notes="b: MtAgentPrism correct and prompt baseline wrong; c: prompt baseline correct and MtAgentPrism wrong.",
+        notes="b: MtAgentLens correct and prompt baseline wrong; c: prompt baseline correct and MtAgentLens wrong.",
     )
 
 
@@ -144,7 +144,7 @@ def table_ablation(report):
     try:
         artifact = load_completed_artifact(
             RESULTS / "controlled_ablation_results.json",
-            expected_schema="mtagentprism.controlled_ablation_results.v1",
+            expected_schema="mtagentlens.controlled_ablation_results.v1",
         )
     except PaperReportError:
         return ""
@@ -182,7 +182,7 @@ def table_backend_health(report=None):
     try:
         artifact = load_completed_artifact(
             BACKEND_HEALTH_DIR / "capture_health.json",
-            expected_schema="mtagentprism.backend_capture_health.v1",
+            expected_schema="mtagentlens.backend_capture_health.v1",
         )
     except PaperReportError:
         return ""
@@ -252,7 +252,7 @@ def _performance_table_if_completed(experiment: str) -> str:
     try:
         artifact = load_completed_artifact(
             PERF_DIR / "performance_results.json",
-            expected_schema="mtagentprism.performance_results.v1",
+            expected_schema="mtagentlens.performance_results.v1",
         )
     except PaperReportError:
         return ""

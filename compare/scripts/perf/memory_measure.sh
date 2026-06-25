@@ -5,7 +5,7 @@
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-COLLECTOR="$PROJECT/collector/build/release/mtagentprism"
+COLLECTOR="$PROJECT/collector/build/release/mtagentlens"
 OUT="$PROJECT/compare/results/perf/memory_footprint_v2.json"
 DUR=180
 RUNS=3

@@ -11,7 +11,7 @@ def test_controlled_ablation_builder_defaults_to_blocked(tmp_path: Path) -> None
     output = tmp_path / "controlled_ablation_results.json"
     artifact = build_controlled_ablation_results(output_path=output)
 
-    assert artifact["schema"] == "mtagentprism.controlled_ablation_results.v1"
+    assert artifact["schema"] == "mtagentlens.controlled_ablation_results.v1"
     assert artifact["status"] == "blocked"
     assert artifact["is_controlled_feature_flag_replay"] is True
     assert artifact["variants"] == []

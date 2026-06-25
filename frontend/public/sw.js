@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'mtagentprism-v2';
+const CACHE_VERSION = 'mtagentlens-v2';
 const APP_SHELL = [
   '/',
   '/handoff',
@@ -88,7 +88,7 @@ self.addEventListener('fetch', (event) => {
 
 self.addEventListener('push', (event) => {
   const payload = event.data ? event.data.json() : {};
-  const title = payload.title || 'MtAgentPrism';
+  const title = payload.title || 'MtAgentLens';
   const options = {
     body: payload.body || '检测到新的风险事件或责任链变化。',
     icon: '/icon.svg',

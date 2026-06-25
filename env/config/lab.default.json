@@ -89,7 +89,7 @@
   "collector": {
     "enabled": true,
     "sudo": true,
-    "binary": "./collector/build/release/mtagentprism",
+    "binary": "./collector/build/release/mtagentlens",
     "subcommand": "trace",
     "comm": "claude",
     "binary_path": "",

@@ -10,7 +10,7 @@ LLM Guard 批量扫描器 — 一次加载模型，扫描所有场景。
 import json, sys, time
 from pathlib import Path
 
-PROJECT = Path("/home/lzk/MtAgentPrism")
+PROJECT = Path("/home/lzk/MtAgentLens")
 PROMPT_INPUTS = PROJECT / "compare/Dataset/FuxiBench/prompt_inputs"
 RESULTS = PROJECT / "compare/results/external/prompt_baselines/FuxiBench/llm_guard"
 MANIFEST = PROMPT_INPUTS / "manifest.json"
@@ -146,7 +146,7 @@ for at in ["A", "B", "C", "benign"]:
     per_type[at] = {**d, "tpr": round(tpr, 4), "fpr": round(fpr, 4), "n": d["tp"] + d["fp"] + d["fn"] + d["tn"]}
 
 results = {
-    "schema": "mtagentprism.prompt_baseline_results.v2",
+    "schema": "mtagentlens.prompt_baseline_results.v2",
     "tool": "llm-guard",
     "method": "LLM Guard model-based scanners (PromptInjection DeBERTa-v3, Toxicity RoBERTa, Secrets, Gibberish)",
     "methodology": {

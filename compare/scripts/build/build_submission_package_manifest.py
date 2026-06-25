@@ -33,7 +33,7 @@ CHECKSUMS_PATH = RELEASE_DIR / "CHECKSUMS.sha256"
 BACKEND_DIR = RESULTS_ROOT / "backend_health"
 PERF_DIR = RESULTS_ROOT / "perf"
 DOCS_DIR = PROJECT_ROOT / "compare" / "docs"
-DESIGN_DOC = PROJECT_ROOT / "docs" / "superpowers" / "specs" / "2026-06-04-mtagentprism-experiment-design.md"
+DESIGN_DOC = PROJECT_ROOT / "docs" / "superpowers" / "specs" / "2026-06-04-mtagentlens-experiment-design.md"
 
 
 CANONICAL_ARTIFACTS = {
@@ -263,19 +263,19 @@ def build_manifest() -> dict[str, Any]:
     report = load_paper_report_v1(CANONICAL_ARTIFACTS["evaluation_report"])
     load_completed_artifact(
         CANONICAL_ARTIFACTS["controlled_ablation"],
-        expected_schema="mtagentprism.controlled_ablation_results.v1",
+        expected_schema="mtagentlens.controlled_ablation_results.v1",
     )
     load_completed_artifact(
         CANONICAL_ARTIFACTS["backend_capture_health"],
-        expected_schema="mtagentprism.backend_capture_health.v1",
+        expected_schema="mtagentlens.backend_capture_health.v1",
     )
     load_completed_artifact(
         CANONICAL_ARTIFACTS["performance"],
-        expected_schema="mtagentprism.performance_results.v1",
+        expected_schema="mtagentlens.performance_results.v1",
     )
     figure_manifest = load_completed_artifact(
         CANONICAL_ARTIFACTS["figure_manifest"],
-        expected_schema="mtagentprism.paper_figure_manifest.v1",
+        expected_schema="mtagentlens.paper_figure_manifest.v1",
     )
 
     total, attack, benign = dataset_counts(report)
@@ -286,7 +286,7 @@ def build_manifest() -> dict[str, Any]:
     files = _file_inventory(figure_manifest)
 
     return {
-        "schema": "mtagentprism.paper_submission_package.v1",
+        "schema": "mtagentlens.paper_submission_package.v1",
         "status": "completed",
         "generated_at": _now_iso(),
         "git": {

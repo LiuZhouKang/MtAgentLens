@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MtAgentPrism 论文性能图 — 统一字体规范。
+"""MtAgentLens 论文性能图 — 统一字体规范。
 
 文本：DejaVu Sans (regular / bold)
 数学符号：STIXGeneral (μ, Σ 等希腊字母)

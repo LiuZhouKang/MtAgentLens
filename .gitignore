@@ -88,3 +88,4 @@ compare/models/
 
 # Collector local models
 collector/models/
+web/

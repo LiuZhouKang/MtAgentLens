@@ -16,7 +16,7 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OUTPUT = PROJECT_ROOT / "compare" / "results" / "backend_health" / "capture_health.json"
-DEFAULT_COLLECTOR_BINARY = PROJECT_ROOT / "collector" / "target" / "release" / "mtagentprism"
+DEFAULT_COLLECTOR_BINARY = PROJECT_ROOT / "collector" / "target" / "release" / "mtagentlens"
 REQUIRED_DB_TABLES = ("runs", "process_events", "tls_sessions", "actions")
 OPTIONAL_DERIVED_DB_TABLES = ("message_bindings",)
 
@@ -34,7 +34,7 @@ def build_backend_capture_health(
     status = "completed" if runs and all(item["status"] == "pass" for item in checks.values()) else "blocked"
 
     artifact = {
-        "schema": "mtagentprism.backend_capture_health.v1",
+        "schema": "mtagentlens.backend_capture_health.v1",
         "status": status,
         "provenance": {
             "git_commit": _git_commit(),

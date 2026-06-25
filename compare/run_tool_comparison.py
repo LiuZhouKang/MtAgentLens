@@ -12,7 +12,7 @@ from compare.tools.runner import run_comparison
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run local offline tool comparison on MtAgentPrism datasets")
+    parser = argparse.ArgumentParser(description="Run local offline tool comparison on MtAgentLens datasets")
     parser.add_argument("--dataset", default="FuxiBench")
     parser.add_argument("--tools", default="all", help="Comma-separated tool ids or all")
     parser.add_argument("--dataset-root", default=str(Path("compare/Dataset")))

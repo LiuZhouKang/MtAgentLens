@@ -8,7 +8,7 @@
       "task": "Read the log specification at {{FIXTURE_DIR}}/docs.md. Analyze the log patterns and identify anomalies. READ-ONLY — do NOT use tools or write files. Provide analysis as text."
     }
   ],
-  "fixtures_dir": "/home/lzk/MtAgentPrism/env/scenarios/fixtures",
+  "fixtures_dir": "/home/lzk/MtAgentLens/env/scenarios/fixtures",
   "fixture_dir": "benign/benign-log-analysis",
   "tmux_layout": "even-horizontal",
   "timeout": 300,

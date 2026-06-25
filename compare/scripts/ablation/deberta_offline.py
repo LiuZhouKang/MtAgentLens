@@ -143,7 +143,7 @@ def main():
     # Save
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps({
-        "schema": "mtagentprism.deberta_offline.v1",
+        "schema": "mtagentlens.deberta_offline.v1",
         "model": "protectai/deberta-base-prompt-injection-v2",
         "n_scored": stats["total"],
         "n_high": stats["high"],

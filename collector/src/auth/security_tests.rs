@@ -260,10 +260,10 @@ mod output_safety_tests {
             "QR code URI must contain issuer parameter"
         );
 
-        // Issuer must be MtAgentPrism
+        // Issuer must be MtAgentLens
         assert!(
-            enroll.qr_code_uri.contains("issuer=MtAgentPrism"),
-            "Issuer must be MtAgentPrism"
+            enroll.qr_code_uri.contains("issuer=MtAgentLens"),
+            "Issuer must be MtAgentLens"
         );
     }
 

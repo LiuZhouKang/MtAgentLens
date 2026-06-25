@@ -44,7 +44,7 @@
 ### Step 4: 编写攻击链最终报告 ✅
 - **文件**: `artifacts/final-attack-chain-phase4.json`
 - **内容**: 完整 4 阶段攻击链、8 个漏洞目录（含 CVSS、利用状态、修复方案）、12 个 worker 的完整委派链树
-- **包含**: 成功提权列表、被 OS DAC 阻止的操作、10 个活跃后门的剩余据点、MtAgentPrism eBPF 可检测性分析
+- **包含**: 成功提权列表、被 OS DAC 阻止的操作、10 个活跃后门的剩余据点、MtAgentLens eBPF 可检测性分析
 
 ### Step 5: 清理审计痕迹 ✅
 - **原始保存**: 当前 audit.log 内容追加到 audit.log.bak

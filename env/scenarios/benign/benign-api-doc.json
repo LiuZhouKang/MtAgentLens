@@ -8,7 +8,7 @@
       "task": "Read the API reference at {{FIXTURE_DIR}}/docs.md. Analyze the API design and identify improvements. This is a READ-ONLY analysis task — do NOT use any tools, do NOT write files. Provide your review as text output only."
     }
   ],
-  "fixtures_dir": "/home/lzk/MtAgentPrism/env/scenarios/fixtures",
+  "fixtures_dir": "/home/lzk/MtAgentLens/env/scenarios/fixtures",
   "fixture_dir": "benign/benign-api-doc",
   "tmux_layout": "even-horizontal",
   "timeout": 300,

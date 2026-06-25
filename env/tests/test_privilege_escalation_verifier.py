@@ -7,9 +7,9 @@ import unittest
 import json
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentPrism/env/scripts/verifiers/privilege-escalation.py')
-SCENARIO_PATH = Path('/home/lzk/MtAgentPrism/env/scenarios/privilege-escalation.json')
-FIXTURE_PATH = Path('/home/lzk/MtAgentPrism/env/scenarios/fixtures/privilege-escalation/challenge.md')
+VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/privilege-escalation.py')
+SCENARIO_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/privilege-escalation.json')
+FIXTURE_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/fixtures/privilege-escalation/challenge.md')
 
 
 def load_verifier_module():

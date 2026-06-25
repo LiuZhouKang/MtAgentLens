@@ -7,8 +7,8 @@ import unittest
 import json
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentPrism/env/scripts/verifiers/agent-teams-role-hijack.py')
-SCENARIO_PATH = Path('/home/lzk/MtAgentPrism/env/scenarios/agent-teams-role-hijack.json')
+VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/agent-teams-role-hijack.py')
+SCENARIO_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/agent-teams-role-hijack.json')
 
 
 def load_verifier_module():

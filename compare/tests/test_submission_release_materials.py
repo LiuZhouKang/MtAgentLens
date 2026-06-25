@@ -44,7 +44,7 @@ def test_availability_statements_choose_public_processed_data_and_restricted_raw
 def test_datacite_draft_has_required_fields_and_author_placeholders() -> None:
     draft = json.loads((RELEASE_DIR / "DATACITE_DRAFT.json").read_text(encoding="utf-8"))
 
-    assert draft["schema"] == "mtagentprism.release_datacite_draft.v1"
+    assert draft["schema"] == "mtagentlens.release_datacite_draft.v1"
     assert draft["status"] == "prepared_with_author_placeholders"
     assert draft["identifier"]["identifier"] == "TO_BE_ASSIGNED_BY_REPOSITORY"
     assert draft["identifier"]["identifierType"] == "DOI"
@@ -106,7 +106,7 @@ def test_trace_redaction_policy_requires_validation_before_public_trace_release(
 def test_trace_redaction_audit_blocks_raw_public_trace_release() -> None:
     audit = json.loads((RELEASE_DIR / "TRACE_REDACTION_AUDIT.json").read_text(encoding="utf-8"))
 
-    assert audit["schema"] == "mtagentprism.trace_redaction_audit.v1"
+    assert audit["schema"] == "mtagentlens.trace_redaction_audit.v1"
     assert audit["status"] == "blocked_for_public_release"
     assert audit["summary"]["database_count"] == 67
     assert audit["summary"]["integrity_failures"] == 0
@@ -140,7 +140,7 @@ def test_prepared_annotation_package_keeps_blinding_and_nonclaim_boundary() -> N
     metrics = json.loads((package_dir / "metrics.json").read_text(encoding="utf-8"))
     first_sample = json.loads((package_dir / "blinded_samples.jsonl").read_text(encoding="utf-8").splitlines()[0])
 
-    assert manifest["schema"] == "mtagentprism.annotation_package_manifest.v1"
+    assert manifest["schema"] == "mtagentlens.annotation_package_manifest.v1"
     assert manifest["status"] in {"prepared_for_independent_annotation", "completed"}
     assert manifest["sample_count"] == 67
     assert manifest["claim_status"] in {"non_claim_until_completed", "blind_annotation_quality_claimed"}

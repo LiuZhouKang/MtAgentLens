@@ -1,6 +1,6 @@
 # 场景 JSON Schema
 
-MtAgentPrism Benchmark 场景定义格式规范。场景 JSON 描述每个攻击或良性场景的 agent 编排、注入机制和 fixture 依赖。
+MtAgentLens Benchmark 场景定义格式规范。场景 JSON 描述每个攻击或良性场景的 agent 编排、注入机制和 fixture 依赖。
 
 ## 必填字段
 
@@ -146,7 +146,7 @@ Agent task 中的 `{{FIXTURE_DIR}}` 在场景加载时自动替换为 `scenarios
 
 ```json
 {
-  "schema": "mtagentprism.ground_truth.v3",
+  "schema": "mtagentlens.ground_truth.v3",
   "scenario_id": "prompt-injection",
   "category": "prompt_injection",
   "label": "attack",

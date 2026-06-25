@@ -5,17 +5,20 @@ import type {
   HandoffObsMetrics,
   HandoffObservabilityEvent,
 } from '@/lib/handoff-observability-contract';
+import type { HandoffWorkbenchModel } from '@/lib/handoff-workbench';
+import { inferHandoffEventSeverity } from '@/lib/handoff-workbench';
 
 type HandoffPressureAtlasProps = {
   metrics: HandoffObsMetrics;
   events: HandoffObservabilityEvent[];
+  model: HandoffWorkbenchModel;
 };
 
 function clampPercentage(value: number) {
   return Math.max(8, Math.min(100, value));
 }
 
-export default function HandoffPressureAtlas({ metrics, events }: HandoffPressureAtlasProps) {
+export default function HandoffPressureAtlas({ metrics, events, model }: HandoffPressureAtlasProps) {
   const boundarySignals = useMemo(
     () =>
       events.filter((event) => {
@@ -64,11 +67,11 @@ export default function HandoffPressureAtlas({ metrics, events }: HandoffPressur
   const cadencePeaks = useMemo(
     () =>
       events.slice(0, 8).map((event, index) => {
-        const severity = String((event as { severity?: string }).severity ?? 'INFO').toUpperCase();
+        const severity = inferHandoffEventSeverity(event);
         const tone =
-          severity === 'CRITICAL' || severity === 'ERROR'
+          severity === 'critical'
             ? '#fb7185'
-            : severity === 'WARNING'
+            : severity === 'warning'
               ? '#fbbf24'
               : index % 2 === 0
                 ? '#8b7dff'
@@ -88,7 +91,9 @@ export default function HandoffPressureAtlas({ metrics, events }: HandoffPressur
         <div className="prism-atlas-label">Delegation Pressure</div>
         <div className="prism-atlas-value">把委托深度、扇出速度与边界衰减压成同一张压力曲面</div>
         <div className="prism-atlas-caption">
-          handoff 不该只是树结构浏览器，它应该先告诉你哪一种扩散最接近失控。
+          {model.leadLane
+            ? `${model.leadLane.agentId} 当前正牵引最值得优先判断的委托压力。`
+            : 'handoff 不该只是树结构浏览器，它应该先告诉你哪一种扩散最接近失控。'}
         </div>
         <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
           {seamRows.map((row) => (
@@ -161,7 +166,9 @@ export default function HandoffPressureAtlas({ metrics, events }: HandoffPressur
         <div className="prism-atlas-label">Field Readout</div>
         <div className="prism-atlas-value">让边界残骸、实时委托和失真信号拥有各自清晰的进入理由</div>
         <div className="prism-atlas-caption">
-          当前观测面最值得优先处理的是 {boundarySignals.length} 条边界信号与 {orchestrationSignals.length} 条扩散信号。
+          {model.leadFocus
+            ? `当前首要信号是「${model.leadFocus.title}」，其次再看 ${boundarySignals.length} 条边界信号与 ${orchestrationSignals.length} 条扩散信号。`
+            : `当前观测面最值得优先处理的是 ${boundarySignals.length} 条边界信号与 ${orchestrationSignals.length} 条扩散信号。`}
         </div>
         <div
           style={{
@@ -172,9 +179,9 @@ export default function HandoffPressureAtlas({ metrics, events }: HandoffPressur
           }}
         >
           {[
-            { label: 'Boundary', value: boundarySignals.length, tone: '#7dd3fc' },
-            { label: 'Orchestration', value: orchestrationSignals.length, tone: '#8b7dff' },
-            { label: 'Debris', value: metrics.orphaned_artifacts, tone: '#fbbf24' },
+            { label: 'Boundary', value: model.signalCounts.boundary, tone: '#7dd3fc' },
+            { label: 'Orchestration', value: model.signalCounts.orchestration, tone: '#8b7dff' },
+            { label: 'Debris', value: model.signalCounts.debris, tone: '#fbbf24' },
           ].map((item) => (
             <div
               key={item.label}

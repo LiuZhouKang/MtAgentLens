@@ -1,5 +1,5 @@
 """Tests for BenchmarkScore calculation."""
-from mtagentprism_benchmark.types import (
+from mtagentlens_benchmark.types import (
     BenchmarkScore, DetectionMetrics, CausalChainMetrics,
     IdentityMetrics, FalsePositiveMetrics, RobustnessMetrics,
 )

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Agent Sentinel — 全量 InjecAgent 2108 样本评估。
 
-不触碰 MtAgentPrism 结果，仅更新 agent_sentinel_full。
+不触碰 MtAgentLens 结果，仅更新 agent_sentinel_full。
 """
 import json, re, time, os, urllib.request, urllib.error, math, sys
 from pathlib import Path

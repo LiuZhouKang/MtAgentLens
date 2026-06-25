@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""MtAgentPrism × InjecAgent (USENIX Security '25) 外部基准评估。
+"""MtAgentLens × InjecAgent (USENIX Security '25) 外部基准评估。
 
-MtAgentPrism:
+MtAgentLens:
   第1层: 完整生产规则引擎 (25条 unsafe + 5条 safe, 来自 Rust rules.rs)
   第2层: Observer LLM (deepseek-v4-pro, 完整生产 system_prompt)
   第3层: Fail-closed (Uncertain → Unsafe)
@@ -36,7 +36,7 @@ MTAP_MODEL = "deepseek-v4-pro"      # Observer LLM
 AS_MODEL = API_CONFIG.get("ANTHROPIC_MODEL", MTAP_MODEL)  # Agent Sentinel 使用与主配置相同的模型（基准公平性）
 
 # ═══════════════════════════════════════════════════════════════
-# MtAgentPrism 第1层: 完整生产规则引擎
+# MtAgentLens 第1层: 完整生产规则引擎
 # ═══════════════════════════════════════════════════════════════
 
 UNSAFE_RULES = [
@@ -110,7 +110,7 @@ def run_rule_engine(prompt_text: str) -> dict:
     }
 
 # ═══════════════════════════════════════════════════════════════
-# MtAgentPrism 第2层: Observer LLM (生产 system_prompt)
+# MtAgentLens 第2层: Observer LLM (生产 system_prompt)
 # ═══════════════════════════════════════════════════════════════
 
 OBSERVER_SYSTEM_PROMPT = """You are a security auditor for AI agent operations. Your job is to classify observed agent behavior.
@@ -193,11 +193,11 @@ def call_observer(prompt_text: str, rule_engine_result: dict) -> dict | None:
     return None
 
 # ═══════════════════════════════════════════════════════════════
-# MtAgentPrism 第3层: 决策融合
+# MtAgentLens 第3层: 决策融合
 # ═══════════════════════════════════════════════════════════════
 
 def mtap_full_classify(prompt_text: str) -> tuple[str, dict]:
-    """MtAgentPrism 三层决策。"""
+    """MtAgentLens 三层决策。"""
     # 第1层: 规则引擎
     rules = run_rule_engine(prompt_text)
     details = {"rules": rules, "observer": None, "final_route": rules["route"]}
@@ -278,7 +278,7 @@ def main():
         fp = INJECAGENT_DIR / fn
         if fp.exists(): all_cases.extend(json.loads(fp.read_text()))
     print(f"InjecAgent 样本: {len(all_cases)}")
-    print(f"MtAgentPrism Observer: {MTAP_MODEL} | Agent Sentinel: {AS_MODEL}")
+    print(f"MtAgentLens Observer: {MTAP_MODEL} | Agent Sentinel: {AS_MODEL}")
 
     # 构建 prompt
     prompts = []
@@ -288,9 +288,9 @@ def main():
         prompts.append(f"User: {task}\n\nAttacker Instruction: {attacker}")
     labels = ["attack"] * len(all_cases)
 
-    # ── 1. MtAgentPrism : 全部运行（规则快 + Observer 抽样） ──
+    # ── 1. MtAgentLens : 全部运行（规则快 + Observer 抽样） ──
     print(f"\n{'='*60}")
-    print("1. MtAgentPrism  (规则引擎 + Observer v4-pro)")
+    print("1. MtAgentLens  (规则引擎 + Observer v4-pro)")
     print(f"{'='*60}")
 
     mtap_preds = []
@@ -317,7 +317,7 @@ def main():
     print(f"2. Agent Sentinel ({AS_MODEL}, 抽样)")
     print(f"{'='*60}")
 
-    # 基准公平性：Agent Sentinel 评估全部样本（与 MtAgentPrism 一致），
+    # 基准公平性：Agent Sentinel 评估全部样本（与 MtAgentLens 一致），
     # 不再抽样 200 个。之前硬编码 min(200, ...) 限制破坏了对等比较。
     #
     # 注意：全量 AS 评估有显著 API 成本（~2000+ 次调用，样本数与 InjecAgent
@@ -341,12 +341,12 @@ def main():
     print(f"\n{'='*70}")
     print("InjecAgent 基准结果")
     print(f"{'='*70}")
-    print(f"MtAgentPrism Observer: {MTAP_MODEL} | Agent Sentinel: {AS_MODEL}")
+    print(f"MtAgentLens Observer: {MTAP_MODEL} | Agent Sentinel: {AS_MODEL}")
     print(f"\n{'工具':32s} {'样本':>6s} {'TPR':>8s} {'FPR':>8s} {'F1':>8s} {'MCC':>8s}")
     print("-" * 70)
 
     mtap_m = compute_metrics(mtap_preds, labels)
-    print(f"{'MtAgentPrism  (规则+Observer)':32s} {len(all_cases):>6d} {mtap_m['TPR']:8.4f} {'—':>8s} {mtap_m['F1']:8.4f} {mtap_m['MCC']:8.4f}")
+    print(f"{'MtAgentLens  (规则+Observer)':32s} {len(all_cases):>6d} {mtap_m['TPR']:8.4f} {'—':>8s} {mtap_m['F1']:8.4f} {mtap_m['MCC']:8.4f}")
 
     if model_preds and "labels" in model_preds:
         # v2 格式：包含 labels 和 benign 对照样本
@@ -368,11 +368,11 @@ def main():
         "dataset": "InjecAgent (USENIX Security '25)",
         "total": len(all_cases),
         "config": {
-            "mtagentprism_model": MTAP_MODEL,
+            "mtagentlens_model": MTAP_MODEL,
             "agent_sentinel_model": AS_MODEL,
-            "mtagentprism_observer_calls": observer_calls,
+            "mtagentlens_observer_calls": observer_calls,
         },
-        "mtagentprism_full": mtap_m,
+        "mtagentlens_full": mtap_m,
         "agent_sentinel_low": as_m,
     }
     if model_preds:

@@ -8,7 +8,7 @@
     "escalated_role": "security-auditor",
     "permission_mode": "bypassPermissions",
     "execution_timestamp": "2026-06-07T19:50:00Z",
-    "working_directory": "/home/lzk/MtAgentPrism/env/scenarios/fixtures/multi_agent_attack/role-hijack/",
+    "working_directory": "/home/lzk/MtAgentLens/env/scenarios/fixtures/multi_agent_attack/role-hijack/",
     "status": "COMPLETED"
   },
 

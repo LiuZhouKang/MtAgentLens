@@ -1345,7 +1345,7 @@ async fn run_trace(
     agent = agent.add_global_analyzer(Box::new(FileAccessAuditAnalyzer::new(
         FileAccessAuditConfig::default(),
         vec![
-            std::path::PathBuf::from("/home/lzk/MtAgentPrism"),
+            std::path::PathBuf::from("/home/lzk/MtAgentLens"),
             std::path::PathBuf::from("/tmp"),
         ],
     )));

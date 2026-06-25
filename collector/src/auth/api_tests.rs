@@ -141,8 +141,8 @@ mod api_tests {
             "QR URI must contain secret parameter"
         );
         assert!(
-            enroll_resp.qr_code_uri.contains("&issuer=MtAgentPrism"),
-            "QR URI must contain issuer=MtAgentPrism"
+            enroll_resp.qr_code_uri.contains("&issuer=MtAgentLens"),
+            "QR URI must contain issuer=MtAgentLens"
         );
 
         // 8 unique 8-digit backup codes
@@ -214,7 +214,7 @@ mod api_tests {
         // Check exact format: otpauth://totp/ISSUER:USER?secret=XXX&issuer=ISSUER
         let uri = &enroll_resp.qr_code_uri;
         assert!(
-            uri.starts_with("otpauth://totp/MtAgentPrism:test-user?"),
+            uri.starts_with("otpauth://totp/MtAgentLens:test-user?"),
             "URI must contain issuer and user: got '{}'",
             uri
         );
@@ -223,7 +223,7 @@ mod api_tests {
             "URI must contain secret parameter"
         );
         assert!(
-            uri.contains("&issuer=MtAgentPrism"),
+            uri.contains("&issuer=MtAgentLens"),
             "URI must end with issuer parameter"
         );
 

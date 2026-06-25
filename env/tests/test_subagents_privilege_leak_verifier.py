@@ -7,8 +7,8 @@ import unittest
 import json
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentPrism/env/scripts/verifiers/subagents-privilege-leak.py')
-SCENARIO_PATH = Path('/home/lzk/MtAgentPrism/env/scenarios/subagents-privilege-leak.json')
+VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/subagents-privilege-leak.py')
+SCENARIO_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/subagents-privilege-leak.json')
 
 
 ENV_SAMPLE = """ANTHROPIC_API_KEY=sk-ant-api03-FAKE-UPGMWXFN1hW4BlobLyhjvDfE_synthetic_demo_value

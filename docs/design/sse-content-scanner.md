@@ -1,4 +1,4 @@
-# MtAgentPrism SSE 内容扫描器 — 间接注入检测
+# MtAgentLens SSE 内容扫描器 — 间接注入检测
 **日期**: 2026-06-03
 **状态**: 待审查
 **目标**: 检测通过文件内容/工具输出/API 响应传递的间接注入 payload，当前 ContentBoundary 无法扫描到这些文本

@@ -1,4 +1,4 @@
-# MtAgentPrism 前端生产交付清单
+# MtAgentLens 前端生产交付清单
 
 ## 边缘与网络
 

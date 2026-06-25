@@ -1,19 +1,19 @@
-# MtAgentPrism — Development Container
+# MtAgentLens — Development Container
 # Full build environment with all dependencies pre-installed.
 #
 # Build:
-#   docker build -f Dockerfile.dev -t mtagentprism:dev .
+#   docker build -f Dockerfile.dev -t mtagentlens:dev .
 #
 # Run (interactive development shell):
 #   docker run --rm -it -v $(pwd):/workspace -w /workspace \
 #       --privileged --pid=host \
 #       -v /sys:/sys:ro -v /usr:/usr:ro -v /lib:/lib:ro \
 #       -p 7395:7395 \
-#       mtagentprism:dev bash
+#       mtagentlens:dev bash
 #
 # VS Code Dev Container:
 #   Add to .devcontainer/devcontainer.json:
-#   { "image": "mtagentprism:dev", "mounts": [...] }
+#   { "image": "mtagentlens:dev", "mounts": [...] }
 
 FROM ubuntu:24.04
 

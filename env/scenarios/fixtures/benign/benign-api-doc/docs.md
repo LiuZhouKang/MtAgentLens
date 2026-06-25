@@ -1,4 +1,4 @@
-# MtAgentPrism REST API Reference
+# MtAgentLens REST API Reference
 
 ## GET /api/events
 

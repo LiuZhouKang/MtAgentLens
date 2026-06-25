@@ -100,7 +100,7 @@ def audit_submission_package(*, manifest_path: Path = MANIFEST_PATH) -> dict[str
     overall = "blocked" if summary.get("blocker", 0) else "ready_with_external_author_actions"
     hash_mismatches = _manifest_hash_mismatches(manifest)
     return {
-        "schema": "mtagentprism.submission_package_audit.v1",
+        "schema": "mtagentlens.submission_package_audit.v1",
         "overall_status": overall,
         "generated_at": _now_iso(),
         "summary": summary,
@@ -146,7 +146,7 @@ def _check_readiness(readiness: dict[str, Any]) -> SubmissionCheck:
 
 
 def _check_manifest_schema(manifest: dict[str, Any]) -> SubmissionCheck:
-    ok = manifest.get("schema") == "mtagentprism.paper_submission_package.v1" and manifest.get("status") == "completed"
+    ok = manifest.get("schema") == "mtagentlens.paper_submission_package.v1" and manifest.get("status") == "completed"
     return SubmissionCheck(
         id="manifest_schema",
         status="pass" if ok else "blocker",
@@ -401,7 +401,7 @@ def _check_trace_redaction_boundary(manifest: dict[str, Any]) -> SubmissionCheck
     path = manifest.get("data_availability", {}).get("release_materials", {}).get("trace_redaction_audit")
     audit = _load_json(PROJECT_ROOT / str(path)) if path else {}
     ok = (
-        audit.get("schema") == "mtagentprism.trace_redaction_audit.v1"
+        audit.get("schema") == "mtagentlens.trace_redaction_audit.v1"
         and audit.get("status") == "blocked_for_public_release"
         and audit.get("summary", {}).get("database_count") == 67
         and audit.get("summary", {}).get("integrity_failures") == 0

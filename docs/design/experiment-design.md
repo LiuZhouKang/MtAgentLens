@@ -1,4 +1,4 @@
-# MtAgentPrism 实验设计 v5 — RQ驱动 · 标准指标 · 正式设计文档
+# MtAgentLens 实验设计 v5 — RQ驱动 · 标准指标 · 正式设计文档
 **状态**: 正式设计文档 · **日期**: 2026-06-14 · **目标会议**: USENIX Security / CCS / NDSS
 
 > v5 取代 v4。核心变更：
@@ -11,7 +11,7 @@
 ## 0. Research Questions
 
 ### RQ1: Detection Superiority
-**MtAgentPrism 能否检测 prompt 级工具结构性漏报的 LLM Agent 攻击？**
+**MtAgentLens 能否检测 prompt 级工具结构性漏报的 LLM Agent 攻击？**
 
 - 核心假设：多 Agent 攻击（Type C）的恶意行为仅通过跨 Agent **行为关联**可见，单个 prompt 文本合法 → prompt 工具结构性失明
 - 实验：Frozen Main Evaluation（67 场景，覆盖 Type A/B/C + Benign）
@@ -27,9 +27,9 @@
 - 关键叙事：Co-necessity pattern — eBPF 信号是必要条件，Observer 是增强层
 
 ### RQ3: Attribution Quality
-**MtAgentPrism 能否超越二元分类，提供结构化攻击归因？**
+**MtAgentLens 能否超越二元分类，提供结构化攻击归因？**
 
-- 核心假设：所有对比工具只输出 binary label，MtAgentPrism 输出结构化 claims + tracebacks + agent-level 责任归属
+- 核心假设：所有对比工具只输出 binary label，MtAgentLens 输出结构化 claims + tracebacks + agent-level 责任归属
 - 实验：Attribution Analysis（Claim Coverage, Evidence Level 分布）
 - 主要指标：Claim Coverage (by boundary type, by attack category), Evidence Level L1-L5 分布
 - 关键叙事：Detection→Attribution 的结构性质变
@@ -184,31 +184,31 @@
 
 | # | 配置 | 工具族 | 输入 |
 |---|------|--------|------|
-| 1 | **MtAgentPrism** (eBPF ON) | runtime-causal-observability | responsibility.db artifacts |
+| 1 | **MtAgentLens** (eBPF ON) | runtime-causal-observability | responsibility.db artifacts |
 | 2 | LLM Guard | prompt-baseline | prompt_inputs manifest |
 | 3 | Vigil | prompt-baseline | prompt_inputs manifest |
 | 4 | Meta Prompt Guard | prompt-baseline | prompt_inputs manifest |
-| 5 | **MtAgentPrism** (eBPF Signal OFF) | runtime-causal-observability | responsibility.db (no TLS) |
+| 5 | **MtAgentLens** (eBPF Signal OFF) | runtime-causal-observability | responsibility.db (no TLS) |
 
 ### 预期 Table 1a: Overall Detection
 
 | Tool | TPR | FPR | Precision | F1 | MCC | Detected/Total |
 |------|-----|-----|-----------|----|-----|----------------|
-| **MtAgentPrism (eBPF ON)** | — | — | — | — | — | —/54 |
+| **MtAgentLens (eBPF ON)** | — | — | — | — | — | —/54 |
 | LLM Guard | 0.370 | — | 1.000 | 0.541 | — | 20/54 |
 | Vigil | 0.259 | — | 0.933 | 0.406 | — | 14/54 |
 | Meta Prompt Guard | 0.074 | — | 1.000 | 0.138 | — | 4/54 |
-| MtAgentPrism (eBPF OFF) | 0.000 | — | — | — | — | 0/54 |
+| MtAgentLens (eBPF OFF) | 0.000 | — | — | — | — | 0/54 |
 
 ### 预期 Table 1b: Per-Attack-Type Detection
 
 | Tool | Type A TPR | Type B TPR | Type C TPR |
 |------|-----------|-----------|-----------|
-| **MtAgentPrism (eBPF ON)** | — | — | — |
+| **MtAgentLens (eBPF ON)** | — | — | — |
 | LLM Guard | — | — | — |
 | Vigil | — | — | — |
 | Meta Prompt Guard | — | — | — |
-| MtAgentPrism (eBPF OFF) | 0.000 | 0.000 | 0.000 |
+| MtAgentLens (eBPF OFF) | 0.000 | 0.000 | 0.000 |
 
 **关键发现**：Type C 是结构性分化点。Prompt 工具 Type C TPR ≈ 0（不是"表现差"，而是每个单独 prompt 都合法）。
 
@@ -216,10 +216,10 @@
 
 | Comparison | b | c | χ² (Yates) | p | Interpretation |
 |------------|---|---|------------|-----|----------------|
-| MtAgentPrism vs LLM Guard | TBD | TBD | TBD | TBD | TBD |
-| MtAgentPrism vs Vigil | TBD | TBD | TBD | TBD | TBD |
-| MtAgentPrism vs Meta Prompt | TBD | TBD | TBD | TBD | TBD |
-| MtAgentPrism vs eBPF OFF | TBD | TBD | TBD | TBD | TBD |
+| MtAgentLens vs LLM Guard | TBD | TBD | TBD | TBD | TBD |
+| MtAgentLens vs Vigil | TBD | TBD | TBD | TBD | TBD |
+| MtAgentLens vs Meta Prompt | TBD | TBD | TBD | TBD | TBD |
+| MtAgentLens vs eBPF OFF | TBD | TBD | TBD | TBD | TBD |
 
 ### Bootstrap 95% CI
 
@@ -281,13 +281,13 @@ Baseline (eBPF ON, 全系统) → 选择性禁用 Layer N 的信号 → 重新�
 
 ### 设计
 
-对比 MtAgentPrism 的结构化归因输出与所有 baseline 的二元分类输出。
+对比 MtAgentLens 的结构化归因输出与所有 baseline 的二元分类输出。
 
 ### 预期 Table 3a: Claim Coverage
 
 | Tool | PolicyViolation | TaintedContextUse | Total Claims | Tracebacks |
 |------|----------------|-------------------|-------------|------------|
-| **MtAgentPrism** | X | X | X | X |
+| **MtAgentLens** | X | X | X | X |
 | LLM Guard | 0 | 0 | 0 | 0 |
 | Vigil | 0 | 0 | 0 | 0 |
 | Meta Prompt Guard | 0 | 0 | 0 | 0 |
@@ -365,7 +365,7 @@ DeepSeek v4-flash + thinking disabled + compact prompt + JSON truncation recover
 ## 11. 声明边界
 
 ### 支持的主张
-- 67 场景 frozen MtAgentPrism 离线评估（RQ1）
+- 67 场景 frozen MtAgentLens 离线评估（RQ1）
 - Prompt baseline 在全部 67 场景 prompt_inputs 上的结果（RQ1）
 - 反事实特征消融矩阵（RQ2）
 - 结构化归因 vs 二元分类的质变（RQ3）
@@ -384,18 +384,18 @@ DeepSeek v4-flash + thinking disabled + compact prompt + JSON truncation recover
 
 ```bash
 # 构建
-make build-bpf && cd collector && cargo build --release --bin mtagentprism
+make build-bpf && cd collector && cargo build --release --bin mtagentlens
 
 # 单场景采集（eBPF ON）
 echo "1" | sudo -S bash -c 'MTAGENTPRISM_SUDO_PASSWORD=1 \
   ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic \
   ANTHROPIC_AUTH_TOKEN=<token> MODEL=deepseek-v4-flash \
-  PYTHONPATH=env/src:. python3 -m mtagentprism_benchmark.cli run \
+  PYTHONPATH=env/src:. python3 -m mtagentlens_benchmark.cli run \
   --scenario <id> --mode process --collector'
 
 # 单场景采集（eBPF Signal OFF — 消融对照）
 echo "1" | sudo -S bash -c 'MTAGENTPRISM_SUDO_PASSWORD=1 \
-  PYTHONPATH=env/src:. python3 -m mtagentprism_benchmark.cli run \
+  PYTHONPATH=env/src:. python3 -m mtagentlens_benchmark.cli run \
   --scenario <id> --mode process --collector -- --ssl=false --process=false'
 
 # Prompt baseline 评估

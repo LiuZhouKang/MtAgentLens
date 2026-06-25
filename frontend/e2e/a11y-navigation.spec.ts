@@ -36,4 +36,22 @@ test.describe('keyboard accessibility', () => {
     await page.keyboard.press('Tab');
     await expect(page.getByRole('link', { name: '返回主界面' })).toBeVisible();
   });
+
+  test('clusters workbench keeps skip link and return navigation reachable', async ({ page }) => {
+    await page.goto('/clusters', { waitUntil: 'domcontentloaded' });
+
+    await page.keyboard.press('Tab');
+    const skipLink = page.getByRole('link', { name: '跳到主要内容' });
+    await expect(skipLink).toBeFocused();
+    await expect(page.getByRole('link', { name: '返回总览' })).toBeVisible();
+  });
+
+  test('agents workbench keeps skip link and return navigation reachable', async ({ page }) => {
+    await page.goto('/agents', { waitUntil: 'domcontentloaded' });
+
+    await page.keyboard.press('Tab');
+    const skipLink = page.getByRole('link', { name: '跳到主要内容' });
+    await expect(skipLink).toBeFocused();
+    await expect(page.getByRole('link', { name: '返回集群页' })).toBeVisible();
+  });
 });

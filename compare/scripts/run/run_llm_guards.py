@@ -11,7 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-PROJECT = Path(__file__).resolve().parents[3]  # compare/scripts/ → mtagentprism/
+PROJECT = Path(__file__).resolve().parents[3]  # compare/scripts/ → mtagentlens/
 COMPARE = PROJECT / "compare"
 sys.path.insert(0, str(PROJECT))
 RESULTS = COMPARE / "results/paper"

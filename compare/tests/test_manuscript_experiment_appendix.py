@@ -13,7 +13,7 @@ def test_manuscript_experiment_appendix_maps_claims_to_artifacts_figures_and_tab
         "67 frozen scenarios",
         "54 attack",
         "13 benign",
-        "MtAgentPrism",
+        "MtAgentLens",
         "LLM Guard",
         "Meta Prompt Guard",
         "Vigil",

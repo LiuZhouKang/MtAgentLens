@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-r"""MtAgentPrism Nature 级可视化引擎 — 10 张图 + 7 张 LaTeX 表.
+r"""MtAgentLens Nature 级可视化引擎 — 10 张图 + 7 张 LaTeX 表.
 
 Nature Machine Intelligence 设计标准:
   - NMI pastel 低饱和度调色板 (unified method families)
@@ -58,7 +58,7 @@ if _CN_FAMILY not in _names:
 
 # ── NMI Pastel 调色板 ──
 P = {
-    "hero":      "#384878",  # MtAgentPrism 深蓝紫
+    "hero":      "#384878",  # MtAgentLens 深蓝紫
     "hero_mid":  "#6878A8",
     "hero_soft": "#A0ACD0",
     "hero_pale": "#D0D4E8",
@@ -78,16 +78,16 @@ P = {
     "white":     "#FFFFFF",
 }
 
-TOOL_ORDER = ["mtagentprism", "yara-x", "fixture-scanner", "gitleaks",
+TOOL_ORDER = ["mtagentlens", "yara-x", "fixture-scanner", "gitleaks",
               "semgrep", "trufflehog", "detect-secrets", "static-ensemble"]
 TOOL_SHORT = {
-    "mtagentprism": "MtAgentPrism", "yara-x": "YARA-X",
+    "mtagentlens": "MtAgentLens", "yara-x": "YARA-X",
     "fixture-scanner": "Fixture Scanner", "gitleaks": "Gitleaks",
     "trufflehog": "TruffleHog", "semgrep": "Semgrep CE",
     "detect-secrets": "detect-secrets",
     "static-ensemble": "Static\nEnsemble",
 }
-# 工具颜色: MtAgentPrism 紫色高亮, Static-ensemble 强调色, 其他低饱和度灰色系
+# 工具颜色: MtAgentLens 紫色高亮, Static-ensemble 强调色, 其他低饱和度灰色系
 TOOL_COLORS = [P["hero"], P["hero_mid"], P["neutral_dk"], P["neutral"],
                P["base_soft"], P["neutral_lt"], P["neutral_lt"], P["accent_teal"]]
 
@@ -171,21 +171,21 @@ def get_sets(report):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def fig1_pr(report, findings, gts):
-    """核心发现图: MtAgentPrism 阶梯 PR 曲线 vs 静态工具单点标记."""
+    """核心发现图: MtAgentLens 阶梯 PR 曲线 vs 静态工具单点标记."""
     attack, benign = get_sets(report)
     ap_data = report["average_precision"]
     pr_data = report.get("pr_curves", {})
 
     fig, ax = plt.subplots(figsize=(5.2, 4.5))
 
-    # MtAgentPrism: 阶梯图
-    as_curve = pr_data.get("mtagentprism", {})
+    # MtAgentLens: 阶梯图
+    as_curve = pr_data.get("mtagentlens", {})
     as_r = as_curve.get("recall", [])
     as_p = as_curve.get("precision", [])
     step_r = [0.0] + as_r
     step_p = [1.0] + as_p
     ax.step(step_r, step_p, where="post", linewidth=2.0,
-            color=P["hero"], label=f"MtAgentPrism (AP={ap_data['mtagentprism']:.3f})",
+            color=P["hero"], label=f"MtAgentLens (AP={ap_data['mtagentlens']:.3f})",
             zorder=10)
     ax.scatter([as_r[-1]], [as_p[-1]], color=P["hero"], s=45,
                zorder=11, edgecolors="white", linewidth=0.8)
@@ -193,7 +193,7 @@ def fig1_pr(report, findings, gts):
     # 静态工具: 散点
     markers = ["D", "s", "p", "h", "^", "v"]
     for i, tid in enumerate(TOOL_ORDER):
-        if tid == "mtagentprism": continue
+        if tid == "mtagentlens": continue
         curve = pr_data.get(tid, {})
         rr = curve.get("recall", [])
         pp = curve.get("precision", [])
@@ -221,7 +221,7 @@ def fig1_pr(report, findings, gts):
             style="italic")
 
     panel_label(ax, "a")
-    fig.suptitle("PR 曲线：MtAgentPrism 在召回率-精确率空间的检测性能",
+    fig.suptitle("PR 曲线：MtAgentLens 在召回率-精确率空间的检测性能",
                  fontweight="bold", y=0.99)
     save(fig, "fig1_pr_curves")
     return fig
@@ -254,7 +254,7 @@ def fig2_category(report):
     cat_n = {}
     data = np.zeros((n_cats, n_tools))
     for i, cat in enumerate(categories):
-        v0 = cat_data[cat].get("mtagentprism", {})
+        v0 = cat_data[cat].get("mtagentlens", {})
         tp = v0.get("tp", 0) if isinstance(v0, dict) else 0
         fn = v0.get("fn", 0) if isinstance(v0, dict) else 0
         cat_n[cat] = max(int(tp + fn), 1)
@@ -272,10 +272,10 @@ def fig2_category(report):
 
     for j, tid in enumerate(TOOL_ORDER):
         offset = (j - n_tools / 2 + 0.5) * w
-        alpha = 1.0 if tid == "mtagentprism" else 0.6
-        ec = P["hero"] if tid == "mtagentprism" else "white"
-        lw = 0.8 if tid == "mtagentprism" else 0.2
-        z = 10 if tid == "mtagentprism" else 1
+        alpha = 1.0 if tid == "mtagentlens" else 0.6
+        ec = P["hero"] if tid == "mtagentlens" else "white"
+        lw = 0.8 if tid == "mtagentlens" else 0.2
+        z = 10 if tid == "mtagentlens" else 1
         ax.bar(x + offset, data[:, j], w, color=TOOL_COLORS[j],
                edgecolor=ec, linewidth=lw, alpha=alpha, zorder=z,
                label=TOOL_SHORT[tid])
@@ -288,7 +288,7 @@ def fig2_category(report):
               fancybox=False, edgecolor=P["neutral"], framealpha=0.9)
 
     panel_label(ax, "b")
-    fig.suptitle(f"类别检出率：MtAgentPrism 覆盖 {as_covered}/{n_cats} 类攻击向量",
+    fig.suptitle(f"类别检出率：MtAgentLens 覆盖 {as_covered}/{n_cats} 类攻击向量",
                  fontweight="bold", y=0.99)
     save(fig, "fig2_category")
     return fig
@@ -339,14 +339,14 @@ def fig3_heatmap(report):
     cbar = plt.colorbar(im, ax=ax, shrink=0.85, pad=0.02)
     cbar.set_label("检出率", fontsize=6.5)
 
-    # MtAgentPrism 列浅背景高亮
+    # MtAgentLens 列浅背景高亮
     rect = plt.Rectangle((-0.5, -0.5), 1, len(vectors), fill=True,
                           facecolor=P["hero_pale"], alpha=0.3, zorder=0)
     ax.add_patch(rect)
 
     n_cov = sum(1 for i in range(len(vectors)) if data[i, 0] > 0)
     panel_label(ax, "c")
-    fig.suptitle(f"攻击向量覆盖：MtAgentPrism {n_cov}/{len(vectors)} 类全覆盖，静态工具稀疏",
+    fig.suptitle(f"攻击向量覆盖：MtAgentLens {n_cov}/{len(vectors)} 类全覆盖，静态工具稀疏",
                  fontweight="bold", y=0.99)
     save(fig, "fig3_heatmap")
     return fig
@@ -357,7 +357,7 @@ def fig3_heatmap(report):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def fig5_behavior(report, findings, gts):
-    """纯行为攻击检测: 仅 MtAgentPrism 可检测."""
+    """纯行为攻击检测: 仅 MtAgentLens 可检测."""
     attack, _ = get_sets(report)
     beh = [s for s in attack if s.startswith("behavior-")]
     rates = []
@@ -365,7 +365,7 @@ def fig5_behavior(report, findings, gts):
         det = {f["scenario_id"] for f in findings.get(tid, [])}
         rates.append(len(det & set(beh)) / len(beh) if beh else 0)
 
-    # Wilson CI for MtAgentPrism
+    # Wilson CI for MtAgentLens
     n_b = len(beh); as_k = int(rates[0] * n_b)
     z = 1.96
     p_h = as_k / n_b if n_b else 0
@@ -407,7 +407,7 @@ def fig5_behavior(report, findings, gts):
 def fig6_boundary(report, findings, gts):
     """ResourceBoundary + ExecArgBoundary 互补覆盖分解."""
     attack, _ = get_sets(report)
-    ag = findings.get("mtagentprism", [])
+    ag = findings.get("mtagentlens", [])
 
     rb_s = {f["scenario_id"] for f in ag if f.get("boundary_type") == "ResourceBoundary"}
     ea_s = {f["scenario_id"] for f in ag if f.get("boundary_type") == "ExecArgBoundary"}
@@ -617,8 +617,8 @@ def fig9_memory(perf):
 def fig10_dashboard(report, perf):
     """三列卡片式性能总览."""
     mm = report["main_metrics"]
-    as_f1 = mm["mtagentprism"]["f1"]
-    best_f1 = max(mm[t]["f1"] for t in TOOL_ORDER if t != "mtagentprism")
+    as_f1 = mm["mtagentlens"]["f1"]
+    best_f1 = max(mm[t]["f1"] for t in TOOL_ORDER if t != "mtagentlens")
     tp = perf.get("throughput", {})
     mem = perf.get("memory", {})
 
@@ -631,7 +631,7 @@ def fig10_dashboard(report, perf):
     fig, ax = plt.subplots(figsize=(9, 5))
     ax.axis("off"); ax.set_xlim(0, 10); ax.set_ylim(0, 10)
 
-    ax.text(5, 9.7, "MtAgentPrism 性能总览", ha="center", fontsize=13, fontweight="bold")
+    ax.text(5, 9.7, "MtAgentLens 性能总览", ha="center", fontsize=13, fontweight="bold")
     ax.text(5, 9.2, "Pilot 评估 · 30 冻结场景 · 7 工具 · Linux 6.17",
             ha="center", fontsize=6.5, color=P["neutral_dk"], style="italic")
 
@@ -641,8 +641,8 @@ def fig10_dashboard(report, perf):
          "items": [
              ("F1 分数", f"{as_f1*100:.1f}%"),
              ("ΔF1 vs 最佳静态", f"{(as_f1-best_f1)*100:+.1f} pp"),
-             ("平均精确率", f"{mm['mtagentprism']['average_precision']:.3f}"),
-             ("场景召回率", f"{mm['mtagentprism']['scenario_recall']:.1%}"),
+             ("平均精确率", f"{mm['mtagentlens']['average_precision']:.3f}"),
+             ("场景召回率", f"{mm['mtagentlens']['scenario_recall']:.1%}"),
              ("McNemar 检验", "p<0.01 (6/6)"),
          ]},
         {"title": "运行效率", "accent": P["accent_teal"], "bg": "#F0F4F4",
@@ -682,7 +682,7 @@ def fig10_dashboard(report, perf):
                     fontsize=7, fontweight="bold", ha="right", color=card["accent"])
             yp -= 0.65
 
-    ax.text(5, 1.2, "实验 1–8 · 30 场景 · 2026-05 · MtAgentPrism v1",
+    ax.text(5, 1.2, "实验 1–8 · 30 场景 · 2026-05 · MtAgentLens v1",
             ha="center", fontsize=5.5, color=P["neutral"])
 
     save(fig, "fig10_dashboard")
@@ -727,8 +727,8 @@ def build_table_main(report):
     rows = []
     for tid in TOOL_ORDER:
         m = main[tid]
-        prefix = "      \\rowcolor{asrow} " if tid == "mtagentprism" else "      "
-        name = f"\\textbf{{{TOOL_SHORT[tid]}}}" if tid == "mtagentprism" else TOOL_SHORT[tid]
+        prefix = "      \\rowcolor{asrow} " if tid == "mtagentlens" else "      "
+        name = f"\\textbf{{{TOOL_SHORT[tid]}}}" if tid == "mtagentlens" else TOOL_SHORT[tid]
         row = [prefix + name] + [
             f"{m['precision']*100:.1f}\\%",
             f"{m['recall']*100:.1f}\\%",
@@ -741,18 +741,18 @@ def build_table_main(report):
     header = " & ".join(f"\\textbf{{{h}}}" for h in headers)
     body = "      \\midrule\n" + "\n".join(rows)
     tab = f"    \\begin{{tabular}}{{{col}}}\n{_hr(header + '\n' + body)}\n    \\end{{tabular}}"
-    return _tenv(tab, "检测性能对比（$n=30$）。灰色高亮为 MtAgentPrism（本系统）。", "tab:main",
+    return _tenv(tab, "检测性能对比（$n=30$）。灰色高亮为 MtAgentLens（本系统）。", "tab:main",
                  notes="F1=2PR/(P+R)；场景召回=至少一个 claim 被检出的攻击场景占比；"
                        "声明覆盖=检出的 GT claim 占比；AP=平均精确率(阈值无关)。")
 
 
 def build_table_mcnemar(report):
     mcn = report["mcnemar"]
-    # Sort: mtagentprism first, then by p
+    # Sort: mtagentlens first, then by p
     def sk(pair):
         r = mcn[pair]
         if not isinstance(r, dict): return (3, 1.0)
-        return (0 if "mtagentprism" in pair else 1, r["p_value"])
+        return (0 if "mtagentlens" in pair else 1, r["p_value"])
     pairs = sorted([p for p in mcn if isinstance(mcn[p], dict) and "p_value" in mcn[p]], key=sk)
 
     headers = ["对比组 (A vs B)", "A⁺B⁻", "A⁻B⁺", "χ²", "p", "显著性", "FDR p", "Cohen's h"]
@@ -760,7 +760,7 @@ def build_table_mcnemar(report):
     rows = []
     prev_has_as = True
     for pair in pairs:
-        r = mcn[pair]; has_as = "mtagentprism" in pair
+        r = mcn[pair]; has_as = "mtagentlens" in pair
         if prev_has_as and not has_as:
             rows.append("      \\addlinespace")
         prev_has_as = has_as
@@ -791,9 +791,9 @@ def build_table_mcnemar(report):
         f"FDR: Benjamini-Hochberg ({meta.get('total_comparisons', 21)} 组)。"
         f"限制比较族为 6 组时 Bonferroni $\\alpha=0.05/6\\approx0.0083$。"
         "Cohen's h 效应量: small=0.2, medium=0.5, large=0.8。"
-        "MtAgentPrism 对全部 6 个基线 $p<0.01$ (FDR 校正后仍显著)。"
+        "MtAgentLens 对全部 6 个基线 $p<0.01$ (FDR 校正后仍显著)。"
     )
-    return _tenv(tab, "McNemar 配对检验。灰色高亮: MtAgentPrism 显著差异对比。",
+    return _tenv(tab, "McNemar 配对检验。灰色高亮: MtAgentLens 显著差异对比。",
                  "tab:mcnemar", notes=notes, fontsize="\\footnotesize")
 
 
@@ -803,7 +803,7 @@ def build_table_ablation(report):
     headers = ["配置", "场景召回", "场景数", "说明"]
     col = "l S[table-format=2.1] c l"
     configs = [
-        ("full", "完整 MtAgentPrism", True),
+        ("full", "完整 MtAgentLens", True),
         ("resource_total", "ResourceBoundary 总贡献", False),
         ("execarg_total", "ExecArgBoundary 总贡献", False),
         ("resource_only", "ResourceBoundary 独有", False),
@@ -955,7 +955,7 @@ def build_heatmap_table(report):
 
     return _tenv(tab, "攻击向量覆盖矩阵。深色 = 高检出率。", "tab:vector-coverage",
                  wide=True, fontsize="\\footnotesize",
-                 notes="颜色编码: 深蓝=1.00(全覆盖), 浅蓝>0, 灰=0。MtAgentPrism 列呈现近乎全线深蓝。")
+                 notes="颜色编码: 深蓝=1.00(全覆盖), 浅蓝>0, 灰=0。MtAgentLens 列呈现近乎全线深蓝。")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -964,7 +964,7 @@ def build_heatmap_table(report):
 
 def main():
     print("═" * 60)
-    print("  MtAgentPrism Nature 级可视化引擎")
+    print("  MtAgentLens Nature 级可视化引擎")
     print("═" * 60)
     print("  标准: NMI Pastel 调色板 · SVG 可编辑 · TrueType PDF · 中文顶会\n")
 

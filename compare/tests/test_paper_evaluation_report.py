@@ -13,11 +13,11 @@ def test_build_paper_evaluation_report_from_completed_artifacts(tmp_path: Path) 
     report = build_report(output_path=output)
 
     assert output.exists()
-    assert report["schema"] == "mtagentprism.paper_evaluation_report.v1"
+    assert report["schema"] == "mtagentlens.paper_evaluation_report.v1"
     metrics = {row["tool_id"]: row for row in report["main_metrics"]}
-    assert set(metrics) >= {"mtagentprism", "llm-guard", "meta-prompt-guard", "vigil"}
-    assert metrics["mtagentprism"]["f1"] == 1.0
-    assert metrics["mtagentprism"]["claim_coverage"] == 1.0
+    assert set(metrics) >= {"mtagentlens", "llm-guard", "meta-prompt-guard", "vigil"}
+    assert metrics["mtagentlens"]["f1"] == 1.0
+    assert metrics["mtagentlens"]["claim_coverage"] == 1.0
     assert metrics["llm-guard"]["supported_scenarios"] == 67
     assert metrics["meta-prompt-guard"]["supported_scenarios"] == 67
     assert metrics["vigil"]["supported_scenarios"] == 67
@@ -44,7 +44,7 @@ def test_build_paper_evaluation_report_from_completed_artifacts(tmp_path: Path) 
     assert report["mcnemar"]["llm-guard"]["c_prompt_correct_mtap_wrong"] == 0
 
     loaded = json.loads(output.read_text(encoding="utf-8"))
-    assert loaded["main_metrics"][0]["tool_id"] == "mtagentprism"
+    assert loaded["main_metrics"][0]["tool_id"] == "mtagentlens"
 
 
 def test_paper_report_rejects_prompt_label_leak(tmp_path: Path) -> None:
@@ -57,7 +57,7 @@ def test_paper_report_rejects_prompt_label_leak(tmp_path: Path) -> None:
     (prompt_dir / "manifest.json").write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.prompt_inputs.v1",
+                "schema": "mtagentlens.prompt_inputs.v1",
                 "entries": [
                     {
                         "scenario_id": "demo",

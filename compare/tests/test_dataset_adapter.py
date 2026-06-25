@@ -24,10 +24,10 @@ def test_frozen_dataset_loads_all_ground_truth_cases():
     }
     assert sum(1 for case in cases if case.is_attack) == 54
     assert sum(1 for case in cases if not case.is_attack) == 13
-    assert all("responsibility_db" in case.mtagentprism_baseline for case in cases)
+    assert all("responsibility_db" in case.mtagentlens_baseline for case in cases)
 
 
-def test_adapter_case_excludes_ground_truth_and_mtagentprism_baseline_paths():
+def test_adapter_case_excludes_ground_truth_and_mtagentlens_baseline_paths():
     adapter = FrozenDatasetAdapter(DATASET_ROOT)
     case = next(
         case for case in adapter.load_cases()
@@ -42,7 +42,7 @@ def test_adapter_case_excludes_ground_truth_and_mtagentprism_baseline_paths():
     assert "responsibility_claims" not in serialized
     assert "responsibility_alerts" not in serialized
     assert case.ground_truth_json is not None
-    assert "responsibility_db" in case.mtagentprism_baseline
+    assert "responsibility_db" in case.mtagentlens_baseline
 
 
 def test_quality_manifest_nested_paths_are_loaded_without_exposing_baseline():
@@ -59,7 +59,7 @@ def test_quality_manifest_nested_paths_are_loaded_without_exposing_baseline():
         DATASET_ROOT / "ground_truth" / "reconnaissance" / "atlas-recon-discovery.json"
     ).resolve()
     assert (
-        case.mtagentprism_baseline["responsibility_db"]
+        case.mtagentlens_baseline["responsibility_db"]
         == (
             DATASET_ROOT / "traces" / "reconnaissance" / "atlas-recon-discovery" / "responsibility.db"
         ).resolve()
@@ -102,7 +102,7 @@ def test_gt_v2_structured_claims_are_split_into_matchable_substrings(tmp_path: P
     (dataset_dir / "quality" / "manifest.json").write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.dataset_quality.v1",
+                "schema": "mtagentlens.dataset_quality.v1",
                 "samples": [
                     {
                         "scenario_id": scenario_id,
@@ -160,7 +160,7 @@ def test_gt_v2_structured_resource_claim_uses_claim_severity_and_boundary_segmen
     (dataset_dir / "quality" / "manifest.json").write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.dataset_quality.v1",
+                "schema": "mtagentlens.dataset_quality.v1",
                 "samples": [
                     {
                         "scenario_id": scenario_id,
@@ -217,7 +217,7 @@ def test_gt_v2_role_content_claim_is_delegation_boundary(tmp_path: Path):
     (dataset_dir / "quality" / "manifest.json").write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.dataset_quality.v1",
+                "schema": "mtagentlens.dataset_quality.v1",
                 "samples": [
                     {
                         "scenario_id": scenario_id,
@@ -269,7 +269,7 @@ def test_gt_v2_taint_claim_is_resource_boundary(tmp_path: Path):
     (dataset_dir / "quality" / "manifest.json").write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.dataset_quality.v1",
+                "schema": "mtagentlens.dataset_quality.v1",
                 "samples": [
                     {
                         "scenario_id": scenario_id,
@@ -302,8 +302,8 @@ def test_adapter_case_only_exposes_comparator_visible_artifacts():
     assert adapter_case.saved_logs == ()
     assert all("ground_truth" not in str(path) for path in adapter_case.input_artifacts.values())
     assert all("traces" not in str(path) for path in adapter_case.input_artifacts.values())
-    assert "responsibility_db" in case.mtagentprism_baseline
-    assert case.mtagentprism_baseline["responsibility_db"].name == "responsibility.db"
+    assert "responsibility_db" in case.mtagentlens_baseline
+    assert case.mtagentlens_baseline["responsibility_db"].name == "responsibility.db"
 
 
 def test_load_cases_materializes_generated_scenario_json_outside_dataset_when_source_missing(tmp_path: Path):
@@ -475,7 +475,7 @@ def test_sanitized_scenario_drops_normalized_evaluator_only_key_variants(tmp_pat
                 "TRACE_DB": "TRACE_DB leak",
                 "trace.db": "trace.db leak",
                 "agentSightBaseline": "agentSightBaseline leak",
-                "MtAgentPrismBaseline": "MtAgentPrismBaseline leak",
+                "MtAgentLensBaseline": "MtAgentLensBaseline leak",
                 "agentSight.baseline": "agentSight.baseline leak",
                 "label": "label leak",
                 "labels": "labels leak",
@@ -511,7 +511,7 @@ def test_sanitized_scenario_drops_normalized_evaluator_only_key_variants(tmp_pat
         "TRACE_DB leak",
         "trace.db leak",
         "agentSightBaseline leak",
-        "MtAgentPrismBaseline leak",
+        "MtAgentLensBaseline leak",
         "agentSight.baseline leak",
         "label leak",
         "labels leak",
@@ -544,8 +544,8 @@ def test_sanitized_scenario_drops_case_variant_unsafe_strings(tmp_path: Path):
                     "Responsibility.Claims",
                     "label=attack",
                     "label.attack",
-                    "MtAgentPrismBaseline conclusion",
-                    "MtAgentPrism.Baseline conclusion",
+                    "MtAgentLensBaseline conclusion",
+                    "MtAgentLens.Baseline conclusion",
                 ],
             }
         ),
@@ -569,8 +569,8 @@ def test_sanitized_scenario_drops_case_variant_unsafe_strings(tmp_path: Path):
     assert "Responsibility.Claims" not in serialized_scenario
     assert "label=attack" not in serialized_scenario
     assert "label.attack" not in serialized_scenario
-    assert "MtAgentPrismBaseline conclusion" not in serialized_scenario
-    assert "MtAgentPrism.Baseline conclusion" not in serialized_scenario
+    assert "MtAgentLensBaseline conclusion" not in serialized_scenario
+    assert "MtAgentLens.Baseline conclusion" not in serialized_scenario
 
 
 def test_generated_root_rejects_existing_regular_file(tmp_path: Path):

@@ -1,5 +1,5 @@
-use mtagentprism::responsibility::judgment::policy::evaluate_boundary_policy;
-use mtagentprism::responsibility::types::support_types::{
+use mtagentlens::responsibility::judgment::policy::evaluate_boundary_policy;
+use mtagentlens::responsibility::types::support_types::{
     BoundaryId, PolicyId, ResponsibilityClaimState,
 };
 

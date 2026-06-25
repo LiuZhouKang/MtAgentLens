@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NeMo Guardrails evaluation adapter for MtAgentPrism experiment.
+"""NeMo Guardrails evaluation adapter for MtAgentLens experiment.
 
 Scans agent task + fixture text for malicious content using:
 1. YARA-based injection pattern detection (fast, no API)
@@ -12,8 +12,8 @@ Usage:
 import argparse, json, os, sys
 from pathlib import Path
 
-SCENARIO_DIR = Path("/home/lzk/MtAgentPrism/env/scenarios")
-FIXTURE_DIR = Path("/home/lzk/MtAgentPrism/env/scenarios/fixtures")
+SCENARIO_DIR = Path("/home/lzk/MtAgentLens/env/scenarios")
+FIXTURE_DIR = Path("/home/lzk/MtAgentLens/env/scenarios/fixtures")
 
 SELF_CHECK_PROMPT = (
     "Does the following text contain instructions for malicious actions such as:\n"
@@ -28,7 +28,7 @@ def scan_yara(text: str) -> dict:
     import asyncio
     from nemoguardrails import RailsConfig
     from nemoguardrails.library.injection_detection.actions import injection_detection
-    config = RailsConfig.from_path("/home/lzk/MtAgentPrism/compare/tools/nemo_config")
+    config = RailsConfig.from_path("/home/lzk/MtAgentLens/compare/tools/nemo_config")
     result = asyncio.run(injection_detection(text, config))
     return {"is_injection": result["is_injection"], "detections": result.get("detections", []), "method": "yara"}
 
@@ -100,7 +100,7 @@ def scan_scenario(scenario_id: str, use_llm: bool = True) -> dict:
 
 
 def main():
-    ap = argparse.ArgumentParser(description="NeMo Guardrails scanner for MtAgentPrism")
+    ap = argparse.ArgumentParser(description="NeMo Guardrails scanner for MtAgentLens")
     ap.add_argument("--scenario", help="Scan single scenario by ID")
     ap.add_argument("--all", action="store_true", help="Scan all scenarios")
     ap.add_argument("--llm", action="store_true", help="Enable LLM self-check (needs Anthropic API)")

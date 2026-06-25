@@ -8,7 +8,7 @@
 
 ## 摘要
 
-我们发现已部署 LLM Agent 的安全架构中存在一个结构性不对称：安全过滤器对用户 prompt 文本执行深度语义审查，但对 Agent 通过工具调用读取的文件内容几乎不施加任何审查。我们将这一观察形式化为 **SAFI（Safety-Asymmetric File Injection，安全不对称文件注入）**——一套系统化地将攻击载荷从 prompt 迁移至 fixture 文件的方法论框架，从而使 prompt 层面的防御在结构上不充分。SAFI 包含一个四阶段工作流（分类、模式选择、fixture 生成、执行验证）、六种活动攻击模式（P1–P6）覆盖文本操控、凭证提取、命令执行、供应链攻击、文言文绕过和分布式载荷拆分，以及一份包含 65 个正则模式的触发器分类法，系统性地刻画了 LLM 安全过滤器的表层词汇。在 FuxiBench（首个多 Agent LLM 攻击检测基准，86 个全标注场景）的构建中，SAFI 实现了最高 80% 的后过滤攻击执行率（P5，CC-BOS 文言文绕过）。关键的是，所有到达 OS 执行层的 SAFI 攻击均被 MtAgentPrism 的 eBPF 可观测性管线检出（PP-TPR = 1.000），而 prompt 层面的检测工具对 67 个攻击场景中的 48 个存在结构性盲区。
+我们发现已部署 LLM Agent 的安全架构中存在一个结构性不对称：安全过滤器对用户 prompt 文本执行深度语义审查，但对 Agent 通过工具调用读取的文件内容几乎不施加任何审查。我们将这一观察形式化为 **SAFI（Safety-Asymmetric File Injection，安全不对称文件注入）**——一套系统化地将攻击载荷从 prompt 迁移至 fixture 文件的方法论框架，从而使 prompt 层面的防御在结构上不充分。SAFI 包含一个四阶段工作流（分类、模式选择、fixture 生成、执行验证）、六种活动攻击模式（P1–P6）覆盖文本操控、凭证提取、命令执行、供应链攻击、文言文绕过和分布式载荷拆分，以及一份包含 65 个正则模式的触发器分类法，系统性地刻画了 LLM 安全过滤器的表层词汇。在 FuxiBench（首个多 Agent LLM 攻击检测基准，86 个全标注场景）的构建中，SAFI 实现了最高 80% 的后过滤攻击执行率（P5，CC-BOS 文言文绕过）。关键的是，所有到达 OS 执行层的 SAFI 攻击均被 MtAgentLens 的 eBPF 可观测性管线检出（PP-TPR = 1.000），而 prompt 层面的检测工具对 67 个攻击场景中的 48 个存在结构性盲区。
 
 ---
 
@@ -416,12 +416,12 @@ SAFI 的有效性对 LLM Agent 安全工具的评估具有直接影响。在 Fux
 - **23 个场景**（Type C，多 Agent）的攻击分布在 Agent 交互拓扑中
 - 零个场景的恶意内容仅在 prompt 文本中
 
-在这些条件下，prompt 层面的检测工具（LLM Guard、Meta Prompt Guard、Vigil）面临结构性限制：它们检查 prompt 文本但无法访问 fixture 文件内容。MtAgentPrism 的 eBPF 方案在 OS 执行层运作，观察 Agent 产生的实际系统调用，无论指令来源何处。这一架构差异产生了以下检测结果：
+在这些条件下，prompt 层面的检测工具（LLM Guard、Meta Prompt Guard、Vigil）面临结构性限制：它们检查 prompt 文本但无法访问 fixture 文件内容。MtAgentLens 的 eBPF 方案在 OS 执行层运作，观察 Agent 产生的实际系统调用，无论指令来源何处。这一架构差异产生了以下检测结果：
 
 | 检测范式 | Type A（prompt） | Type B（fixture） | Type C（多 Agent） | 总体 |
 |---------|:--------------:|:---------------:|:-----------------:|:---:|
 | Prompt 层面工具（最佳） | 0.900 | 0.235 | 0.000 | 0.155 |
-| MtAgentPrism（eBPF） | 0.900 | 0.857 | 0.913 | **0.896** |
+| MtAgentLens（eBPF） | 0.900 | 0.857 | 0.913 | **0.896** |
 
 Type B 和 Type C 列代表了 SAFI 诱导的检测缺口：prompt 层面工具无法检测的攻击，因为攻击内容从未出现在 prompt 中。
 

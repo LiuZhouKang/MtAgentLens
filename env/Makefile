@@ -7,7 +7,7 @@ build-rust: ; $(MAKE) -C $(ROOT) build-rust
 
 .PHONY: env-list-scenarios
 env-list-scenarios:
-	@PATH="$$HOME/.local/bin:$$PATH" mtagentprism-benchmark list-scenarios
+	@PATH="$$HOME/.local/bin:$$PATH" mtagentlens-benchmark list-scenarios
 
 .PHONY: env-run-fast
 env-run-fast:
@@ -15,7 +15,7 @@ env-run-fast:
 		echo "ERROR: SCENARIO= is required"; \
 		exit 1; \
 	fi
-	@PATH="$$HOME/.local/bin:$$PATH" mtagentprism-benchmark run --scenario $(SCENARIO) --mode process $(ARGS)
+	@PATH="$$HOME/.local/bin:$$PATH" mtagentlens-benchmark run --scenario $(SCENARIO) --mode process $(ARGS)
 
 .PHONY: env-run-oneclick
 env-run-oneclick:
@@ -23,7 +23,7 @@ env-run-oneclick:
 		echo "ERROR: SCENARIO= is required"; \
 		exit 1; \
 	fi
-	@PATH="$$HOME/.local/bin:$$PATH" mtagentprism-benchmark run --scenario $(SCENARIO) --mode tmux-live $(ARGS)
+	@PATH="$$HOME/.local/bin:$$PATH" mtagentlens-benchmark run --scenario $(SCENARIO) --mode tmux-live $(ARGS)
 
 .PHONY: env-verify
 env-verify:
@@ -31,11 +31,11 @@ env-verify:
 		echo "ERROR: RUN_DIR= is required"; \
 		exit 1; \
 	fi
-	@PATH="$$HOME/.local/bin:$$PATH" mtagentprism-benchmark evaluate --dataset $(RUN_DIR)
+	@PATH="$$HOME/.local/bin:$$PATH" mtagentlens-benchmark evaluate --dataset $(RUN_DIR)
 
 .PHONY: env-smoke
 env-smoke:
-	@PATH="$$HOME/.local/bin:$$PATH" mtagentprism-benchmark run --scenario prompt-injection --mode process
+	@PATH="$$HOME/.local/bin:$$PATH" mtagentlens-benchmark run --scenario prompt-injection --mode process
 
 .PHONY: env-eval
 env-eval:
@@ -43,6 +43,6 @@ env-eval:
 		echo "ERROR: RUN_DIR= is required"; \
 		exit 1; \
 	fi
-	@PATH="$$HOME/.local/bin:$$PATH" mtagentprism-benchmark evaluate --dataset $(RUN_DIR)
+	@PATH="$$HOME/.local/bin:$$PATH" mtagentlens-benchmark evaluate --dataset $(RUN_DIR)
 
 .PHONY: build build-frontend build-bpf build-rust

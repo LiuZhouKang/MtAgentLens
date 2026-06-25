@@ -30,7 +30,7 @@ PROJECT = Path(__file__).resolve().parents[3]
 PERF_DIR = PROJECT / "compare" / "results" / "perf"
 RAW_DIR = PERF_DIR / "raw"
 BENCH_DIR = PROJECT / "compare" / "scripts" / "perf" / "bench_targets"
-COLLECTOR_BIN = PROJECT / "collector" / "target" / "release" / "mtagentprism"
+COLLECTOR_BIN = PROJECT / "collector" / "target" / "release" / "mtagentlens"
 THROUGHPUT_BIN = PROJECT / "collector" / "target" / "release" / "perf_throughput"
 OUTPUT_PATH = PERF_DIR / "performance_results.json"
 
@@ -206,7 +206,7 @@ def _find_pid_by_cmdline(marker: str) -> int | None:
             continue
         executable = Path(parts[0]).name
         cmdline = " ".join(parts)
-        if executable == "mtagentprism" and marker in cmdline:
+        if executable == "mtagentlens" and marker in cmdline:
             return int(proc_dir.name)
     return None
 
@@ -280,7 +280,7 @@ def _git_dirty() -> bool:
 def _ensure_binaries(*, skip_build: bool, command_log: list[CommandRecord]) -> None:
     if not skip_build:
         record, _ = _run(
-            ["cargo", "build", "--release", "--bin", "mtagentprism", "--bin", "perf_throughput"],
+            ["cargo", "build", "--release", "--bin", "mtagentlens", "--bin", "perf_throughput"],
             cwd=PROJECT / "collector",
             timeout=900,
             record_id="build_collector_perf_bins",
@@ -780,7 +780,7 @@ def build_artifact(
     }
 
     artifact = {
-        "schema": "mtagentprism.performance_results.v1",
+        "schema": "mtagentlens.performance_results.v1",
         "status": "completed",
         "generated_at": _now_iso(),
         "provenance": {

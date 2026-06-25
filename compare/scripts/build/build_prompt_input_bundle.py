@@ -41,7 +41,7 @@ EVALUATOR_ONLY_TOKENS = (
     "responsibility.db",
     "responsibility_claim",
     "responsibility_alert",
-    "mtagentprism_baseline",
+    "mtagentlens_baseline",
     "trace_db",
 )
 PROMPT_TEXT_EXCLUDED_METADATA = (
@@ -59,7 +59,7 @@ EVALUATOR_ONLY_REDACTIONS = {
     "responsibility.db": "[REDACTED_EVALUATOR_TOKEN]",
     "responsibility_claim": "[REDACTED_EVALUATOR_TOKEN]",
     "responsibility_alert": "[REDACTED_EVALUATOR_TOKEN]",
-    "mtagentprism_baseline": "[REDACTED_EVALUATOR_TOKEN]",
+    "mtagentlens_baseline": "[REDACTED_EVALUATOR_TOKEN]",
     "trace_db": "[REDACTED_EVALUATOR_TOKEN]",
 }
 
@@ -106,7 +106,7 @@ def build_prompt_input_bundle(
         entries.append(entry)
 
     manifest = {
-        "schema": "mtagentprism.prompt_inputs.v1",
+        "schema": "mtagentlens.prompt_inputs.v1",
         "dataset": dataset_dir.name,
         "generated_from": {
             "dataset_dir": _display_path(dataset_dir),
@@ -127,7 +127,7 @@ def build_prompt_input_bundle(
                 "responsibility databases",
                 "responsibility alerts",
                 "trace databases",
-                "MtAgentPrism baseline outputs",
+                "MtAgentLens baseline outputs",
             ],
             "fixture_file_policy": {
                 "text_suffixes": sorted(TEXT_SUFFIXES),
@@ -176,7 +176,7 @@ def _build_entry(
     prompt_path = scenario_dir / "prompt.txt"
     prompt_path.write_text(prompt_text, encoding="utf-8")
     bundle_json = {
-        "schema": "mtagentprism.prompt_input_case.v1",
+        "schema": "mtagentlens.prompt_input_case.v1",
         "scenario_id": scenario_id,
         "source_scenario_path": _display_path(source_scenario_path),
         "mode": scenario.get("mode"),
@@ -227,7 +227,7 @@ def _render_prompt_text(
     fixture_files: list[tuple[str, str, str, int]],
 ) -> str:
     lines = [
-        "# MtAgentPrism Prompt Baseline Input",
+        "# MtAgentLens Prompt Baseline Input",
         "",
         "## Agent Tasks",
     ]

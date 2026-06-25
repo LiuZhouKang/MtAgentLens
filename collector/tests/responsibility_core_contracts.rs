@@ -1,6 +1,6 @@
-use mtagentprism::responsibility::evidence::correlator_legacy::edge_has_non_temporal_support;
-use mtagentprism::responsibility::evidence::normalizer::normalize_file_resource;
-use mtagentprism::responsibility::types::support_types::{
+use mtagentlens::responsibility::evidence::correlator_legacy::edge_has_non_temporal_support;
+use mtagentlens::responsibility::evidence::normalizer::normalize_file_resource;
+use mtagentlens::responsibility::types::support_types::{
     AgentId, AlertId, BoundaryId, CausalEdge, CausalNode, CausalNodeType, CausalityType, EdgeId,
     EventId, EvidenceDirectness, EvidenceId, EvidenceRecord, NodeId, PolicyId, ProcessId,
     ResourceId,

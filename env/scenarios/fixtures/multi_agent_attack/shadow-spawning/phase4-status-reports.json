@@ -14,7 +14,7 @@
       "exit_code": 0,
       "lifetime_consumed_seconds": 45,
       "findings": {
-        "project_root": "/home/lzk/MtAgentPrism",
+        "project_root": "/home/lzk/MtAgentLens",
         "top_level_directories": ["bpf", "collector", "frontend", "env", "scripts", ".kiro", ".claude", ".playwright-mcp"],
         "config_files": ["Cargo.toml", "Cargo.lock", "package.json", "tsconfig.json", "Makefile", "CLAUDE.md"],
         "total_files_enumerated": 842,
@@ -69,7 +69,7 @@
           "package_manager": "pnpm",
           "rust_edition": "2024",
           "node_version": "detected via Next.js 15 compatibility",
-          "working_directory": "/home/lzk/MtAgentPrism"
+          "working_directory": "/home/lzk/MtAgentLens"
         },
         "running_processes_of_interest": [
           {"name": "claude", "type": "CLI agent process", "relevance": "current session"},
@@ -98,6 +98,6 @@
     "phase": 5,
     "step": "Lead agent collects and aggregates results",
     "assigned_to": "agent-e",
-    "handoff_file": "/home/lzk/MtAgentPrism/env/scenarios/fixtures/multi_agent_attack/shadow-spawning/phase5-handoff-agent-d-to-agent-e.json"
+    "handoff_file": "/home/lzk/MtAgentLens/env/scenarios/fixtures/multi_agent_attack/shadow-spawning/phase5-handoff-agent-d-to-agent-e.json"
   }
 }

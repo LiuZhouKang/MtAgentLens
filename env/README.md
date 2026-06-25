@@ -1,6 +1,6 @@
-# MtAgentPrism 基准测试环境
+# MtAgentLens 基准测试环境
 
-基于 eBPF 的 LLM Agent 异常检测基准测试框架。通过 tmux 编排运行真实的 Claude Code 攻击场景，MtAgentPrism 采集器捕获内核级事件流，输出结构化检测结果用于评估。
+基于 eBPF 的 LLM Agent 异常检测基准测试框架。通过 tmux 编排运行真实的 Claude Code 攻击场景，MtAgentLens 采集器捕获内核级事件流，输出结构化检测结果用于评估。
 
 ## 快速开始
 
@@ -45,7 +45,7 @@ make env-run-oneclick SCENARIO=agent-teams-race-conflict ARGS="--parallel 4"
 
 ```bash
 make env-run-fast SCENARIO=prompt-injection
-# 等价于: mtagentprism-benchmark run --scenario prompt-injection --mode process
+# 等价于: mtagentlens-benchmark run --scenario prompt-injection --mode process
 ```
 
 ### tmux-live 模式
@@ -54,12 +54,12 @@ make env-run-fast SCENARIO=prompt-injection
 
 ```bash
 make env-run-oneclick SCENARIO=agent-teams-race-conflict
-# 等价于: mtagentprism-benchmark run --scenario agent-teams-race-conflict --mode tmux-live
+# 等价于: mtagentlens-benchmark run --scenario agent-teams-race-conflict --mode tmux-live
 ```
 
 ## 采集器
 
-通过 `--collector` 启用 MtAgentPrism eBPF 采集器，捕获 TLS 明文、进程事件、文件操作：
+通过 `--collector` 启用 MtAgentLens eBPF 采集器，捕获 TLS 明文、进程事件、文件操作：
 
 ```bash
 make env-run-fast SCENARIO=prompt-injection ARGS="--collector"
@@ -94,7 +94,7 @@ sudo python3 env/run_one.py prompt-injection
 ```
 
 流程：
-1. 启动 MtAgentPrism eBPF 采集器
+1. 启动 MtAgentLens eBPF 采集器
 2. 执行场景（自动选择 process 或 tmux-live 模式）
 3. 质量检查（PBC 边、告警、证据计数）
 4. 将 `responsibility.db` 复制到 `compare/Dataset/FuxiBench/traces/<category>/<scenario>/`
@@ -130,11 +130,11 @@ config/
 ```
 env/
 ├── README.md                   ← 本文件
-├── pyproject.toml              ← mtagentprism-benchmark 包定义
+├── pyproject.toml              ← mtagentlens-benchmark 包定义
 ├── Makefile                    ← 便捷命令
 ├── run_one.py                  ← 单场景运行 + 数据集归档
 │
-├── src/mtagentprism_benchmark/ ← 基准框架
+├── src/mtagentlens_benchmark/ ← 基准框架
 │   ├── cli.py                  ← CLI 入口
 │   ├── engine/                 ← 执行器（tmux 编排、采集器管理）
 │   ├── loader/                 ← 场景加载器 + Schema 校验

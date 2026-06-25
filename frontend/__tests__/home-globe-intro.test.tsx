@@ -16,8 +16,8 @@ describe('HomeGlobeIntro', () => {
   it('renders the intro iframe shell', () => {
     render(<HomeGlobeIntro src="/globe/index.html?embed=intro" onComplete={vi.fn()} />);
 
-    expect(screen.getByTitle('MtAgentPrism 开场地球')).toBeDefined();
-    expect(screen.getByLabelText('MtAgentPrism 开场序章')).toBeDefined();
+    expect(screen.getByTitle('MtAgentLens 开场地球')).toBeDefined();
+    expect(screen.getByLabelText('MtAgentLens 开场序章')).toBeDefined();
   });
 
   it('does not auto-complete after iframe load and minimum duration', async () => {
@@ -31,7 +31,7 @@ describe('HomeGlobeIntro', () => {
       />,
     );
 
-    fireEvent.load(screen.getByTitle('MtAgentPrism 开场地球'));
+    fireEvent.load(screen.getByTitle('MtAgentLens 开场地球'));
     await vi.advanceTimersByTimeAsync(3000);
     expect(onComplete).not.toHaveBeenCalled();
   });

@@ -1,4 +1,4 @@
-# MtAgentPrism 前端安全扫描结果
+# MtAgentLens 前端安全扫描结果
 
 更新时间：2026-06-20（本轮复核已执行 `npm audit --audit-level=high`）
 

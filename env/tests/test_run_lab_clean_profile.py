@@ -245,7 +245,7 @@ class LaunchEnvUsageTests(unittest.TestCase):
         )
 
         task_cmd = run_lab.build_tmux_window_command(
-            Path("/home/lzk/MtAgentPrism/env"), task, 30, "claude", {"BASE": "1"}
+            Path("/home/lzk/MtAgentLens/env"), task, 30, "claude", {"BASE": "1"}
         )
         cli_cmd = run_lab.build_tmux_cli_command(
             task, "claude", task.claude_args, {"BASE": "1"}, "hello"
@@ -273,7 +273,7 @@ class LaunchEnvUsageTests(unittest.TestCase):
         env_map = {"BASE": "1", "SHOULD_DROP": "x", "PATH": "/env/bin", "HOME": "/env/home"}
 
         task_cmd = run_lab.build_tmux_window_command(
-            Path("/home/lzk/MtAgentPrism/env"), task, 30, "claude", env_map
+            Path("/home/lzk/MtAgentLens/env"), task, 30, "claude", env_map
         )
         cli_cmd = run_lab.build_tmux_cli_command(
             task, "claude", task.claude_args, env_map, "hello"
@@ -308,7 +308,7 @@ class LaunchEnvUsageTests(unittest.TestCase):
                 with mock.patch.object(run_lab.subprocess, "run") as run_mock:
                     run_mock.return_value = mock.Mock()
                     results = run_lab.run_tasks_process_mode(
-                        root=Path("/home/lzk/MtAgentPrism/env"),
+                        root=Path("/home/lzk/MtAgentLens/env"),
                         tasks=[task],
                         timeout_seconds=30,
                         claude_bin="claude",

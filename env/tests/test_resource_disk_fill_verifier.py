@@ -6,7 +6,7 @@ import types
 import unittest
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentPrism/env/scripts/verifiers/resource-disk-fill.py')
+VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/resource-disk-fill.py')
 
 
 def load_verifier_module():

@@ -1,7 +1,7 @@
 /*
  * exec_loop.c — fork/exec 微基准目标程序
  *
- * 在循环中 fork 子进程并执行 /bin/true, 触发 MtAgentPrism 的
+ * 在循环中 fork 子进程并执行 /bin/true, 触发 MtAgentLens 的
  * sched_process_fork / sched_process_exec / sched_process_exit tracepoints。
  *
  * 用法: ./exec_loop [iterations=10000]

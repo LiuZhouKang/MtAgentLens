@@ -210,7 +210,7 @@ def main():
                         "brier_old": old_brier, "brier_new": new_brier, "delta_auroc": delta_auc}
 
     # Save
-    output = {"schema": "mtagentprism.platt_tuning.v1", "results": {
+    output = {"schema": "mtagentlens.platt_tuning.v1", "results": {
         lid: {"a_opt": round(r["a"], 4), "b_opt": round(r["b"], 4),
               "auroc_before": round(r["auroc_old"], 4), "auroc_after": round(r["auroc_new"], 4),
               "brier_before": round(r["brier_old"], 4), "brier_after": round(r["brier_new"], 4)}

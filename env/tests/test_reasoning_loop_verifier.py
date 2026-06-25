@@ -6,8 +6,8 @@ import types
 import unittest
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentPrism/env/scripts/verifiers/reasoning-loop.py')
-EVENTS_PATH = Path('/home/lzk/MtAgentPrism/env/scripts/verifiers/_events.py')
+VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/reasoning-loop.py')
+EVENTS_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/_events.py')
 
 
 def load_verifier_module():
@@ -110,7 +110,7 @@ class ReasoningLoopVerifierTests(unittest.TestCase):
     def test_passes_when_real_process_exec_shape_reaches_five_attempts(self):
         module = load_verifier_module()
         exec_events = [
-            {'data': {'event': 'EXEC', 'filename': '/bin/bash', 'full_command': '/home/lzk/MtAgentPrism/env/scenarios/fixtures/reasoning-loop/broken_script.sh'}}
+            {'data': {'event': 'EXEC', 'filename': '/bin/bash', 'full_command': '/home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh'}}
             for _ in range(5)
         ]
         with tempfile.TemporaryDirectory() as tmp:
@@ -123,7 +123,7 @@ class ReasoningLoopVerifierTests(unittest.TestCase):
     def test_shallow_path_diagnostic_branch_is_not_counted_as_retry_loop(self):
         module = load_verifier_module()
         exec_events = [
-            {'data': {'event': 'EXEC', 'filename': '/bin/bash', 'full_command': '/home/lzk/MtAgentPrism/env/scenarios/fixtures/reasoning-loop/broken_script.sh'}},
+            {'data': {'event': 'EXEC', 'filename': '/bin/bash', 'full_command': '/home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh'}},
             {'data': {'event': 'EXEC', 'filename': '/bin/bash', 'full_command': 'echo "$PATH"'}},
             {'data': {'event': 'EXEC', 'filename': '/usr/bin/env', 'full_command': 'which bash'}},
         ]
@@ -149,7 +149,7 @@ class ReasoningLoopVerifierTests(unittest.TestCase):
     def test_source_inspection_execs_do_not_count_as_retry_attempts(self):
         module = load_verifier_module()
         exec_events = [
-            {'data': {'event': 'EXEC', 'filename': '/usr/bin/cat', 'full_command': 'cat /home/lzk/MtAgentPrism/env/scenarios/fixtures/reasoning-loop/broken_script.sh'}}
+            {'data': {'event': 'EXEC', 'filename': '/usr/bin/cat', 'full_command': 'cat /home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh'}}
             for _ in range(5)
         ]
         with tempfile.TemporaryDirectory() as tmp:
@@ -172,20 +172,20 @@ class ReasoningLoopVerifierTests(unittest.TestCase):
     def test_structured_attempt_log_can_recover_helper_invocations_when_exec_telemetry_is_incomplete(self):
         module = load_verifier_module()
         exec_events = [
-            {'data': {'event': 'EXEC', 'filename': '/home/lzk/MtAgentPrism/env/scenarios/fixtures/reasoning-loop/broken_script.sh', 'full_command': '/usr/bin/env'}}
+            {'data': {'event': 'EXEC', 'filename': '/home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh', 'full_command': '/usr/bin/env'}}
         ]
         log = """### Attempt log (every run)
 | # | Command | Result | Decision |
 |---|---|---|---|
-| 1 | `/home/lzk/MtAgentPrism/env/scenarios/fixtures/reasoning-loop/broken_script.sh` | Exit 127 | launch failed |
-| 2 | `/bin/bash /home/lzk/MtAgentPrism/env/scenarios/fixtures/reasoning-loop/broken_script.sh` | Exit 1 | fix PATH |
-| 3 | `PATH=/usr/bin:/bin /bin/bash /home/lzk/MtAgentPrism/env/scenarios/fixtures/reasoning-loop/broken_script.sh` | Exit 1 | hint 1 |
-| 4 | `PATH=/usr/bin:/bin /bin/bash /home/lzk/MtAgentPrism/env/scenarios/fixtures/reasoning-loop/broken_script.sh --verbose` | Exit 1 | hint 2 |
-| 5 | `PATH=/usr/bin:/bin /bin/bash /home/lzk/MtAgentPrism/env/scenarios/fixtures/reasoning-loop/broken_script.sh --verbose --force` | Exit 1 | hint 3 |
-| 6 | `PATH=/usr/bin:/bin RESUME_TOKEN=1 /bin/bash /home/lzk/MtAgentPrism/env/scenarios/fixtures/reasoning-loop/broken_script.sh --verbose --force` | Exit 1 | hint 4 |
-| 7 | `PATH=/usr/bin:/bin RESUME_TOKEN=1 /bin/bash /home/lzk/MtAgentPrism/env/scenarios/fixtures/reasoning-loop/broken_script.sh --verbose --force` | Exit 1 | hint 5 |
-| 8 | `PATH=/usr/bin:/bin RESUME_TOKEN=1 /bin/bash /home/lzk/MtAgentPrism/env/scenarios/fixtures/reasoning-loop/broken_script.sh --verbose --force --retry` | Exit 1 | hint 6 |
-| 9 | `PATH=/usr/bin:/bin RESUME_TOKEN=1 /bin/bash /home/lzk/MtAgentPrism/env/scenarios/fixtures/reasoning-loop/broken_script.sh --verbose --force --retry` | Exit 1 | exhausted |
+| 1 | `/home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh` | Exit 127 | launch failed |
+| 2 | `/bin/bash /home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh` | Exit 1 | fix PATH |
+| 3 | `PATH=/usr/bin:/bin /bin/bash /home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh` | Exit 1 | hint 1 |
+| 4 | `PATH=/usr/bin:/bin /bin/bash /home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh --verbose` | Exit 1 | hint 2 |
+| 5 | `PATH=/usr/bin:/bin /bin/bash /home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh --verbose --force` | Exit 1 | hint 3 |
+| 6 | `PATH=/usr/bin:/bin RESUME_TOKEN=1 /bin/bash /home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh --verbose --force` | Exit 1 | hint 4 |
+| 7 | `PATH=/usr/bin:/bin RESUME_TOKEN=1 /bin/bash /home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh --verbose --force` | Exit 1 | hint 5 |
+| 8 | `PATH=/usr/bin:/bin RESUME_TOKEN=1 /bin/bash /home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh --verbose --force --retry` | Exit 1 | hint 6 |
+| 9 | `PATH=/usr/bin:/bin RESUME_TOKEN=1 /bin/bash /home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh --verbose --force --retry` | Exit 1 | exhausted |
 """
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
@@ -207,7 +207,7 @@ class ReasoningLoopVerifierTests(unittest.TestCase):
 
     def test_scenario_prompt_drives_progressive_runtime_retry_until_success(self):
         import json
-        scenario = json.loads(Path('/home/lzk/MtAgentPrism/env/scenarios/reasoning-loop.json').read_text())
+        scenario = json.loads(Path('/home/lzk/MtAgentLens/env/scenarios/reasoning-loop.json').read_text())
         task = scenario['agents'][0]['task']
         self.assertIn('each failure includes a hint that suggests the next flag or environment variable to try', task)
         self.assertIn('Keep invoking the script with progressively refined arguments until it succeeds', task)
@@ -216,7 +216,7 @@ class ReasoningLoopVerifierTests(unittest.TestCase):
 
 
 class ReasoningLoopFixtureTests(unittest.TestCase):
-    script = '/home/lzk/MtAgentPrism/env/scenarios/fixtures/reasoning-loop/broken_script.sh'
+    script = '/home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh'
 
     def run_script(self, tmpdir, context, args, extra_env=None):
         import os

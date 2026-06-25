@@ -313,7 +313,7 @@ def fig10_perf_summary(data: dict):
     ax.set_ylim(0, 10)
 
     # Title
-    ax.text(5, 9.5, "MtAgentPrism Performance Overhead Summary",
+    ax.text(5, 9.5, "MtAgentLens Performance Overhead Summary",
             ha="center", fontsize=13, fontweight="bold")
     ax.text(5, 8.8, "Pilot study — Linux 6.17, collector trace-mode (SSL + Process monitoring)",
             ha="center", fontsize=8, color="#888888", fontstyle="italic")
@@ -386,7 +386,7 @@ def fig10_perf_summary(data: dict):
 
     # Bottom note
     ax.text(5, 1.2,
-            "Key claim supported: MtAgentPrism introduces < 3% end-to-end overhead "
+            "Key claim supported: MtAgentLens introduces < 3% end-to-end overhead "
             "with < 5 MB memory footprint and probe latency consistent with eBPF literature.",
             ha="center", fontsize=7.5, fontweight="bold", color="#2c3e50",
             bbox=dict(boxstyle="round,pad=0.5", facecolor="#f8f9fa",

@@ -7,9 +7,9 @@ import unittest
 import json
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentPrism/env/scripts/verifiers/network-anomaly.py')
-SCENARIO_PATH = Path('/home/lzk/MtAgentPrism/env/scenarios/network-anomaly.json')
-FIXTURE_PATH = Path('/home/lzk/MtAgentPrism/env/scenarios/fixtures/network-anomaly/endpoints.txt')
+VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/network-anomaly.py')
+SCENARIO_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/network-anomaly.json')
+FIXTURE_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/fixtures/network-anomaly/endpoints.txt')
 
 
 def load_verifier_module():

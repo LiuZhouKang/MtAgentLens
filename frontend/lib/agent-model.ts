@@ -5,6 +5,9 @@ import {
   findAgentNode,
   formatNodeLabelById,
 } from './stellar-model-helpers';
+import { summarizeResourceSurface, type ResourceCounts, type SurfacedResource } from './resource-surface';
+export type AgentResourceCounts = ResourceCounts;
+export type AgentSurfacedResource = SurfacedResource;
 
 export interface AgentModel {
   agentId: string;
@@ -16,6 +19,8 @@ export interface AgentModel {
   claimedRoles: string[];
   relatedAgentIds: string[];
   touchedResources: string[];
+  surfacedResources: AgentSurfacedResource[];
+  resourceCounts: AgentResourceCounts;
   linkedEvidence: CorrelationEvidence[];
   highestSeverity: ResponsibilityAlert['severity'] | null;
 }
@@ -59,16 +64,18 @@ export function buildAgentModel(
       ].filter((value): value is string => !!value && value !== agentId),
     ),
   );
-  const touchedResources = Array.from(
-    new Set(
+  const connectedResourceNodes = Array.from(
+    new Map(
       directlyConnectedEdges
         .flatMap((edge) => [edge.source, edge.target])
         .filter((nodeId) => nodeId !== agentNodeId)
         .map((nodeId) => graph.nodes.find((node) => node.node_id === nodeId))
         .filter((node): node is NonNullable<typeof node> => !!node && node.node_type !== 'Agent')
-        .map((node) => formatNodeLabelById(graph, node.node_id)),
-    ),
+        .map((node) => [node.node_id, node]),
+    ).values(),
   );
+  const touchedResources = connectedResourceNodes.map((node) => formatNodeLabelById(graph, node.node_id));
+  const { resourceCounts, surfacedResources } = summarizeResourceSurface(connectedResourceNodes, graph, 8);
   const highestSeverity =
     relevantAlerts
       .map((alert) => alert.severity)
@@ -90,6 +97,8 @@ export function buildAgentModel(
     claimedRoles,
     relatedAgentIds,
     touchedResources,
+    surfacedResources,
+    resourceCounts,
     linkedEvidence: collectLinkedEvidence(relevantAlerts, evidence, directNode?.evidence_refs ?? []),
     highestSeverity,
   };

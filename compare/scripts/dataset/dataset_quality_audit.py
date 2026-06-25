@@ -375,7 +375,7 @@ def build_manifest(dataset: Path, audits: list[SampleAudit]) -> dict[str, Any]:
     scenario_ids = [audit.scenario_id for audit in sorted(audits, key=lambda a: a.scenario_id)]
     return {
         "dataset": dataset.name,
-        "schema": "mtagentprism.dataset_quality.v1",
+        "schema": "mtagentlens.dataset_quality.v1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "summary": {
             "total_samples": len(audits),
@@ -400,7 +400,7 @@ def build_metadata_v2_draft(dataset: Path, audits: list[SampleAudit], manifest: 
         label_counts[label] = label_counts.get(label, 0) + 1
 
     return {
-        "schema": "mtagentprism.dataset_metadata.v2.draft",
+        "schema": "mtagentlens.dataset_metadata.v2.draft",
         "annotation_status": "draft_needs_human_review",
         "dataset": dataset.name,
         "scenario_ids": manifest["scenario_ids"],
@@ -560,7 +560,7 @@ def build_gt_v2_draft(dataset: Path, audit: SampleAudit) -> dict[str, Any]:
     claims = audit.db_counts.get("responsibility_claims", 0)
 
     return {
-        "schema": "mtagentprism.ground_truth.v2.draft",
+        "schema": "mtagentlens.ground_truth.v2.draft",
         "annotation_status": "draft_needs_human_review",
         "scenario_id": audit.scenario_id,
         "label": label,

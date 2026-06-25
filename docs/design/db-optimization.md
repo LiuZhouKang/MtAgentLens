@@ -1,4 +1,4 @@
-# MtAgentPrism DB 持久化体积优化设计
+# MtAgentLens DB 持久化体积优化设计
 **日期**: 2026-06-03
 **状态**: 待审查
 **目标**: 将 10 分钟 session 的 DB 体积从 440MB 降至 < 20MB

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MtAgentPrism 性能微基准实验 (Experiment 8).
+"""MtAgentLens 性能微基准实验 (Experiment 8).
 
 运行全部四个子实验:
   8.1 eBPF 探针延迟
@@ -39,7 +39,7 @@ from perf.common import (
 
 def main():
     parser = argparse.ArgumentParser(
-        description="MtAgentPrism Performance Micro-Benchmarks (Experiment 8)",
+        description="MtAgentLens Performance Micro-Benchmarks (Experiment 8)",
     )
     parser.add_argument(
         "--all", action="store_true", default=True,
@@ -80,7 +80,7 @@ def main():
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
     print("=" * 70)
-    print("  MtAgentPrism Performance Micro-Benchmarks (Experiment 8)")
+    print("  MtAgentLens Performance Micro-Benchmarks (Experiment 8)")
     print(f"  Results: {RESULTS_DIR}")
     print(f"  Figures: {FIGURES_DIR}")
     print("=" * 70)

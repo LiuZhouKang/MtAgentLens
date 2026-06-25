@@ -16,7 +16,7 @@ use http_body_util::BodyExt;
 use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::{Request, StatusCode};
-use mtagentprism::auth::api::{
+use mtagentlens::auth::api::{
     self, AuthState, EnrollResponse, LoginResponse, VerifyResponse, decode_test_token,
     new_auth_state,
 };

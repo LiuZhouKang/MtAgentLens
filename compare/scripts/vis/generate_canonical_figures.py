@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate canonical paper figures from completed MtAgentPrism artifacts.
+"""Generate canonical paper figures from completed MtAgentLens artifacts.
 
 This script intentionally avoids matplotlib because the current system
 matplotlib build is incompatible with the installed NumPy ABI. It writes SVG
@@ -52,13 +52,13 @@ def main() -> int:
 
     report = load_paper_report_v1(report_path)
     ablation = load_completed_artifact(
-        ablation_path, expected_schema="mtagentprism.controlled_ablation_results.v1"
+        ablation_path, expected_schema="mtagentlens.controlled_ablation_results.v1"
     )
     backend = load_completed_artifact(
-        backend_path, expected_schema="mtagentprism.backend_capture_health.v1"
+        backend_path, expected_schema="mtagentlens.backend_capture_health.v1"
     )
     performance = load_completed_artifact(
-        performance_path, expected_schema="mtagentprism.performance_results.v1"
+        performance_path, expected_schema="mtagentlens.performance_results.v1"
     )
 
     figures = [
@@ -69,7 +69,7 @@ def main() -> int:
     ]
 
     manifest = {
-        "schema": "mtagentprism.paper_figure_manifest.v1",
+        "schema": "mtagentlens.paper_figure_manifest.v1",
         "status": "completed",
         "generated_at": _now_iso(),
         "source_artifacts": {
@@ -124,7 +124,7 @@ def main() -> int:
 
 def _fig_main_metrics(report: dict[str, Any]) -> dict[str, Any]:
     rows = []
-    for tool_id in ("mtagentprism", "llm-guard", "meta-prompt-guard", "vigil"):
+    for tool_id in ("mtagentlens", "llm-guard", "meta-prompt-guard", "vigil"):
         metric = report["metrics_by_tool"][tool_id]
         rows.append(
             {
@@ -136,7 +136,7 @@ def _fig_main_metrics(report: dict[str, Any]) -> dict[str, Any]:
         )
     svg = _svg_page(
         "Figure 1. Frozen 67-scenario evaluation",
-        "MtAgentPrism preserves scenario recall where prompt baselines do not.",
+        "MtAgentLens preserves scenario recall where prompt baselines do not.",
         [_grouped_bar_panel(70, 95, 980, 430, rows, ["f1", "scenario_recall"])],
         width=1120,
         height=620,
@@ -144,10 +144,10 @@ def _fig_main_metrics(report: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": "fig1_main_metrics",
         "title": "Frozen 67-scenario evaluation",
-        "claim": "MtAgentPrism achieves full frozen-set recall under the completed prompt-input contract.",
-        "panels": ["F1 and scenario recall for MtAgentPrism and prompt baselines."],
+        "claim": "MtAgentLens achieves full frozen-set recall under the completed prompt-input contract.",
+        "panels": ["F1 and scenario recall for MtAgentLens and prompt baselines."],
         "svg": svg,
-        "source_data": {"schema": "mtagentprism.figure_source_data.v1", "rows": rows},
+        "source_data": {"schema": "mtagentlens.figure_source_data.v1", "rows": rows},
     }
 
 
@@ -180,7 +180,7 @@ def _fig_ablation(ablation: dict[str, Any]) -> dict[str, Any]:
         "panels": ["Scenario recall for full replay and each completed action-family feature-flag variant."],
         "svg": svg,
         "source_data": {
-            "schema": "mtagentprism.figure_source_data.v1",
+            "schema": "mtagentlens.figure_source_data.v1",
             "methodology": ablation.get("methodology"),
             "rows": rows,
             "claim_boundary": ablation.get("claim_scope", {}),
@@ -218,7 +218,7 @@ def _fig_backend_health(backend: dict[str, Any]) -> dict[str, Any]:
         ],
         "svg": svg,
         "source_data": {
-            "schema": "mtagentprism.figure_source_data.v1",
+            "schema": "mtagentlens.figure_source_data.v1",
             "backend_rows": backend_rows,
             "claim_boundary": backend.get("claim_scope", {}),
         },
@@ -264,7 +264,7 @@ def _fig_performance(performance: dict[str, Any]) -> dict[str, Any]:
         ],
         "svg": svg,
         "source_data": {
-            "schema": "mtagentprism.figure_source_data.v1",
+            "schema": "mtagentlens.figure_source_data.v1",
             "probe_rows": probe_rows,
             "throughput_rows": throughput_rows,
             "metric_rows": metric_rows,
@@ -432,7 +432,7 @@ def _format_value(value: float) -> str:
 
 def _tool_name(tool_id: str) -> str:
     return {
-        "mtagentprism": "MtAgentPrism",
+        "mtagentlens": "MtAgentLens",
         "llm-guard": "LLM Guard",
         "meta-prompt-guard": "Meta Prompt Guard",
         "vigil": "Vigil",

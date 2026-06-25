@@ -8,10 +8,10 @@ os.environ['MTAGENTPRISM_SUDO_PASSWORD'] = '1'
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'env' / 'src'))
 
-from mtagentprism_benchmark.workspace import BenchmarkWorkspace
-from mtagentprism_benchmark.engine.executor import execute_scenario
-from mtagentprism_benchmark.engine.collector_manager import CollectorManager
-from mtagentprism_benchmark.types import ScenarioConfig, ScenarioMode, AgentSpec, RunMode
+from mtagentlens_benchmark.workspace import BenchmarkWorkspace
+from mtagentlens_benchmark.engine.executor import execute_scenario
+from mtagentlens_benchmark.engine.collector_manager import CollectorManager
+from mtagentlens_benchmark.types import ScenarioConfig, ScenarioMode, AgentSpec, RunMode
 
 TRACES_DIR = ROOT / 'compare' / 'Dataset' / 'FuxiBench' / 'traces'
 RUNS_DIR = ROOT / 'env' / 'runs'

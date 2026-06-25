@@ -16,7 +16,7 @@ def _tool() -> ToolMetadata:
         tool_class="static",
         source_url="builtin://compare/tools/adapters/fixture_scanner.py",
         version="builtin",
-        license="MtAgentPrism-project",
+        license="MtAgentLens-project",
         install=[],
         adapter="fixture_scanner",
         input_modes=["static"],
@@ -44,7 +44,7 @@ def _case(
         adapter_case=adapter_case,
         ground_truth_json=None,
         expected_claims=expected_claims,
-        mtagentprism_baseline={},
+        mtagentlens_baseline={},
         is_attack=is_attack,
     )
 

@@ -52,7 +52,7 @@ def test_promotes_candidate_with_auditable_provenance(tmp_path: Path):
     promoted = json.loads((dataset / "ground_truth" / "prompt_injection" / "attack-one.json").read_text())
     benign = json.loads((dataset / "ground_truth" / "benign" / "benign-one.json").read_text())
     assert report["summary"]["promoted"] == 2
-    assert promoted["schema"] == "mtagentprism.ground_truth.v2"
+    assert promoted["schema"] == "mtagentlens.ground_truth.v2"
     assert promoted["annotation_status"] == "auto_adjudicated_with_db_evidence"
     assert promoted["quality"]["paper_ready"] is True
     assert promoted["provenance"]["candidate_ground_truth"] == (
@@ -95,7 +95,7 @@ def _write_case(
     _write_db(dataset / db_rel, scenario_id, claim_count=0 if label == "benign" else 1)
 
     candidate = {
-        "schema": "mtagentprism.ground_truth.v2.candidate",
+        "schema": "mtagentlens.ground_truth.v2.candidate",
         "annotation_status": "machine_generated_needs_review",
         "scenario_id": scenario_id,
         "label": label,
@@ -175,7 +175,7 @@ def _append_manifest_sample(dataset: Path, sample: dict[str, object]) -> None:
         manifest = json.loads(path.read_text(encoding="utf-8"))
     else:
         manifest = {
-            "schema": "mtagentprism.dataset_quality.v1",
+            "schema": "mtagentlens.dataset_quality.v1",
             "dataset": dataset.name,
             "summary": {},
             "samples": [],

@@ -17,7 +17,7 @@ VALID_TOOL = {
     "class": "static",
     "source_url": "builtin://compare/tools/adapters/fixture_scanner.py",
     "version": "builtin",
-    "license": "MtAgentPrism-project",
+    "license": "MtAgentLens-project",
     "install": [],
     "adapter": "fixture_scanner",
     "input_modes": ["static"],
@@ -40,7 +40,7 @@ def test_accepts_builtin_fixture_scanner_lockfile_metadata() -> None:
             tool_class="static",
             source_url="builtin://compare/tools/adapters/fixture_scanner.py",
             version="builtin",
-            license="MtAgentPrism-project",
+            license="MtAgentLens-project",
             install=(),
             adapter="fixture_scanner",
             input_modes=("static",),
@@ -319,19 +319,19 @@ def test_rejects_prohibited_metadata_concepts_in_extra_keys(key: str) -> None:
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("source_url", "https://example.com/mtagentprism-claims-tool"),
-        ("inclusion_rationale", "Reads MtAgentPrism alerts as comparator input."),
+        ("source_url", "https://example.com/mtagentlens-claims-tool"),
+        ("inclusion_rationale", "Reads MtAgentLens alerts as comparator input."),
         ("adapter", "claim_inputs"),
     ],
 )
-def test_rejects_mtagentprism_derived_claim_or_alert_inputs(field: str, value: object) -> None:
+def test_rejects_mtagentlens_derived_claim_or_alert_inputs(field: str, value: object) -> None:
     tool = dict(VALID_TOOL)
     tool["id"] = "external-static-tool"
     tool["source_url"] = "https://example.com/external-static-tool"
     tool["version"] = "v1.0.0"
     tool[field] = value
 
-    with pytest.raises(ValueError, match="prohibited|round 1|claim|alert|mtagentprism"):
+    with pytest.raises(ValueError, match="prohibited|round 1|claim|alert|mtagentlens"):
         validate_lockfile(lock_with(tool))
 
 

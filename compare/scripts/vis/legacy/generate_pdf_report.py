@@ -19,9 +19,9 @@ from compare.scripts.vis.paper_report import (  # noqa: E402
 )
 
 
-PROMPT_TOOL_ORDER = ["mtagentprism", "llm-guard", "meta-prompt-guard", "vigil"]
+PROMPT_TOOL_ORDER = ["mtagentlens", "llm-guard", "meta-prompt-guard", "vigil"]
 TOOL_NAMES = {
-    "mtagentprism": "MtAgentPrism",
+    "mtagentlens": "MtAgentLens",
     "llm-guard": "LLM Guard",
     "meta-prompt-guard": "Meta Prompt Guard",
     "vigil": "Vigil",
@@ -55,7 +55,7 @@ def build_mcnemar_table(report: dict) -> tuple[list[str], list[list[str]]]:
     for row in prompt_mcnemar_rows(report):
         rows.append(
             [
-                f"MtAgentPrism vs {TOOL_NAMES.get(row['tool_id'], row['tool_id'])}",
+                f"MtAgentLens vs {TOOL_NAMES.get(row['tool_id'], row['tool_id'])}",
                 str(row["b"]),
                 str(row["c"]),
                 f"{row['statistic']:.2f}",
@@ -83,14 +83,14 @@ def generate_pdf(results_dir: Path, output_path: Path) -> None:
             figsize=(11, 8.5),
             gridspec_kw={"height_ratios": [0.8, 2.4, 1.6, 1.2]},
         )
-        fig.suptitle("MtAgentPrism Paper Evaluation Report", fontsize=14, fontweight="bold", y=0.98)
+        fig.suptitle("MtAgentLens Paper Evaluation Report", fontsize=14, fontweight="bold", y=0.98)
 
         ax_title.axis("off")
         ax_title.text(
             0.5,
             0.55,
             f"Frozen dataset v1.0.0: {total} scenarios ({attack} attack, {benign} benign). "
-            "Scope: completed frozen MtAgentPrism evaluation and prompt baselines only.",
+            "Scope: completed frozen MtAgentLens evaluation and prompt baselines only.",
             ha="center",
             va="center",
             fontsize=9,
@@ -125,8 +125,8 @@ def generate_pdf(results_dir: Path, output_path: Path) -> None:
         plt.close(fig)
 
         info = pdf.infodict()
-        info["Title"] = "MtAgentPrism Paper Evaluation Report"
-        info["Author"] = "MtAgentPrism Benchmark"
+        info["Title"] = "MtAgentLens Paper Evaluation Report"
+        info["Author"] = "MtAgentLens Benchmark"
         info["Subject"] = "Completed frozen evaluation and prompt-baseline comparison"
 
 

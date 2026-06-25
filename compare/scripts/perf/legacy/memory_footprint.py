@@ -36,7 +36,7 @@ def _find_collector_pid() -> int | None:
     """找到正在运行的 collector 进程 PID."""
     try:
         result = subprocess.run(
-            ["pgrep", "-f", "mtagentprism"],
+            ["pgrep", "-f", "mtagentlens"],
             capture_output=True, text=True,
         )
         pids = result.stdout.strip().split("\n")
@@ -46,7 +46,7 @@ def _find_collector_pid() -> int | None:
                 # 检查是否是 collector 进程
                 try:
                     cmdline = Path(f"/proc/{pid}/cmdline").read_text()
-                    if "mtagentprism" in cmdline and "trace" in cmdline:
+                    if "mtagentlens" in cmdline and "trace" in cmdline:
                         return pid
                 except (FileNotFoundError, PermissionError):
                     continue

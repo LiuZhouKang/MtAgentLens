@@ -32,6 +32,7 @@ export interface InvestigationModel {
   boundaryCrossingCount: number;
   ruleCount: number;
   patternCount: number;
+  parentClusterId: string | null;
 }
 
 function getActiveGraph(alert: ResponsibilityAlert, fallbackGraph: GraphData): GraphData {
@@ -147,8 +148,9 @@ export function buildInvestigationModel(
     linkedEvidence,
     pathEdges,
     pathNodes,
-    boundaryCrossingCount: graph.edges.filter((edge) => edge.edge_type === 'PolicyBoundaryCrossing').length,
+    boundaryCrossingCount: pathEdges.filter((edge) => edge.edge_type === 'PolicyBoundaryCrossing').length,
     ruleCount: alert.engine.rule_verdicts.length,
     patternCount: alert.engine.pattern_verdicts.length,
+    parentClusterId: alert.primary_agent?.agent_id ?? null,
   };
 }

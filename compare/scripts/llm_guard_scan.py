@@ -11,7 +11,7 @@ from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 # 本地模型路径 (compare/models/prompt-injection-deberta-v3)
-_LOCAL_MODEL = Path("/home/lzk/MtAgentPrism/compare/models/prompt-injection-deberta-v3")
+_LOCAL_MODEL = Path("/home/lzk/MtAgentLens/compare/models/prompt-injection-deberta-v3")
 
 text_file = Path(sys.argv[1])
 if not text_file.exists():

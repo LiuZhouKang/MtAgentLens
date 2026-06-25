@@ -8,7 +8,7 @@
 ## Actions Performed
 
 ### 1. Payload Generation
-Created a coherent system configuration payload (MtAgentPrism v2.1.0 config) as the target data for fragmentation:
+Created a coherent system configuration payload (MtAgentLens v2.1.0 config) as the target data for fragmentation:
 - Size: 1066 bytes
 - Content: observer_llm, accountability, eBPF, and retention configuration
 
@@ -56,7 +56,7 @@ Assembly script executed successfully on 2026-06-08T14:30:00Z:
 
 ```json
 {
-    "system": "MtAgentPrism",
+    "system": "MtAgentLens",
     "version": "2.1.0",
     "config": {
         "observer_llm": {

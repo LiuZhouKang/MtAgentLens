@@ -199,9 +199,9 @@ function AppShell() {
   const heroVisible = panelLevel === 0;
   const hasRealSession = !!store.activeRunId;
   const featuredAgentId = featuredAlert?.primary_agent?.agent_id ?? null;
-  const primaryCtaLabel = featuredAlert ? '进入风险调查' : hasRealSession ? '进入总览态势' : '查看示例场景';
+  const primaryCtaLabel = featuredAlert ? '回放运行链路' : hasRealSession ? '进入总览态势' : '查看示例场景';
   const primaryCtaAction = featuredAlert
-    ? () => openInvestigation(featuredAlert.alert_id)
+    ? () => router.push('/traces')
     : hasRealSession
       ? () => router.push('/overview')
       : loadDemo;
@@ -583,7 +583,7 @@ function AppShell() {
                 marginBottom: 14,
               }}
             >
-              <span className="prism-kicker-rule">MtAgentPrism Responsibility Observatory</span>
+              <span className="prism-kicker-rule">MtAgentLens Responsibility Observatory</span>
             </Reveal>
 
             <Reveal disabled={auditMode} delay={0.13}>
@@ -618,7 +618,7 @@ function AppShell() {
                   color: 'var(--text-secondary)',
                 }}
               >
-                MtAgentPrism 不再把多 Agent 风险拆成日志、链路与截图，而是把 authority、delegation、execution 与 evidence
+                MtAgentLens 不再把多 Agent 风险拆成日志、链路与截图，而是把 authority、delegation、execution 与 evidence
                 收束成一个可以直接进入判断的责任现场。
               </p>
             </Reveal>
@@ -674,6 +674,9 @@ function AppShell() {
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
                 <Link href="/overview" style={{ textDecoration: 'none' }}>
                   <span className="prism-meta-inline__item">进入 Stellar Overview</span>
+                </Link>
+                <Link href="/traces" style={{ textDecoration: 'none' }}>
+                  <span className="prism-meta-inline__item">进入 Trace Workbench</span>
                 </Link>
                 {featuredAgentId ? (
                   <Link href={buildClusterHref(featuredAgentId)} style={{ textDecoration: 'none' }}>

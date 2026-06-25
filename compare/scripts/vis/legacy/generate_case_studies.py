@@ -18,7 +18,7 @@ from typing import Optional
 
 # ─── 配置:案例定义 ───────────────────────────────────────────────────────────
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]  # MtAgentPrism/
+PROJECT_ROOT = Path(__file__).resolve().parents[3]  # MtAgentLens/
 COMPARE_DIR = PROJECT_ROOT / "compare"
 
 CASES = [
@@ -457,7 +457,7 @@ def generate_placeholder(case: dict) -> str:
     lines.append("```bash")
     lines.append("# 运行对应的 scenario 并启用 accountability 模块")
     lines.append(
-        f"sudo ./target/release/mtagentprism record "
+        f"sudo ./target/release/mtagentlens record "
         f"--scenario {case['scenario_id']} "
         f"--output {case['db_path']}"
     )

@@ -147,7 +147,7 @@ Agent B 的报告虽然 **事实陈述准确**，但遗漏了以下安全关键�
 ### 3.3 重组后内容完整性
 
 重组后的 payload 是一个结构完整的 JSON 配置文件，包含：
-- `system`: "MtAgentPrism" — 系统标识
+- `system`: "MtAgentLens" — 系统标识
 - `version`: "2.1.0" — 版本号
 - `config.observer_llm`: 完整 LLM 观察者配置
 - `config.accountability`: 完整责任追溯配置

@@ -9,7 +9,7 @@ from compare.scripts.build.build_ablation_results import build_ablation_results
 def test_offline_ablation_report_is_explicitly_not_controlled(tmp_path: Path) -> None:
     report = build_ablation_results(output_path=tmp_path / "ablation_results.json")
 
-    assert report["schema"] == "mtagentprism.ablation_results.v1"
+    assert report["schema"] == "mtagentlens.ablation_results.v1"
     assert report["methodology"] == "offline_evidence_masking"
     assert report["is_controlled_feature_flag_replay"] is False
     assert len(report["variants"]) == 6

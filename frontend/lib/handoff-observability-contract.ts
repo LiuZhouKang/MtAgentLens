@@ -196,6 +196,7 @@ export interface FileCorrelationEvent {
 
 export interface ContextSaturationEvent {
   sub_type: "CONTEXT_SATURATION";
+  timestamp_ms: number;
   spawn_id: string;
   agent_id: string;
   chain_depth: number;

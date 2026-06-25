@@ -119,7 +119,7 @@ def test_readiness_audit_json_serializable() -> None:
 
 def test_backend_health_gate_rejects_empty_or_planned_artifacts(tmp_path: Path) -> None:
     empty = tmp_path / "capture_health.json"
-    empty.write_text(json.dumps({"schema": "mtagentprism.backend_capture_health.v1"}) + "\n", encoding="utf-8")
+    empty.write_text(json.dumps({"schema": "mtagentlens.backend_capture_health.v1"}) + "\n", encoding="utf-8")
     evidence = _validate_backend_health_artifact(empty)
     assert evidence["valid"] is False
 
@@ -127,7 +127,7 @@ def test_backend_health_gate_rejects_empty_or_planned_artifacts(tmp_path: Path) 
     planned.write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.backend_capture_health.v1",
+                "schema": "mtagentlens.backend_capture_health.v1",
                 "status": "planned_missing_artifact",
                 "provenance": {},
                 "checks": {},
@@ -144,7 +144,7 @@ def test_backend_health_gate_rejects_empty_or_planned_artifacts(tmp_path: Path) 
     blocked.write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.backend_capture_health.v1",
+                "schema": "mtagentlens.backend_capture_health.v1",
                 "status": "blocked",
                 "provenance": {
                     "git_commit": "abc",
@@ -181,7 +181,7 @@ def test_controlled_ablation_gate_rejects_offline_or_shallow_artifacts(tmp_path:
     offline.write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.ablation_results.v1",
+                "schema": "mtagentlens.ablation_results.v1",
                 "methodology": "offline_evidence_masking",
                 "is_controlled_feature_flag_replay": False,
                 "variants": [{"variant_id": "mask_claims", "status": "completed"}],
@@ -198,7 +198,7 @@ def test_controlled_ablation_gate_rejects_offline_or_shallow_artifacts(tmp_path:
     shallow.write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.controlled_ablation_results.v1",
+                "schema": "mtagentlens.controlled_ablation_results.v1",
                 "status": "completed",
                 "methodology": "sqlite_persisted_graph_action_family_feature_flags",
                 "is_controlled_feature_flag_replay": True,
@@ -241,7 +241,7 @@ def test_controlled_ablation_gate_accepts_completed_schema(tmp_path: Path) -> No
     path.write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.controlled_ablation_results.v1",
+                "schema": "mtagentlens.controlled_ablation_results.v1",
                 "status": "completed",
                 "methodology": "sqlite_persisted_graph_action_family_feature_flags",
                 "is_controlled_feature_flag_replay": True,
@@ -286,7 +286,7 @@ def test_backend_health_gate_accepts_completed_schema(tmp_path: Path) -> None:
     path.write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.backend_capture_health.v1",
+                "schema": "mtagentlens.backend_capture_health.v1",
                 "status": "completed",
                 "provenance": {
                     "git_commit": "abc",
@@ -311,7 +311,7 @@ def test_backend_health_gate_accepts_completed_schema(tmp_path: Path) -> None:
 
 def test_performance_gate_rejects_empty_or_partial_artifacts(tmp_path: Path) -> None:
     path = tmp_path / "perf_report.json"
-    path.write_text(json.dumps({"schema": "mtagentprism.performance_results.v1"}) + "\n", encoding="utf-8")
+    path.write_text(json.dumps({"schema": "mtagentlens.performance_results.v1"}) + "\n", encoding="utf-8")
     evidence = _validate_performance_artifact(path)
     assert evidence["valid"] is False
 
@@ -319,7 +319,7 @@ def test_performance_gate_rejects_empty_or_partial_artifacts(tmp_path: Path) -> 
     partial.write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.performance_results.v1",
+                "schema": "mtagentlens.performance_results.v1",
                 "status": "completed",
                 "provenance": {"git_commit": "abc"},
                 "experiments": {
@@ -339,7 +339,7 @@ def test_performance_gate_accepts_completed_schema(tmp_path: Path) -> None:
     path.write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.performance_results.v1",
+                "schema": "mtagentlens.performance_results.v1",
                 "status": "completed",
                 "provenance": {
                     "git_commit": "abc",

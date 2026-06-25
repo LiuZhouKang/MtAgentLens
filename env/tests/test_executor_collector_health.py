@@ -2,12 +2,12 @@ from pathlib import Path
 import json
 import pytest
 
-from mtagentprism_benchmark.engine.collector_manager import CollectorManager
-from mtagentprism_benchmark.engine.executor import execute_scenario
-from mtagentprism_benchmark.engine.runner import _save_summary
-from mtagentprism_benchmark.types import AgentSpec, ScenarioConfig, ScenarioMode
-from mtagentprism_benchmark.types import RunResult
-from mtagentprism_benchmark.workspace import BenchmarkWorkspace
+from mtagentlens_benchmark.engine.collector_manager import CollectorManager
+from mtagentlens_benchmark.engine.executor import execute_scenario
+from mtagentlens_benchmark.engine.runner import _save_summary
+from mtagentlens_benchmark.types import AgentSpec, ScenarioConfig, ScenarioMode
+from mtagentlens_benchmark.types import RunResult
+from mtagentlens_benchmark.workspace import BenchmarkWorkspace
 
 
 class FailingCollector:
@@ -131,11 +131,11 @@ def test_collector_manager_start_raises_when_collector_exits_immediately(
         return proc
 
     monkeypatch.setattr(
-        "mtagentprism_benchmark.engine.collector_manager.subprocess.Popen",
+        "mtagentlens_benchmark.engine.collector_manager.subprocess.Popen",
         fake_popen,
     )
     monkeypatch.setattr(
-        "mtagentprism_benchmark.engine.collector_manager._find_claude_binary",
+        "mtagentlens_benchmark.engine.collector_manager._find_claude_binary",
         lambda: None,
     )
 

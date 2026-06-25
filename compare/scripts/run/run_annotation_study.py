@@ -975,7 +975,7 @@ def main() -> int:
     binary_b = ["attack" if l == "attack" else "benign" for l in labels_b]
 
     metrics = {
-        "schema": "mtagentprism.annotation_metrics.v1",
+        "schema": "mtagentlens.annotation_metrics.v1",
         "status": "completed",
         "claim_boundary": "blind_annotation_quality_claimed",
         "sample_count": len(samples),

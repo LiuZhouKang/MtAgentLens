@@ -8,7 +8,7 @@ def test_canonical_figure_manifest_binds_completed_source_artifacts() -> None:
     manifest_path = Path("compare/results/paper/figures/figure_manifest.json")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    assert manifest["schema"] == "mtagentprism.paper_figure_manifest.v1"
+    assert manifest["schema"] == "mtagentlens.paper_figure_manifest.v1"
     assert manifest["status"] == "completed"
     assert set(manifest["source_artifacts"]) == {
         "evaluation_report",

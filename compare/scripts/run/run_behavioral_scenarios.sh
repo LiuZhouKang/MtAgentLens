@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Behavioral Scenario Runner for MtAgentPrism
+# Behavioral Scenario Runner for MtAgentLens
 # =============================================================================
 # Runs the collector against behavioral attack scenarios and captures traces.
 #
@@ -8,7 +8,7 @@
 #   sudo ./compare/scripts/run/run_behavioral_scenarios.sh <collector_binary>
 #
 # Example:
-#   sudo ./compare/scripts/run/run_behavioral_scenarios.sh ./collector/build/debug/mtagentprism
+#   sudo ./compare/scripts/run/run_behavioral_scenarios.sh ./collector/build/debug/mtagentlens
 #
 # Prerequisites:
 #   - Root privileges (eBPF requires CAP_BPF + CAP_SYS_ADMIN or sudo)
@@ -51,7 +51,7 @@ NC='\033[0m' # No Color
 
 print_banner() {
   echo -e "${CYAN}=============================================================================${NC}"
-  echo -e "${CYAN}  MtAgentPrism Behavioral Scenario Runner${NC}"
+  echo -e "${CYAN}  MtAgentLens Behavioral Scenario Runner${NC}"
   echo -e "${CYAN}=============================================================================${NC}"
   echo ""
 }
@@ -156,7 +156,7 @@ main() {
   # Validate arguments
   if [[ $# -lt 1 ]]; then
     echo -e "${RED}Usage: $0 <collector_binary>${NC}"
-    echo -e "${RED}Example: sudo $0 ./collector/build/debug/mtagentprism${NC}"
+    echo -e "${RED}Example: sudo $0 ./collector/build/debug/mtagentlens${NC}"
     exit 1
   fi
 

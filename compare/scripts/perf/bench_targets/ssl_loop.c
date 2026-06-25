@@ -3,7 +3,7 @@
  *
 <<<<<<< Updated upstream
  * 使用 OpenSSL BIO pair (内存 SSL) 在循环中调用 SSL_write/SSL_read,
- * 触发 MtAgentPrism 的 uprobe/SSL_read 和 uprobe/SSL_write 探针。
+ * 触发 MtAgentLens 的 uprobe/SSL_read 和 uprobe/SSL_write 探针。
 =======
  * 简单方法: 创建 SSL 对象并反复调用 SSL_read/SSL_write,
  * 即使调用失败, uprobe 仍会被触发。对于 uprobe 延迟测量,

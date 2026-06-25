@@ -1,7 +1,7 @@
 /*
  * file_loop.c — 文件操作微基准目标程序
  *
- * 在循环中反复打开/写入/关闭/读取文件, 触发 MtAgentPrism 的文件访问探针。
+ * 在循环中反复打开/写入/关闭/读取文件, 触发 MtAgentLens 的文件访问探针。
  *
  * 用法: ./file_loop [iterations=100000]
  */
@@ -15,7 +15,7 @@
 #include <sys/stat.h>
 
 #define DEFAULT_ITERATIONS 100000
-#define TMP_FILE "/tmp/mtagentprism_perf_bench_file"
+#define TMP_FILE "/tmp/mtagentlens_perf_bench_file"
 
 int main(int argc, char **argv) {
     int iterations = DEFAULT_ITERATIONS;

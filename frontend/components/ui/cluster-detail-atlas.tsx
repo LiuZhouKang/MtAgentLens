@@ -12,15 +12,7 @@ function clampPercentage(value: number) {
 }
 
 function computePressure(model: ClusterModel) {
-  const severityBoost =
-    model.highestSeverity === 'Critical' ? 30 : model.highestSeverity === 'Warning' ? 18 : 10;
-  return clampPercentage(
-    model.alertIds.length * 18 +
-      model.linkedEvidence.length * 12 +
-      model.boundaryCrossingCount * 22 +
-      model.highlightEdgeIds.length * 8 +
-      severityBoost,
-  );
+  return clampPercentage(model.pressureScore);
 }
 
 export default function ClusterDetailAtlas({ model }: ClusterDetailAtlasProps) {
@@ -35,14 +27,14 @@ export default function ClusterDetailAtlas({ model }: ClusterDetailAtlasProps) {
     },
     {
       label: 'Delegation Breadth',
-      value: clampPercentage(18 + model.relatedAgentIds.length * 14),
-      copy: `${model.relatedAgentIds.length} agents in play`,
+      value: clampPercentage(18 + model.delegationEdgeCount * 26),
+      copy: `${model.delegationEdgeCount} delegation seams`,
       tone: '#8b7dff',
     },
     {
-      label: 'Traceback Focus',
-      value: clampPercentage(12 + model.highlightEdgeIds.length * 10),
-      copy: `${model.highlightEdgeIds.length} highlighted edges`,
+      label: 'Evidence Saturation',
+      value: clampPercentage(12 + model.linkedEvidence.length * 18),
+      copy: `${model.linkedEvidence.length} linked evidence`,
       tone: '#7dd3fc',
     },
   ];
@@ -107,7 +99,7 @@ export default function ClusterDetailAtlas({ model }: ClusterDetailAtlasProps) {
               {[
                 { label: 'Alerts', value: model.alertIds.length },
                 { label: 'Evidence', value: model.linkedEvidence.length },
-                { label: 'Agents', value: model.relatedAgentIds.length },
+                { label: 'Signals', value: model.surfacedResources.length },
               ].map((item) => (
                 <div
                   key={item.label}
@@ -157,9 +149,9 @@ export default function ClusterDetailAtlas({ model }: ClusterDetailAtlasProps) {
           ))}
         </div>
         <div style={{ marginTop: 18, display: 'grid', gap: 10 }}>
-          {model.relatedAgentIds.slice(0, 4).map((agentId, index) => (
+          {model.agentLanes.slice(0, 4).map((lane, index) => (
             <div
-              key={agentId}
+              key={lane.agentId}
               className="prism-atlas-row"
               style={{
                 padding: '10px 12px',
@@ -169,11 +161,13 @@ export default function ClusterDetailAtlas({ model }: ClusterDetailAtlasProps) {
               }}
             >
               <div style={{ display: 'grid', gap: 4 }}>
-                <div className="prism-atlas-mini-title">{agentId}</div>
+                <div className="prism-atlas-mini-title">{lane.label}</div>
                 <div className="prism-atlas-mini-copy">delegation lane {index + 1}</div>
               </div>
               <div className="prism-atlas-mini-copy">
-                {Math.max(1, model.highlightEdgeIds.length - index)} active seams
+                {lane.boundaryCrossingCount > 0
+                  ? `${lane.boundaryCrossingCount} boundary seams`
+                  : `${Math.max(1, lane.highlightedEdgeCount)} active seams`}
               </div>
             </div>
           ))}
@@ -207,6 +201,12 @@ export default function ClusterDetailAtlas({ model }: ClusterDetailAtlasProps) {
             <div className="prism-atlas-mini-title">Lead signal</div>
             <div className="prism-atlas-mini-copy">{model.highestSeverity ?? 'Info'} severity</div>
           </div>
+          {model.surfacedResources[0] ? (
+            <div className="prism-atlas-row">
+              <div className="prism-atlas-mini-title">Materialized surface</div>
+              <div className="prism-atlas-mini-copy">{model.surfacedResources[0].label}</div>
+            </div>
+          ) : null}
           <div className="prism-atlas-row">
             <div className="prism-atlas-mini-title">Reading cue</div>
             <div className="prism-atlas-mini-copy">

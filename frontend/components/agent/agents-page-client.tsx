@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, ArrowRight, Cpu, Database, FileText, Network, ShieldAlert } from 'lucide-react';
 import PrismPanel from '@/components/ui/prism-panel';
 import PrismButton from '@/components/ui/prism-button';
 import AgentResponsibilityAtlas from '@/components/ui/agent-responsibility-atlas';
@@ -16,7 +17,16 @@ import { buildAgentModel } from '@/lib/agent-model';
 import { buildAgentHref, parseAgentId } from '@/lib/agent-route';
 import { buildClusterHref } from '@/lib/cluster-route';
 import { buildInvestigationHref } from '@/lib/investigation-route';
-import { ArrowLeft, ArrowRight, Cpu } from 'lucide-react';
+
+function getSeverityTone(severity: string | null) {
+  if (severity === 'Critical') return 'danger';
+  if (severity === 'Warning') return 'warning';
+  return 'info';
+}
+
+function formatConfidence(value: number) {
+  return `${Math.round(value * 100)}%`;
+}
 
 export default function AgentsPageClient() {
   const router = useRouter();
@@ -74,6 +84,14 @@ export default function AgentsPageClient() {
     () => agentModels.find((model) => model.agentId === selectedAgentId) ?? agentModels[0] ?? null,
     [agentModels, selectedAgentId],
   );
+  const selectedResourceClassCount = selectedModel
+    ? Object.values(selectedModel.resourceCounts).filter((count) => count > 0).length
+    : 0;
+  const selectedRiskSurfaceCount = selectedModel
+    ? selectedModel.resourceCounts.files + selectedModel.resourceCounts.networks + selectedModel.resourceCounts.boundaries
+    : 0;
+  const totalEvidenceCount = agentModels.reduce((sum, model) => sum + model.linkedEvidence.length, 0);
+  const criticalAgentCount = agentModels.filter((model) => model.highestSeverity === 'Critical').length;
 
   const handleSelectAgent = useCallback((agentId: string) => {
     const nextHref = buildAgentHref(agentId);
@@ -89,11 +107,9 @@ export default function AgentsPageClient() {
 
   if (!selectedModel) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--investigation-stage-bg)', padding: 24, color: 'var(--text-primary)' }}>
+      <div className="stellar-page">
         <PrismPanel size="hero" shimmer style={{ maxWidth: 640, margin: '10vh auto 0' }}>
-          <div style={{ fontSize: 12, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--text-quaternary)' }}>
-            Agent Cockpit
-          </div>
+          <div className="stellar-section-label">Agent Cockpit</div>
           <h1 style={{ margin: '12px 0 0', fontSize: 30, lineHeight: 1.04 }}>当前没有可打开的 Agent 监测对象</h1>
           <p style={{ marginTop: 14, lineHeight: 1.72, color: 'var(--text-secondary)' }}>
             等首页或集群页接入真实观测会话后，这里会承接单个 agent 的成熟监测视图。
@@ -110,159 +126,243 @@ export default function AgentsPageClient() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--investigation-stage-bg)', color: 'var(--text-primary)', padding: 24 }}>
+    <div className="stellar-page">
       <ObservatoryHeader
-        eyebrow="L2 Agent Cockpit"
-        title="把单个 Agent 的身份、暴露面与定责线索压成一张判断页"
-        description="这一层不再只是读取节点详情，而是把 claimed role、资源接触、横向关系与证据抓握力收束成单主体责任画像。"
+        eyebrow="L2 Agent Workbench"
+        title="单个 Agent 的身份、暴露面与定责证据"
+        description="从 eBPF 捕获的资源接触、Rust collector 统一事件流、Analyzer 规则与边界评分中，压出可直接行动的单主体责任画像。"
         activeSection="agents"
         backHref="/clusters"
         backLabel="返回集群页"
         stats={[
           activeRunId ? `观测会话 ${activeRunId.slice(0, 12)}...` : '示例场景',
-          `${agentModels.length} agent entries`,
-          `${selectedModel.linkedEvidence.length} linked evidence`,
+          `${agentModels.length} agents`,
+          `${criticalAgentCount} critical`,
+          `${totalEvidenceCount} evidence refs`,
         ]}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 300px) minmax(0, 1fr)', gap: 16, marginTop: 18 }}>
-        <PrismPanel grid style={{ display: 'grid', gap: 10, alignSelf: 'start' }}>
-          <div style={{ fontSize: 12, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--text-quaternary)' }}>
-            Agent Directory
-          </div>
-          {agentModels.map((model) => (
-            <button
-              key={model.agentId}
-              type="button"
-              onClick={() => handleSelectAgent(model.agentId)}
-              style={{
-                textAlign: 'left',
-                padding: '12px 14px',
-                borderRadius: 16,
-                border: model.agentId === selectedModel.agentId ? '1px solid var(--brand-primary)' : '1px solid var(--border-soft)',
-                background: model.agentId === selectedModel.agentId ? 'rgba(66, 153, 225, 0.12)' : 'var(--surface-soft)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ fontSize: 15, fontWeight: 600 }}>{model.title}</div>
-              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                {model.alertIds.length} alerts · {model.touchedResources.length} touched resources
+      <div className="stellar-workbench stellar-workbench--agent">
+        <aside className="stellar-rail stellar-rail--sticky" aria-label="Agent directory">
+          <PrismPanel grid className="stellar-rail-panel">
+            <div className="stellar-section-label">Agent Directory</div>
+            <div className="stellar-mini-metrics">
+              <div>
+                <span>对象</span>
+                <strong>{agentModels.length}</strong>
               </div>
-            </button>
-          ))}
-        </PrismPanel>
+              <div>
+                <span>Critical</span>
+                <strong>{criticalAgentCount}</strong>
+              </div>
+              <div>
+                <span>Evidence</span>
+                <strong>{totalEvidenceCount}</strong>
+              </div>
+            </div>
+            <div className="stellar-directory-list">
+              {agentModels.map((model) => {
+                const surfaceCount = model.resourceCounts.files + model.resourceCounts.networks + model.resourceCounts.boundaries;
 
-        <div style={{ display: 'grid', gap: 16 }}>
-          <PrismPanel size="hero" grid shimmer>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-              <div style={{ maxWidth: 760 }}>
-                <div style={{ fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--text-quaternary)' }}>
-                  Agent Dossier
-                </div>
-                <h2
-                  className="prism-display"
-                  style={{ margin: '12px 0 0', fontSize: 'clamp(26px, 3vw, 40px)', lineHeight: 0.98, letterSpacing: '-0.04em' }}
-                >
-                  {selectedModel.title}
-                </h2>
-                <p style={{ marginTop: 14, color: 'var(--text-secondary)', lineHeight: 1.74, fontSize: 14 }}>
-                  {selectedModel.summary}
-                </p>
-                <div className="prism-editorial-note" style={{ marginTop: 16, maxWidth: 620 }}>
-                  <div className="prism-editorial-note__label">Reading Cue</div>
-                  <div className="prism-editorial-note__copy">
-                    这里的目标不是补充更多节点资料，而是迅速确认这个 agent 的身份声明、实际接触面与证据抓握力是否已经足够支撑下一步定责。
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
-                  <Link href={buildClusterHref(selectedModel.parentClusterId)} style={{ textDecoration: 'none' }}>
-                    <PrismButton variant="secondary" size="sm">回到所属 Cluster</PrismButton>
+                return (
+                  <button
+                    key={model.agentId}
+                    type="button"
+                    className="stellar-directory-row"
+                    data-active={model.agentId === selectedModel.agentId}
+                    data-tone={getSeverityTone(model.highestSeverity)}
+                    onClick={() => handleSelectAgent(model.agentId)}
+                  >
+                    <span className="stellar-directory-row__tone" />
+                    <span className="stellar-directory-row__body">
+                      <strong>{model.title}</strong>
+                      <small>{model.alertIds.length} alerts · {surfaceCount} surfaced signals</small>
+                    </span>
+                    <span className="stellar-directory-row__badge">{model.highestSeverity ?? 'Info'}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </PrismPanel>
+        </aside>
+
+        <main className="stellar-core">
+          <PrismPanel size="lg" grid shimmer className="stellar-command-panel">
+            <div className="stellar-command-copy">
+              <div className="stellar-section-label">Agent Command Surface</div>
+              <h2>{selectedModel.title}</h2>
+              <p>{selectedModel.summary}</p>
+              <div className="stellar-action-row">
+                <Link href={buildClusterHref(selectedModel.parentClusterId)}>
+                  <PrismButton variant="secondary" size="sm">回到所属 Cluster</PrismButton>
+                </Link>
+                {selectedModel.leadAlertId ? (
+                  <Link href={buildInvestigationHref(selectedModel.leadAlertId)}>
+                    <PrismButton variant="primary" size="sm">进入主调查</PrismButton>
                   </Link>
-                  {selectedModel.leadAlertId ? (
-                    <Link href={buildInvestigationHref(selectedModel.leadAlertId)} style={{ textDecoration: 'none' }}>
-                      <PrismButton variant="primary" size="sm">进入主调查</PrismButton>
-                    </Link>
-                  ) : null}
-                </div>
+                ) : null}
               </div>
-              <div style={{ display: 'grid', gap: 10, minWidth: 220 }}>
-                <div className="prism-meta-inline__item">{selectedModel.highestSeverity ?? 'No Alert'}</div>
-                <div className="prism-meta-inline__item">{selectedModel.linkedEvidence.length} linked evidence</div>
-                <div className="prism-meta-inline__item">{selectedModel.claimedRoles.length || 0} claimed roles</div>
-                <div className="prism-meta-inline__item">{selectedModel.touchedResources.length} touched resources</div>
+            </div>
+            <div className="stellar-kpi-grid" aria-label="Selected agent metrics">
+              <div className="stellar-kpi">
+                <span>Severity</span>
+                <strong data-tone={getSeverityTone(selectedModel.highestSeverity)}>{selectedModel.highestSeverity ?? 'Info'}</strong>
+              </div>
+              <div className="stellar-kpi">
+                <span>Evidence</span>
+                <strong>{selectedModel.linkedEvidence.length}</strong>
+              </div>
+              <div className="stellar-kpi">
+                <span>Roles</span>
+                <strong>{selectedModel.claimedRoles.length}</strong>
+              </div>
+              <div className="stellar-kpi">
+                <span>Surface</span>
+                <strong>{selectedRiskSurfaceCount}</strong>
               </div>
             </div>
           </PrismPanel>
 
           <AgentResponsibilityAtlas model={selectedModel} />
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
-            <PrismPanel grid>
-              <div style={{ fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--text-quaternary)' }}>
-                Identity Claim
+          <PrismPanel grid className="stellar-table-panel">
+            <div className="stellar-panel-heading">
+              <div>
+                <div className="stellar-section-label">Responsibility Queue</div>
+                <h3>Agent 责任队列</h3>
               </div>
-              <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
+              <span>{agentModels.length} entries</span>
+            </div>
+            <div className="stellar-data-table" role="table" aria-label="Agent responsibility queue">
+              <div className="stellar-data-table__head" role="row">
+                <span role="columnheader">Agent</span>
+                <span role="columnheader">Severity</span>
+                <span role="columnheader">Evidence</span>
+                <span role="columnheader">Surface</span>
+                <span role="columnheader">Next</span>
+              </div>
+              {agentModels.map((model) => {
+                const surfaceCount = model.resourceCounts.files + model.resourceCounts.networks + model.resourceCounts.boundaries;
+
+                return (
+                  <button
+                    key={model.agentId}
+                    type="button"
+                    className="stellar-data-table__row"
+                    data-selected={model.agentId === selectedModel.agentId}
+                    onClick={() => handleSelectAgent(model.agentId)}
+                    role="row"
+                  >
+                    <span role="cell">
+                      <strong>{model.title}</strong>
+                      <small>{model.claimedRoles[0] ?? 'pending role claim'}</small>
+                    </span>
+                    <span role="cell" data-tone={getSeverityTone(model.highestSeverity)}>{model.highestSeverity ?? 'Info'}</span>
+                    <span role="cell">{model.linkedEvidence.length}</span>
+                    <span role="cell">{surfaceCount}</span>
+                    <span role="cell"><ArrowRight size={13} /></span>
+                  </button>
+                );
+              })}
+            </div>
+          </PrismPanel>
+
+          <div className="stellar-lower-grid">
+            <PrismPanel grid>
+              <div className="stellar-section-label">Identity Claim</div>
+              <div className="stellar-chip-stack">
                 {(selectedModel.claimedRoles.length ? selectedModel.claimedRoles : ['等待真实角色声明']).map((role) => (
-                  <div key={role} className="prism-meta-inline__item">
-                    <Cpu size={12} />
-                    {role}
+                  <div key={role} className="stellar-chip-row">
+                    <Cpu size={13} />
+                    <span>{role}</span>
                   </div>
                 ))}
               </div>
             </PrismPanel>
 
             <PrismPanel grid>
-              <div style={{ fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--text-quaternary)' }}>
-                Lateral Links
-              </div>
-              <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
+              <div className="stellar-section-label">Lateral Links</div>
+              <div className="stellar-chip-stack">
                 {selectedModel.relatedAgentIds.map((agentId) => (
-                  <Link key={agentId} href={buildAgentHref(agentId)} style={{ textDecoration: 'none' }}>
-                    <div className="prism-meta-inline__item" style={{ justifyContent: 'space-between' }}>
-                      <span>{agentId}</span>
-                      <ArrowRight size={12} />
-                    </div>
+                  <Link key={agentId} href={buildAgentHref(agentId)} className="stellar-chip-row stellar-chip-row--link">
+                    <span>{agentId}</span>
+                    <ArrowRight size={13} />
                   </Link>
                 ))}
-              </div>
-            </PrismPanel>
-
-            <PrismPanel grid>
-              <div style={{ fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--text-quaternary)' }}>
-                Contact Surface
-              </div>
-              <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
-                {selectedModel.touchedResources.map((resource) => (
-                  <div key={resource} className="prism-meta-inline__item">{resource}</div>
-                ))}
+                {!selectedModel.relatedAgentIds.length ? (
+                  <div className="stellar-chip-row">暂无横向 agent 关系</div>
+                ) : null}
               </div>
             </PrismPanel>
           </div>
+        </main>
 
-          <PrismPanel grid>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <aside className="stellar-inspector" aria-label="Selected agent inspector">
+          <PrismPanel grid className="stellar-inspector-panel">
+            <div className="stellar-panel-heading">
               <div>
-                <div style={{ fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--text-quaternary)' }}>
-                  Next Hop
-                </div>
-                <div style={{ marginTop: 8, color: 'var(--text-secondary)', lineHeight: 1.7, fontSize: 13 }}>
-                  从单个 agent 可继续回到所属 cluster，或直接进入主调查确认最终 verdict。
-                </div>
+                <div className="stellar-section-label">Inspector</div>
+                <h3>判读抽屉</h3>
               </div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <Link href={buildClusterHref(selectedModel.parentClusterId)} style={{ textDecoration: 'none' }}>
-                  <PrismButton variant="secondary" size="sm">回到所属 Cluster</PrismButton>
-                </Link>
-                {selectedModel.leadAlertId ? (
-                  <Link href={buildInvestigationHref(selectedModel.leadAlertId)} style={{ textDecoration: 'none' }}>
-                    <PrismButton variant="primary" size="sm">进入主调查</PrismButton>
-                  </Link>
-                ) : null}
+              <span>{selectedResourceClassCount} classes</span>
+            </div>
+
+            <div className="stellar-inspector-summary">
+              <div>
+                <ShieldAlert size={16} />
+                <span>最高风险</span>
+                <strong data-tone={getSeverityTone(selectedModel.highestSeverity)}>{selectedModel.highestSeverity ?? 'Info'}</strong>
+              </div>
+              <div>
+                <FileText size={16} />
+                <span>告警绑定</span>
+                <strong>{selectedModel.alertIds.length}</strong>
+              </div>
+              <div>
+                <Database size={16} />
+                <span>资源触点</span>
+                <strong>{selectedModel.surfacedResources.length}</strong>
+              </div>
+              <div>
+                <Network size={16} />
+                <span>横向关系</span>
+                <strong>{selectedModel.relatedAgentIds.length}</strong>
               </div>
             </div>
+
+            <div className="stellar-section-label">Contact Surface</div>
+            <div className="stellar-evidence-list">
+              {selectedModel.surfacedResources.map((resource) => (
+                <div key={resource.nodeId} className="stellar-evidence-row">
+                  <strong>{resource.label}</strong>
+                  <span>{resource.bucket} · {resource.evidenceCount} evidence refs</span>
+                </div>
+              ))}
+              {!selectedModel.surfacedResources.length ? (
+                <div className="stellar-evidence-row">
+                  <strong>等待真实资源接触轨迹接入</strong>
+                  <span>tls_capture / process / stdiocap 事件会在这里汇聚</span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="stellar-section-label">Evidence Ledger</div>
+            <div className="stellar-evidence-list">
+              {selectedModel.linkedEvidence.slice(0, 5).map((item) => (
+                <div key={item.evidence_id} className="stellar-evidence-row">
+                  <strong>{item.evidence_id}</strong>
+                  <span>{item.match_level} · {formatConfidence(item.confidence)} confidence</span>
+                </div>
+              ))}
+              {!selectedModel.linkedEvidence.length ? (
+                <div className="stellar-evidence-row">
+                  <strong>暂无证据引用</strong>
+                  <span>等待 analyzer 产生可追溯 evidence refs</span>
+                </div>
+              ) : null}
+            </div>
           </PrismPanel>
-        </div>
+        </aside>
       </div>
     </div>
   );

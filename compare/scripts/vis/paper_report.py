@@ -9,7 +9,7 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_REPORT = PROJECT_ROOT / "compare" / "results" / "paper" / "evaluation_report.json"
-EXPECTED_SCHEMA = "mtagentprism.paper_evaluation_report.v1"
+EXPECTED_SCHEMA = "mtagentlens.paper_evaluation_report.v1"
 
 
 class PaperReportError(ValueError):
@@ -43,8 +43,8 @@ def load_paper_report_v1(path: Path = DEFAULT_REPORT) -> dict[str, Any]:
         if not isinstance(row, dict) or not row.get("tool_id"):
             raise PaperReportError("every main_metrics row must contain tool_id")
         metrics_by_tool[str(row["tool_id"])] = row
-    if "mtagentprism" not in metrics_by_tool:
-        raise PaperReportError("main_metrics must include mtagentprism")
+    if "mtagentlens" not in metrics_by_tool:
+        raise PaperReportError("main_metrics must include mtagentlens")
 
     normalized = dict(report)
     normalized["metrics_by_tool"] = metrics_by_tool
@@ -75,7 +75,7 @@ def prompt_mcnemar_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
         rows.append(
             {
                 "tool_id": tool_id,
-                "comparison": f"MtAgentPrism vs {tool_id}",
+                "comparison": f"MtAgentLens vs {tool_id}",
                 "b": int(item.get("b_mtap_correct_prompt_wrong", 0)),
                 "c": int(item.get("c_prompt_correct_mtap_wrong", 0)),
                 "statistic": float(item.get("statistic_yates", 0.0)),

@@ -1,8 +1,8 @@
-# MtAgentPrism Project Documentation
+# MtAgentLens Project Documentation
 
 ## Architecture Overview
 
-MtAgentPrism is an eBPF-based observability tool for AI agents. It captures system-level
+MtAgentLens is an eBPF-based observability tool for AI agents. It captures system-level
 events including process execution, file operations, and network connections.
 
 ## Key Design Decisions

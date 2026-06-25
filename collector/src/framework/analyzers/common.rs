@@ -18,7 +18,7 @@ use serde_json::Value;
 ///
 /// # Examples
 /// ```
-/// use mtagentprism::framework::analyzers::common::detect_data_type;
+/// use mtagentlens::framework::analyzers::common::detect_data_type;
 ///
 /// assert_eq!(detect_data_type("Hello World"), "text");
 /// assert_eq!(detect_data_type("HTTP/1.1 200 OK\r\n"), "text");
@@ -52,7 +52,7 @@ pub fn detect_data_type(data_str: &str) -> &'static str {
 /// # Examples
 /// ```
 /// use serde_json::json;
-/// use mtagentprism::framework::analyzers::common::data_to_string;
+/// use mtagentlens::framework::analyzers::common::data_to_string;
 ///
 /// let text_data = json!("Hello World");
 /// assert_eq!(data_to_string(&text_data), "Hello World");

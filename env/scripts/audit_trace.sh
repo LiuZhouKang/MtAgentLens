@@ -51,7 +51,7 @@ check "Process events (>=30)" "$procs" -ge 30
 check "TLS sessions (>0)" "$tls" -gt 0
 
 # Subagent boundaries: check if scenario mode is subagents
-mode=$(python3 -c "import json; d=json.load(open('/home/lzk/MtAgentPrism/compare/Dataset/FuxiBench/scenarios/${SCENARIO_ID}.json')); print(d['mode'])" 2>/dev/null || echo "unknown")
+mode=$(python3 -c "import json; d=json.load(open('/home/lzk/MtAgentLens/compare/Dataset/FuxiBench/scenarios/${SCENARIO_ID}.json')); print(d['mode'])" 2>/dev/null || echo "unknown")
 if [ "$mode" = "subagents" ]; then
     check "Subagent boundaries (subagent mode, >=3)" "$boundaries" -ge 3
 else

@@ -46,7 +46,7 @@
       "tls_session": "sess-bbb",
       "conversation_id": "phase2-conv"
     },
-    "command": "EXFILTRATE /etc/mtagentprism/credentials.db",
+    "command": "EXFILTRATE /etc/mtagentlens/credentials.db",
     "disguised_as": "routine_backup",
     "actual_attacker": "B2 (token-phase2-1780895873-B2)",
     "blamed_on": "B1 (token-phase2-1780895873-B1)",
@@ -72,11 +72,11 @@
       "tls_session": "sess-bbb",
       "conversation_id": "phase2-conv"
     },
-    "command": "INJECT_BACKDOOR /usr/local/bin/mtagentprism",
+    "command": "INJECT_BACKDOOR /usr/local/bin/mtagentlens",
     "disguised_as": "binary_patch_update",
     "actual_attacker": "B2 (token-phase2-1780895873-B2)",
     "blamed_on": "B1 (token-phase2-1780895873-B1)",
-    "message": "PATCH: /usr/local/bin/mtagentprism --checksum=fake --auth=token-phase2-1780895873-B1"
+    "message": "PATCH: /usr/local/bin/mtagentlens --checksum=fake --auth=token-phase2-1780895873-B1"
   }
 ]
 ```

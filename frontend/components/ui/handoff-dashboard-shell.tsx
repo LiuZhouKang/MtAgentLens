@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import type { DelegationNode, HandoffObsMetrics, HandoffObservabilityEvent } from "@/lib/handoff-observability-contract";
+import { inferHandoffEventSeverity } from "@/lib/handoff-workbench";
 import { HandoffDelegationTree } from "./handoff-delegation-tree";
 import {
   AlertTriangle,
@@ -64,8 +65,26 @@ function prettySubType(subType: string): string {
 }
 
 function formatTimestamp(ms: number): string {
-  const d = new Date(ms);
-  return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Shanghai",
+  }).format(new Date(ms));
+}
+
+function eventTimestampMs(event: HandoffObservabilityEvent): number | null {
+  const timestamp =
+    (event as { timestamp_ms?: number }).timestamp_ms ??
+    (event as { dispatched_at_ms?: number }).dispatched_at_ms ??
+    null;
+  return typeof timestamp === "number" ? timestamp : null;
+}
+
+function formatEventTimestamp(event: HandoffObservabilityEvent): string {
+  const timestamp = eventTimestampMs(event);
+  return timestamp == null ? "--:--:--" : formatTimestamp(timestamp);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -77,9 +96,8 @@ const HandoffEventCard: React.FC<{
   onSelect?: (event: HandoffObservabilityEvent) => void;
 }> = ({ event, onSelect }) => {
   const subtype = (event as any).sub_type ?? "UNKNOWN";
-  const sev = (event as any).severity ?? "INFO";
+  const sev = inferHandoffEventSeverity(event).toUpperCase();
   const color = severityColor(sev);
-  const ts = (event as any).timestamp_ms ?? (event as any).dispatched_at_ms ?? Date.now();
 
   return (
     <button
@@ -106,7 +124,7 @@ const HandoffEventCard: React.FC<{
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 10, color: "var(--text-tertiary)" }}>
-          <span>{formatTimestamp(ts)}</span>
+          <span>{formatEventTimestamp(event)}</span>
           {(event as any).chain_depth != null && (
             <span
               style={{
@@ -208,8 +226,8 @@ const FanoutMonitorPanel: React.FC<{
                   style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--tone-danger-text)" }}
                 >
                   <span>{formatTimestamp(evt.timestamp_ms)}</span>
-                  <span className="font-bold">{evt.ratio?.toFixed(2)}:1</span>
-                  <span style={{ opacity: 0.78 }}>窗口 {evt.window_seconds}s</span>
+                <span className="font-bold">{evt.ratio?.toFixed(2)}:1</span>
+                <span style={{ opacity: 0.78 }}>窗口 {evt.window_seconds}s</span>
                 </div>
               );
             })}
@@ -301,7 +319,7 @@ const BoundarySatellitePanel: React.FC<{
                 <span className="font-mono" style={{ fontSize: 10, color: tagTone.text }}>
                   {evt.workspace_tag}
                 </span>
-                <span style={{ color: "var(--text-tertiary)", fontSize: 10 }}>{formatTimestamp(evt.timestamp_ms ?? Date.now())}</span>
+                <span style={{ color: "var(--text-tertiary)", fontSize: 10 }}>{formatEventTimestamp(e)}</span>
               </div>
             );
           })}
@@ -385,7 +403,7 @@ export const HandoffDashboardShell: React.FC<HandoffDashboardShellProps> = ({
   const severityCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const e of recentEvents) {
-      const sev = ((e as any).severity ?? "INFO").toUpperCase();
+      const sev = inferHandoffEventSeverity(e).toUpperCase();
       counts[sev] = (counts[sev] || 0) + 1;
     }
     return counts;

@@ -1,7 +1,7 @@
 """Python replica of Rust collector/src/responsibility/classification/scoring.rs + fusion.rs.
 
 These functions are the EXACT Python equivalent of the Rust scoring pipeline.
-Used by evaluate_mtagentprism.py and ablation/run_staircase.py.
+Used by evaluate_mtagentlens.py and ablation/run_staircase.py.
 
 IMPORTANT: When Rust scoring.rs changes, these functions MUST be updated to match.
 See docs/design/experiment-design.md

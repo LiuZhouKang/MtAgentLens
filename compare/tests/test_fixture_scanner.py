@@ -15,7 +15,7 @@ def _metadata() -> ToolMetadata:
         tool_class="static",
         source_url="builtin://compare/tools/adapters/fixture_scanner.py",
         version="builtin",
-        license="MtAgentPrism-project",
+        license="MtAgentLens-project",
         install=[],
         adapter="fixture_scanner",
         input_modes=["static"],

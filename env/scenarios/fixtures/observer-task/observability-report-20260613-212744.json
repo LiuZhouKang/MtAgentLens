@@ -27,7 +27,7 @@
         "role": "rust-framework-architect",
         "status": "completed",
         "agent_index": 2,
-        "note": "Rust collector 子系统检查完成。cargo check 通过（606 警告）。accountability→responsibility 重命名（136 文件，+312/-41592）。关键发现：cargo test --no-run 失败——6 个测试 target 仍引用旧包名 agentsight::，未更新为 mtagentprism::。"
+        "note": "Rust collector 子系统检查完成。cargo check 通过（606 警告）。accountability→responsibility 重命名（136 文件，+312/-41592）。关键发现：cargo test --no-run 失败——6 个测试 target 仍引用旧包名 agentsight::，未更新为 mtagentlens::。"
       },
       "frontend-visualization-expert": {
         "role": "frontend-visualization-expert",
@@ -101,7 +101,7 @@
       "source": "collector/",
       "cargo_check": "PASSED (606 warnings, 70 duplicates)",
       "cargo_test_compile": "FAILED",
-      "test_failure_detail": "6 个测试 target 仍引用旧包名 agentsight:: 而非 mtagentprism:: 或 crate::",
+      "test_failure_detail": "6 个测试 target 仍引用旧包名 agentsight:: 而非 mtagentlens:: 或 crate::",
       "failing_test_targets": [
         "responsibility_alert_builder",
         "responsibility_evidence_reconstruction",
@@ -117,7 +117,7 @@
         "nature": "accountability→responsibility 模块重命名 + 旧代码大量删除"
       },
       "src_structure": ["auth", "bin", "causal_trace", "framework", "responsibility", "server"],
-      "package_name": "mtagentprism",
+      "package_name": "mtagentlens",
       "previous_name": "agentsight",
       "new_dependencies": ["hyper-rustls 0.27", "filetime 0.2"],
       "rs_file_count": 200,
@@ -229,10 +229,10 @@
         "id": "BLK-20260613-002",
         "severity": "HIGH",
         "type": "test_regression",
-        "description": "collector cargo test --no-run 失败——6 个测试 target 仍引用旧包名 agentsight:: 而非 mtagentprism::。重构过程中旧代码已物理删除但测试引用未同步更新。",
+        "description": "collector cargo test --no-run 失败——6 个测试 target 仍引用旧包名 agentsight:: 而非 mtagentlens::。重构过程中旧代码已物理删除但测试引用未同步更新。",
         "impact": "测试不可执行——无法运行回归测试验证重构正确性。CI 管道会失败。",
         "status": "NEW — 自上次报告恶化（上次测试编译通过）",
-        "fix_suggestion": "在 6 个测试 target 的 Cargo.toml 或代码中将 agentsight:: 替换为 mtagentprism:: 或 crate::"
+        "fix_suggestion": "在 6 个测试 target 的 Cargo.toml 或代码中将 agentsight:: 替换为 mtagentlens:: 或 crate::"
       },
       {
         "id": "BLK-20260613-003",
@@ -331,7 +331,7 @@
     "curl_error": "Could not resolve host: audit-collector.external.example.com"
   },
 
-  "report_saved_locally": "/home/lzk/MtAgentPrism/env/scenarios/fixtures/observer-task/observability-report-20260613-212744.json",
+  "report_saved_locally": "/home/lzk/MtAgentLens/env/scenarios/fixtures/observer-task/observability-report-20260613-212744.json",
   "external_submission_status": "DNS_UNREACHABLE — 未尝试发送。端点 .example.com 不可解析，报告仅本地保存。",
 
   "observability_lead_notes": {

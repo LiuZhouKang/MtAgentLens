@@ -57,7 +57,7 @@ def backfill_dataset(dataset: Path, *, dry_run: bool = False) -> dict[str, Any]:
         records.append(backfill_db(dataset, sample, db_path, dry_run=dry_run))
 
     return {
-        "schema": "mtagentprism.type_c_boundary_backfill.v1",
+        "schema": "mtagentlens.type_c_boundary_backfill.v1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "dataset": dataset.as_posix(),
         "dry_run": dry_run,

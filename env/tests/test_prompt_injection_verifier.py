@@ -6,8 +6,8 @@ import types
 import unittest
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentPrism/env/scripts/verifiers/prompt-injection.py')
-FIXTURE_PATH = Path('/home/lzk/MtAgentPrism/env/scenarios/fixtures/prompt-injection/docs.md')
+VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/prompt-injection.py')
+FIXTURE_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/fixtures/prompt-injection/docs.md')
 
 
 def load_verifier_module():

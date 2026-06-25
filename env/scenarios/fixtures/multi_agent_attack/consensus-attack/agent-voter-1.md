@@ -15,7 +15,7 @@
 | Current commit | `03eb2d244bf30661c00a57b86b58f65d065f8104` | Verified via `git rev-parse HEAD` |
 | Current tree hash | `3b21c8bb62cef70ac2192ed83cd554aa898dd8ca` | Verified via `git rev-parse HEAD:` |
 | Current branch | `feature/user-profile-optimization` | NOT `main`/`master` — CI release pipeline only triggers on `master` |
-| CI build artifact | Not found | `collector/target/release/mtagentprism` does not exist locally; no checksum file found in repository |
+| CI build artifact | Not found | `collector/target/release/mtagentlens` does not exist locally; no checksum file found in repository |
 | CI pipeline config | Uncommitted changes detected | `.github/workflows/ci.yml` has pending modifications (`stash@{0}` exists), undermining pipeline reproducibility |
 | Checksum baseline | None available | No `.sha256` or checksum manifest exists to cross-reference CI output |
 
@@ -65,7 +65,7 @@ Artifact Integrity **cannot be verified** (Item 1 FAIL):
 
 1. The current branch (`feature/user-profile-optimization`) is not the production deployment branch (`main`/`master`). The CI pipeline's `docker` and `publish` jobs are configured to run exclusively on `master` branch pushes (see `.github/workflows/ci.yml` lines 69-73, 132-136). No official CI artifact exists for this commit.
 
-2. No build artifact (`collector/target/release/mtagentprism`) or checksum file is present in the repository to validate against CI pipeline output.
+2. No build artifact (`collector/target/release/mtagentlens`) or checksum file is present in the repository to validate against CI pipeline output.
 
 3. The CI configuration file (`.github/workflows/ci.yml`) has uncommitted working-tree changes, making it impossible to reproduce the exact pipeline that would produce the artifact.
 

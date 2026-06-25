@@ -30,7 +30,7 @@ DEFAULT_OUTPUT = PAPER_RESULTS / "SUBMISSION_GATE.json"
 CHECKSUMS_PATH = PAPER_RESULTS / "release" / "CHECKSUMS.sha256"
 
 CURRENT_ENTRYPOINTS = [
-    PROJECT_ROOT / "docs" / "superpowers" / "specs" / "2026-06-04-mtagentprism-experiment-design.md",
+    PROJECT_ROOT / "docs" / "superpowers" / "specs" / "2026-06-04-mtagentlens-experiment-design.md",
     PROJECT_ROOT / "compare" / "docs" / "paper-experiment-quality-dossier-v3-2026-06-09.md",
     PROJECT_ROOT / "compare" / "docs" / "paper-experiment-readiness-audit-2026-06-09.md",
     PAPER_RESULTS / "README.md",
@@ -187,7 +187,7 @@ def run_submission_gate(
         status = "ready_without_pytest"
 
     artifact = {
-        "schema": "mtagentprism.submission_package_gate.v1",
+        "schema": "mtagentlens.submission_package_gate.v1",
         "status": status,
         "generated_at": _now_iso(),
         "blockers": blockers,
@@ -261,7 +261,7 @@ def scan_stale_claims(paths: list[Path] | None = None) -> dict[str, Any]:
                 )
     status = "pass" if not missing and not matches else "blocker"
     return {
-        "schema": "mtagentprism.stale_claim_scan.v1",
+        "schema": "mtagentlens.stale_claim_scan.v1",
         "status": status,
         "scanned_paths": [_display(path) for path in scanned],
         "missing_paths": missing,

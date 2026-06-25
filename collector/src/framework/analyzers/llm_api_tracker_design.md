@@ -6,7 +6,7 @@
 
 ### 动机
 
-MtAgentPrism 监控 AI Agent，但当前流水线对 LLM API 调用的可见性仅限于原始 HTTP 报文。没有结构化的：
+MtAgentLens 监控 AI Agent，但当前流水线对 LLM API 调用的可见性仅限于原始 HTTP 报文。没有结构化的：
 - 模型识别（用的哪个模型？）
 - Token 消耗追踪（prompt/completion tokens）
 - 请求-响应延迟配对（单次调用花了多久？）

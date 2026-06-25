@@ -61,9 +61,9 @@ def test_backend_health_builder_completes_with_full_real_run_contract(tmp_path: 
 def test_backend_health_builder_parses_json_counters_inside_collector_log_prefix(tmp_path: Path) -> None:
     trace_err = "\n".join(
         [
-            '[INFO] mtagentprism::accountability {"event":"PERSISTENCE_STATS","lost_persist_count":0}',
-            '[INFO] mtagentprism::framework [SSL] STDERR: {"event":"RINGBUF_STATS","dropped_events":0}',
-            '[INFO] mtagentprism::framework [PROCESS] STDERR: {"event":"PROCESS_RINGBUF_STATS","dropped_events":0}',
+            '[INFO] mtagentlens::accountability {"event":"PERSISTENCE_STATS","lost_persist_count":0}',
+            '[INFO] mtagentlens::framework [SSL] STDERR: {"event":"RINGBUF_STATS","dropped_events":0}',
+            '[INFO] mtagentlens::framework [PROCESS] STDERR: {"event":"PROCESS_RINGBUF_STATS","dropped_events":0}',
         ]
     )
     run_dir = _make_run_dir(tmp_path, trace_err=trace_err)

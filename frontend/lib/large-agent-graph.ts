@@ -13,8 +13,8 @@ interface LargeAgentGraphOptions {
   resourceSatelliteCount?: number;
 }
 
-const DEFAULT_AGENT_SATELLITES = 34;
-const DEFAULT_RESOURCE_SATELLITES = 18;
+const DEFAULT_AGENT_SATELLITES = 360;
+const DEFAULT_RESOURCE_SATELLITES = 84;
 
 function phase(timestamp_ns: number): PhaseIndicator {
   return { Authoritative: { timestamp_ns, overrides: null } };
@@ -141,7 +141,7 @@ export function buildLargeAgentGraph(baseGraph: GraphData, options: LargeAgentGr
                 ? { Context: { context_id: `ctx-${agentIndex}-${Math.floor(index / 3)}` } }
                 : kind === 4
                   ? { Network: { host: ['api.openai.com', 'collector.local', 'metadata.google.internal', 'pypi.org'][index % 4], port: index % 4 === 2 ? 80 : 443, scheme: index % 4 === 2 ? 'http' : 'https' } }
-                  : { File: { canonical_path: `/workspace/.mtagentprism/${agentId}/artifact-${index}.json` } };
+                  : { File: { canonical_path: `/workspace/.mtagentlens/${agentId}/artifact-${index}.json` } };
 
       addUniqueNode(nodes, seenNodeIds, makeResource(nodeId, resource, timestamp_ns, [evidenceId]));
       addUniqueEdge(
@@ -209,7 +209,7 @@ export function buildLargeAgentGraph(baseGraph: GraphData, options: LargeAgentGr
         : index % 4 === 1
           ? { Context: { context_id: `${anchorName}:context:${index}` } }
           : index % 4 === 2
-            ? { File: { canonical_path: `/var/log/mtagentprism/${anchorName}/event-${index}.jsonl` } }
+            ? { File: { canonical_path: `/var/log/mtagentlens/${anchorName}/event-${index}.jsonl` } }
             : { ToolCall: { tool_name: 'evidence-normalizer', call_id: `${anchorName}:${index}` } };
 
       addUniqueNode(nodes, seenNodeIds, makeResource(nodeId, satellite, timestamp_ns, [evidenceId]));

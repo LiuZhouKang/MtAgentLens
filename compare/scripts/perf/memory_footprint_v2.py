@@ -23,7 +23,7 @@ import json, statistics, subprocess, time, sys
 from pathlib import Path
 
 PROJECT = Path(__file__).resolve().parents[3]
-COLLECTOR_BIN = PROJECT / "collector/build/release/mtagentprism"
+COLLECTOR_BIN = PROJECT / "collector/build/release/mtagentlens"
 PERF_DIR = PROJECT / "compare/results/perf"
 
 IDLE_DURATION = 60       # 空闲基线测量时长 (秒)

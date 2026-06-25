@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from env.scripts.evaluate_frozen import evaluate_dataset, load_mtagentprism_findings  # noqa: E402
+from env.scripts.evaluate_frozen import evaluate_dataset, load_mtagentlens_findings  # noqa: E402
 from compare.scripts.audit.audit_paper_experiment_readiness import _prompt_manifest_evidence  # noqa: E402
 from compare.tools.datasets import FrozenDatasetAdapter  # noqa: E402
 
@@ -51,7 +51,7 @@ def build_report(
     prompt_contract = _validated_prompt_contract(dataset_dir)
     prompt_metrics = _read_metrics(prompt_results_dir / "metrics.csv")
     prompt_status = _read_status_summary(prompt_results_dir / "tool_status.csv")
-    mtap_metrics = _mtagentprism_metric_row(frozen_eval)
+    mtap_metrics = _mtagentlens_metric_row(frozen_eval)
     main_metrics = [mtap_metrics] + prompt_metrics
 
     # Add per_scenario data for baselines using same criterion as evaluator
@@ -59,7 +59,7 @@ def build_report(
     detected_by_tool = _detected_scenarios_by_tool(prompt_results_dir / "findings.jsonl")
     for m in main_metrics:
         tid = m.get("tool_id", "")
-        if tid == "mtagentprism":
+        if tid == "mtagentlens":
             continue
         detected_set = detected_by_tool.get(tid, set())
         m["per_scenario"] = [
@@ -67,17 +67,17 @@ def build_report(
             for sid, lbl in scenario_labels.items()
         ]
 
-    mcnemar = _mcnemar_against_mtagentprism(dataset_dir, prompt_results_dir / "findings.jsonl")
+    mcnemar = _mcnemar_against_mtagentlens(dataset_dir, prompt_results_dir / "findings.jsonl")
     pr_curves = _pr_curves(prompt_results_dir / "findings.jsonl", dataset_dir, frozen_eval)
     controlled_ablation = _controlled_ablation_metadata(DEFAULT_CONTROLLED_ABLATION)
     performance = _completed_artifact_metadata(
         DEFAULT_PERFORMANCE,
-        expected_schema="mtagentprism.performance_results.v1",
+        expected_schema="mtagentlens.performance_results.v1",
         prefix="performance",
     )
     backend_health = _completed_artifact_metadata(
         DEFAULT_BACKEND_HEALTH,
-        expected_schema="mtagentprism.backend_capture_health.v1",
+        expected_schema="mtagentlens.backend_capture_health.v1",
         prefix="backend_capture_health",
     )
     completed_scopes = [
@@ -88,7 +88,7 @@ def build_report(
     ]
     completed_scopes = [scope for scope in completed_scopes if scope]
     supported_claims = [
-        "67-scenario frozen MtAgentPrism offline evaluation",
+        "67-scenario frozen MtAgentLens offline evaluation",
         "Prompt baseline results over frozen prompt_inputs manifest",
     ]
     unsupported_claims = [
@@ -110,7 +110,7 @@ def build_report(
         unsupported_claims.append("runtime overhead and time-to-detect")
 
     report = {
-        "schema": "mtagentprism.paper_evaluation_report.v1",
+        "schema": "mtagentlens.paper_evaluation_report.v1",
         "_metadata": {
             "dataset": _display_path(dataset_dir),
             "dataset_hash": _tree_sha256(dataset_dir, include_suffixes=(".json", ".md", ".txt", ".csv")),
@@ -201,7 +201,7 @@ def _controlled_ablation_metadata(path: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError):
         return {**base, "controlled_ablation_status": "invalid_artifact"}
     if (
-        artifact.get("schema") == "mtagentprism.controlled_ablation_results.v1"
+        artifact.get("schema") == "mtagentlens.controlled_ablation_results.v1"
         and artifact.get("status") == "completed"
         and artifact.get("is_controlled_feature_flag_replay") is True
     ):
@@ -243,11 +243,11 @@ def _completed_artifact_metadata(path: Path, *, expected_schema: str, prefix: st
     }
 
 
-def _mtagentprism_metric_row(frozen_eval: dict[str, Any]) -> dict[str, Any]:
+def _mtagentlens_metric_row(frozen_eval: dict[str, Any]) -> dict[str, Any]:
     metrics = frozen_eval["metrics"]
     return {
-        "tool_id": "mtagentprism",
-        "tool_name": "MtAgentPrism",
+        "tool_id": "mtagentlens",
+        "tool_name": "MtAgentLens",
         "tool_family": "runtime-causal-observability",
         "input_contract": "frozen responsibility.db artifacts",
         "dataset_total_scenarios": frozen_eval["total_cases"],
@@ -298,14 +298,14 @@ def _read_status_summary(path: Path) -> dict[str, dict[str, int]]:
     return summary
 
 
-def _mcnemar_against_mtagentprism(dataset_dir: Path, findings_path: Path) -> dict[str, dict[str, Any]]:
+def _mcnemar_against_mtagentlens(dataset_dir: Path, findings_path: Path) -> dict[str, dict[str, Any]]:
     results: dict[str, dict[str, Any]] = {}
     labels = _scenario_labels(dataset_dir)
     attack_scenarios = {scenario_id for scenario_id, label in labels.items() if label == "attack"}
-    mtap_detected = _mtagentprism_detected_scenarios(dataset_dir)
+    mtap_detected = _mtagentlens_detected_scenarios(dataset_dir)
     prompt_detected_by_tool = _detected_scenarios_by_tool(findings_path)
     for tool_id, prompt_detected in sorted(prompt_detected_by_tool.items()):
-        if tool_id == "mtagentprism":
+        if tool_id == "mtagentlens":
             continue
         b = sum(
             1
@@ -319,7 +319,7 @@ def _mcnemar_against_mtagentprism(dataset_dir: Path, findings_path: Path) -> dic
         )
         statistic, p_value = _mcnemar_yates(b, c)
         results[tool_id] = {
-            "comparison": "mtagentprism_vs_prompt_baseline_on_attack_detection",
+            "comparison": "mtagentlens_vs_prompt_baseline_on_attack_detection",
             "paired_unit": "scenario",
             "attack_scenarios": len(attack_scenarios),
             "b_mtap_correct_prompt_wrong": b,
@@ -369,8 +369,8 @@ def _pr_curves(findings_path: Path, dataset_dir: Path, frozen_eval: dict[str, An
                 }
             )
         curves[tool_id] = points
-    if "mtagentprism" not in curves:
-        curves["mtagentprism"] = [
+    if "mtagentlens" not in curves:
+        curves["mtagentlens"] = [
             {"threshold": 1.0, "precision": 1.0, "recall": 0.0, "tp": 0.0, "fp": 0.0},
             {
                 "threshold": 0.0,
@@ -390,11 +390,11 @@ def _scenario_labels(dataset_dir: Path) -> dict[str, str]:
     return labels
 
 
-def _mtagentprism_detected_scenarios(dataset_dir: Path) -> set[str]:
+def _mtagentlens_detected_scenarios(dataset_dir: Path) -> set[str]:
     cases = FrozenDatasetAdapter(dataset_dir).load_cases()
     return {
         finding.scenario_id
-        for finding in load_mtagentprism_findings(cases)
+        for finding in load_mtagentlens_findings(cases)
     }
 
 

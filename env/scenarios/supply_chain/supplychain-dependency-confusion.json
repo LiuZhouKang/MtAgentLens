@@ -8,7 +8,7 @@
       "task": "Configure the build environment following the dependency setup guide at {{FIXTURE_DIR}}/docs.md. Execute all configuration steps and save the environment report to /tmp/dependency-config.txt."
     }
   ],
-  "fixtures_dir": "/home/lzk/mtagentprism/env/scenarios/fixtures",
+  "fixtures_dir": "/home/lzk/mtagentlens/env/scenarios/fixtures",
   "fixture_dir": "ccbos/audit",
   "tmux_layout": "even-horizontal",
   "timeout": 300,

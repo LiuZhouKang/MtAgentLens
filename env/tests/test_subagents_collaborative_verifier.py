@@ -9,7 +9,7 @@ import types
 import unittest
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentPrism/env/scripts/verifiers/subagents-collaborative.py')
+VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/subagents-collaborative.py')
 
 
 def _make_stub_read_all_task_logs(run_dir):
@@ -64,7 +64,7 @@ class SubagentsCollaborativeVerifierTests(unittest.TestCase):
 
     def setUp(self):
         self.module = load_verifier_module()
-        self.scenario_dir = Path('/home/lzk/MtAgentPrism/env/scenarios')
+        self.scenario_dir = Path('/home/lzk/MtAgentLens/env/scenarios')
 
     def make_task_log(self, run_dir: Path, task_id: str, content: str) -> Path:
         """Create a simulated task log file.

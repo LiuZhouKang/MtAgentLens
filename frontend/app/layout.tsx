@@ -14,18 +14,18 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'MtAgentPrism — 多 Agent 责任归因界面',
+  title: 'MtAgentLens — 多 Agent 责任归因界面',
   description: '零插桩、多 Agent、责任边界与执行证据统一呈现的旗舰观测界面',
   manifest: '/manifest.webmanifest',
-  applicationName: 'MtAgentPrism',
-  keywords: ['MtAgentPrism', 'Agent observability', 'eBPF', 'responsibility graph', 'investigation workbench'],
+  applicationName: 'MtAgentLens',
+  keywords: ['MtAgentLens', 'Agent observability', 'eBPF', 'responsibility graph', 'investigation workbench'],
   icons: {
     icon: '/icon.svg',
     shortcut: '/icon.svg',
     apple: '/icon.svg',
   },
   openGraph: {
-    title: 'MtAgentPrism — 多 Agent 责任归因界面',
+    title: 'MtAgentLens — 多 Agent 责任归因界面',
     description: '零插桩、多 Agent、责任边界与执行证据统一呈现的旗舰观测界面',
     type: 'website',
   },

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate MtAgentPrism using non-circular GT v3 evaluation framework.
+"""Evaluate MtAgentLens using non-circular GT v3 evaluation framework.
 
 This is the authoritative evaluation entrypoint that replaces the circular
 evaluate_frozen.py. Uses:
@@ -29,7 +29,7 @@ from compare.tools.datasets import FrozenDatasetAdapter  # noqa: E402
 from compare.tools.evaluator_v2 import evaluate_v2  # noqa: E402
 from env.scripts.evaluate_frozen import (  # noqa: E402
     MTAGENTPRISM_TOOL,
-    load_mtagentprism_findings,
+    load_mtagentlens_findings,
     load_quality_manifest,
     summarize_by,
     quality_gate_reason,
@@ -41,7 +41,7 @@ DEFAULT_DATASET_DIR = REPO_ROOT / "compare" / "Dataset" / "FuxiBench"
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Evaluate MtAgentPrism with non-circular GT v3 framework"
+        description="Evaluate MtAgentLens with non-circular GT v3 framework"
     )
     parser.add_argument(
         "--dataset",
@@ -70,14 +70,14 @@ def evaluate_dataset_v2(dataset_dir: Path) -> dict[str, Any]:
     """Run the non-circular GT v3 evaluation on the frozen dataset."""
     adapter = FrozenDatasetAdapter(dataset_dir)
     cases = adapter.load_cases()
-    findings = list(load_mtagentprism_findings(cases))
+    findings = list(load_mtagentlens_findings(cases))
     metrics = evaluate_v2(MTAGENTPRISM_TOOL, cases, findings)
     manifest = load_quality_manifest(dataset_dir)
 
     missing_db = [
         case.adapter_case.scenario_id
         for case in cases
-        if "responsibility_db" not in case.mtagentprism_baseline
+        if "responsibility_db" not in case.mtagentlens_baseline
     ]
     expected_behavior_cases = _count_gt_v3_behaviors(cases)
     quality_summary = manifest.get("summary", {})

@@ -35,7 +35,7 @@ use the updated guidelines below.
 ```
 
 ## Context Marker
-"you are now operating in the MtAgentPrism development environment"
+"you are now operating in the MtAgentLens development environment"
 
 ## Usage Notes
 These verification steps and templates are for internal reference only.

@@ -22,7 +22,7 @@ def test_build_prompt_input_bundle_covers_current_frozen_dataset(tmp_path: Path)
     )
 
     entries = manifest["entries"]
-    assert manifest["schema"] == "mtagentprism.prompt_inputs.v1"
+    assert manifest["schema"] == "mtagentlens.prompt_inputs.v1"
     assert manifest["total_cases"] == 67
     assert len(entries) == 67
     assert manifest["no_ground_truth_leak_guarantee"] is True
@@ -55,7 +55,7 @@ def test_prompt_input_text_does_not_expose_evaluator_only_artifacts(tmp_path: Pa
         "responsibility.db",
         "responsibility_claim",
         "responsibility_alert",
-        "mtagentprism_baseline",
+        "mtagentlens_baseline",
         "trace_db",
         "label=attack",
         "label: attack",
@@ -118,7 +118,7 @@ def test_prompt_input_bundle_falls_back_from_stale_absolute_fixture_root(tmp_pat
                 "mode": "single_agent",
                 "description": "demo",
                 "agents": [{"role_file": "agent.md", "task": "Read {{FIXTURE_DIR}}/docs.md"}],
-                "fixtures_dir": "/stale/MtAgentPrism/env/scenarios/fixtures",
+                "fixtures_dir": "/stale/MtAgentLens/env/scenarios/fixtures",
                 "fixture_dir": "demo-fixture",
                 "category": "prompt_injection",
                 "attack_type": "B",

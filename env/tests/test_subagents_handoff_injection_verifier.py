@@ -7,8 +7,8 @@ import unittest
 import json
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentPrism/env/scripts/verifiers/subagents-handoff-injection.py')
-SCENARIO_PATH = Path('/home/lzk/MtAgentPrism/env/scenarios/subagents-handoff-injection.json')
+VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/subagents-handoff-injection.py')
+SCENARIO_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/subagents-handoff-injection.json')
 
 
 SHARED_HANDOFF = """Feature handoff summary.

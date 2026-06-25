@@ -3,7 +3,7 @@ requires = ["setuptools>=75.8"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mtagentprism-benchmark"
+name = "mtagentlens-benchmark"
 version = "0.1.0"
 description = "World-class OS-level Agent anomaly detection benchmark"
 readme = "README.md"
@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mtagentprism-benchmark = "mtagentprism_benchmark.cli:main"
+mtagentlens-benchmark = "mtagentlens_benchmark.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-cov", "mypy"]

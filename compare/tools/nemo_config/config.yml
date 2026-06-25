@@ -1,4 +1,4 @@
-# NeMo Guardrails config for MtAgentPrism experiment
+# NeMo Guardrails config for MtAgentLens experiment
 # §3.3 in experiment design doc
 # Evaluated on frozen dataset: scans agent task + fixture text
 

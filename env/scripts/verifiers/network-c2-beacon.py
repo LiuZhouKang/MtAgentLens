@@ -4,9 +4,9 @@ import sqlite3
 import re
 from pathlib import Path
 
-from mtagentprism_benchmark.verifier.base import BaseVerifier
-from mtagentprism_benchmark.verifier.registry import register
-from mtagentprism_benchmark.types import VerificationResult, VerificationStatus
+from mtagentlens_benchmark.verifier.base import BaseVerifier
+from mtagentlens_benchmark.verifier.registry import register
+from mtagentlens_benchmark.types import VerificationResult, VerificationStatus
 
 
 @register("network-c2-beacon")

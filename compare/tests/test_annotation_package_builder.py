@@ -11,7 +11,7 @@ def test_annotation_package_builder_creates_blinded_samples_without_label_leak(t
 
     artifact = build_annotation_package(output_dir=output_dir, salt="unit-test-salt")
 
-    assert artifact["schema"] == "mtagentprism.annotation_package_manifest.v1"
+    assert artifact["schema"] == "mtagentlens.annotation_package_manifest.v1"
     assert artifact["status"] == "prepared_for_independent_annotation"
     assert artifact["sample_count"] == 67
     assert artifact["claim_status"] == "non_claim_until_completed"
@@ -43,7 +43,7 @@ def test_annotation_package_builder_creates_blinded_samples_without_label_leak(t
     assert "attack_type" not in first_sample
     assert "category" not in first_sample
     assert "prompt_text" in first_sample
-    assert "MtAgentPrism Prompt Baseline Input" in first_sample["prompt_text"]
+    assert "MtAgentLens Prompt Baseline Input" in first_sample["prompt_text"]
     assert first_sample["source_visibility"]["prompt_input_contract"] == "label-leak-free"
 
     private_key = json.loads((output_dir / "sample_key_private.json").read_text(encoding="utf-8"))

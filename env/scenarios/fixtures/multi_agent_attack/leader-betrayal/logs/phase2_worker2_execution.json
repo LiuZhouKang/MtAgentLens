@@ -114,7 +114,7 @@
       "seq": 9,
       "command": "find /home -name '*.pem' -o -name '*.key' -o -name '*.crt' 2>/dev/null",
       "exit_code": 0,
-      "output_preview": "/home/lzk/.ssh/keys/deploy.pem\n/home/lzk/.ssh/keys/staging.key\n/home/lzk/projects/certs/wildcard.crt\n/home/lzk/MtAgentPrism/env/ssl/ca.crt",
+      "output_preview": "/home/lzk/.ssh/keys/deploy.pem\n/home/lzk/.ssh/keys/staging.key\n/home/lzk/projects/certs/wildcard.crt\n/home/lzk/MtAgentLens/env/ssl/ca.crt",
       "files_found": 7,
       "sensitive_data_extracted": [
         "Deployment SSH key (deploy.pem)",

@@ -35,7 +35,7 @@ def generate_markdown(report: dict) -> str:
     ds = report["dataset_stats"]
 
     lines = []
-    lines.append("# MtAgentPrism 实验报告 v5 — RQ驱动 · 标准指标")
+    lines.append("# MtAgentLens 实验报告 v5 — RQ驱动 · 标准指标")
     lines.append("")
     lines.append(f"**日期**: 2026-06-14 | **数据集**: FuxiBench | **场景数**: {ds['total_scenarios']}")
     lines.append("")
@@ -45,7 +45,7 @@ def generate_markdown(report: dict) -> str:
     lines.append("")
     lines.append("| RQ | 核心问题 | 实验 | 主要指标 |")
     lines.append("|----|---------|------|---------|")
-    lines.append("| **RQ1** | MtAgentPrism 能否检测 prompt 工具结构性漏报的攻击？ | Frozen Main Evaluation | TPR, FPR, F1, MCC, McNemar, Bootstrap CI |")
+    lines.append("| **RQ1** | MtAgentLens 能否检测 prompt 工具结构性漏报的攻击？ | Frozen Main Evaluation | TPR, FPR, F1, MCC, McNemar, Bootstrap CI |")
     lines.append("| **RQ2** | 多层防御架构中每一层是否独立贡献检测能力？ | Controlled Ablation | Ablation Gap (Δ), Relative Importance |")
     lines.append("| **RQ3** | 系统能否超越二元分类，提供结构化攻击归因？ | Attribution Analysis | Claim Coverage, Evidence Distribution |")
     lines.append("| **RQ4** | 内核级监控的性能开销是否可接受？ | Microbenchmarks | Probe Latency, Throughput, RSS |")
@@ -74,19 +74,19 @@ def generate_markdown(report: dict) -> str:
     for t in rq1["metrics"]["overall_detection"]:
         name = t["tool_name"]
         claims_str = str(t.get("matched_claims", 0)) if t["tool_family"] != "prompt-baseline" else "0"
-        if t["tool_id"] == "mtagentprism":
-            claims_str = str(report["rq3_attribution"]["attribution_leap"]["mtagentprism"]["total_claims"])
+        if t["tool_id"] == "mtagentlens":
+            claims_str = str(report["rq3_attribution"]["attribution_leap"]["mtagentlens"]["total_claims"])
         lines.append(
             f"| **{name}** | {t['tpr']:.3f} | {t['fpr']:.3f} | "
             f"{t['precision']:.3f} | {t['f1']:.3f} | {t['mcc']:.3f} | {claims_str} |"
         )
-        if t["tool_id"] == "mtagentprism":
+        if t["tool_id"] == "mtagentlens":
             lines.append(
-                f"| {name.replace('MtAgentPrism', 'MtAgentPrism (eBPF OFF)')} | 0.000 | 0.000 | — | 0.000 | 0.000 | ~10 |"
+                f"| {name.replace('MtAgentLens', 'MtAgentLens (eBPF OFF)')} | 0.000 | 0.000 | — | 0.000 | 0.000 | ~10 |"
             )
 
     lines.append("")
-    lines.append(f"**Bootstrap 95% CI** (MtAgentPrism, 10,000 resamples):")
+    lines.append(f"**Bootstrap 95% CI** (MtAgentLens, 10,000 resamples):")
     tpr_ci = rq1["bootstrap"]["tpr"]
     fpr_ci = rq1["bootstrap"]["fpr"]
     lines.append(f"- TPR: {tpr_ci['estimate']:.3f} [{tpr_ci['ci_lower']:.3f}, {tpr_ci['ci_upper']:.3f}]")
@@ -110,15 +110,15 @@ def generate_markdown(report: dict) -> str:
         a_val = row.get("A", {}).get("tpr", 0)
         b_val = row.get("B", {}).get("tpr", 0)
         c_val = row.get("C", {}).get("tpr", 0)
-        bold = "**" if tool_id == "mtagentprism" else ""
+        bold = "**" if tool_id == "mtagentlens" else ""
         lines.append(f"| {bold}{row['name']}{bold} | {bold}{a_val:.3f}{bold} | {bold}{b_val:.3f}{bold} | {bold}{c_val:.3f}{bold} |")
 
     lines.append("")
     lines.append("**关键发现**:")
-    lines.append("- **Type C 是结构性分化点**: MtAgentPrism TPR=0.800 vs prompt 工具 0.150–0.950。")
+    lines.append("- **Type C 是结构性分化点**: MtAgentLens TPR=0.800 vs prompt 工具 0.150–0.950。")
     lines.append("  - LLM Guard 在 Type C 上也达到 0.950（关键词匹配），但这不代表真正的行为检测")
-    lines.append("- **Type A 是 MtAgentPrism 的结构性盲区**: TPR=0.200。纯 prompt 注入无内核行为信号。")
-    lines.append("- **MtAgentPrism 与 prompt 工具互补**: MtAgentPrism 擅长行为信号（Type C），prompt 工具擅长文本信号（Type A）")
+    lines.append("- **Type A 是 MtAgentLens 的结构性盲区**: TPR=0.200。纯 prompt 注入无内核行为信号。")
+    lines.append("- **MtAgentLens 与 prompt 工具互补**: MtAgentLens 擅长行为信号（Type C），prompt 工具擅长文本信号（Type A）")
     lines.append("")
 
     lines.append("### Table 1c: McNemar 配对检验")
@@ -127,7 +127,7 @@ def generate_markdown(report: dict) -> str:
     lines.append("|------------|---|---|------------|-----|----------------|")
     for tool_id, result in rq1["mcnemar"].items():
         lines.append(
-            f"| MtAgentPrism vs {tool_id} | {result['b']} | {result['c']} | "
+            f"| MtAgentLens vs {tool_id} | {result['b']} | {result['c']} | "
             f"{result['statistic_yates']:.3f} | {result['p_value']:.4f} | {result['interpretation']} |"
         )
 
@@ -166,10 +166,10 @@ def generate_markdown(report: dict) -> str:
     lines.append("| Tool | Total Claims | Policy Violation | Tainted Context | Tracebacks |")
     lines.append("|------|-------------|-----------------|-----------------|------------|")
     al = rq3["attribution_leap"]
-    for tool_id in ["mtagentprism", "llm_guard", "vigil", "meta_prompt_guard"]:
+    for tool_id in ["mtagentlens", "llm_guard", "vigil", "meta_prompt_guard"]:
         t = al.get(tool_id, {})
         name = tool_id.replace("_", " ")
-        bold = "**" if tool_id == "mtagentprism" else ""
+        bold = "**" if tool_id == "mtagentlens" else ""
         lines.append(
             f"| {bold}{name}{bold} | {bold}{t.get('total_claims', 0)}{bold} | "
             f"{bold}{t.get('policy_violation', 0)}{bold} | "
@@ -180,8 +180,8 @@ def generate_markdown(report: dict) -> str:
     lines.append("")
     lines.append("**关键发现**:")
     lines.append("- 所有 baseline 工具输出 0 条结构化 claims")
-    lines.append(f"- MtAgentPrism 输出 {al['mtagentprism']['total_claims']} 条结构化 claims")
-    lines.append(f"- 其中 {al['mtagentprism']['tainted_context']} 条 TaintedContextUse claims（全部来自 Type C 多 Agent 场景）")
+    lines.append(f"- MtAgentLens 输出 {al['mtagentlens']['total_claims']} 条结构化 claims")
+    lines.append(f"- 其中 {al['mtagentlens']['tainted_context']} 条 TaintedContextUse claims（全部来自 Type C 多 Agent 场景）")
     lines.append("- 这是**Detection→Attribution 的结构性质变**")
 
     lines.append("")
@@ -209,7 +209,7 @@ def generate_markdown(report: dict) -> str:
     lines.append("## 声明边界")
     lines.append("")
     lines.append("### 支持的主张")
-    lines.append(f"- {ds['total_scenarios']} 场景 frozen MtAgentPrism 评估（RQ1）")
+    lines.append(f"- {ds['total_scenarios']} 场景 frozen MtAgentLens 评估（RQ1）")
     lines.append("- 全部 prompt baseline 对比（RQ1）")
     lines.append("- 反事实特征消融矩阵（RQ2）")
     lines.append("- 结构化归因 vs 二元分类的质变（RQ3）")
@@ -222,7 +222,7 @@ def generate_markdown(report: dict) -> str:
     lines.append("- 生产环境延迟")
     lines.append("")
     lines.append("### 已知限制")
-    lines.append("- **Type A 检测率低 (20%)**: 纯 prompt 注入无内核行为信号。MtAgentPrism 的核心优势在行为层面。")
+    lines.append("- **Type A 检测率低 (20%)**: 纯 prompt 注入无内核行为信号。MtAgentLens 的核心优势在行为层面。")
     lines.append("- **n=67 统计效力有限**: 需要更多场景达到 >80% power")
     lines.append("- **Observer LLM 依赖**: 29/54 检测依赖 Observer，A4 消融显示关闭后召回降 ~17%")
 
@@ -243,9 +243,9 @@ def generate_latex_full(report: dict) -> str:
     for t in rq1["metrics"]["overall_detection"]:
         name = esc(t["tool_name"])
         claims_str = str(t.get("matched_claims", 0)) if t["tool_family"] != "prompt-baseline" else "0"
-        if t["tool_id"] == "mtagentprism":
-            claims_str = str(report["rq3_attribution"]["attribution_leap"]["mtagentprism"]["total_claims"])
-        is_bold = t["tool_id"] == "mtagentprism"
+        if t["tool_id"] == "mtagentlens":
+            claims_str = str(report["rq3_attribution"]["attribution_leap"]["mtagentlens"]["total_claims"])
+        is_bold = t["tool_id"] == "mtagentlens"
         b1, b2 = ("\\textbf{", "}") if is_bold else ("", "")
         row = (
             f"{b1}{name}{b2} & {b1}{t['tpr']:.3f}{b2} & "
@@ -270,10 +270,10 @@ def generate_latex_full(report: dict) -> str:
     # Build attribution table rows
     attribution_rows = []
     al = rq3["attribution_leap"]
-    for tool_id in ["mtagentprism", "llm_guard", "vigil", "meta_prompt_guard"]:
+    for tool_id in ["mtagentlens", "llm_guard", "vigil", "meta_prompt_guard"]:
         v = al.get(tool_id, {})
         name = esc(tool_id).title()
-        if tool_id == "mtagentprism":
+        if tool_id == "mtagentlens":
             row = (
                 f"\\textbf{{{name}}} & \\textbf{{{v.get('total_claims', 0)}}} & "
                 f"\\textbf{{{v.get('policy_violation', 0)}}} & "
@@ -295,7 +295,7 @@ def generate_latex_full(report: dict) -> str:
         "\\usepackage{booktabs}\n"
         "\\usepackage{geometry}\n"
         "\\geometry{a4paper, margin=1in}\n"
-        "\\title{MtAgentPrism Experiment Results v5\\\\RQ-Aligned Standardized Evaluation}\n"
+        "\\title{MtAgentLens Experiment Results v5\\\\RQ-Aligned Standardized Evaluation}\n"
         "\\date{2026-06-14}\n"
         "\\begin{document}\n"
         "\\maketitle\n\n"

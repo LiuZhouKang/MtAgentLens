@@ -21,7 +21,7 @@ def test_submission_audit_accepts_current_ready_package_with_bounded_release_sta
     _refresh_submission_sidecars()
     artifact = audit_submission_package()
 
-    assert artifact["schema"] == "mtagentprism.submission_package_audit.v1"
+    assert artifact["schema"] == "mtagentlens.submission_package_audit.v1"
     assert artifact["overall_status"] == "ready_with_external_author_actions"
     assert artifact["summary"]["pass"] >= 8
     assert artifact["summary"].get("blocker", 0) == 0

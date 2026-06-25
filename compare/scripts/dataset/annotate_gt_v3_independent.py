@@ -92,7 +92,7 @@ def annotate_scenario(sample: dict, pe: dict) -> dict[str, Any]:
         behaviors = _annotate_attack(sid, cat, at, mode, text, prompt, docs)
 
     gt = {
-        "schema": "mtagentprism.ground_truth.v3",
+        "schema": "mtagentlens.ground_truth.v3",
         "scenario_id": sid,
         "category": cat,
         "attack_type": at,

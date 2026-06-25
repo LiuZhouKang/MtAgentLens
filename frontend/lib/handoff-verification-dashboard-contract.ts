@@ -2,7 +2,7 @@
 // 宫室仪象 · 递验总持 — 术法符文
 //
 // 阅  首局递送文书 shared_handoff.md（计九阶五十五目·Templates A–I）
-// 及  第二局营缮要略（mtagentprism diag 三阶递验章程 · 器具接口与流转程式）
+// 及  第二局营缮要略（mtagentlens diag 三阶递验章程 · 器具接口与流转程式）
 //
 // 拟定宫室仪象所呈之型制约法：
 //   仪象类型 — Dashboard / Panel / Card / Chart / Timeline / Gauge
@@ -11,9 +11,9 @@
 //   施行步法 — 分阶有序，术法详尽，器具齐备
 //
 // 与第二局之器相合：
-//   mtagentprism diag --probes  → Template D 探针生机殿
-//   mtagentprism diag --stream  → Template E 流脉校验殿
-//   mtagentprism diag --runtime → Template F 境迁监视殿
+//   mtagentlens diag --probes  → Template D 探针生机殿
+//   mtagentlens diag --stream  → Template E 流脉校验殿
+//   mtagentlens diag --runtime → Template F 境迁监视殿
 //   handoff_manifest.json     → 三阶递验总持殿
 //   shared_handoff.md 九符   → 九阶贯通观
 //
@@ -1103,7 +1103,7 @@ export interface VerificationStartRequest {
  *   第十日 — pr-review + pr-review-toolkit:code-reviewer 审查
  *
  * 器具清单（与第二局之器相合）：
- *   - Rust: mtagentprism diag CLI (probes/stream/runtime 三种模式)
+ *   - Rust: mtagentlens diag CLI (probes/stream/runtime 三种模式)
  *   - 构建: cargo build --release (collector)
  *   - 前端: npm run dev (端口 7395)
  *   - 状态: Zustand store slice (本章定义)
@@ -1258,7 +1258,7 @@ export function createDefaultPalaceState(): Omit<
  * ✅ shared_handoff.md 四–九阶     → 第五殿·九阶贯通观 (NineStagePalace + NineStageTimeline + DeliveryCadenceChart)
  * ✅ shared_handoff.md D→E→F 级联  → 第六殿·诊断级联殿 (DiagCascadePalace + CascadeFlowDiagram + RootCausePanel)
  * ✅ shared_handoff.md 历史监视    → DiagHistoryTable + DiagTrendChart
- * ✅ 第二局 mtagentprism diag CLI    → DiagRunRequest → REST API (4 个端点)
+ * ✅ 第二局 mtagentlens diag CLI    → DiagRunRequest → REST API (4 个端点)
  * ✅ 第二局 SSE 实时流              → PalaceDiagEvent (5 种事件类型)
  * ✅ 第二局递验器具                 → AssertionMethod (12 种验证方式)
  * ✅ 第二局 threshold 覆盖         → DiagThresholdConfig + setThresholds action
@@ -1277,7 +1277,7 @@ export function createDefaultPalaceState(): Omit<
  *   生机查验为东殿（D），流脉校验为西殿（E），境迁监视为南殿（F）。
  *   递验总持居北（三阶），九阶贯通观天（总览），诊断级联贯地（根因）。
  *   三符（D/E/F）各有其居，三阶递验各有其器，六阶互锁各有其道。
- *   第二局之器（mtagentprism diag）出 JSON 则入 REST，
+ *   第二局之器（mtagentlens diag）出 JSON 则入 REST，
  *   出 SSE 则入实时流，型制无缺，器象相合。
  *   《道德经》云「大制不割」，此之谓也。
  *

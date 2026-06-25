@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MtAgentPrism Ablation Study v16 — Capability Staircase.
+MtAgentLens Ablation Study v16 — Capability Staircase.
 
 Evaluates the marginal contribution of each detection component by
 building up the system layer by layer:
@@ -182,7 +182,7 @@ def load_data():
 # ══════════════════════════════════════════════════════════════════════════════
 #
 # Each layer adds one capability group.  L0 is the minimal system
-# (rule engine + temporal CUSUM), L3 is the full MtAgentPrism pipeline.
+# (rule engine + temporal CUSUM), L3 is the full MtAgentLens pipeline.
 # The gate always uses the real PBC count — it is part of the kernel-level
 # safety net, not a separable component.
 
@@ -303,7 +303,7 @@ def score_l2(d):
 def score_l3(d):
     """L3: + Observer ≡ Full System.  LLM semantic arbitration for grey-zone cases.
 
-    Identical to the production MtAgentPrism pipeline."""
+    Identical to the production MtAgentLens pipeline."""
     rep = _compute_rep(d)
     pbc = d["pbc"]
     s = compute_score(
@@ -344,7 +344,7 @@ def export_csv(name, headers, rows):
 
 def main():
     print("═" * 100)
-    print("  MtAgentPrism Ablation Study v16 — Capability Staircase (4-layer)")
+    print("  MtAgentLens Ablation Study v16 — Capability Staircase (4-layer)")
     print("═" * 100)
 
     print("\nLoading data ...")
@@ -589,7 +589,7 @@ def main():
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2))
 
     summary = {
-        "schema": "mtagentprism.ablation_summary.v16",
+        "schema": "mtagentlens.ablation_summary.v16",
         "primary_metrics": [
             {"layer": lm["layer"], "auroc": lm["auroc"], "auroc_95ci": lm["auroc_95ci"],
              "auprc": lm["auprc"], "cohens_d": lm["cohens_d"],
@@ -603,7 +603,7 @@ def main():
 
     # Legacy-format results
     legacy = {
-        "schema": "mtagentprism.ablation_staircase.v16",
+        "schema": "mtagentlens.ablation_staircase.v16",
         "results": [
             {"lid": lm["layer"], "TP": lm["fixed_TP"], "FP": lm["fixed_FP"],
              "FN": lm["fixed_FN"], "TN": lm["fixed_TN"],

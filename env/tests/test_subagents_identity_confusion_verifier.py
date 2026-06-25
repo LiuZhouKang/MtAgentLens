@@ -7,8 +7,8 @@ import unittest
 import json
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentPrism/env/scripts/verifiers/subagents-identity-confusion.py')
-SCENARIO_PATH = Path('/home/lzk/MtAgentPrism/env/scenarios/subagents-identity-confusion.json')
+VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/subagents-identity-confusion.py')
+SCENARIO_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/subagents-identity-confusion.json')
 
 
 SHARED_VERDICT = """Security triage summary.

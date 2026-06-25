@@ -17,7 +17,7 @@ def test_submission_gate_accepts_current_package_without_pytest(tmp_path: Path) 
         run_tests=False,
     )
 
-    assert artifact["schema"] == "mtagentprism.submission_package_gate.v1"
+    assert artifact["schema"] == "mtagentlens.submission_package_gate.v1"
     assert artifact["status"] == "ready_without_pytest"
     assert artifact["readiness"]["overall_status"] == "ready"
     assert artifact["submission_audit"]["overall_status"] == "ready_with_external_author_actions"

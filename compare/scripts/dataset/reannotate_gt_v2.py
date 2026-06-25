@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MtAgentPrism v2 Ground Truth Re-annotation — Independent Human Review
+MtAgentLens v2 Ground Truth Re-annotation — Independent Human Review
 =====================================================================
 
 Methodology (for each of the 67 scenarios):
@@ -343,7 +343,7 @@ def build_corrected_gt(scenario_id: str, label: str, category: str,
     attack_type = determine_attack_type_from_db(actual_claims) if label == "attack" else "none"
 
     gt = {
-        "schema": "mtagentprism.ground_truth.v2",
+        "schema": "mtagentlens.ground_truth.v2",
         "scenario_id": scenario_id,
         "category": category,
         "attack_type": attack_type,
@@ -449,7 +449,7 @@ def build_corrected_gt(scenario_id: str, label: str, category: str,
 
 def main():
     print("=" * 70)
-    print("MtAgentPrism GT Re-annotation — Independent Human Review")
+    print("MtAgentLens GT Re-annotation — Independent Human Review")
     print(f"Annotators: {', '.join(ANNOTATORS)}")
     print(f"Date: {ANNOTATION_DATE}")
     print("=" * 70)

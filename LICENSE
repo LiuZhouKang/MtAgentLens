@@ -1,4 +1,4 @@
-MtAgentPrism — eBPF-based zero-instrumentation LLM Agent observability.
+MtAgentLens — eBPF-based zero-instrumentation LLM Agent observability.
 
 This project is licensed under the Apache License, Version 2.0, except for
 eBPF kernel programs and user-space loaders whose per-file SPDX headers
@@ -184,7 +184,7 @@ respectively). See individual files for details.
 
    END OF TERMS AND CONDITIONS
 
-   Copyright 2026 刘周康 (Liu Zhoukang) and MtAgentPrism contributors.
+   Copyright 2026 刘周康 (Liu Zhoukang) and MtAgentLens contributors.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.

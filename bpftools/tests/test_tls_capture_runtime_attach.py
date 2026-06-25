@@ -7,7 +7,7 @@ import subprocess
 import unittest
 
 
-BPF_DIR = "/home/lzk/mtagentprism/bpf"
+BPF_DIR = "/home/lzk/mtagentlens/bpf"
 SSLSNIFF = os.path.join(BPF_DIR, "tls_capture")
 DEFAULT_CLAUDE_BINARY = "/home/lzk/.npm-global/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe"
 

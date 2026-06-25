@@ -1,4 +1,4 @@
-# MtAgentPrism System Verification Procedure · 系统稽核规程
+# MtAgentLens System Verification Procedure · 系统稽核规程
 
 ## Overview
 

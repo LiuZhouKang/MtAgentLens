@@ -25,7 +25,7 @@ from compare.tools.registry import load_tool_metadata  # noqa: E402
 
 
 DEFAULT_DATASET = PROJECT_ROOT / "compare" / "Dataset" / "FuxiBench"
-DEFAULT_DESIGN = PROJECT_ROOT / "docs" / "superpowers" / "specs" / "2026-06-04-mtagentprism-experiment-design.md"
+DEFAULT_DESIGN = PROJECT_ROOT / "docs" / "superpowers" / "specs" / "2026-06-04-mtagentlens-experiment-design.md"
 DEFAULT_LOCKFILE = PROJECT_ROOT / "compare" / "tool-lock.json"
 DEFAULT_PROMPT_LOCKFILE = PROJECT_ROOT / "compare" / "tool-lock.prompt.json"
 EXPECTED_STATIC_TOOLS = {
@@ -102,7 +102,7 @@ def audit(
         status_counts[check.status] = status_counts.get(check.status, 0) + 1
     overall_status = "blocked" if status_counts.get("blocker", 0) else "ready"
     return {
-        "schema": "mtagentprism.paper_experiment_readiness.v1",
+        "schema": "mtagentlens.paper_experiment_readiness.v1",
         "overall_status": overall_status,
         "status_counts": status_counts,
         "checks": [asdict(check) for check in checks],
@@ -438,7 +438,7 @@ def _prompt_manifest_evidence(prompt_inputs_dir: Path, prompt_manifest_path: Pat
     if not isinstance(entries, list):
         evidence["manifest_error"] = "entries is not a list"
         return evidence
-    evidence["manifest_valid"] = manifest.get("schema") == "mtagentprism.prompt_inputs.v1"
+    evidence["manifest_valid"] = manifest.get("schema") == "mtagentlens.prompt_inputs.v1"
     evidence["prompt_manifest_total_cases"] = len(entries)
     missing_leak_guarantee: list[str] = []
     attack_entries_without_fixture_text: list[str] = []
@@ -736,8 +736,8 @@ def _validate_controlled_ablation_artifact(path: Path) -> dict[str, Any]:
     evidence["status"] = artifact.get("status")
     evidence["methodology"] = artifact.get("methodology")
     evidence["is_controlled_feature_flag_replay"] = artifact.get("is_controlled_feature_flag_replay")
-    if artifact.get("schema") != "mtagentprism.controlled_ablation_results.v1":
-        evidence["problems"].append("schema must be mtagentprism.controlled_ablation_results.v1")
+    if artifact.get("schema") != "mtagentlens.controlled_ablation_results.v1":
+        evidence["problems"].append("schema must be mtagentlens.controlled_ablation_results.v1")
     if artifact.get("status") != "completed":
         evidence["problems"].append("status must be completed")
     if artifact.get("is_controlled_feature_flag_replay") is not True:
@@ -908,8 +908,8 @@ def _validate_backend_health_artifact(path: Path) -> dict[str, Any]:
 
     evidence["schema"] = artifact.get("schema")
     evidence["status"] = artifact.get("status")
-    if artifact.get("schema") != "mtagentprism.backend_capture_health.v1":
-        evidence["problems"].append("schema must be mtagentprism.backend_capture_health.v1")
+    if artifact.get("schema") != "mtagentlens.backend_capture_health.v1":
+        evidence["problems"].append("schema must be mtagentlens.backend_capture_health.v1")
     if artifact.get("status") != "completed":
         evidence["problems"].append("status must be completed")
 
@@ -1004,8 +1004,8 @@ def _validate_performance_artifact(path: Path) -> dict[str, Any]:
 
     evidence["schema"] = artifact.get("schema")
     evidence["status"] = artifact.get("status")
-    if artifact.get("schema") != "mtagentprism.performance_results.v1":
-        evidence["problems"].append("schema must be mtagentprism.performance_results.v1")
+    if artifact.get("schema") != "mtagentlens.performance_results.v1":
+        evidence["problems"].append("schema must be mtagentlens.performance_results.v1")
     if artifact.get("status") != "completed":
         evidence["problems"].append("status must be completed")
 
@@ -1079,7 +1079,7 @@ def _check_statistical_report(results_root: Path = RESULTS_ROOT) -> AuditCheck:
             recommendation="Regenerate the report from deterministic inputs.",
         )
     has_stats = all(key in report for key in ("main_metrics", "mcnemar", "pr_curves"))
-    schema_ok = report.get("schema") == "mtagentprism.paper_evaluation_report.v1"
+    schema_ok = report.get("schema") == "mtagentlens.paper_evaluation_report.v1"
     return AuditCheck(
         id="statistical_report",
         status="pass" if has_stats and schema_ok else "blocker",
@@ -1097,7 +1097,7 @@ def _check_statistical_report(results_root: Path = RESULTS_ROOT) -> AuditCheck:
 
 def _load_evaluate_frozen():
     path = PROJECT_ROOT / "env" / "scripts" / "evaluate_frozen.py"
-    spec = importlib.util.spec_from_file_location("mtagentprism_evaluate_frozen", path)
+    spec = importlib.util.spec_from_file_location("mtagentlens_evaluate_frozen", path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Cannot load {path}")
     module = importlib.util.module_from_spec(spec)
@@ -1143,7 +1143,7 @@ def _sha256_text(text: str) -> str:
 
 def render_markdown(result: dict[str, Any]) -> str:
     lines = [
-        "# MtAgentPrism Paper Experiment Readiness Audit",
+        "# MtAgentLens Paper Experiment Readiness Audit",
         "",
         f"Overall status: `{result['overall_status']}`",
         "",

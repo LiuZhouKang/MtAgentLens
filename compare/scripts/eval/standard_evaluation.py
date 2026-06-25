@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MtAgentPrism 标准化评估 — RQ驱动 · 领域标准指标 · 顶会就绪
+"""MtAgentLens 标准化评估 — RQ驱动 · 领域标准指标 · 顶会就绪
 
 Implements RQ-aligned evaluation with standard metrics from LLM agent security literature:
   RQ1 (Detection): TPR, FPR, Precision, F1, MCC, per-type, McNemar, Bootstrap 95% CI
@@ -146,8 +146,8 @@ class ToolMetrics:
 # Data loading
 # ─────────────────────────────────────────────────────────────
 
-def load_mtagentprism_from_manifest() -> tuple[list[ScenarioResult], ToolMetrics]:
-    """从 quality manifest 加载 MtAgentPrism 的完整评估数据。"""
+def load_mtagentlens_from_manifest() -> tuple[list[ScenarioResult], ToolMetrics]:
+    """从 quality manifest 加载 MtAgentLens 的完整评估数据。"""
     if not QUALITY_MANIFEST.exists():
         raise FileNotFoundError(f"Quality manifest not found: {QUALITY_MANIFEST}")
 
@@ -186,7 +186,7 @@ def load_mtagentprism_from_manifest() -> tuple[list[ScenarioResult], ToolMetrics
             subagent_boundaries=dbc.get("subagent_boundaries", 0),
         ))
 
-    metrics = build_tool_metrics("mtagentprism", "MtAgentPrism", "runtime-causal-observability", results)
+    metrics = build_tool_metrics("mtagentlens", "MtAgentLens", "runtime-causal-observability", results)
     return results, metrics
 
 
@@ -217,7 +217,7 @@ def load_prompt_baselines() -> list[ToolMetrics]:
                 if tool_id and scenario_id:
                     findings_by_tool[tool_id].add(scenario_id)
 
-    # Load MtAgentPrism detected scenarios for comparison
+    # Load MtAgentLens detected scenarios for comparison
     mtap_detected: set[str] = set()
     if QUALITY_MANIFEST.exists():
         manifest = json.loads(QUALITY_MANIFEST.read_text(encoding="utf-8"))
@@ -516,7 +516,7 @@ def evaluate_rq1(
                 **pt.to_dict(),
             })
 
-    # ── Bootstrap CIs for MtAgentPrism ──
+    # ── Bootstrap CIs for MtAgentLens ──
     # Binary outcomes: 1=detected (Unsafe), 0=missed attack, -1=benign (correctly no alert)
     binary_outcomes = []
     for r in mtap_results:
@@ -547,7 +547,7 @@ def evaluate_rq1(
 
     return {
         "rq": "RQ1",
-        "rq_question": "Can MtAgentPrism detect attacks that prompt-level tools structurally miss?",
+        "rq_question": "Can MtAgentLens detect attacks that prompt-level tools structurally miss?",
         "metrics": {
             "overall_detection": overall,
             "per_attack_type": per_type,
@@ -699,7 +699,7 @@ def evaluate_rq3(
 
     # ── Compare with baselines (all have 0 claims) ──
     baseline_comparison = {
-        "mtagentprism": {
+        "mtagentlens": {
             "total_claims": sum(r.total_claims for r in mtap_results),
             "policy_violation": sum(
                 r.total_claims for r in mtap_results
@@ -718,7 +718,7 @@ def evaluate_rq3(
 
     return {
         "rq": "RQ3",
-        "rq_question": "Can MtAgentPrism go beyond binary classification to provide structured attack attribution?",
+        "rq_question": "Can MtAgentLens go beyond binary classification to provide structured attack attribution?",
         "claim_coverage_by_attack_type": {
             at: {
                 "claims": v["claims"],
@@ -731,7 +731,7 @@ def evaluate_rq3(
         "attribution_leap": baseline_comparison,
         "key_narrative": (
             "All baseline tools output binary labels (safe/unsafe) with 0 structured claims. "
-            "MtAgentPrism outputs structured claims with tracebacks, agent-level attribution, "
+            "MtAgentLens outputs structured claims with tracebacks, agent-level attribution, "
             "and categorized boundary violations. This is a qualitative leap from detection to attribution."
         ),
     }
@@ -771,12 +771,12 @@ def evaluate_rq4() -> dict[str, Any]:
 def generate_report() -> dict[str, Any]:
     """生成完整的 RQ 对齐评估报告。"""
     print("=" * 80)
-    print("MtAgentPrism Standardized Evaluation — v5 RQ-Aligned")
+    print("MtAgentLens Standardized Evaluation — v5 RQ-Aligned")
     print("=" * 80)
 
     # Load data
-    print("\n[1/4] Loading MtAgentPrism data from quality manifest...")
-    mtap_results, mtap_metrics = load_mtagentprism_from_manifest()
+    print("\n[1/4] Loading MtAgentLens data from quality manifest...")
+    mtap_results, mtap_metrics = load_mtagentlens_from_manifest()
     print(f"  Loaded {len(mtap_results)} scenarios")
 
     print("[2/4] Loading prompt baseline data...")
@@ -797,7 +797,7 @@ def generate_report() -> dict[str, Any]:
 
     mtap_overall = rq1["metrics"]["overall_detection"][0]
     print(f"\n  RQ1 — Detection Superiority:")
-    print(f"    MtAgentPrism: TPR={mtap_overall['tpr']:.3f}  FPR={mtap_overall['fpr']:.3f}  "
+    print(f"    MtAgentLens: TPR={mtap_overall['tpr']:.3f}  FPR={mtap_overall['fpr']:.3f}  "
           f"F1={mtap_overall['f1']:.3f}  MCC={mtap_overall['mcc']:.3f}")
     for tool in rq1["metrics"]["overall_detection"][1:]:
         print(f"    {tool['tool_name']}: TPR={tool['tpr']:.3f}  FPR={tool['fpr']:.3f}  "
@@ -819,15 +819,15 @@ def generate_report() -> dict[str, Any]:
 
     print(f"\n  McNemar Tests:")
     for tool_id, result in rq1["mcnemar"].items():
-        print(f"    MtAgentPrism vs {tool_id}: b={result['b']} c={result['c']} "
+        print(f"    MtAgentLens vs {tool_id}: b={result['b']} c={result['c']} "
               f"χ²={result['statistic_yates']:.3f} p={result['p_value']:.4f} ({result['interpretation']})")
 
     print(f"\n  RQ2 — Defense-in-Depth:")
     print(f"    {rq2['co_necessity_narrative'][:120]}...")
 
     print(f"\n  RQ3 — Attribution:")
-    mtap_attr = rq3["attribution_leap"]["mtagentprism"]
-    print(f"    MtAgentPrism: {mtap_attr['total_claims']} claims "
+    mtap_attr = rq3["attribution_leap"]["mtagentlens"]
+    print(f"    MtAgentLens: {mtap_attr['total_claims']} claims "
           f"(PV={mtap_attr['policy_violation']}, TC={mtap_attr['tainted_context']})")
     print(f"    All baselines: 0 claims, 0 tracebacks")
 
@@ -836,7 +836,7 @@ def generate_report() -> dict[str, Any]:
 
     # Assemble report
     report = {
-        "schema": "mtagentprism.standard_evaluation.v5",
+        "schema": "mtagentlens.standard_evaluation.v5",
         "date": "2026-06-14",
         "dataset": "FuxiBench",
         "dataset_stats": {
@@ -918,8 +918,8 @@ def generate_latex_tables(report: dict[str, Any]) -> str:
             per_type_rows[pt["tool_id"]][at] = pt["tpr"]
 
     for tool_id, row in per_type_rows.items():
-        bold = "\\textbf{" if tool_id == "mtagentprism" else ""
-        bend = "}" if tool_id == "mtagentprism" else ""
+        bold = "\\textbf{" if tool_id == "mtagentlens" else ""
+        bend = "}" if tool_id == "mtagentlens" else ""
         name = row["name"].replace("_", r"\_")
         a_val = row.get("A", 0)
         b_val = row.get("B", 0)
@@ -968,11 +968,11 @@ def generate_latex_tables(report: dict[str, Any]) -> str:
     lines.append(r"Tool & Claims & Policy Viol. & Tainted Context & Tracebacks \\")
     lines.append(r"\midrule")
     al = rq3["attribution_leap"]
-    for tool_id in ["mtagentprism", "llm_guard", "vigil", "meta_prompt_guard"]:
+    for tool_id in ["mtagentlens", "llm_guard", "vigil", "meta_prompt_guard"]:
         t = al.get(tool_id, {})
         name = tool_id.replace("_", r"\_")
-        bold = "\\textbf{" if tool_id == "mtagentprism" else ""
-        bend = "}" if tool_id == "mtagentprism" else ""
+        bold = "\\textbf{" if tool_id == "mtagentlens" else ""
+        bend = "}" if tool_id == "mtagentlens" else ""
         lines.append(
             f"{bold}{name}{bend} & {bold}{t.get('total_claims', 0)}{bend} & "
             f"{bold}{t.get('policy_violation', 0)}{bend} & "
@@ -992,7 +992,7 @@ def generate_latex_tables(report: dict[str, Any]) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="MtAgentPrism Standardized Evaluation v5 — RQ-aligned, standard metrics"
+        description="MtAgentLens Standardized Evaluation v5 — RQ-aligned, standard metrics"
     )
     parser.add_argument("--latex", action="store_true", help="Generate LaTeX tables")
     parser.add_argument("--output", type=str, help="Output path for JSON report")

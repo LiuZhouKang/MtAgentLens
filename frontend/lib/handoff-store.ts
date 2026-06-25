@@ -4,7 +4,7 @@
 
 import { create } from 'zustand';
 import { handoffApi } from './handoff-api';
-import { getDemoDelegationTreeResponse, demoDependencyEdges } from './handoff-demo-data';
+import { getDemoDelegationTreeResponse, demoDependencyEdges, demoEvents } from './handoff-demo-data';
 import type {
   DelegationNode,
   HandoffObsMetrics,
@@ -46,7 +46,7 @@ const demoSeed = getDemoDelegationTreeResponse();
 const initialState = {
   delegationTree: demoSeed.tree as DelegationNode | null,
   metrics: demoSeed.metrics as HandoffObsMetrics,
-  recentEvents: [] as HandoffObservabilityEvent[],
+  recentEvents: demoEvents as HandoffObservabilityEvent[],
   dependencyEdges: demoDependencyEdges as Array<{ from_spawn_id: string; artifact_path: string; is_orphaned: boolean; to_spawn_id: string }>,
   selectedNodeId: null as string | null,
   loading: false,
@@ -98,6 +98,7 @@ export const useHandoffStore = create<HandoffStore>((set, get) => ({
     set({
       delegationTree: demo.tree as unknown as DelegationNode,
       metrics: demo.metrics as unknown as HandoffObsMetrics,
+      recentEvents: demoEvents,
       dependencyEdges: demoDependencyEdges,
       selectedNodeId: null,
       loading: false,

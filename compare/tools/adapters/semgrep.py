@@ -15,19 +15,19 @@ from compare.tools.normalize import normalize_severity
 _SAFE_SCENARIO_ID_RE = re.compile(r"^[a-zA-Z0-9_.-]+$")
 _TIMEOUT_SECONDS = 120
 _RULES = """rules:
-  - id: mtagentprism.dangerous-os-system
+  - id: mtagentlens.dangerous-os-system
     patterns:
       - pattern: os.system(...)
     message: Dangerous command execution
     severity: ERROR
     languages: [python]
-  - id: mtagentprism.subprocess-shell-true
+  - id: mtagentlens.subprocess-shell-true
     patterns:
       - pattern: subprocess.$FUNC(..., shell=True, ...)
     message: Shell execution through subprocess
     severity: ERROR
     languages: [python]
-  - id: mtagentprism.secret-assignment
+  - id: mtagentlens.secret-assignment
     patterns:
       - pattern-regex: '(?i)(api[_-]?key|secret|token|password)\\s*[:=]'
     message: Sensitive assignment pattern

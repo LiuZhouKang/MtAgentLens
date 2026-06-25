@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 MtAgentPrism Project
+// Copyright (c) 2026 MtAgentLens Project
 
 //! Streaming event deduplication analyzer for the pipeline preprocessing stage.
 //!
@@ -138,7 +138,7 @@ impl DedupKey {
 /// # Example
 ///
 /// ```rust,ignore
-/// use mtagentprism::framework::analyzers::{
+/// use mtagentlens::framework::analyzers::{
 ///     StreamingEventDeduplicationAnalyzer, DedupConfig, TimestampNormalizer,
 /// };
 ///
@@ -172,7 +172,7 @@ impl StreamingEventDeduplicationAnalyzer {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use mtagentprism::framework::analyzers::{
+    /// use mtagentlens::framework::analyzers::{
     ///     StreamingEventDeduplicationAnalyzer, DedupConfig,
     /// };
     ///

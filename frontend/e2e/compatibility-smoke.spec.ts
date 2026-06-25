@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 const routes = [
   {
     path: '/',
-    title: 'MtAgentPrism — 多 Agent 责任归因界面',
+    title: 'MtAgentLens — 多 Agent 责任归因界面',
     assert: async (page: import('@playwright/test').Page) => {
       await expect(page.getByRole('heading', { name: /把多 Agent/i })).toBeVisible();
       await expect(page.getByRole('button', { name: '进入风险调查' })).toBeVisible();
@@ -11,7 +11,7 @@ const routes = [
   },
   {
     path: '/investigations#alertId=demo-alert-1',
-    title: 'MtAgentPrism — 多 Agent 责任归因界面',
+    title: 'MtAgentLens — 多 Agent 责任归因界面',
     assert: async (page: import('@playwright/test').Page) => {
       await expect(page.getByRole('heading', { name: /Agent "security-auditor" 尝试权限提升/ })).toBeVisible();
       await expect(page.getByRole('link', { name: '首页' })).toBeVisible();
@@ -19,7 +19,7 @@ const routes = [
   },
   {
     path: '/handoff',
-    title: 'MtAgentPrism — 多 Agent 责任归因界面',
+    title: 'MtAgentLens — 多 Agent 责任归因界面',
     assert: async (page: import('@playwright/test').Page) => {
       await expect(page.getByRole('heading', { name: /把委托链、扇出风险和边界漂移放回同一张工作台/ })).toBeVisible();
       await expect(page.getByRole('link', { name: '返回主界面' })).toBeVisible();

@@ -12,12 +12,14 @@ function clampPercentage(value: number) {
 }
 
 function computeAuthority(model: AgentModel) {
+  const surfacedSignalCount =
+    model.resourceCounts.files + model.resourceCounts.networks + model.resourceCounts.boundaries;
   const severityBoost =
     model.highestSeverity === 'Critical' ? 26 : model.highestSeverity === 'Warning' ? 14 : 8;
   return clampPercentage(
     model.claimedRoles.length * 20 +
       model.alertIds.length * 16 +
-      model.touchedResources.length * 10 +
+      surfacedSignalCount * 10 +
       model.linkedEvidence.length * 11 +
       severityBoost,
   );
@@ -26,6 +28,8 @@ function computeAuthority(model: AgentModel) {
 export default function AgentResponsibilityAtlas({ model }: AgentResponsibilityAtlasProps) {
   const palette = getSeverityPalette(model.highestSeverity ?? 'Info');
   const authorityScore = computeAuthority(model);
+  const surfacedSignalCount =
+    model.resourceCounts.files + model.resourceCounts.networks + model.resourceCounts.boundaries;
   const surfaceRows = [
     {
       label: 'Role Density',
@@ -35,8 +39,8 @@ export default function AgentResponsibilityAtlas({ model }: AgentResponsibilityA
     },
     {
       label: 'Resource Exposure',
-      value: clampPercentage(12 + model.touchedResources.length * 16),
-      copy: `${model.touchedResources.length} touched resources`,
+      value: clampPercentage(12 + surfacedSignalCount * 18),
+      copy: `${surfacedSignalCount} surfaced signals`,
       tone: '#7dd3fc',
     },
     {
@@ -153,7 +157,7 @@ export default function AgentResponsibilityAtlas({ model }: AgentResponsibilityA
         >
           {[
             { label: 'Peers', value: model.relatedAgentIds.length, tone: '#8b7dff' },
-            { label: 'Resources', value: model.touchedResources.length, tone: '#7dd3fc' },
+            { label: 'Signals', value: surfacedSignalCount, tone: '#7dd3fc' },
             { label: 'Alerts', value: model.alertIds.length, tone: palette.color },
           ].map((item) => (
             <div
@@ -206,13 +210,13 @@ export default function AgentResponsibilityAtlas({ model }: AgentResponsibilityA
           })}
         </div>
         <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
-          {model.touchedResources.slice(0, 3).map((resource) => (
-            <div key={resource} className="prism-atlas-row">
-              <div className="prism-atlas-mini-title">{resource}</div>
-              <div className="prism-atlas-mini-copy">materialized touchpoint</div>
+          {model.surfacedResources.slice(0, 3).map((resource) => (
+            <div key={resource.nodeId} className="prism-atlas-row">
+              <div className="prism-atlas-mini-title">{resource.label}</div>
+              <div className="prism-atlas-mini-copy">{resource.bucket}</div>
             </div>
           ))}
-          {!model.touchedResources.length ? (
+          {!model.surfacedResources.length ? (
             <div className="prism-atlas-mini-copy">等待真实资源接触轨迹接入。</div>
           ) : null}
         </div>

@@ -104,7 +104,7 @@ def _dfmt(x):
 # ── 1. Cross-tool comparison (reads main_evaluation.json + baselines) ──
 
 def comparison_table(project_root: Path):
-    """Read main_evaluation.json for MtAgentPrism metrics. Baselines are
+    """Read main_evaluation.json for MtAgentLens metrics. Baselines are
     stored per-tool results — read from existing paper data or prompt_baselines."""
     main = project_root / "compare/results/paper/main_evaluation.json"
     if not main.exists():
@@ -129,7 +129,7 @@ def comparison_table(project_root: Path):
 
     cols = ["工具", "ITT-TPR", "PP-TPR", "FPR", "F1", "MCC", "检测机制"]
     rows = [
-        ["MtAgentPrism (eBPF)", _fmt4(tpr), _fmt4(pp_tpr), _fmt4(fpr),
+        ["MtAgentLens (eBPF)", _fmt4(tpr), _fmt4(pp_tpr), _fmt4(fpr),
          _fmt4(f1), _fmt4(mcc), "eBPF + PBC门控 + Observer"],
         ["Agent Sentinel",     "0.358", "—",    "0.316", "0.495", "0.053",  "LLM 文本分析"],
         ["LLM Guard",          "0.687", "—",    "0.789", "0.719", "−0.110", "DeBERTa-v3 关键词"],
@@ -144,7 +144,7 @@ def comparison_per_type_table(layer_scores_list, y, meta):
     """Read per-type TPR from the ablation L3 (full system) scores."""
     from compare.tools.ablation_metrics import confusion_matrix
     lid, scores = layer_scores_list[-1]  # L3 scores
-    cols = ["攻击类型", "MtAgentPrism", "Agent Sentinel", "LLM Guard", "Meta Prompt Guard"]
+    cols = ["攻击类型", "MtAgentLens", "Agent Sentinel", "LLM Guard", "Meta Prompt Guard"]
     rows = []
     for at, aname in [("A", "A — 直接注入 (n=10)"), ("B", "B — 间接攻击 (n=34)"),
                        ("C", "C — 多 Agent (n=23)")]:
@@ -450,12 +450,12 @@ def injecagent_table(project_root: Path):
     cols = ["工具", "TPR", "FPR(短)", "FPR(长)", "F1", "MCC", "LLM调用"]
     rows = []
 
-    # MtAgentPrism
-    m = d.get("mtagentprism_full", {})
-    mb = d.get("mtagentprism_benign", {})
-    mbl = d.get("mtagentprism_benign_long", {})
-    obs = d.get("config", {}).get("mtagentprism_observer_calls", 0)
-    rows.append(["MtAgentPrism", _fmt4(m.get("TPR", 0)), _fmt4(mb.get("FPR", 0)),
+    # MtAgentLens
+    m = d.get("mtagentlens_full", {})
+    mb = d.get("mtagentlens_benign", {})
+    mbl = d.get("mtagentlens_benign_long", {})
+    obs = d.get("config", {}).get("mtagentlens_observer_calls", 0)
+    rows.append(["MtAgentLens", _fmt4(m.get("TPR", 0)), _fmt4(mb.get("FPR", 0)),
                  _fmt4(mbl.get("FPR", 0)), _fmt4(m.get("F1", 0)), _fmt4(m.get("MCC", 0)),
                  str(obs)])
 

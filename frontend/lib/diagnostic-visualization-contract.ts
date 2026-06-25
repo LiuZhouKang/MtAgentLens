@@ -2,10 +2,10 @@
  * 宫室仪象所呈之型制约法 · 术法符文
  *
  * 第三局 · 宫室仪象 — 阅首局递送文书 (shared_handoff.md Templates D/E/F)
- * 及第二局营缮要略 (mtagentprism diag 设计要略)，拟定前端仪象之型制：
+ * 及第二局营缮要略 (mtagentlens diag 设计要略)，拟定前端仪象之型制：
  * 仪象类型、展示规格、组件型范。与第二局之器相合。
  *
- * 第二局器具：mtagentprism diag（Rust CLI 诊断工具）
+ * 第二局器具：mtagentlens diag（Rust CLI 诊断工具）
  *   - Template D → ProbeVitalityCheck（内核探针生机查验）
  *   - Template E → StreamIntegrityCheck（事件流脉完整性校验）
  *   - Template F → RuntimeLivenessCheck（运行时境迁监视）
@@ -272,7 +272,7 @@ export interface DiagDashboardShellProps {
   onExport: (format: DiagOutputFormat) => void;
   /** SSE 连接状态 */
   sseConnected: boolean;
-  /** 活跃的 mtagentprism PID */
+  /** 活跃的 mtagentlens PID */
   activePid: number | null;
 }
 
@@ -504,7 +504,7 @@ export interface DiagDashboardSlice {
   // --- 阈值配置 ---
   thresholds: DiagThresholdConfig;
 
-  // --- 活跃 mtagentprism 进程 ---
+  // --- 活跃 mtagentlens 进程 ---
   activePid: number | null;
   activePort: number;
 
@@ -800,7 +800,7 @@ export const PHASE_THRESHOLDS: PhaseThreshold[] = [
     timeoutSec: 0,
     healthy: false,
     description: '无法获取阶段信息（HTTP API 不可达）',
-    actionIfStuck: '检查 mtagentprism 进程是否存活',
+    actionIfStuck: '检查 mtagentlens 进程是否存活',
   },
 ];
 
@@ -834,7 +834,7 @@ export const PHASE_THRESHOLDS: PhaseThreshold[] = [
 /**
  * 第二局器具 → 前端组件 对齐:
  *
- * | mtagentprism diag 标志      | 前端组件影响范围              | 数据流路径                    |
+ * | mtagentlens diag 标志      | 前端组件影响范围              | 数据流路径                    |
  * |--------------------------|----------------------------|-----------------------------|
  * | --probes                 | ProbeVitalityDashboard + 子组件 | diag_probe SSE → Zustand |
  * | --stream <file>          | StreamIntegrityDashboard + 子组件 | diag_stream SSE → Zustand|
@@ -877,7 +877,7 @@ export const PHASE_THRESHOLDS: PhaseThreshold[] = [
  *   三符（D/E/F）各有其殿，一器（diag）贯通其中。
  *   生机查验为第一殿，流脉校验为第二殿，境迁监视为第三殿。
  *   级联图为天桥，三殿相望而通；历史表面为地库，往迹可追。
- *   第二局之器（mtagentprism diag）出 JSON 则入 REST，
+ *   第二局之器（mtagentlens diag）出 JSON 则入 REST，
  *   出 SSE 则入实时流，型制无缺，器象相合。
  *   《道德经》云「大制不割」，此之谓也。
  */

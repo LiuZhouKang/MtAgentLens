@@ -80,7 +80,7 @@ def _build_table1(main_metrics: list[dict[str, Any]]) -> list[dict[str, Any]]:
         tid = m.get("tool_id", "")
         # Map tool_id to display name
         display_names = {
-            "mtagentprism": "MtAgentPrism",
+            "mtagentlens": "MtAgentLens",
             "llm-guard": "LLM Guard",
             "meta-prompt-guard": "Meta Prompt Guard",
             "vigil": "Vigil",
@@ -115,7 +115,7 @@ def _build_table2(main_metrics: list[dict[str, Any]], report: dict[str, Any]) ->
 
     rows = []
     display_names = {
-        "mtagentprism": "MtAgentPrism",
+        "mtagentlens": "MtAgentLens",
         "llm-guard": "LLM Guard",
         "meta-prompt-guard": "Meta Prompt Guard",
         "vigil": "Vigil",
@@ -220,7 +220,7 @@ def _build_table3(ablation_path: Path) -> list[dict[str, Any]]:
 
     # ── V2-evaluated variants ──
     v2_labels = {
-        "full_replay": ("Baseline (Full MtAgentPrism)", "Full system: 53/54 detected"),
+        "full_replay": ("Baseline (Full MtAgentLens)", "Full system: 53/54 detected"),
         "disable_content_boundary_signals": ("2: Kernel only (no SSE scanner)", "SSE scanner critical for content-boundary attacks"),
         "disable_ai_pipeline": ("3: Rules+heuristics only", f"Mean score Δ={ai_score-bl_score:+.3f}; severity accuracy drops"),
         "disable_identity_resolution": ("4: Single agent (no identity)", f"Identities: {bl_ident:.1f}→{id_ident:.1f}; attribution collapsed"),
@@ -245,7 +245,7 @@ def _build_table3(ablation_path: Path) -> list[dict[str, Any]]:
     if not rows:
         if ablation_path.exists():
             artifact = json.loads(ablation_path.read_text(encoding="utf-8"))
-            rows.append({"Ablation": "Baseline (Full MtAgentPrism)", "F1": 1.0, "Scenario_Recall": 1.0,
+            rows.append({"Ablation": "Baseline (Full MtAgentLens)", "F1": 1.0, "Scenario_Recall": 1.0,
                          "Claim_Coverage": 1.0, "Regressed_Scenarios": 0, "Key_Insight": "—"})
             for v in artifact.get("variants", []):
                 m = v.get("metrics", {})

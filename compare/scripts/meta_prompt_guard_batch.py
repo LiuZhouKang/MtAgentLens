@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Meta Prompt Guard batch evaluation on MtAgentPrism FuxiBench prompt_inputs.
+"""Meta Prompt Guard batch evaluation on MtAgentLens FuxiBench prompt_inputs.
 
 Loads Prompt-Guard-86M from local compare/models/prompt-guard-86m, classifies
 each scenario's FULL prompt_text (task + fixture content),
@@ -8,7 +8,7 @@ and produces per-type metrics (TPR/FPR) for Type A, B, C, and benign scenarios.
 Output: compare/results/external/prompt_baselines/FuxiBench/meta_prompt_guard/
 
 Usage:
-    cd /home/lzk/MtAgentPrism
+    cd /home/lzk/MtAgentLens
     python3 compare/scripts/meta_prompt_guard_batch.py         # Full batch (86 scenarios)
     python3 compare/scripts/meta_prompt_guard_batch.py --dry 3 # Test with 3 scenarios
 """
@@ -24,7 +24,7 @@ from collections import defaultdict
 from pathlib import Path
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-PROJECT = Path(__file__).resolve().parents[2]  # compare/ → mtagentprism/
+PROJECT = Path(__file__).resolve().parents[2]  # compare/ → mtagentlens/
 COMPARE = PROJECT / "compare"
 MANIFEST_PATH = COMPARE / "Dataset/FuxiBench/prompt_inputs/manifest.json"
 # prompt_text_path values already include "cases/" prefix, so CASES_BASE is the
@@ -342,7 +342,7 @@ def main():
 
     # Build summary
     summary = {
-        "schema": "mtagentprism.meta_prompt_guard_batch.v1",
+        "schema": "mtagentlens.meta_prompt_guard_batch.v1",
         "model": model_info,
         "dataset": "FuxiBench",
         "total_scenarios": len(entries),

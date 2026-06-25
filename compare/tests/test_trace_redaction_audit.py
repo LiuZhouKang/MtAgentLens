@@ -11,11 +11,11 @@ def test_trace_redaction_audit_blocks_public_release_for_raw_local_paths(tmp_pat
     trace_dir = dataset / "traces" / "benign" / "sample"
     trace_dir.mkdir(parents=True)
     db_path = trace_dir / "responsibility.db"
-    _write_db(db_path, text="/home/lzk/MtAgentPrism/env/scenarios/fixtures/benign/sample/docs.md")
+    _write_db(db_path, text="/home/lzk/MtAgentLens/env/scenarios/fixtures/benign/sample/docs.md")
 
     artifact = audit_trace_redaction(dataset_root=dataset)
 
-    assert artifact["schema"] == "mtagentprism.trace_redaction_audit.v1"
+    assert artifact["schema"] == "mtagentlens.trace_redaction_audit.v1"
     assert artifact["status"] == "blocked_for_public_release"
     assert artifact["summary"]["database_count"] == 1
     assert artifact["summary"]["integrity_failures"] == 0

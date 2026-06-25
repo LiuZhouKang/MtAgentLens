@@ -39,7 +39,6 @@ export default function HomeEngineStage({
   theme,
   panelLevel,
   onReady,
-  onError: _onError,
   onNodeSelected,
 }: HomeEngineStageProps) {
   const graph = useAppStore((state) => state.graph);

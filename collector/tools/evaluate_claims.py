@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MtAgentPrism Claim-Level Evaluation Tool (v3)
+MtAgentLens Claim-Level Evaluation Tool (v3)
 ============================================
 
 Replaces the flawed binary-classification calibrate_scoring.py with proper
@@ -386,7 +386,7 @@ def evaluate_scenario(
 def main():
     import argparse
     parser = argparse.ArgumentParser(
-        description="MtAgentPrism Claim-Level Evaluation Tool (v3)"
+        description="MtAgentLens Claim-Level Evaluation Tool (v3)"
     )
     parser.add_argument("--csv", type=str, help="Output CSV file path")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show per-scenario details")
@@ -394,7 +394,7 @@ def main():
     args = parser.parse_args()
 
     print("=" * 72)
-    print("  MtAgentPrism Claim-Level Evaluation v3")
+    print("  MtAgentLens Claim-Level Evaluation v3")
     print("  Hungarian bipartite matching: claim_type + policy + boundary + severity")
     print("=" * 72)
     print()

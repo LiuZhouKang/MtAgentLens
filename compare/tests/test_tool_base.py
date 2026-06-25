@@ -37,7 +37,7 @@ def test_adapter_case_public_payload_excludes_evaluator_only_fields(tmp_path):
     assert payload["scenario_id"] == "case-1"
     assert "ground_truth_json" not in payload
     assert "expected_claims" not in payload
-    assert "mtagentprism_baseline" not in payload
+    assert "mtagentlens_baseline" not in payload
 
 
 def test_finding_record_round_trips_to_json_dict(tmp_path):
@@ -74,7 +74,7 @@ def test_adapter_result_status_helpers():
         tool_class="static",
         source_url="builtin://compare/tools/adapters/fixture_scanner.py",
         version="builtin",
-        license="MtAgentPrism-project",
+        license="MtAgentLens-project",
         install=[],
         adapter="fixture_scanner",
         input_modes=["static"],
@@ -187,7 +187,7 @@ def test_evaluation_case_copies_mutable_inputs_and_stores_immutable_views(tmp_pa
         adapter_case=adapter_case,
         ground_truth_json=None,
         expected_claims=expected_claims,
-        mtagentprism_baseline=baseline,
+        mtagentlens_baseline=baseline,
         is_attack=True,
     )
 
@@ -202,13 +202,13 @@ def test_evaluation_case_copies_mutable_inputs_and_stores_immutable_views(tmp_pa
     baseline["extra"] = tmp_path / "extra.json"
 
     assert case.expected_claims == (claim,)
-    assert case.mtagentprism_baseline == {"events": tmp_path / "baseline.json"}
-    assert isinstance(case.mtagentprism_baseline, MappingProxyType)
+    assert case.mtagentlens_baseline == {"events": tmp_path / "baseline.json"}
+    assert isinstance(case.mtagentlens_baseline, MappingProxyType)
 
     with pytest.raises(AttributeError):
         case.expected_claims.append(claim)
     with pytest.raises(TypeError):
-        case.mtagentprism_baseline["blocked"] = tmp_path / "blocked.json"
+        case.mtagentlens_baseline["blocked"] = tmp_path / "blocked.json"
 
 
 def test_tool_metadata_copies_list_inputs_and_stores_immutable_tuples():
@@ -221,7 +221,7 @@ def test_tool_metadata_copies_list_inputs_and_stores_immutable_tuples():
         tool_class="static",
         source_url="builtin://compare/tools/adapters/fixture_scanner.py",
         version="builtin",
-        license="MtAgentPrism-project",
+        license="MtAgentLens-project",
         install=install,
         adapter="fixture_scanner",
         input_modes=input_modes,
@@ -264,7 +264,7 @@ def test_adapter_result_copies_findings_list_and_stores_immutable_tuple(tmp_path
         tool_class="static",
         source_url="builtin://compare/tools/adapters/fixture_scanner.py",
         version="builtin",
-        license="MtAgentPrism-project",
+        license="MtAgentLens-project",
         install=[],
         adapter="fixture_scanner",
         input_modes=["static"],

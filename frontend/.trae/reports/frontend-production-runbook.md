@@ -1,4 +1,4 @@
-# MtAgentPrism 前端生产部署 Runbook
+# MtAgentLens 前端生产部署 Runbook
 
 ## 目标
 

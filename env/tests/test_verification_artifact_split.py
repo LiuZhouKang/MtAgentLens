@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-SCRIPTS_DIR = Path('/home/lzk/MtAgentPrism/env/scripts')
+SCRIPTS_DIR = Path('/home/lzk/MtAgentLens/env/scripts')
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 

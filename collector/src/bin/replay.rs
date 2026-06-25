@@ -2,8 +2,8 @@
 // Ablation replay tool: re-run Correlator on existing SQLite DB with signals disabled.
 // Usage: cargo run --bin replay -- --sqlite <path> [--disable-signal argument_matching|process_lineage|temporal_proximity]
 
-use mtagentprism::responsibility::graph::graph_pattern_matcher::{PatternMatcher, default_templates};
-use mtagentprism::responsibility::{
+use mtagentlens::responsibility::graph::graph_pattern_matcher::{PatternMatcher, default_templates};
+use mtagentlens::responsibility::{
     evidence::{
         ActionCandidate, ActionCandidateType, CandidateDerivationMode, CorrelationEvidence,
         EvidenceCorrelator, Lossiness, MatchLevel, NonLinkDiagnostic, NonLinkReason, SignalClass,
@@ -18,9 +18,9 @@ use mtagentprism::responsibility::{
         PolicyEvaluationResult, ProcessId, ResourceId, TracebackId, ViolationPatternMatchRecord,
     },
 };
-use mtagentprism::framework::analyzers::{Analyzer, SSEProcessor};
-use mtagentprism::framework::replay::load_replayable_trace_events;
-use mtagentprism::framework::runners::EventStream;
+use mtagentlens::framework::analyzers::{Analyzer, SSEProcessor};
+use mtagentlens::framework::replay::load_replayable_trace_events;
+use mtagentlens::framework::runners::EventStream;
 use clap::Parser;
 use futures::StreamExt;
 use futures::stream;
@@ -304,7 +304,7 @@ fn replay_via_persistence_reader(
     disable_signal: &[String],
     persisted_graph_replay: bool,
 ) -> Result<RunDirReplayReport, String> {
-    use mtagentprism::responsibility::persistence::PersistenceReader;
+    use mtagentlens::responsibility::persistence::PersistenceReader;
 
     let reader = PersistenceReader::open(db_path)
         .map_err(|e| format!("failed to open persistence reader: {e}"))?;
@@ -316,14 +316,14 @@ fn replay_via_persistence_reader(
 
     let config = replay_config_from_disable_signal(disable_signal);
     let result = if persisted_graph_replay {
-        mtagentprism::responsibility::replay::ReplayExecutor::reauthoritative_from_persisted_graph_with_config(
+        mtagentlens::responsibility::replay::ReplayExecutor::reauthoritative_from_persisted_graph_with_config(
             &reader,
             &run.run_id,
             &config,
         )
         .map_err(|e| format!("persisted graph replay failed: {e}"))?
     } else {
-        mtagentprism::responsibility::replay::ReplayExecutor::reauthoritative_with_config(
+        mtagentlens::responsibility::replay::ReplayExecutor::reauthoritative_with_config(
             &reader,
             &run.run_id,
             &config,
@@ -372,9 +372,9 @@ fn replay_via_persistence_reader(
 
 fn replay_config_from_disable_signal(
     disable_signal: &[String],
-) -> mtagentprism::responsibility::replay::ReplayConfig {
-    use mtagentprism::responsibility::replay::{all_action_candidate_types, ReplayConfig};
-    use mtagentprism::responsibility::types::{
+) -> mtagentlens::responsibility::replay::ReplayConfig {
+    use mtagentlens::responsibility::replay::{all_action_candidate_types, ReplayConfig};
+    use mtagentlens::responsibility::types::{
         ActionCandidateType as ReplayActionCandidateType,
         MatchLevel as ReplayMatchLevel,
     };
@@ -2584,7 +2584,7 @@ fn summarize_noise(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mtagentprism::responsibility::{
+    use mtagentlens::responsibility::{
         evidence::{MatchLevel, NonLinkDiagnostic, NonLinkReason, SignalClass},
         persistence::{SqliteWriter, open_db},
         types::support_types::{IntentClass, IntentParseState},
@@ -2669,7 +2669,7 @@ mod tests {
                 "agent-1",
                 1000i64,
                 "WebSearch",
-                "{\"query\":\"mtagentprism\"}",
+                "{\"query\":\"mtagentlens\"}",
                 "unknown",
                 "malformed",
                 1i64,
@@ -4848,12 +4848,12 @@ mod tests {
                 .enabled_match_levels
                 .as_ref()
                 .is_some_and(|levels| {
-                    levels.contains(&mtagentprism::responsibility::types::MatchLevel::L1Exact)
+                    levels.contains(&mtagentlens::responsibility::types::MatchLevel::L1Exact)
                         && !levels.contains(
-                            &mtagentprism::responsibility::types::MatchLevel::L2Normalized,
+                            &mtagentlens::responsibility::types::MatchLevel::L2Normalized,
                         )
                         && !levels.contains(
-                            &mtagentprism::responsibility::types::MatchLevel::L3Containment,
+                            &mtagentlens::responsibility::types::MatchLevel::L3Containment,
                         )
                         && levels.len() == 3
                 })
@@ -4864,21 +4864,21 @@ mod tests {
                 .as_ref()
                 .is_some_and(|action_types| {
                     !action_types.contains(
-                        &mtagentprism::responsibility::types::ActionCandidateType::ProcessExec,
+                        &mtagentlens::responsibility::types::ActionCandidateType::ProcessExec,
                     ) && !action_types.contains(
-                        &mtagentprism::responsibility::types::ActionCandidateType::ProcessSpawn,
+                        &mtagentlens::responsibility::types::ActionCandidateType::ProcessSpawn,
                     ) && !action_types.contains(
-                        &mtagentprism::responsibility::types::ActionCandidateType::NetworkConnect,
+                        &mtagentlens::responsibility::types::ActionCandidateType::NetworkConnect,
                     ) && !action_types.contains(
-                        &mtagentprism::responsibility::types::ActionCandidateType::NetworkSend,
+                        &mtagentlens::responsibility::types::ActionCandidateType::NetworkSend,
                     ) && !action_types.contains(
-                        &mtagentprism::responsibility::types::ActionCandidateType::FileRead,
+                        &mtagentlens::responsibility::types::ActionCandidateType::FileRead,
                     ) && !action_types.contains(
-                        &mtagentprism::responsibility::types::ActionCandidateType::FileWrite,
+                        &mtagentlens::responsibility::types::ActionCandidateType::FileWrite,
                     ) && !action_types.contains(
-                        &mtagentprism::responsibility::types::ActionCandidateType::FileOverwrite,
+                        &mtagentlens::responsibility::types::ActionCandidateType::FileOverwrite,
                     ) && !action_types.contains(
-                        &mtagentprism::responsibility::types::ActionCandidateType::FileDelete,
+                        &mtagentlens::responsibility::types::ActionCandidateType::FileDelete,
                     ) && action_types.is_empty()
                 })
         );
@@ -4892,7 +4892,7 @@ mod tests {
                 .enabled_match_levels
                 .as_ref()
                 .is_some_and(|levels| levels.contains(
-                    &mtagentprism::responsibility::types::MatchLevel::L1Exact,
+                    &mtagentlens::responsibility::types::MatchLevel::L1Exact,
                 ) && levels.len() == 1)
         );
 
@@ -4904,15 +4904,15 @@ mod tests {
                 .as_ref()
                 .is_some_and(|action_types| {
                     !action_types.contains(
-                        &mtagentprism::responsibility::types::ActionCandidateType::FileRead,
+                        &mtagentlens::responsibility::types::ActionCandidateType::FileRead,
                     ) && !action_types.contains(
-                        &mtagentprism::responsibility::types::ActionCandidateType::FileWrite,
+                        &mtagentlens::responsibility::types::ActionCandidateType::FileWrite,
                     ) && !action_types.contains(
-                        &mtagentprism::responsibility::types::ActionCandidateType::FileOverwrite,
+                        &mtagentlens::responsibility::types::ActionCandidateType::FileOverwrite,
                     ) && !action_types.contains(
-                        &mtagentprism::responsibility::types::ActionCandidateType::FileDelete,
+                        &mtagentlens::responsibility::types::ActionCandidateType::FileDelete,
                     ) && action_types.contains(
-                        &mtagentprism::responsibility::types::ActionCandidateType::NetworkConnect,
+                        &mtagentlens::responsibility::types::ActionCandidateType::NetworkConnect,
                     )
                 })
         );

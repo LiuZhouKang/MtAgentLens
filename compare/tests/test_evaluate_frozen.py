@@ -157,7 +157,7 @@ def _write_manifest(dataset: Path, scenario_ids: list[str], *, paper_ready: int)
     (dataset / "quality" / "manifest.json").write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.dataset_quality.v1",
+                "schema": "mtagentlens.dataset_quality.v1",
                 "dataset": dataset.name,
                 "scenario_ids": scenario_ids,
                 "summary": {

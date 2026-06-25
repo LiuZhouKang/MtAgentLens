@@ -1,7 +1,7 @@
 {
-  "name": "MtAgentPrism",
+  "name": "MtAgentLens",
   "id": "/",
-  "short_name": "MtAgentPrism",
+  "short_name": "MtAgentLens",
   "description": "零插桩、多 Agent、责任边界与执行证据统一呈现的旗舰观测界面",
   "lang": "zh-CN",
   "dir": "ltr",

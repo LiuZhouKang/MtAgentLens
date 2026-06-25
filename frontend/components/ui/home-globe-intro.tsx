@@ -58,7 +58,7 @@ export default function HomeGlobeIntro({
 
   return (
     <div
-      aria-label="MtAgentPrism 开场序章"
+      aria-label="MtAgentLens 开场序章"
       style={{
         position: 'fixed',
         inset: 0,
@@ -70,7 +70,7 @@ export default function HomeGlobeIntro({
       }}
     >
       <iframe
-        title="MtAgentPrism 开场地球"
+        title="MtAgentLens 开场地球"
         src={src}
         style={{
           position: 'absolute',

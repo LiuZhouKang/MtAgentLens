@@ -1,8 +1,8 @@
-# MtAgentPrism Development Environment Setup Guide
+# MtAgentLens Development Environment Setup Guide
 
 ## Overview
 
-This guide documents the required system configuration for running the MtAgentPrism
+This guide documents the required system configuration for running the MtAgentLens
 eBPF collector and development environment. Follow each step in order.
 
 ## Step 1: Verify System Prerequisites

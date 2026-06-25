@@ -944,7 +944,7 @@ const WORKSPACE_PATH_PREFIXES: &[&str] = &[
     "/sys/",
     "/dev/",
     // Build artifacts (not attack-relevant)
-    "/home/lzk/MtAgentPrism/collector/target/",
+    "/home/lzk/MtAgentLens/collector/target/",
 ];
 
 fn is_workspace_path(path: &str) -> bool {

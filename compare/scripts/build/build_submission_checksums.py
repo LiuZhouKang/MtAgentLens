@@ -48,7 +48,7 @@ def build_checksums(
     )
     output_path.write_text("".join(f"{digest}  {path}\n" for digest, path in entries), encoding="utf-8")
     return {
-        "schema": "mtagentprism.submission_checksums.v1",
+        "schema": "mtagentlens.submission_checksums.v1",
         "status": "completed",
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "hash_source": _display(manifest_path),

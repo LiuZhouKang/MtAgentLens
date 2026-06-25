@@ -1,12 +1,12 @@
 # 场景贡献指南
 
-如何为 MtAgentPrism Benchmark 贡献新的攻击检测场景。
+如何为 MtAgentLens Benchmark 贡献新的攻击检测场景。
 
 ## 快速上手
 
 1. 运行脚手架生成场景骨架：
    ```bash
-   mtagentprism-benchmark scaffold --category <分类> --name <场景-id>
+   mtagentlens-benchmark scaffold --category <分类> --name <场景-id>
    ```
 2. 填写生成 JSON 中的待补充字段
 3. 在 `scenarios/fixtures/<场景-id>/` 下创建 fixture 文件

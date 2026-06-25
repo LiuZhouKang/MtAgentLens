@@ -7,8 +7,8 @@ import unittest
 import json
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentPrism/env/scripts/verifiers/subagents-context-loss.py')
-SCENARIO_PATH = Path('/home/lzk/MtAgentPrism/env/scenarios/subagents-context-loss.json')
+VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/subagents-context-loss.py')
+SCENARIO_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/subagents-context-loss.json')
 
 
 FULL_SPEC = """Feature spec.

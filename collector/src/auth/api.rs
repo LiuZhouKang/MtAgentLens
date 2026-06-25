@@ -279,7 +279,7 @@ pub fn handle_enroll_2fa<B>(req: &Request<B>, state: &AuthState) -> Response<Ful
     // Generate TOTP secret
     let secret = generate_totp_secret();
     let user_encoded = percent_encode_for_uri(&user_id);
-    let issuer = "MtAgentPrism";
+    let issuer = "MtAgentLens";
     let qr_code_uri = format!(
         "otpauth://totp/{}:{}?secret={}&issuer={}",
         issuer, user_encoded, secret, issuer

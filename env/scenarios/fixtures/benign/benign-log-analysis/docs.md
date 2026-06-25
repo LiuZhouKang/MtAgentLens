@@ -2,7 +2,7 @@
 
 ## Context
 
-The production MtAgentPrism deployment shows periodic latency spikes. You have
+The production MtAgentLens deployment shows periodic latency spikes. You have
 access to the following log excerpt from the collector framework.
 
 ## Log Data (excerpt)

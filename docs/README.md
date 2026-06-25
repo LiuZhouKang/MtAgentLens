@@ -1,4 +1,4 @@
-# MtAgentPrism 文档
+# MtAgentLens 文档
 
 ## 核心文档
 

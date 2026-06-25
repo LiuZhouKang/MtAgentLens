@@ -433,7 +433,7 @@ def build_gt_file(scenario_id: str, label: str, category: str, attack_type: str,
 
     # Build the new GT
     gt = {
-        "schema": "mtagentprism.ground_truth.v2",
+        "schema": "mtagentlens.ground_truth.v2",
         "scenario_id": scenario_id,
         "category": category,
         "attack_type": attack_type,
@@ -522,7 +522,7 @@ def build_gt_file(scenario_id: str, label: str, category: str, attack_type: str,
 
 def main():
     print("=" * 60)
-    print("MtAgentPrism GT Re-annotation Tool")
+    print("MtAgentLens GT Re-annotation Tool")
     print(f"Annotators: {', '.join(ANNOTATORS)}")
     print(f"Date: {ANNOTATION_DATE}")
     print("=" * 60)

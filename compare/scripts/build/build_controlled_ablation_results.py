@@ -48,7 +48,7 @@ def _artifact_from_variant_runs(*, dataset_dir: Path, variant_runs: dict[str, An
         "generated_at": datetime.now(UTC).isoformat(),
     }
     base: dict[str, Any] = {
-        "schema": "mtagentprism.controlled_ablation_results.v1",
+        "schema": "mtagentlens.controlled_ablation_results.v1",
         "methodology": "sqlite_persisted_graph_action_family_feature_flags",
         "is_controlled_feature_flag_replay": True,
         "dataset": {"version": "FuxiBench", "scenario_count": _scenario_count(dataset_dir)},

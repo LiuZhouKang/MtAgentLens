@@ -1,4 +1,4 @@
-"""Offline external tool comparison harness for MtAgentPrism datasets."""
+"""Offline external tool comparison harness for MtAgentLens datasets."""
 
 from .base import (
     AdapterCase,

@@ -2,20 +2,25 @@
 // Used when /api/demo backend endpoint is unavailable.
 
 import type { CorrelationEvidence, ResponsibilityAlert, GraphData, GraphSnapshot } from './types';
-import { buildLargeAgentGraph, deriveGraphMetrics } from './large-agent-graph';
 
 // Keep demo fixtures deterministic across SSR and CSR to avoid hydration drift.
 const now = Date.parse('2026-06-20T09:30:00.000Z') * 1_000_000;
 
 function snapshot(nodes: any[], edges: any[]): GraphSnapshot {
-  const metrics = deriveGraphMetrics({ nodes, edges });
-
   return {
     snapshot_id: 'demo-snap-1',
     timestamp_ns: now - 5_000_000_000,
     nodes,
     edges,
-    metrics,
+    metrics: {
+      node_counts: { Agent: 3, Resource: 4, PolicyBoundary: 2 },
+      edge_counts: { IntentCausesAction: 3, AgentDelegatesTo: 1, ContextFlowsFrom: 1, TaintPropagatesTo: 1, PolicyBoundaryCrossing: 1, CompetingExplanation: 0 },
+      agent_count: 3,
+      cross_agent_edges: 1,
+      delegation_depth: 1,
+      taint_chains: 1,
+      avg_confidence: 0.73,
+    },
   };
 }
 
@@ -41,12 +46,10 @@ const demoEdges = [
   { edge_id: 'e-intent-3', edge_type: 'IntentCausesAction' as const, source: 'agent-frontend', target: 'res-api', evidence_refs: ['ev-1'], confidence: 0.91, phase: { Authoritative: { timestamp_ns: now - 29_000_000_000, overrides: null } } },
 ];
 
-const demoBaseGraph: GraphData = {
+export const demoGraph: GraphData = {
   nodes: demoNodes,
   edges: demoEdges,
 };
-
-export const demoGraph: GraphData = buildLargeAgentGraph(demoBaseGraph);
 
 export const demoEvidence: CorrelationEvidence[] = [
   {
@@ -159,7 +162,7 @@ export const demoAlerts: ResponsibilityAlert[] = [
       ],
       total_duration_ms: 10500,
     },
-    graph_snapshot: snapshot(demoGraph.nodes, demoGraph.edges),
+    graph_snapshot: snapshot(demoNodes, demoEdges),
     phase: { Authoritative: { timestamp_ns: now - 10_000_000_000, overrides: null } },
     provisional_ref: null,
   },
@@ -191,7 +194,7 @@ export const demoAlerts: ResponsibilityAlert[] = [
       ],
       total_duration_ms: 2000,
     },
-    graph_snapshot: snapshot(demoGraph.nodes, demoGraph.edges),
+    graph_snapshot: snapshot(demoNodes, demoEdges),
     phase: { Authoritative: { timestamp_ns: now - 28_000_000_000, overrides: null } },
     provisional_ref: null,
   },

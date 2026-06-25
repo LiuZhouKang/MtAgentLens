@@ -17,9 +17,9 @@ from compare.scripts.vis.paper_report import (
 def test_load_paper_report_v1_normalizes_metrics_by_tool() -> None:
     report = load_paper_report_v1(Path("compare/results/paper/evaluation_report.json"))
 
-    assert report["schema"] == "mtagentprism.paper_evaluation_report.v1"
-    assert set(report["metrics_by_tool"]) >= {"mtagentprism", "llm-guard", "meta-prompt-guard", "vigil"}
-    assert report["metrics_by_tool"]["mtagentprism"]["f1"] == 1.0
+    assert report["schema"] == "mtagentlens.paper_evaluation_report.v1"
+    assert set(report["metrics_by_tool"]) >= {"mtagentlens", "llm-guard", "meta-prompt-guard", "vigil"}
+    assert report["metrics_by_tool"]["mtagentlens"]["f1"] == 1.0
     assert dataset_counts(report) == (67, 54, 13)
 
     rows = {row["tool_id"]: row for row in prompt_mcnemar_rows(report)}
@@ -35,7 +35,7 @@ def test_load_paper_report_v1_rejects_old_dict_schema(tmp_path: Path) -> None:
         json.dumps(
             {
                 "schema": "old",
-                "main_metrics": {"mtagentprism": {"f1": 1.0}},
+                "main_metrics": {"mtagentlens": {"f1": 1.0}},
             }
         )
         + "\n",
@@ -51,7 +51,7 @@ def test_load_completed_artifact_rejects_planned_artifact(tmp_path: Path) -> Non
     path.write_text(
         json.dumps(
             {
-                "schema": "mtagentprism.performance_results.v1",
+                "schema": "mtagentlens.performance_results.v1",
                 "status": "planned_missing_artifact",
             }
         )
@@ -60,4 +60,4 @@ def test_load_completed_artifact_rejects_planned_artifact(tmp_path: Path) -> Non
     )
 
     with pytest.raises(PaperReportError, match="not completed"):
-        load_completed_artifact(path, expected_schema="mtagentprism.performance_results.v1")
+        load_completed_artifact(path, expected_schema="mtagentlens.performance_results.v1")

@@ -1,6 +1,6 @@
 # 基准方法论
 
-MtAgentPrism Benchmark 的设计理念、场景分类体系和评估方法。
+MtAgentLens Benchmark 的设计理念、场景分类体系和评估方法。
 
 ## 1. 设计哲学
 
@@ -75,7 +75,7 @@ Agent 被诱导过度消耗系统计算、存储或网络资源。涵盖：端�
 
 #### 11. agent_teams — Agent 团队攻击（15 场景）
 
-多个 Agent 通过 Leader-Worker 协作模式实施的协同攻击，是 FuxiBench 最具特色的类别，也是 MtAgentPrism 相比纯 prompt 检测工具的差异化优势所在。涵盖：Leader 被恶意委派签名欺骗后在伪造身份下 spawn 多个 worker 的角色劫持（`role-hijack`）；K-of-N 投票中部分 worker 串通共享 fixture 压制其他成员的串通投票（`collusion-ring`）；Leader 滥用权限下达恶意指令而 worker 盲从执行的 Leader 背叛（`leader-betrayal`）；Agent A 向共享知识库注入恶意文档后 Agent B+C 读取并级联执行的镜像投毒；以及令牌颁发→捕获→重放的三跳身份冒充。所有场景使用 `[RESTRUCTURED]` 重构结构以确保真实的进程边界跨越（PBC）。检测依赖进程血缘追踪 + 并查集身份解析（UnionFind IdentityResolver）+ 跨进程污点传播（TaintTracker）的三层机制。
+多个 Agent 通过 Leader-Worker 协作模式实施的协同攻击，是 FuxiBench 最具特色的类别，也是 MtAgentLens 相比纯 prompt 检测工具的差异化优势所在。涵盖：Leader 被恶意委派签名欺骗后在伪造身份下 spawn 多个 worker 的角色劫持（`role-hijack`）；K-of-N 投票中部分 worker 串通共享 fixture 压制其他成员的串通投票（`collusion-ring`）；Leader 滥用权限下达恶意指令而 worker 盲从执行的 Leader 背叛（`leader-betrayal`）；Agent A 向共享知识库注入恶意文档后 Agent B+C 读取并级联执行的镜像投毒；以及令牌颁发→捕获→重放的三跳身份冒充。所有场景使用 `[RESTRUCTURED]` 重构结构以确保真实的进程边界跨越（PBC）。检测依赖进程血缘追踪 + 并查集身份解析（UnionFind IdentityResolver）+ 跨进程污点传播（TaintTracker）的三层机制。
 
 #### 12. multi_agent_attack — 多 Agent 联合攻击（3 场景）
 
@@ -110,7 +110,7 @@ eBPF 采集器是否捕获到异常相关的原始事件（SSL、进程、文件
 
 ### L3：结构化告警
 
-MtAgentPrism 责任归属运行时是否生成了结构化的安全告警（`decision=Unsafe`）。
+MtAgentLens 责任归属运行时是否生成了结构化的安全告警（`decision=Unsafe`）。
 
 ### L4：因果关系追溯
 

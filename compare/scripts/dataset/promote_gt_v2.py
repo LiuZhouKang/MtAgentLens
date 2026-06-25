@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 
-PROMOTED_SCHEMA = "mtagentprism.ground_truth.v2"
+PROMOTED_SCHEMA = "mtagentlens.ground_truth.v2"
 PROMOTED_STATUS = "auto_adjudicated_with_db_evidence"
 NOISE_EXPECTED_CLAIM_MARKERS = (
     "/.kiro/",
@@ -106,7 +106,7 @@ def promote_dataset(dataset: Path, *, backup: bool = False) -> dict[str, Any]:
         )
 
     report = {
-        "schema": "mtagentprism.gt_v2_promotion_report.v1",
+        "schema": "mtagentlens.gt_v2_promotion_report.v1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "dataset": dataset.as_posix(),
         "summary": {
@@ -144,7 +144,7 @@ def validate_candidate_set(
 
 def validate_candidate(dataset: Path, sample: dict[str, Any], candidate: dict[str, Any]) -> None:
     sid = str(sample["scenario_id"])
-    if candidate.get("schema") != "mtagentprism.ground_truth.v2.candidate":
+    if candidate.get("schema") != "mtagentlens.ground_truth.v2.candidate":
         raise PromotionError(f"{sid}: unsupported candidate schema")
     if candidate.get("annotation_status") != "machine_generated_needs_review":
         raise PromotionError(f"{sid}: unexpected candidate annotation_status")

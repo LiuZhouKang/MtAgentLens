@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Platt Calibration Tool for MtAgentPrism v7 Scoring Engine.
+Platt Calibration Tool for MtAgentLens v7 Scoring Engine.
 
 Reads all FuxiBench scenario databases and ground truth labels,
 extracts claims data, and fits Platt sigmoid parameters (A, B) using
@@ -244,12 +244,12 @@ def fit_platt_params(
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="MtAgentPrism v7 Platt calibrator")
+    parser = argparse.ArgumentParser(description="MtAgentLens v7 Platt calibrator")
     parser.add_argument("--dry-run", action="store_true", help="Only analyze, don't output params")
     parser.add_argument("--output-params", action="store_true", help="Output calibrated A,B")
     args = parser.parse_args()
 
-    print("=== MtAgentPrism v7 Platt Calibration Tool ===")
+    print("=== MtAgentLens v7 Platt Calibration Tool ===")
     print(f"Dataset: {DATASET_DIR}")
     print()
 

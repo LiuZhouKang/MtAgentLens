@@ -19,7 +19,7 @@ import numpy as np
 # ── 路径常量 ────────────────────────────────────────────────────────────────
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-COLLECTOR_BIN = PROJECT_ROOT / "collector" / "target" / "release" / "mtagentprism"
+COLLECTOR_BIN = PROJECT_ROOT / "collector" / "target" / "release" / "mtagentlens"
 PERF_DIR = Path(__file__).resolve().parent
 BENCH_TARGETS_DIR = PERF_DIR / "bench_targets"
 RESULTS_DIR = PROJECT_ROOT / "compare" / "results" / "perf"

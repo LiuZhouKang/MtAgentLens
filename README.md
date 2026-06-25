@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">MtAgentPrism</h1>
+  <h1 align="center">MtAgentLens</h1>
   <p align="center">
     <strong>零插桩 · 内核级 · 多 Agent 攻击可观测性</strong><br>
     <sub>从系统调用到攻击因果链——在 Agent 无法触及的 OS 边界看见一切</sub>
@@ -28,9 +28,9 @@
 
 ---
 
-## MtAgentPrism
+## MtAgentLens
 
-MtAgentPrism 在 **Linux 内核系统调用边界**通过 eBPF 观测一切。它不读 prompt、不依赖 Agent 框架、不修改任何代码。它看到的是 Agent 无法隐藏的事实——SSL/TLS 解密后的明文、进程的 `exec`/`fork`/`open` 序列、文件在进程间的传递路径、网络连接的源与目标。
+MtAgentLens 在 **Linux 内核系统调用边界**通过 eBPF 观测一切。它不读 prompt、不依赖 Agent 框架、不修改任何代码。它看到的是 Agent 无法隐藏的事实——SSL/TLS 解密后的明文、进程的 `exec`/`fork`/`open` 序列、文件在进程间的传递路径、网络连接的源与目标。
 
 然后它构建一张**跨进程因果责任图**——不仅告诉你"发生了什么"，还告诉你"谁引起的、经过谁、影响了谁"。
 
@@ -138,7 +138,7 @@ MtAgentPrism 在 **Linux 内核系统调用边界**通过 eBPF 观测一切。�
   |                 FRONTEND + HTTP API (:7395)                     |
   |                                                                 |
   |  Next.js 16 · React 19 · TypeScript 5 · Tailwind CSS 4          |
-  |  rust-embed: compiled into mtagentprism binary at build time    |
+  |  rust-embed: compiled into mtagentlens binary at build time    |
   |                                                                 |
   |  /           Timeline (scrollable, 10+ event type renderers)    |
   |  /tree       Process tree (hierarchical visualization)          |
@@ -154,7 +154,7 @@ MtAgentPrism 在 **Linux 内核系统调用边界**通过 eBPF 观测一切。�
 
 LLM Guard、Meta Prompt Guard 等工具扫描 prompt 文本寻找恶意模式。这有三个致命盲区：
 
-| 盲区 | 攻击实例 | MtAgentPrism 如何应对 |
+| 盲区 | 攻击实例 | MtAgentLens 如何应对 |
 |------|---------|---------------------|
 | **文本绕过** — 文言文、Unicode 同形字、语义遮蔽可轻易绕过文本分类器 | `prompt-injection-classical`（纯文言文·墨子·棋局对弈）被所有 prompt 工具漏检 | **L1** 不读 prompt 文本——直接在 uprobe 点拦截 SSL 明文，看到实际的 HTTP 请求体和响应 |
 | **间接注入** — fixture 文件中的恶意指令不经过 prompt，文本扫描器无法看到 | `supplychain-malicious-build` 的 `build.sh` 中包含 `curl POST /exfil`，prompt 中只写"请运行构建脚本" | **L2** 追踪文件读取→进程执行→网络出站的完整链路，在进程边界跨越（PBC）时标记 |
@@ -167,8 +167,8 @@ LLM Guard、Meta Prompt Guard 等工具扫描 prompt 文本寻找恶意模式。
 ## 快速开始
 
 ```bash
-git clone https://github.com/mtagentprism/mtagentprism.git --recursive
-cd mtagentprism
+git clone https://github.com/mtagentlens/mtagentlens.git --recursive
+cd mtagentlens
 
 # 安装依赖 (Ubuntu/Debian)
 sudo apt-get install -y clang llvm libelf-dev zlib1g-dev make
@@ -177,22 +177,22 @@ sudo apt-get install -y clang llvm libelf-dev zlib1g-dev make
 make build
 
 # 监控 Claude Code（已验证）
-sudo ./collector/build/release/mtagentprism record -c claude \
+sudo ./collector/build/release/mtagentlens record -c claude \
   --binary-path ~/.local/share/claude/versions/$(claude --version | head -1)
 
 # 浏览器访问 http://127.0.0.1:7395
 ```
 
-> **当前验证状态**：MtAgentPrism 已在 **Claude Code**（Bun 运行时，静态链接 BoringSSL）上完成全面测试。对于动态链接系统 `libssl.so` 的 Agent（大多数 Python/Node.js AI 工具），eBPF uprobe 机制在架构上同样适用，尚未系统性验证。对其他 LLM Agent 的实验性支持可通过 `-c <进程名>` 尝试——欢迎反馈测试结果。
+> **当前验证状态**：MtAgentLens 已在 **Claude Code**（Bun 运行时，静态链接 BoringSSL）上完成全面测试。对于动态链接系统 `libssl.so` 的 Agent（大多数 Python/Node.js AI 工具），eBPF uprobe 机制在架构上同样适用，尚未系统性验证。对其他 LLM Agent 的实验性支持可通过 `-c <进程名>` 尝试——欢迎反馈测试结果。
 
 Docker：
 
 ```bash
-docker build -t mtagentprism .
+docker build -t mtagentlens .
 docker run --rm -it --privileged --pid=host \
   -v /sys:/sys:ro -v /usr:/usr:ro -v /lib:/lib:ro \
   -p 7395:7395 \
-  mtagentprism record -c claude --binary-path /path/to/claude/binary
+  mtagentlens record -c claude --binary-path /path/to/claude/binary
 ```
 
 ---
@@ -210,12 +210,12 @@ docker run --rm -it --privileged --pid=host \
 
 ```bash
 # 灵活组合监控
-sudo mtagentprism trace --ssl --process --system --server
+sudo mtagentlens trace --ssl --process --system --server
 
 # 独立子命令
-sudo mtagentprism ssl --http-parser --http-filter "POST /api"
-sudo mtagentprism process --comm python --duration 1000
-sudo mtagentprism stdio --pid 12345
+sudo mtagentlens ssl --http-parser --http-filter "POST /api"
+sudo mtagentlens process --comm python --duration 1000
+sudo mtagentlens stdio --pid 12345
 ```
 
 ---
@@ -223,9 +223,9 @@ sudo mtagentprism stdio --pid 12345
 ## 项目结构
 
 ```
-MtAgentPrism/
+MtAgentLens/
 │
-├── collector/                     Rust 引擎 — 编译为单二进制 mtagentprism
+├── collector/                     Rust 引擎 — 编译为单二进制 mtagentlens
 │   ├── src/main.rs                CLI 入口 (clap derive)，6 个子命令
 │   ├── src/framework/             流式数据采集管线
 │   │   ├── runners/               7 个 Runner：Ssl, Process, Stdio, System, Agent, Fake
@@ -256,10 +256,10 @@ MtAgentPrism/
 │
 ├── frontend/                      Next.js 16 · React 19 · TypeScript 5 · Tailwind 4
 │   ├── 编译为静态 HTML/CSS/JS (next build → out/)
-│   └── 通过 rust-embed 内嵌到 mtagentprism 二进制
+│   └── 通过 rust-embed 内嵌到 mtagentlens 二进制
 │
 ├── env/                           基准测试环境
-│   ├── src/mtagentprism_benchmark/ Python 包 (CLI, Engine, Evaluator, Verifier)
+│   ├── src/mtagentlens_benchmark/ Python 包 (CLI, Engine, Evaluator, Verifier)
 │   ├── scenarios/                 164 个场景定义 (38 类别) + fixtures
 │   ├── scripts/verifiers/         73 个场景验证器
 │   └── runs/                      运行工件 (gitignored)
@@ -302,7 +302,7 @@ MtAgentPrism/
 | Type C（多 Agent） | 23 — 跨进程协同攻击（**核心贡献**） |
 | 标注 | 3 名独立标注者，交叉验证 + 共识裁判 |
 
-**MtAgentPrism 在 FuxiBench 上的表现**：
+**MtAgentLens 在 FuxiBench 上的表现**：
 
 | 指标 | 值 | 说明 |
 |------|:--:|------|
@@ -379,7 +379,7 @@ make test               # 全量测试
 make docker             # Docker 镜像
 
 cd collector
-cargo build --release   # → build/release/mtagentprism
+cargo build --release   # → build/release/mtagentlens
 cargo test              # 862+ 测试
 
 cd frontend
@@ -403,12 +403,12 @@ npm run dev             # 开发服务器
 ## 引用
 
 ```bibtex
-@software{mtagentprism2026,
-  author = {刘周康 and MtAgentPrism contributors},
-  title = {{MtAgentPrism}: Zero-Instrumentation Multi-Agent LLM Attack
+@software{mtagentlens2026,
+  author = {刘周康 and MtAgentLens contributors},
+  title = {{MtAgentLens}: Zero-Instrumentation Multi-Agent LLM Attack
            Observability with eBPF},
   year = {2026},
-  url = {https://github.com/mtagentprism/mtagentprism}
+  url = {https://github.com/mtagentlens/mtagentlens}
 }
 ```
 

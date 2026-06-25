@@ -10,9 +10,9 @@ install: ; sudo apt update && sudo apt-get install -y --no-install-recommends li
 
 test: ; make -C bpftools test && cd collector && cargo test && cd ../frontend && npm run build
 
-docker: ; docker build -t mtagentprism .
+docker: ; docker build -t mtagentlens .
 
-docker-dev: ; docker build -f Dockerfile.dev -t mtagentprism:dev .
+docker-dev: ; docker build -f Dockerfile.dev -t mtagentlens:dev .
 
 env-%: ; $(MAKE) -C env env-$* SCENARIO="$(SCENARIO)" ARGS="$(ARGS)" AUTO_ATTACH="$(AUTO_ATTACH)" RUN_DIR="$(RUN_DIR)"
 

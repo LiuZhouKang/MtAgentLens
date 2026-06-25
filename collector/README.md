@@ -1,6 +1,6 @@
 # Collector
 
-MtAgentPrism 的 Rust 核心引擎。编译为单个静态二进制 `mtagentprism`，内嵌 eBPF 程序和前端静态资源，无外部运行时依赖。
+MtAgentLens 的 Rust 核心引擎。编译为单个静态二进制 `mtagentlens`，内嵌 eBPF 程序和前端静态资源，无外部运行时依赖。
 
 ## 流水线
 
@@ -200,7 +200,7 @@ src/
 cd collector
 
 cargo build              # 调试构建
-cargo build --release    # 发布构建 → build/release/mtagentprism
+cargo build --release    # 发布构建 → build/release/mtagentlens
 cargo test               # 862+ 测试
 cargo fmt -- --check     # 格式检查 (edition 2024)
 cargo clippy             # Lint

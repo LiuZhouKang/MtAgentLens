@@ -94,7 +94,7 @@ def audit_trace_redaction(*, dataset_root: Path) -> dict[str, Any]:
     summary = _summary(databases, findings)
     status = "passed_machine_scan" if summary["public_release_ready"] else "blocked_for_public_release"
     return {
-        "schema": "mtagentprism.trace_redaction_audit.v1",
+        "schema": "mtagentlens.trace_redaction_audit.v1",
         "status": status,
         "generated_at": _now_iso(),
         "dataset": {

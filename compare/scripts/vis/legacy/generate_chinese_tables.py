@@ -18,9 +18,9 @@ from compare.scripts.vis.paper_report import (  # noqa: E402
 )
 
 RESULTS = PROJECT / "compare" / "results" / "paper"
-TOOL_ORDER = ["mtagentprism", "llm-guard", "meta-prompt-guard", "vigil"]
+TOOL_ORDER = ["mtagentlens", "llm-guard", "meta-prompt-guard", "vigil"]
 TOOL_NAMES = {
-    "mtagentprism": "MtAgentPrism",
+    "mtagentlens": "MtAgentLens",
     "llm-guard": "LLM Guard",
     "meta-prompt-guard": "Meta Prompt Guard",
     "vigil": "Vigil",
@@ -55,7 +55,7 @@ def build_main_table(report):
             continue
         m = metrics[tid]
         name = TOOL_NAMES.get(tid, tid)
-        bold = tid == "mtagentprism"
+        bold = tid == "mtagentlens"
         rows.append([
             f"\\textbf{{{name}}}" if bold else name,
             _pct(m.get("precision", 0.0)),
@@ -77,7 +77,7 @@ def build_mcnemar_table(report):
     rows = []
     for row in prompt_mcnemar_rows(report):
         rows.append([
-            f"MtAgentPrism vs {TOOL_NAMES.get(row['tool_id'], row['tool_id'])}",
+            f"MtAgentLens vs {TOOL_NAMES.get(row['tool_id'], row['tool_id'])}",
             str(row["b"]),
             str(row["c"]),
             f"{row['statistic']:.2f}",

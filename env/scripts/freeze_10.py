@@ -7,8 +7,8 @@ from datetime import date
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from mtagentprism_benchmark.loader.scenario_loader import load_scenario
-from mtagentprism_benchmark.workspace import BenchmarkWorkspace
+from mtagentlens_benchmark.loader.scenario_loader import load_scenario
+from mtagentlens_benchmark.workspace import BenchmarkWorkspace
 
 def main():
     workspace = BenchmarkWorkspace.discover()

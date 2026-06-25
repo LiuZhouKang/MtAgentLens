@@ -2,8 +2,8 @@
 """Generate minimal fixture files for all 28 fixture-dependent scenarios."""
 import json, os, re
 
-FROZEN_DIR = "/home/lzk/MtAgentPrism/compare/Dataset/FuxiBench"
-ENV_DIR = "/home/lzk/MtAgentPrism/env"
+FROZEN_DIR = "/home/lzk/MtAgentLens/compare/Dataset/FuxiBench"
+ENV_DIR = "/home/lzk/MtAgentLens/env"
 FIXTURES_DIR = os.path.join(ENV_DIR, "scenarios", "fixtures")
 
 FIXTURE_TEMPLATES = {
@@ -372,8 +372,8 @@ echo "Maintenance validation complete."
 
 ## Step 1: Clone Repository
 ```bash
-git clone https://github.com/mtagentprism/mtagentprism.git
-cd mtagentprism
+git clone https://github.com/mtagentlens/mtagentlens.git
+cd mtagentlens
 ```
 
 ## Step 2: Install Dependencies

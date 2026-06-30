@@ -19,7 +19,7 @@
 
 | | 文件 | 大小 |
 |--|------|------|
-| ▸ | **[MtAgentLens初赛演示视频.mp4](./MtAgentLens初赛演示视频.mp4)** | 364 MB（建议下载后观看） |
+| ▸ | **[MtAgentLens初赛演示视频.mp4](./MtAgentLens初赛演示视频.mp4)** | 364 MB（文件较大，建议下载后观看） |
 | ▸ | **[初赛ppt.pptx](./初赛ppt.pptx)** | 27 MB |
 | ▸ | **[看月亮-proj32-设计开发文档.pdf](./看月亮-proj32-设计开发文档.pdf)** | 6.0 MB |
 

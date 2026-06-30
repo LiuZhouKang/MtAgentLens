@@ -1,20 +1,15 @@
-<p align="center">
-  <h1 align="center">MtAgentLens</h1>
-  <p align="center">
-    <strong>零插桩 · 内核级 · 多 Agent 攻击可观测性</strong><br>
-    <sub>从系统调用到责任归因——在 OS 边界采集可验证的运行事实</sub>
-  </p>
-  <p align="center">
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue"></a>
-    <a href="#性能"><img src="https://img.shields.io/badge/probe_latency-~101ns-blueviolet"></a>
-    <a href="#性能"><img src="https://img.shields.io/badge/overhead-<3%25-brightgreen"></a>
-    <a href="#FuxiBench"><img src="https://img.shields.io/badge/FuxiBench-F1%3D0.945-orange"></a>
-  </p>
-</p>
+# MtAgentLens
+
+**零插桩 · 内核级 · 多 Agent 攻击可观测性**
+
+从系统调用到责任归因——在 OS 边界采集可验证的运行事实
+
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue"></a>
+<a href="#性能"><img src="https://img.shields.io/badge/probe_latency-~101ns-blueviolet"></a>
+<a href="#性能"><img src="https://img.shields.io/badge/overhead-<3%25-brightgreen"></a>
+<a href="#FuxiBench"><img src="https://img.shields.io/badge/FuxiBench-F1%3D0.945-orange"></a>
 
 ---
-
-<div align="center">
 
 ## 全国大学生计算机系统能力大赛 · 操作系统设计赛 — OS 功能挑战赛
 
@@ -22,32 +17,13 @@
 
 ### 初赛提交材料
 
-<table align="center">
-  <tr>
-    <th></th>
-    <th>文件</th>
-    <th>大小</th>
-  </tr>
-  <tr>
-    <td align="center">▸</td>
-    <td><strong><a href="./MtAgentLens初赛演示视频.mp4">MtAgentLens初赛演示视频.mp4</a></strong></td>
-    <td>364 MB（建议下载后观看）</td>
-  </tr>
-  <tr>
-    <td align="center">▸</td>
-    <td><strong><a href="./初赛ppt.pptx">初赛ppt.pptx</a></strong></td>
-    <td>27 MB</td>
-  </tr>
-  <tr>
-    <td align="center">▸</td>
-    <td><strong><a href="./看月亮-proj32-设计开发文档.pdf">看月亮-proj32-设计开发文档.pdf</a></strong></td>
-    <td>6.0 MB</td>
-  </tr>
-</table>
+| | 文件 | 大小 |
+|--|------|------|
+| ▸ | **[MtAgentLens初赛演示视频.mp4](./MtAgentLens初赛演示视频.mp4)**<br><sub>或百度网盘：[https://pan.baidu.com/s/1s2ScqX0-u4f5LfQt-E7Duw](https://pan.baidu.com/s/1s2ScqX0-u4f5LfQt-E7Duw?pwd=semn)（提取码：semn）</sub> | 364 MB |
+| ▸ | **[初赛ppt.pptx](./初赛ppt.pptx)** | 27 MB |
+| ▸ | **[看月亮-proj32-设计开发文档.pdf](./看月亮-proj32-设计开发文档.pdf)** | 6.0 MB |
 
 <sub>队名：看月亮</sub>
-
-</div>
 
 ---
 

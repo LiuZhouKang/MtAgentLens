@@ -22,11 +22,28 @@
 
 ### 初赛提交材料
 
-| | 文件 | 大小 |
-|--|------|------|
-| ▸ | **[MtAgentLens初赛演示视频.mp4](./MtAgentLens初赛演示视频.mp4)** | 364 MB（建议下载后观看） |
-| ▸ | **[初赛ppt.pptx](./初赛ppt.pptx)** | 27 MB |
-| ▸ | **[看月亮-proj32-设计开发文档.pdf](./看月亮-proj32-设计开发文档.pdf)** | 6.0 MB |
+<table align="center">
+  <tr>
+    <th></th>
+    <th>文件</th>
+    <th>大小</th>
+  </tr>
+  <tr>
+    <td align="center">▸</td>
+    <td><strong><a href="./MtAgentLens初赛演示视频.mp4">MtAgentLens初赛演示视频.mp4</a></strong></td>
+    <td>364 MB（建议下载后观看）</td>
+  </tr>
+  <tr>
+    <td align="center">▸</td>
+    <td><strong><a href="./初赛ppt.pptx">初赛ppt.pptx</a></strong></td>
+    <td>27 MB</td>
+  </tr>
+  <tr>
+    <td align="center">▸</td>
+    <td><strong><a href="./看月亮-proj32-设计开发文档.pdf">看月亮-proj32-设计开发文档.pdf</a></strong></td>
+    <td>6.0 MB</td>
+  </tr>
+</table>
 
 <sub>队名：看月亮</sub>
 

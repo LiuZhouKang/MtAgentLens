@@ -720,7 +720,7 @@ async fn run_raw_ssl(
     println!("Raw SSL Events");
     println!("{}", "=".repeat(60));
 
-    let mut ssl_runner = SslRunner::from_binary_extractor(binary_extractor.get_sslsniff_path());
+    let mut ssl_runner = SslRunner::from_binary_extractor(binary_extractor.get_tls_capture_path());
 
     // Set up event broadcasting for server if enabled
     let (event_sender, _event_receiver) = broadcast::channel(1000);
@@ -1094,7 +1094,7 @@ async fn run_trace(
 
         for pid_target in ssl_targets {
             let mut ssl_runner =
-                SslRunner::from_binary_extractor(binary_extractor.get_sslsniff_path());
+                SslRunner::from_binary_extractor(binary_extractor.get_tls_capture_path());
             let mut ssl_args = Vec::new();
             if let Some(pid_filter) = pid_target {
                 ssl_args.extend(["-p".to_string(), pid_filter.to_string()]);
@@ -1297,8 +1297,8 @@ async fn run_trace(
     // Graceful degradation: if model.onnx is not found, Layer 3 is disabled
     // but all other detection layers continue to function.
     // Portable model path lookup: try common locations.
-    // For open-source deployment, users can set MTAGENTPRISM_MODEL_DIR.
-    let classifier_model_dir = std::env::var("MTAGENTPRISM_MODEL_DIR")
+    // For open-source deployment, users can set MTAGENTLENS_MODEL_DIR.
+    let classifier_model_dir = std::env::var("MTAGENTLENS_MODEL_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| {
             let candidates = [

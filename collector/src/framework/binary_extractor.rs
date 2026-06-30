@@ -11,13 +11,13 @@ use tokio::time::{Duration, sleep};
 
 // BPF binaries from bpftools/.output/bin/
 const PROCESS_BINARY: &[u8] = include_bytes!("../../../bpftools/.output/bin/process");
-const SSLSNIFF_BINARY: &[u8] = include_bytes!("../../../bpftools/.output/bin/tls_capture");
+const TLS_CAPTURE_BINARY: &[u8] = include_bytes!("../../../bpftools/.output/bin/tls_capture");
 const STDIOCAP_BINARY: &[u8] = &[];
 
 pub struct BinaryExtractor {
     _temp_dir: TempDir, // Keep alive to prevent cleanup
     pub process_path: PathBuf,
-    pub sslsniff_path: PathBuf,
+    pub tls_capture_path: PathBuf,
     stdiocap_init_lock: Mutex<()>,
     stdiocap_path: OnceLock<PathBuf>,
 }
@@ -35,9 +35,9 @@ impl BinaryExtractor {
         let process_path = temp_path.join("process");
         Self::extract_binary(&process_path, PROCESS_BINARY, "process").await?;
 
-        // Extract and setup the sslsniff binary
-        let sslsniff_path = temp_path.join("sslsniff");
-        Self::extract_binary(&sslsniff_path, SSLSNIFF_BINARY, "sslsniff").await?;
+        // Extract and setup the tls_capture binary
+        let tls_capture_path = temp_path.join("tls_capture");
+        Self::extract_binary(&tls_capture_path, TLS_CAPTURE_BINARY, "tls_capture").await?;
 
         // Small delay to ensure files are fully written
         sleep(Duration::from_millis(100)).await;
@@ -45,7 +45,7 @@ impl BinaryExtractor {
         Ok(Self {
             _temp_dir: temp_dir,
             process_path,
-            sslsniff_path,
+            tls_capture_path,
             stdiocap_init_lock: Mutex::new(()),
             stdiocap_path: OnceLock::new(),
         })
@@ -76,8 +76,8 @@ impl BinaryExtractor {
         &self.process_path
     }
 
-    pub fn get_sslsniff_path(&self) -> &Path {
-        &self.sslsniff_path
+    pub fn get_tls_capture_path(&self) -> &Path {
+        &self.tls_capture_path
     }
 
     pub fn get_stdiocap_path(&self) -> Result<&Path, Box<dyn std::error::Error + Send + Sync>> {
@@ -125,12 +125,12 @@ impl BinaryExtractor {
 
 #[cfg(test)]
 mod tests {
-    use super::SSLSNIFF_BINARY;
+    use super::TLS_CAPTURE_BINARY;
     use std::fs;
     use std::path::PathBuf;
 
     #[test]
-    fn embedded_sslsniff_binary_matches_on_disk_fixture() {
+    fn embedded_tls_capture_binary_matches_on_disk_fixture() {
         let on_disk_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join("bpftools")
@@ -140,15 +140,15 @@ mod tests {
 
         let on_disk_bytes = fs::read(&on_disk_path).unwrap_or_else(|error| {
             panic!(
-                "failed to read on-disk sslsniff binary at {}: {error}",
+                "failed to read on-disk tls_capture binary at {}: {error}",
                 on_disk_path.display()
             )
         });
 
         assert_eq!(
-            SSLSNIFF_BINARY,
+            TLS_CAPTURE_BINARY,
             on_disk_bytes.as_slice(),
-            "embedded sslsniff bytes differ from on-disk bpf/sslsniff; rebuild collector embeds or bpf artifact parity is stale"
+            "embedded tls_capture bytes differ from on-disk bpftools tls_capture; rebuild collector embeds or bpf artifact parity is stale"
         );
     }
 }

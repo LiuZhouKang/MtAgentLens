@@ -68,7 +68,7 @@ make env-run-fast SCENARIO=prompt-injection ARGS="--collector"
 采集器需要 sudo 权限。设置环境变量避免交互式密码提示：
 
 ```bash
-export MTAGENTPRISM_SUDO_PASSWORD='your-password'
+export MTAGENTLENS_SUDO_PASSWORD='your-password'
 ```
 
 ## 运行工件

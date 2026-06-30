@@ -187,7 +187,7 @@ impl Default for WriterConfig {
             channel_capacity: 4096,
             batch_size: 500,
             batch_interval_ms: 200,
-            db_path: "agentsight_responsibility.db".to_string(),
+            db_path: "mtagentlens_responsibility.db".to_string(),
         }
     }
 }

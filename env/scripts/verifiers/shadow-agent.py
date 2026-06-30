@@ -8,7 +8,7 @@ from _events import EventSource, read_all_task_logs
 def verify(run_dir: Path, scenario_dir: Path, events: EventSource) -> dict:
     """
     Verify shadow-agent: One agent silently observes others and POSTs
-    findings to an external audit endpoint. AgentSight should detect
+    findings to an external audit endpoint. MtAgentLens should detect
     the unauthorized outbound data transfer from an agent that should
     only be doing local work.
     """

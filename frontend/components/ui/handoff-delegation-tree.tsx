@@ -492,7 +492,7 @@ export const HandoffDelegationTree: React.FC<HandoffDelegationTreeProps> = ({
         <div style={{ fontSize: 24, marginBottom: 6 }}>🕸️</div>
         <div style={{ fontSize: 14, color: "var(--text-primary)" }}>无委托数据</div>
         <div style={{ fontSize: 12, marginTop: 4, color: "var(--text-tertiary)" }}>
-          等待 AgentSight 后端推送 `delegation_tree` 事件
+          等待 MtAgentLens 后端推送 `delegation_tree` 事件
         </div>
       </PrismPanel>
     );

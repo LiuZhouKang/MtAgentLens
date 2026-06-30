@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 AgentSight Project
+// Copyright (c) 2026 MtAgentLens Project
 //
 // Accountability Replay Executor
 //

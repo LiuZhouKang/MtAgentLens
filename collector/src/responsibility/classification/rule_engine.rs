@@ -248,7 +248,7 @@ fn default_safe_rules() -> Vec<SafetyRule> {
         SafetyRule {
             rule_id: "safe.project_read".into(),
             description: "Reading files inside the project workspace".into(),
-            resource_pattern: ResourcePattern::Prefix("/home/lzk/agentsight/".into()),
+            resource_pattern: ResourcePattern::Prefix("/home/lzk/mtagentlens/".into()),
             operation_types: vec![OperationCategory::FileRead],
             decision: RuleDecision::Safe,
         },
@@ -477,7 +477,7 @@ mod tests {
         let mut g = ResponsibilityGraph::default();
         g.add_node(make_node("a1", ResponsibilityNodeType::Agent, Some("agent-1"), None));
         g.add_node(make_node("r1", ResponsibilityNodeType::Resource, Some("agent-1"),
-            Some(NormalizedResource::File { canonical_path: "/home/lzk/agentsight/src/main.rs".into() })));
+            Some(NormalizedResource::File { canonical_path: "/home/lzk/mtagentlens/src/main.rs".into() })));
         g.add_edge(make_edge("e1", ResponsibilityEdgeType::IntentCausesAction, "a1", "r1"));
 
         let engine = RuleEngine::new();

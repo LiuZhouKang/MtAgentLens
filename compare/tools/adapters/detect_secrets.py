@@ -110,7 +110,7 @@ def _require_fixture_dir(case: AdapterCase) -> Path:
 
 
 def _detect_secrets_binary() -> str:
-    configured = os.environ.get("MTAGENTPRISM_DETECT_SECRETS_BIN")
+    configured = os.environ.get("MTAGENTLENS_DETECT_SECRETS_BIN")
     if configured and Path(configured).exists():
         return configured
     project_binary = Path(__file__).resolve().parents[3] / "compare" / ".venv-detect-secrets" / "bin" / "detect-secrets"

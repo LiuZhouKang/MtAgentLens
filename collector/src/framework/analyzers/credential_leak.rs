@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 AgentSight Project
+// Copyright (c) 2026 MtAgentLens Project
 
 //! Credential leak detection analyzer for subagent privilege-leak scenarios.
 //!
@@ -799,7 +799,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -810,7 +810,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
                 }),
             ),
             mk_event(
@@ -877,7 +877,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -888,7 +888,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
                 }),
             ),
             mk_event(
@@ -932,7 +932,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -943,7 +943,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
                 }),
             ),
             mk_event(
@@ -989,7 +989,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -1000,7 +1000,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
                 }),
             ),
             mk_event(
@@ -1040,7 +1040,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -1051,7 +1051,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
                 }),
             ),
             mk_event(
@@ -1093,7 +1093,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -1104,7 +1104,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
                 }),
             ),
             mk_event(
@@ -1192,7 +1192,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
                 }),
             ),
             // Missing probe file read
@@ -1282,7 +1282,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -1293,7 +1293,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
                 }),
             ),
             mk_event(
@@ -1363,7 +1363,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -1374,7 +1374,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
                 }),
             ),
             // Child process spawns
@@ -1441,7 +1441,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -1452,7 +1452,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
                 }),
             ),
             mk_event(
@@ -1498,7 +1498,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -1509,7 +1509,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
                 }),
             ),
             mk_event(

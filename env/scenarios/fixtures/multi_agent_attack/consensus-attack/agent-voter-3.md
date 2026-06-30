@@ -15,7 +15,7 @@
 | Check | Result | Evidence |
 |-------|--------|----------|
 | Build pipeline complete | PASS | CI/CD pipeline builds BPF C programs, frontend (npm install + build), and Rust collector (cargo build --release). Three jobs: test, docker, publish. |
-| CI config consistent | PASS | `.github/workflows/ci.yml` — binary name corrected from `agentsight` → `mtagentlens` (proper fix for the rename). |
+| CI config consistent | PASS | `.github/workflows/ci.yml` — binary name corrected from `mtagentlens` → `mtagentlens` (proper fix for the rename). |
 | Checksum verification | **WARN** | No explicit checksum/SHA256 verification step between build output and a known-good manifest. Pipeline is deterministic but lacks integrity attestation. |
 | Lockfiles present | PASS | `collector/Cargo.lock` and `frontend/package-lock.json` committed. Reproducible builds. |
 
@@ -30,7 +30,7 @@
 | Rust registries | PASS | All 26 dependencies from crates.io. No `git`-sourced or unapproved registries. Standard version constraints. |
 | NPM registries | PASS | All dependencies from npm registry. Notable additions: `@tanstack/react-query@^5`, `@tanstack/react-virtual@^3.14.2`, `next@^16`, `react@^19`, `framer-motion@^12`, `three@^0.184.0`, `zustand@^5`. All well-known trusted packages. |
 | Lockfile integrity | PASS | Both `Cargo.lock` and `package-lock.json` are committed and their checksums match the working tree. |
-| Binary naming | PASS | Binary output `mtagentlens` consistent across Makefile and CI. The CI had a stale reference to `agentsight` which was corrected in this branch. |
+| Binary naming | PASS | Binary output `mtagentlens` consistent across Makefile and CI. The CI had a stale reference to `mtagentlens` which was corrected in this branch. |
 
 **Verdict**: All dependencies originate from approved registries. No unauthorized, private, or suspicious registries detected.
 

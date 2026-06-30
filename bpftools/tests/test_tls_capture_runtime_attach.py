@@ -2,33 +2,34 @@
 """Runtime-level RED test for producer-side tls_capture attach behavior."""
 
 import os
+from pathlib import Path
 import signal
 import subprocess
 import unittest
 
 
-BPF_DIR = "/home/lzk/mtagentlens/bpf"
-SSLSNIFF = os.path.join(BPF_DIR, "tls_capture")
+BPF_DIR = Path(__file__).resolve().parents[1]
+TLS_CAPTURE = str(BPF_DIR / ".output" / "bin" / "tls_capture")
 DEFAULT_CLAUDE_BINARY = "/home/lzk/.npm-global/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe"
 
 
 def resolve_claude_binary() -> str | None:
-    configured = os.environ.get("MTAGENTPRISM_CLAUDE_BINARY", DEFAULT_CLAUDE_BINARY)
+    configured = os.environ.get("MTAGENTLENS_CLAUDE_BINARY", DEFAULT_CLAUDE_BINARY)
     return configured if os.path.exists(configured) else None
 
 
 class SslsniffRuntimeAttachTest(unittest.TestCase):
     def test_claude_binary_reaches_boringssl_offset_attach_path(self) -> None:
-        sudo_password = os.environ.get("MTAGENTPRISM_SUDO_PASSWORD")
+        sudo_password = os.environ.get("MTAGENTLENS_SUDO_PASSWORD")
         if not sudo_password:
             self.skipTest(
-                "Set MTAGENTPRISM_SUDO_PASSWORD to run the runtime attach test with sudo"
+                "Set MTAGENTLENS_SUDO_PASSWORD to run the runtime attach test with sudo"
             )
 
         claude_binary = resolve_claude_binary()
         if not claude_binary:
             self.skipTest(
-                "Set MTAGENTPRISM_CLAUDE_BINARY to an existing Claude ELF to run the runtime attach test"
+                "Set MTAGENTLENS_CLAUDE_BINARY to an existing Claude ELF to run the runtime attach test"
             )
 
         attach_failure = (
@@ -38,7 +39,7 @@ class SslsniffRuntimeAttachTest(unittest.TestCase):
         cmd = [
             "sudo",
             "-S",
-            SSLSNIFF,
+            TLS_CAPTURE,
             "-v",
             "--binary-path",
             claude_binary,

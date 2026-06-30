@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# AgentSight Verification Suite Orchestrator
+# MtAgentLens Verification Suite Orchestrator
 # =============================================================================
 # Runs all three verifiers in sequence and produces an aggregate report:
 #   1. Python verifier (C0-C6 + Sequential) — Subagent output validation
@@ -82,7 +82,7 @@ SHELL_EXIT_CODE=-1
 CROSS_EXIT_CODE=-1
 
 emit_line
-emit "  AgentSight Verification Suite Orchestrator"
+emit "  MtAgentLens Verification Suite Orchestrator"
 emit "  Timestamp: $TIMESTAMP"
 emit "  Repository: $REPO_ROOT"
 emit_line

@@ -1,6 +1,13 @@
 # MtAgentLens 实验设计 v5 — RQ驱动 · 标准指标 · 正式设计文档
 **状态**: 正式设计文档 · **日期**: 2026-06-14 · **目标会议**: USENIX Security / CCS / NDSS
 
+> **当前实现口径（2026-06-27）**：本文件保留 v5 实验设计思路。最终主评估已扩展为
+> FuxiBench 86 场景（67 attack + 19 benign），攻击类型分布为 Type A=10、
+> Type B=34、Type C=23。最终指标以
+> `compare/results/paper/main_evaluation.json` 和
+> `compare/results/paper/EXPERIMENTS.md` 为准：MtAgentLens TPR=0.896、
+> FPR=0.000、F1=0.945、MCC=0.809；Type C TPR=1.000。
+
 > v5 取代 v4。核心变更：
 > 1. 定义 4 个 Research Questions，每个实验严格对齐 RQ
 > 2. 全面采用领域标准指标（TPR/FPR/F1/MCC/Bootstrap CI/Ablation Gap）
@@ -14,7 +21,7 @@
 **MtAgentLens 能否检测 prompt 级工具结构性漏报的 LLM Agent 攻击？**
 
 - 核心假设：多 Agent 攻击（Type C）的恶意行为仅通过跨 Agent **行为关联**可见，单个 prompt 文本合法 → prompt 工具结构性失明
-- 实验：Frozen Main Evaluation（67 场景，覆盖 Type A/B/C + Benign）
+- 实验：Frozen Main Evaluation（当前主评估为 86 场景，覆盖 Type A/B/C + Benign）
 - 主要指标：TPR, FPR, F1, MCC（per attack type）
 - 统计验证：McNemar 配对检验 + Bootstrap 95% CI
 
@@ -60,7 +67,7 @@
 
 **Per-attack-type 分解**：所有检测指标按 Type A (direct injection) / Type B (indirect/fixture) / Type C (multi-agent) 分别报告。
 
-**为什么 MCC 优于 F1**：67 场景中 54 attack vs 13 benign（不平衡），MCC 不会被 majority class 主导。MCC > 0.7 表示强检测能力，≈0 表示随机猜测。
+**为什么 MCC 优于 F1**：当前主评估 86 场景中 67 attack vs 19 benign（不平衡），MCC 不会被 majority class 主导。MCC > 0.7 表示强检测能力，≈0 表示随机猜测。
 
 ### 1.2 消融指标（RQ2）
 
@@ -146,18 +153,18 @@
 
 ### 3.1 Frozen v1.0.0
 
-- **67 场景**：54 attack (10 Type A, 24 Type B, 20 Type C) + 13 benign
-- **8 条已采集 trace**（eBPF 内核级监控 ON）
-- **全部 67 场景有 ground truth**（三标注者交叉验证，Cohen's κ pending）
-- **全部 67 场景有 prompt baseline 结果**（LLM Guard, Vigil, Meta Prompt Guard）
+- **当前主评估 86 场景**：67 attack (10 Type A, 34 Type B, 23 Type C) + 19 benign
+- **全部 86 场景有 ground truth**（三标注者交叉验证 + 共识裁判）
+- **全部 86 场景有 prompt input bundle**（用于 LLM Guard、Meta Prompt Guard、Agent Sentinel 文本基线）
+- `compare/Dataset/FuxiBench/traces/` 中还包含主评估外的扩展/灰区/历史运行归档，不应直接等同于 86 场景主评估规模。
 
 ### 3.2 攻击类型定义
 
 | 类型 | 定义 | 场景数 | 为何 prompt 工具可能漏检 |
 |------|------|--------|------------------------|
 | **Type A** (Direct Injection) | 单 Agent，直接恶意 prompt | 10 | prompt 文本包含攻击信号 → prompt 工具可检测 |
-| **Type B** (Indirect/Fixture) | 单 Agent，通过文件/环境间接攻击 | 24 | 攻击信号在文件系统，不在 prompt 文本中 |
-| **Type C** (Multi-Agent) | 多 Agent，跨 Agent 委派/传播攻击 | 20 | 每个单独 prompt 合法，仅跨 Agent 行为关联可见 |
+| **Type B** (Indirect/Fixture) | 单 Agent，通过文件/环境间接攻击 | 34 | 攻击信号在文件系统，不在 prompt 文本中 |
+| **Type C** (Multi-Agent) | 多 Agent，跨 Agent 委派/传播攻击 | 23 | 每个单独 prompt 合法，仅跨 Agent 行为关联可见 |
 
 ---
 
@@ -180,7 +187,7 @@
 
 ### 设计
 
-比较 5 种配置在 67 场景 frozen 数据集上的检测能力：
+比较 5 种配置在 frozen 数据集上的检测能力（当前主评估为 86 场景）：
 
 | # | 配置 | 工具族 | 输入 |
 |---|------|--------|------|
@@ -190,15 +197,15 @@
 | 4 | Meta Prompt Guard | prompt-baseline | prompt_inputs manifest |
 | 5 | **MtAgentLens** (eBPF Signal OFF) | runtime-causal-observability | responsibility.db (no TLS) |
 
-### 预期 Table 1a: Overall Detection
+### Table 1a: Overall Detection
 
 | Tool | TPR | FPR | Precision | F1 | MCC | Detected/Total |
 |------|-----|-----|-----------|----|-----|----------------|
-| **MtAgentLens (eBPF ON)** | — | — | — | — | — | —/54 |
-| LLM Guard | 0.370 | — | 1.000 | 0.541 | — | 20/54 |
-| Vigil | 0.259 | — | 0.933 | 0.406 | — | 14/54 |
-| Meta Prompt Guard | 0.074 | — | 1.000 | 0.138 | — | 4/54 |
-| MtAgentLens (eBPF OFF) | 0.000 | — | — | — | — | 0/54 |
+| **MtAgentLens (eBPF ON)** | 0.896 | 0.000 | 1.000 | 0.945 | 0.809 | 60/67 |
+| LLM Guard | 详见 `compare/results/paper/EXPERIMENTS.md` | — | — | — | — | — |
+| Agent Sentinel | 详见 `compare/results/paper/EXPERIMENTS.md` | — | — | — | — | — |
+| Meta Prompt Guard | 详见 `compare/results/paper/EXPERIMENTS.md` | — | — | — | — | — |
+| MtAgentLens (eBPF Signal OFF) | 详见消融结果 | — | — | — | — | — |
 
 ### 预期 Table 1b: Per-Attack-Type Detection
 
@@ -332,7 +339,7 @@ Baseline (eBPF ON, 全系统) → 选择性禁用 Layer N 的信号 → 重新�
 
 ### 设计
 
-三名独立标注者（刘周康、唐浩钺、刘锦样）对 67 场景进行盲标注。
+三名独立标注者（刘周康、唐浩钺、刘锦样）对当前主评估 86 场景进行盲标注。
 
 ### 预期 Table 5: Annotation Quality
 
@@ -365,8 +372,8 @@ DeepSeek v4-flash + thinking disabled + compact prompt + JSON truncation recover
 ## 11. 声明边界
 
 ### 支持的主张
-- 67 场景 frozen MtAgentLens 离线评估（RQ1）
-- Prompt baseline 在全部 67 场景 prompt_inputs 上的结果（RQ1）
+- 86 场景 frozen MtAgentLens 离线评估（RQ1）
+- Prompt baseline 在全部 86 场景 prompt_inputs 上的结果（RQ1）
 - 反事实特征消融矩阵（RQ2）
 - 结构化归因 vs 二元分类的质变（RQ3）
 - 本地性能微基准（RQ4）
@@ -376,7 +383,7 @@ DeepSeek v4-flash + thinking disabled + compact prompt + JSON truncation recover
 - 外部基准泛化
 - 实时/online 端到端稳定性
 - 生产环境延迟
-- 更大规模数据集（>67 场景）
+- 超出主评估 86 场景的扩展/灰区归档泛化结论
 
 ---
 
@@ -387,14 +394,14 @@ DeepSeek v4-flash + thinking disabled + compact prompt + JSON truncation recover
 make build-bpf && cd collector && cargo build --release --bin mtagentlens
 
 # 单场景采集（eBPF ON）
-echo "1" | sudo -S bash -c 'MTAGENTPRISM_SUDO_PASSWORD=1 \
+echo "1" | sudo -S bash -c 'MTAGENTLENS_SUDO_PASSWORD=1 \
   ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic \
   ANTHROPIC_AUTH_TOKEN=<token> MODEL=deepseek-v4-flash \
   PYTHONPATH=env/src:. python3 -m mtagentlens_benchmark.cli run \
   --scenario <id> --mode process --collector'
 
 # 单场景采集（eBPF Signal OFF — 消融对照）
-echo "1" | sudo -S bash -c 'MTAGENTPRISM_SUDO_PASSWORD=1 \
+echo "1" | sudo -S bash -c 'MTAGENTLENS_SUDO_PASSWORD=1 \
   PYTHONPATH=env/src:. python3 -m mtagentlens_benchmark.cli run \
   --scenario <id> --mode process --collector -- --ssl=false --process=false'
 
@@ -405,7 +412,7 @@ PYTHONPATH=env:env/src:. python3 compare/scripts/run/run_llm_guards_direct.py
 PYTHONPATH=env:env/src:. python3 compare/scripts/build/build_paper_evaluation_report.py
 
 # 性能
-MTAGENTPRISM_SUDO_PASSWORD=1 PYTHONDONTWRITEBYTECODE=1 \
+MTAGENTLENS_SUDO_PASSWORD=1 PYTHONDONTWRITEBYTECODE=1 \
   python3 compare/scripts/perf/build_performance_results.py --skip-build
 ```
 

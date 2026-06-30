@@ -79,7 +79,7 @@ impl Analyzer for ConnectionBuffer {
 
                 // Determine write vs read by content: HTTP responses start
                 // with "HTTP/", requests start with a method (POST/GET).
-                // The eBPF sslsniff uprobe doesn't populate a direction field.
+                // The eBPF tls_capture uprobe doesn't populate a direction field.
                 let is_response = raw_data.starts_with("HTTP/");
 
                 if !is_response {

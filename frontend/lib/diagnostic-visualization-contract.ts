@@ -49,7 +49,7 @@ export type DiagOutputFormat = 'json' | 'text';
 export type AssertionStatus = 'pass' | 'fail' | 'warn' | 'skip' | 'pending';
 
 /** 探针名称 — 对应 shared_handoff.md Template D 中的 BPF_PROGS 数组 */
-export type ProbeName = 'sslsniff' | 'browsertrace' | 'process' | 'stdiocap';
+export type ProbeName = 'tls_capture' | 'browsertrace' | 'process' | 'stdiocap';
 
 /** 已知事件类型枚举 — 对应 shared_handoff.md Template E 的 KNOWN_TYPES */
 export const KNOWN_EVENT_TYPES = [
@@ -672,7 +672,7 @@ export type DiagThresholdsUpdateRequest = Partial<DiagThresholdConfig>;
  * │   └── SseStatusIndicator
  * ├── DiagThreeColumnGrid
  * │   ├── ProbeVitalityDashboard (左列)
- * │   │   ├── ProbeStatusCard ×4 (sslsniff, browsertrace, process, stdiocap)
+ * │   │   ├── ProbeStatusCard ×4 (tls_capture, browsertrace, process, stdiocap)
  * │   │   │   └── ProbeDetailPanel (展开态)
  * │   │   └── ProbeVitalityTimeline (图)
  * │   ├── StreamIntegrityDashboard (中列)

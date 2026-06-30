@@ -976,8 +976,8 @@ export interface SmartSamplingState {
   dropped_critical_events: number;      // 关键路径上丢弃的事件（应为 0）
 
   // 自保护
-  cpu_overhead_pct: number;            // AgentSight 自身 CPU 开销
-  memory_usage_mb: number;              // AgentSight 自身内存使用
+  cpu_overhead_pct: number;            // MtAgentLens 自身 CPU 开销
+  memory_usage_mb: number;              // MtAgentLens 自身内存使用
 }
 
 // ── 4.7 Handoff 版本 DAG（§23） ──

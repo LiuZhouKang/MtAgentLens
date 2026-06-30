@@ -52,6 +52,15 @@ cc-bos/
 agent-sentinel/
 3d-force-graph/
 
+# Design references & competition video production (local only)
+参考/
+参考2/
+设计/
+演示视频/
+
+# Competition submission files (uploaded manually)
+MtAgentLens初赛演示视频.mp4
+
 # Sensitive files
 .env
 .envrc
@@ -89,3 +98,7 @@ compare/models/
 # Collector local models
 collector/models/
 web/
+
+# Competition submission files (uploaded manually)
+初赛ppt.pptx
+看月亮-proj32-设计开发文档.pdf

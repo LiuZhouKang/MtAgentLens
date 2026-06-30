@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 AgentSight Project
+// Copyright (c) 2026 MtAgentLens Project
 //
 // Subagent 3 — 仪表盘前端数据合约 (精简版)
 //
 // 输入:
-//   shared_handoff.md       → AgentSight 可观测能力矩阵 (eBPF SSL/进程/文件/stdio)
+//   shared_handoff.md       → MtAgentLens 可观测能力矩阵 (eBPF SSL/进程/文件/stdio)
 //   shared_handoff_supplement.md → 补充需求 A (workspace_boundary), B (cross_boundary_read), C (allow_filter=false)
 //   agent_B.md (Subagent 2) → 安全审查发现: sk-prod 凭据通过 shared.md → agent_A.md 泄漏
 //
@@ -187,7 +187,7 @@ export function routeHandoffSSE(
 
 /** 可视化传播链在 3D 空间 */
 export interface ShowPropagationChainMsg {
-  type: "agentsight:showPropagationChain";
+  type: "mtagentlens:showPropagationChain";
   hops: {
     hop_id: string;
     agent_id: string;

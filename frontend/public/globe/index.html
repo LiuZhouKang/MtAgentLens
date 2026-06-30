@@ -1,40 +1,40 @@
 <html>
 <head>
-  <title>The globe of economic complexity</title>
+  <title>MtAgentLens — Responsibility Observatory</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=0" />
 <META NAME="ROBOTS" CONTENT="INDEX, FOLLOW">
 	<meta charset="utf-8">
 
-  <meta property="og:title" content="The Globe of Economic Complexity: Visualize $15 Trillion of World Exports">
-  <meta name="description" content="One dot equals $100M of exports">
-  <meta property="og:description" content="One dot equals $100M of exports">
-  <meta property="og:image" content="http://globe.cid.harvard.edu/images/preview.png">
+  <meta property="og:title" content="MtAgentLens — Responsibility Observatory">
+  <meta name="description" content="Zero-instrumentation responsibility observability for multi-agent systems">
+  <meta property="og:description" content="Zero-instrumentation responsibility observability for multi-agent systems">
+  <meta property="og:image" content="images/preview.png">
   <meta property="og:url" content="index.html">
   <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
   <script>
-    var __agentsightParams = new URLSearchParams(window.location.search);
-    window.__AGENTSIGHT_EMBED_MODE = __agentsightParams.get('embed') || '';
-    window.__AGENTSIGHT_EMBED_HERO = window.__AGENTSIGHT_EMBED_MODE === 'hero';
-    window.__AGENTSIGHT_EMBED_INTRO = window.__AGENTSIGHT_EMBED_MODE === 'intro';
-    window.__AGENTSIGHT_HEADLESS_AUDIT =
-      ((window.__AGENTSIGHT_EMBED_HERO || window.__AGENTSIGHT_EMBED_INTRO) && __agentsightParams.get('audit') === 'headless') ||
-      ((window.__AGENTSIGHT_EMBED_HERO || window.__AGENTSIGHT_EMBED_INTRO) &&
+    var __mtagentlensParams = new URLSearchParams(window.location.search);
+    window.__MTAGENTLENS_EMBED_MODE = __mtagentlensParams.get('embed') || '';
+    window.__MTAGENTLENS_EMBED_HERO = window.__MTAGENTLENS_EMBED_MODE === 'hero';
+    window.__MTAGENTLENS_EMBED_INTRO = window.__MTAGENTLENS_EMBED_MODE === 'intro';
+    window.__MTAGENTLENS_HEADLESS_AUDIT =
+      ((window.__MTAGENTLENS_EMBED_HERO || window.__MTAGENTLENS_EMBED_INTRO) && __mtagentlensParams.get('audit') === 'headless') ||
+      ((window.__MTAGENTLENS_EMBED_HERO || window.__MTAGENTLENS_EMBED_INTRO) &&
         !!navigator.webdriver &&
         /HeadlessChrome/i.test(navigator.userAgent));
-    if (window.__AGENTSIGHT_EMBED_HERO || window.__AGENTSIGHT_EMBED_INTRO) {
-      document.documentElement.className += ' agentsight-embed';
+    if (window.__MTAGENTLENS_EMBED_HERO || window.__MTAGENTLENS_EMBED_INTRO) {
+      document.documentElement.className += ' mtagentlens-embed';
     }
-    if (window.__AGENTSIGHT_EMBED_HERO) {
-      document.documentElement.className += ' agentsight-hero';
+    if (window.__MTAGENTLENS_EMBED_HERO) {
+      document.documentElement.className += ' mtagentlens-hero';
     }
-    if (window.__AGENTSIGHT_EMBED_INTRO) {
-      document.documentElement.className += ' agentsight-intro';
+    if (window.__MTAGENTLENS_EMBED_INTRO) {
+      document.documentElement.className += ' mtagentlens-intro';
     }
-    if (window.__AGENTSIGHT_HEADLESS_AUDIT) {
-      document.documentElement.className += ' agentsight-audit';
+    if (window.__MTAGENTLENS_HEADLESS_AUDIT) {
+      document.documentElement.className += ' mtagentlens-audit';
     }
   </script>
-  <link href="style.css" rel="stylesheet" type="text/css">
+  <link href="style.css?v=mtagentlens-logo-20260630" rel="stylesheet" type="text/css">
   <link rel="icon" href="images/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -65,19 +65,19 @@
         function announceReady() {
           if (announced) return;
           announced = true;
-          window.parent.postMessage({ type: 'agentsight:ready' }, '*');
+          window.parent.postMessage({ type: 'mtagentlens:ready' }, '*');
         }
 
-        window.agentsight_bootstrap = function () {};
-        window.agentsight_loadGraph = function () {};
-        window.agentsight_setPhase = function () {};
-        window.__agentsightSetHeroView = function () {};
-        window.__agentsightIsHeroViewReleased = function () { return false; };
+        window.mtagentlens_bootstrap = function () {};
+        window.mtagentlens_loadGraph = function () {};
+        window.mtagentlens_setPhase = function () {};
+        window.__mtagentlensSetHeroView = function () {};
+        window.__mtagentlensIsHeroViewReleased = function () { return false; };
         window.addEventListener('DOMContentLoaded', announceReady, { once: true });
         window.addEventListener('load', announceReady, { once: true });
       }
 
-      if (window.__AGENTSIGHT_HEADLESS_AUDIT) {
+      if (window.__MTAGENTLENS_HEADLESS_AUDIT) {
         registerHeadlessAuditBridge();
         return;
       }
@@ -107,7 +107,7 @@
           return loadScript(src);
         });
       }, Promise.resolve()).catch(function (error) {
-        console.error('[AgentSight] Globe asset bootstrap failed', error);
+        console.error('[MtAgentLens] Globe asset bootstrap failed', error);
       });
     })();
   </script>
@@ -119,58 +119,15 @@
 		<div class="intro-stage-shell">
 			<div class="intro-brand-lockup">
 				<div class="intro-brand-panel">
-					<div class="intro-brand-mark">
-						<svg class="intro-brand-mark__glyph" viewBox="0 0 64 64" aria-hidden="true">
-							<circle cx="32" cy="32" r="20" fill="none" stroke="#f4fbff" stroke-width="1.7"/>
-							<path d="M32 12 L35.1 18.7 L28.9 18.7 Z" fill="#f4fbff"/>
-							<path d="M22 21.5 L32 16.3 L42 21.5 L42 32.7 L32 38 L22 32.7 Z" fill="none" stroke="#f4fbff" stroke-width="1.7" stroke-linejoin="round"/>
-							<path d="M32 16.3 V38" fill="none" stroke="#f4fbff" stroke-width="1.5" stroke-linecap="round"/>
-							<path d="M22 21.5 L32 27.2 L42 21.5" fill="none" stroke="#f4fbff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-							<path d="M24.8 42 L32 35.6 L39.2 42" fill="none" stroke="#f4fbff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-							<path d="M22.5 46 H41.5" fill="none" stroke="#f4fbff" stroke-width="1.7" stroke-linecap="round"/>
-							<path d="M17.5 23.8 C20.1 20.9 22.9 18.9 26.4 17.8" fill="none" stroke="rgba(244,251,255,0.54)" stroke-width="1.35" stroke-linecap="round"/>
-							<path d="M46.5 23.8 C43.9 20.9 41.1 18.9 37.6 17.8" fill="none" stroke="rgba(244,251,255,0.54)" stroke-width="1.35" stroke-linecap="round"/>
-						</svg>
-					</div>
-					<div class="intro-brand-lockup__text">
-						<div class="intro-brand-lockup__kicker">Responsibility Observatory</div>
-						<div class="intro-brand-lockup__name">
-							<span class="intro-brand-lockup__name-prefix">MtAgent</span>
-							<span class="intro-brand-lockup__name-divider" aria-hidden="true"></span>
-							<span class="intro-brand-lockup__name-core">Prism</span>
-						</div>
-						<div class="intro-brand-lockup__descriptor">Multi-Agent Responsibility Intelligence</div>
-					</div>
+					<img class="intro-brand-lockup__image" src="/brand/mtagentlens-lockup.svg" alt="MtAgentLens" />
 				</div>
 			</div>
 			<div class="intro-hero-grid">
 				<div id="description">
-					<div class="intro-copy intro-copy--eyebrow">Responsibility Calibration Sequence</div>
-					<div class="intro-copy intro-copy--title">把多 Agent 的委派、越界与证据<br/>折成一张可直接定责的责任现场</div>
-					<div class="intro-copy intro-copy--body">MtAgentLens 先在这段序章里校准责任尺度，再进入主舞台查看 authority、delegation、boundary 与 evidence 如何在 cluster、agent 与 investigation 里收束成可判断的现场。</div>
-					<div class="intro-copy intro-copy--manifesto">先校准尺度，再进入现场。</div>
-					<div class="intro-signal-strip">
-						<div class="intro-signal-pill"><span class="intro-signal-pill__dot"></span>Authority Surface</div>
-						<div class="intro-signal-pill"><span class="intro-signal-pill__dot"></span>Boundary Rupture</div>
-						<div class="intro-signal-pill"><span class="intro-signal-pill__dot"></span>Evidence Lock</div>
-					</div>
-					<div id="loaded"><span class="intro-loaded-dot"></span>Calibrating responsibility field</div>
-				</div>
-				<div class="intro-side-atlas">
-					<div class="intro-side-atlas__label">Field Readout</div>
-					<div class="intro-side-atlas__title">不是加载动画，而是进入判断之前的品牌化校准层。</div>
-					<div class="intro-side-atlas__row">
-						<span>01</span>
-						<span>Authority claims compress into one surface.</span>
-					</div>
-					<div class="intro-side-atlas__row">
-						<span>02</span>
-						<span>Boundary rupture becomes spatial, not textual.</span>
-					</div>
-					<div class="intro-side-atlas__row">
-						<span>03</span>
-						<span>Evidence lock determines what deserves investigation.</span>
-					</div>
+					<div class="intro-copy intro-copy--eyebrow">MtAgentLens · Responsibility Lens</div>
+					<div class="intro-copy intro-copy--title">把多 Agent 的权责边界<br/>凝结为可裁决的现场</div>
+					<div class="intro-copy intro-copy--body">进入主舞台前，MtAgentLens 先校准责任尺度：主张、执行、越界与证据在同一张现场中闭环，确保每一次判断可追溯、可验证。</div>
+					<div id="loaded"><span class="intro-loaded-dot"></span>Preparing responsibility field</div>
 				</div>
 			</div>
 			<div id="choice" style="display:none">
@@ -185,10 +142,10 @@
 						<path d="M36 50.5 V62.5" fill="none" stroke="#f6fbff" stroke-width="2" stroke-linecap="round"/>
 					</svg>
 				</div>
-				<div class="intro-choice-eyebrow">Cinematic Entry</div>
+				<div class="intro-choice-eyebrow">Guided Entry</div>
 				<div class="intro-choice-title">进入责任序章</div>
-				<div class="intro-choice-copy">按照叙事镜头进入 MtAgentLens，先理解 authority、delegation、execution 与 evidence 如何在同一现场收束。</div>
-				<div class="intro-choice-meta"><span>Guided Sequence</span><span>90 sec narrative</span></div>
+				<div class="intro-choice-copy">用一段叙事镜头建立直觉：权责、委派、越界与证据如何在现场收束。</div>
+				<div class="intro-choice-meta"><span>Calibration</span><span>~60s</span></div>
 				</div>
 
 				<div><div class="midSeparator">&nbsp;</div></div>
@@ -209,18 +166,14 @@
 					</svg>
 				</div>
 				<div class="intro-choice-eyebrow">Direct Access</div>
-				<div class="intro-choice-title">直接进入主舞台</div>
-				<div class="intro-choice-copy">跳过序章，直接进入 MtAgentLens 首页，立即查看总览、调查、cluster 与委派监测工作台。</div>
-				<div class="intro-choice-meta"><span>Direct Workspace</span><span>L0 -> L2 observatory</span></div>
+				<div class="intro-choice-title">进入主舞台</div>
+				<div class="intro-choice-copy">跳过序章，直达工作台：总览、调查、cluster 与委派监测。</div>
+				<div class="intro-choice-meta"><span>Workspace</span><span>Now</span></div>
 				</div>
 			</div>
 			<div class="intro-footer-lockup">
 				<div class="intro-footer-lockup__rule"></div>
-				<div class="intro-footer-lockup__text">
-					<div class="intro-footer-lockup__label">MtAgentLens</div>
-					<div class="intro-footer-lockup__subline">Responsibility Observatory for Multi-Agent Systems</div>
-					<div class="intro-footer-lockup__edition">Field Calibration Sequence</div>
-				</div>
+				<img class="intro-footer-lockup__image" src="/brand/mtagentlens-lockup.svg" alt="MtAgentLens" />
 				<div class="intro-footer-lockup__rule"></div>
 			</div>
 		</div>
@@ -378,33 +331,33 @@
 			}
 
 		</script>
-<!-- AgentSight Graph Injection — Particle Clusters + Sphere-Surface Drift -->
+<!-- MtAgentLens Graph Injection — Particle Clusters + Sphere-Surface Drift -->
 <script>
 (function() {
   'use strict';
-  var isEmbedHeroMode = !!window.__AGENTSIGHT_EMBED_HERO;
-  var isEmbedIntroMode = !!window.__AGENTSIGHT_EMBED_INTRO;
+  var isEmbedHeroMode = !!window.__MTAGENTLENS_EMBED_HERO;
+  var isEmbedIntroMode = !!window.__MTAGENTLENS_EMBED_INTRO;
   if (isEmbedIntroMode) return;
   var bridgeBootAttempts = 0;
 
-  function bootstrapAgentSightGraph() {
+  function bootstrapMtAgentLensGraph() {
     if (graphGroup) return;
     bridgeBootAttempts += 1;
 
     if (typeof scene !== 'undefined' && typeof THREE !== 'undefined' && typeof renderer !== 'undefined' && typeof camera !== 'undefined') {
-      initAgentSightGraph();
+      initMtAgentLensGraph();
       return;
     }
 
     if (bridgeBootAttempts < 80) {
-      setTimeout(bootstrapAgentSightGraph, 250);
+      setTimeout(bootstrapMtAgentLensGraph, 250);
     }
   }
 
   window.addEventListener('load', function() {
-    setTimeout(bootstrapAgentSightGraph, 150);
+    setTimeout(bootstrapMtAgentLensGraph, 150);
   });
-  setTimeout(bootstrapAgentSightGraph, 300);
+  setTimeout(bootstrapMtAgentLensGraph, 300);
 
   // ── Global state ──
   var graphGroup = null;
@@ -722,39 +675,39 @@
 
     // If globe not ready yet, queue the message
     if (!graphGroup) {
-      if (msg.type === 'agentsight:loadGraph') {
+      if (msg.type === 'mtagentlens:loadGraph') {
         pendingGraphPayload = { nodes: msg.nodes || [], edges: msg.edges || [] };
-        bootstrapAgentSightGraph();
+        bootstrapMtAgentLensGraph();
         return;
       }
-      if (msg.type === 'agentsight:setPhase') {
+      if (msg.type === 'mtagentlens:setPhase') {
         pendingPhase = msg.phase || 'provisional';
-        bootstrapAgentSightGraph();
+        bootstrapMtAgentLensGraph();
         return;
       }
     }
 
     switch (msg.type) {
-      case 'agentsight:loadGraph':
+      case 'mtagentlens:loadGraph':
         loadGraph(msg.nodes || [], msg.edges || []);
         break;
-      case 'agentsight:highlightPath':
+      case 'mtagentlens:highlightPath':
         highlightPath(msg.edgeIds || []);
         break;
-      case 'agentsight:clearHighlights':
+      case 'mtagentlens:clearHighlights':
         clearHighlights();
         break;
-      case 'agentsight:setPhase':
+      case 'mtagentlens:setPhase':
         setPhase(msg.phase || 'provisional');
         break;
-      case 'agentsight:clearGraph':
+      case 'mtagentlens:clearGraph':
         clearGraph();
         break;
     }
   });
 
   // ── Initialize ──
-  function initAgentSightGraph() {
+  function initMtAgentLensGraph() {
     graphGroup = new THREE.Object3D();
     scene.add(graphGroup);
 
@@ -857,7 +810,7 @@
         var nid = targetToNid[hitObj.uuid || hitObj.id];
         if (nid) {
           window.parent.postMessage({
-            type: 'agentsight:nodeClicked',
+            type: 'mtagentlens:nodeClicked',
             nodeId: nid,
           }, '*');
         }
@@ -865,15 +818,15 @@
     });
 
     // Signal React parent that we're ready
-    window.parent.postMessage({ type: 'agentsight:ready' }, '*');
-    console.log('[AgentSight] Particle-cluster graph bridge initialized');
+    window.parent.postMessage({ type: 'mtagentlens:ready' }, '*');
+    console.log('[MtAgentLens] Particle-cluster graph bridge initialized');
   }
 
   // ── Load graph data ──
   function loadGraph(nodes, edges) {
     if (!graphGroup) {
       pendingGraphPayload = { nodes: nodes || [], edges: edges || [] };
-      bootstrapAgentSightGraph();
+      bootstrapMtAgentLensGraph();
       return;
     }
     clearGraph();
@@ -952,7 +905,7 @@
       edgeLines[e.edge_id] = { line: line, sourceId: e.source, targetId: e.target };
     });
 
-    console.log('[AgentSight] Graph loaded: ' + nodes.length + ' nodes, ' + edges.length + ' edges');
+    console.log('[MtAgentLens] Graph loaded: ' + nodes.length + ' nodes, ' + edges.length + ' edges');
   }
 
   // ── Traceback path highlight ──
@@ -1007,7 +960,7 @@
     currentPhase = phase;
     if (!graphGroup) {
       pendingPhase = phase;
-      bootstrapAgentSightGraph();
+      bootstrapMtAgentLensGraph();
       return;
     }
     var spriteOp = phase === 'provisional' ? 0.45 : 0.55;
@@ -1053,12 +1006,12 @@
   }
 
   // ── Expose to iframe context ──
-  window.agentsight_bootstrap       = bootstrapAgentSightGraph;
-  window.agentsight_loadGraph       = loadGraph;
-  window.agentsight_highlightPath   = highlightPath;
-  window.agentsight_clearHighlights = clearHighlights;
-  window.agentsight_setPhase        = setPhase;
-  window.agentsight_clearGraph      = clearGraph;
+  window.mtagentlens_bootstrap       = bootstrapMtAgentLensGraph;
+  window.mtagentlens_loadGraph       = loadGraph;
+  window.mtagentlens_highlightPath   = highlightPath;
+  window.mtagentlens_clearHighlights = clearHighlights;
+  window.mtagentlens_setPhase        = setPhase;
+  window.mtagentlens_clearGraph      = clearGraph;
 })();
 </script>
 

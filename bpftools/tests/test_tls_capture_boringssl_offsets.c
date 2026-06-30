@@ -25,13 +25,13 @@ static void assert_true(bool condition, const char *message)
 
 int main(void)
 {
-    const char *binary_path = getenv("MTAGENTPRISM_CLAUDE_BINARY");
+    const char *binary_path = getenv("MTAGENTLENS_CLAUDE_BINARY");
     if (!binary_path || binary_path[0] == '\0') {
         binary_path = "/home/lzk/.npm-global/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe";
     }
     if (access(binary_path, R_OK) != 0) {
         fprintf(stderr,
-                "SKIP: set MTAGENTPRISM_CLAUDE_BINARY to a readable Claude ELF (current: %s)\n",
+                "SKIP: set MTAGENTLENS_CLAUDE_BINARY to a readable Claude ELF (current: %s)\n",
                 binary_path);
         return 0;
     }

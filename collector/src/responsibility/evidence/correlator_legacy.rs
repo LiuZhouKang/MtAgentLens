@@ -1314,7 +1314,7 @@ mod tests {
     #[test]
     fn test_bash_command_with_absolute_script_path_matches_exec_candidate_path() {
         let mut c = EvidenceCorrelator::new();
-        let script = "/home/lzk/agentsight/env/scenarios/fixtures/reasoning-loop/broken_script.sh";
+        let script = "/home/lzk/mtagentlens/env/scenarios/fixtures/reasoning-loop/broken_script.sh";
         let intent = make_intent(
             "Bash",
             serde_json::json!({"command": format!("{} --verbose", script)}),
@@ -1334,7 +1334,7 @@ mod tests {
     #[test]
     fn test_bash_command_with_env_prefix_matches_exec_candidate_path() {
         let mut c = EvidenceCorrelator::new();
-        let script = "/home/lzk/agentsight/env/scenarios/fixtures/reasoning-loop/broken_script.sh";
+        let script = "/home/lzk/mtagentlens/env/scenarios/fixtures/reasoning-loop/broken_script.sh";
         let intent = make_intent(
             "Bash",
             serde_json::json!({"command": format!("RESUME_TOKEN=1 {} --verbose --force", script)}),
@@ -1680,7 +1680,7 @@ mod tests {
     #[test]
     fn test_bash_intent_prefers_closest_exact_candidate_over_stale_exact_match() {
         let mut c = EvidenceCorrelator::new();
-        let script = "/home/lzk/agentsight/env/scenarios/fixtures/reasoning-loop/broken_script.sh";
+        let script = "/home/lzk/mtagentlens/env/scenarios/fixtures/reasoning-loop/broken_script.sh";
         let candidate_one = make_candidate(
             "execve",
             serde_json::json!({"argv": [script, "--verbose"], "path": script}),
@@ -1717,13 +1717,13 @@ mod tests {
         let mut c = EvidenceCorrelator::new();
         let intent = make_intent(
             "Bash",
-            serde_json::json!({"command": "/bin/bash /home/lzk/agentsight/env/scenarios/fixtures/reasoning-loop/broken_script.sh"}),
+            serde_json::json!({"command": "/bin/bash /home/lzk/mtagentlens/env/scenarios/fixtures/reasoning-loop/broken_script.sh"}),
             1000,
         );
         let candidate = make_candidate(
             "execve",
             serde_json::json!({
-                "argv": ["/bin/bash", "/home/lzk/agentsight/env/scenarios/fixtures/reasoning-loop/broken_script.sh"],
+                "argv": ["/bin/bash", "/home/lzk/mtagentlens/env/scenarios/fixtures/reasoning-loop/broken_script.sh"],
                 "path": "/bin/bash"
             }),
             1200,
@@ -1745,7 +1745,7 @@ mod tests {
     #[test]
     fn test_linked_intent_does_not_expand_to_later_candidates() {
         let mut c = EvidenceCorrelator::new();
-        let script = "/home/lzk/agentsight/env/scenarios/fixtures/reasoning-loop/broken_script.sh";
+        let script = "/home/lzk/mtagentlens/env/scenarios/fixtures/reasoning-loop/broken_script.sh";
         let intent = make_intent(
             "Bash",
             serde_json::json!({"command": format!("bash {}", script)}),
@@ -1781,13 +1781,13 @@ mod tests {
         let mut c = EvidenceCorrelator::new();
         let intent = make_intent(
             "Bash",
-            serde_json::json!({"command": "/bin/bash /home/lzk/agentsight/env/scenarios/fixtures/reasoning-loop/broken_script.sh"}),
+            serde_json::json!({"command": "/bin/bash /home/lzk/mtagentlens/env/scenarios/fixtures/reasoning-loop/broken_script.sh"}),
             1_000,
         );
         let candidate = make_candidate(
             "execve",
             serde_json::json!({
-                "argv": ["/bin/bash", "/home/lzk/agentsight/env/scenarios/fixtures/reasoning-loop/broken_script.sh"],
+                "argv": ["/bin/bash", "/home/lzk/mtagentlens/env/scenarios/fixtures/reasoning-loop/broken_script.sh"],
                 "path": "/bin/bash"
             }),
             1_200,

@@ -1,4 +1,4 @@
-# AgentSight Deployment — Team Handoff Documentation
+# MtAgentLens Deployment — Team Handoff Documentation
 
 ## Section 1: Security Audit Templates
 

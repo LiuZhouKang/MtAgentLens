@@ -485,7 +485,7 @@ mod tests {
             ResponsibilityNodeType::Resource,
             Some("agent-1"),
             Some(NormalizedResource::File {
-                canonical_path: "/home/lzk/agentsight/src/main.rs".into(),
+                canonical_path: "/home/lzk/mtagentlens/src/main.rs".into(),
             }),
         ));
         g.add_edge(make_edge("e1", ResponsibilityEdgeType::IntentCausesAction, "a1", "r1"));

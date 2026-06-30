@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
   ArrowUpRight,
@@ -10,18 +9,15 @@ import {
   FileSearch,
   Network,
   Orbit,
-  Radar,
   ShieldAlert,
   ShieldCheck,
-  Waypoints,
   Workflow,
   Wrench,
 } from 'lucide-react';
 import ObservatoryHeader from '@/components/system/observatory-header';
+import ObservatoryPageHero from '@/components/system/observatory-page-hero';
 import PrismPanel from '@/components/ui/prism-panel';
-import { api } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
-import { demoEvidence } from '@/lib/demo-data';
 import { deriveClusterIds } from '@/lib/stellar-directory';
 import { buildClusterModel, compareClusterModels } from '@/lib/cluster-model';
 import { buildClusterHref } from '@/lib/cluster-route';
@@ -29,6 +25,7 @@ import { buildInvestigationHref } from '@/lib/investigation-route';
 import { buildAgentHref } from '@/lib/agent-route';
 import { getSeverityPalette } from '@/lib/severity-palette';
 import type { GraphData } from '@/lib/types';
+import { useRunEvidence } from '@/lib/use-run-evidence';
 
 type StageLayer = {
   label: string;
@@ -117,28 +114,7 @@ export default function OverviewPageClient() {
   const alerts = useAppStore((state) => state.alerts);
   const graph = useAppStore((state) => state.graph);
 
-  const evidenceQuery = useQuery({
-    queryKey: ['run-evidence', activeRunId],
-    enabled: !!activeRunId,
-    retry: false,
-    queryFn: async () => {
-      if (!activeRunId) {
-        return {
-          evidence: [],
-          intents: [],
-          actions: [],
-          non_links: [],
-        };
-      }
-
-      return api.getEvidence(activeRunId);
-    },
-  });
-
-  const evidenceItems = useMemo(
-    () => (activeRunId ? evidenceQuery.data?.evidence ?? [] : demoEvidence),
-    [activeRunId, evidenceQuery.data?.evidence],
-  );
+  const { evidenceItems } = useRunEvidence(activeRunId);
 
   const clusterModels = useMemo(
     () =>
@@ -307,6 +283,47 @@ export default function OverviewPageClient() {
             activeRunId ? `观测会话 ${activeRunId.slice(0, 12)}...` : '示例场景',
             `${criticalClusters.length} critical clusters`,
             `${clusterModels.length} cluster entries`,
+          ]}
+        />
+
+        <ObservatoryPageHero
+          eyebrow="Mission Control Overview"
+          title={leadCluster ? `先锁定 ${leadCluster.title}，再展开运行因果面` : '先锁定主风险，再展开运行因果面'}
+          description="参考 NASA Open MCT 的总控台组织方式与 Grafana 的多信号总览节奏，把 probes、runtime graph、priority queue 与下钻动作压进同一层控制平面。"
+          statusLabel={activeRunId ? 'live run synchronized' : 'demo command scene'}
+          chips={[
+            `${clusterModels.length} cluster fields`,
+            `${graph.nodes.length} runtime objects`,
+            `${alerts.length} alert narratives`,
+          ]}
+          stats={[
+            {
+              label: 'Lead Cluster',
+              value: leadCluster?.title ?? 'awaiting focus',
+              hint: leadCluster ? `${leadCluster.alertIds.length} alerts linked` : '等待主要调查对象形成',
+            },
+            {
+              label: 'Boundary Seams',
+              value: `${totalDelegations}`,
+              hint: '跨主体与跨边界路径正在收敛',
+            },
+            {
+              label: 'Evidence',
+              value: `${evidenceItems.length}`,
+              hint: 'collector 与 analyzer 可直接回流的材料',
+            },
+          ]}
+          actions={[
+            {
+              label: '进入主调查',
+              href: leadCluster?.leadAlertId ? buildInvestigationHref(leadCluster.leadAlertId) : '/investigations',
+              hint: '直接进入当前最值得裁决的案件工作台',
+            },
+            {
+              label: '查看责任集群',
+              href: leadCluster ? buildClusterHref(leadCluster.clusterId) : '/clusters',
+              hint: '把总览态势落到 cluster 扩散面',
+            },
           ]}
         />
 

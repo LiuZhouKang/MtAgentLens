@@ -13,7 +13,7 @@
 // 与第二局之器相合：
 //   sha256sum / diff -u / grep -n          → 一阶文契仪象
 //   sqlite3 / jq / cargo test --lib *      → 二阶流布仪象
-//   agentsight replay / diff / 浏览器DOM    → 三阶因果仪象
+//   mtagentlens replay / diff / 浏览器DOM    → 三阶因果仪象
 //
 // 术法符文之形（TypeScript 类型契约）
 // 对齐现有模式: lib/data-contract.ts · lib/types.ts
@@ -98,8 +98,8 @@ export type AssertionMethod =
   | "sql_query"               // SQLite 查询
   | "jq_filter"               // jq JSONL 过滤
   | "python_assert"           // Python 脚本断言
-  | "agentsight_replay_diff"  // agentsight diff 命令
-  | "agentsight_cli"          // agentsight replay/record 命令
+  | "mtagentlens_replay_diff"  // mtagentlens diff 命令
+  | "mtagentlens_cli"          // mtagentlens replay/record 命令
   | "browser_dom"             // 浏览器 DOM 断言
   | "browser_sse"             // 浏览器 SSE 事件流验证
   | "zustand_devtools"        // Zustand DevTools store 验证
@@ -524,7 +524,7 @@ export const CROSS_TIER_CONSISTENCY_CONSTRAINTS: Omit<CrossTierConsistencyConstr
     constraint_id: "CROSS-005",
     description: "SEDA 去重—安全事件守恒：启用 SEDA 后告警数 = 禁用 SEDA 后告警数（suppressed_by_dedup = 0）",
     involved_tiers: ["tier_1_document", "tier_2_propagation", "tier_3_causal"],
-    verification_method: "agentsight diff --baseline-session replay-dedup-off --injected-session replay-dedup-on",
+    verification_method: "mtagentlens diff --baseline-session replay-dedup-off --injected-session replay-dedup-on",
     linked_assertion_ids: ["1.3.11", "3.3.3"],
     failure_remediation_ref: "seda_false_suppression",
   },
@@ -636,10 +636,10 @@ export type InstrumentTool =
   | "cargo_test_lib_agent_loop"
   | "cargo_test_lib_event_dedup"
   | "cargo_test_lib_tool_execution"
-  | "agentsight_record"
-  | "agentsight_trace"
-  | "agentsight_replay"
-  | "agentsight_diff"
+  | "mtagentlens_record"
+  | "mtagentlens_trace"
+  | "mtagentlens_replay"
+  | "mtagentlens_diff"
   | "sqlite3"
   | "jq"
   | "chrome_devtools"
@@ -1221,7 +1221,7 @@ export const DEFAULT_VERIFICATION_CONFIG: VerificationDashboardConfig = {
   toolCallTimeoutMs: 120_000,
   crossAgentToolJoinWindowNs: 1_000_000_000, // ±1s
 
-  sandboxPath: "/tmp/agentsight_sandbox",
+  sandboxPath: "/tmp/mtagentlens_sandbox",
   signalAnomalyZScoreThreshold: 3.0,
   aldExactRepeatThreshold: 5,
   aldCooldownMs: 60_000,
@@ -1423,7 +1423,7 @@ export function generateVerificationSummary(
  *    - 递验中的 SEDA 去重诊断 → 联动 DedupDiagnosticsPanel
  *
  * 6. 递验配置持久化:
- *    - localStorage key: "agentsight_verification_config"
+ *    - localStorage key: "mtagentlens_verification_config"
  *    - 启动时加载配置覆盖 DEFAULT_VERIFICATION_CONFIG
  *    - 配置变更后自动持久化
  */
@@ -1432,8 +1432,8 @@ export function generateVerificationSummary(
 // 十三、术法符文终章 — 型制约法就绪
 //     此文与第二局器具营缮要略（三阶递验章程）完全相合：
 //     - 第一阶文契递验 → 断言 1.3.1–1.3.11 + 破执 7 种模式 + 法器 sha256sum/diff/grep/cargo test
-//     - 第二阶流布递验 → 断言 2.3.1–2.3.16 + 破执 9 种模式 + 法器 sqlite3/jq/agentsight record
-//     - 第三阶因果递验 → 断言 3.3.1–3.3.17 + 破执 10 种模式 + 法器 agentsight replay/diff/chrome/zustand
+//     - 第二阶流布递验 → 断言 2.3.1–2.3.16 + 破执 9 种模式 + 法器 sqlite3/jq/mtagentlens record
+//     - 第三阶因果递验 → 断言 3.3.1–3.3.17 + 破执 10 种模式 + 法器 mtagentlens replay/diff/chrome/zustand
 //
 //     此文与首局递送文书相合：
 //     - 首局五十二目，对应 handoff-visualization-contract 仪象类型

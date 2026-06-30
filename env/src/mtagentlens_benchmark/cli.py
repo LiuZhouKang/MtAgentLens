@@ -21,7 +21,17 @@ def main() -> None:
 @click.option("--output", "-o", default="runs", type=click.Path(), help="Output directory")
 @click.option("--collector/--no-collector", "with_collector", default=False,
               help="Start MtAgentLens eBPF collector (requires sudo)")
-def run(scenario: str | None, run_all: bool, mode: str, parallel: int, output: str, with_collector: bool) -> None:
+@click.option("--disable-responsibility-observer", is_flag=True,
+              help="Disable responsibility-layer Observer LLM during collector runs")
+def run(
+    scenario: str | None,
+    run_all: bool,
+    mode: str,
+    parallel: int,
+    output: str,
+    with_collector: bool,
+    disable_responsibility_observer: bool,
+) -> None:
     """Run scenarios — live or batch mode."""
     if not scenario and not run_all:
         raise click.UsageError("Must specify --scenario or --all")
@@ -52,7 +62,10 @@ def run(scenario: str | None, run_all: bool, mode: str, parallel: int, output: s
     if with_collector:
         from mtagentlens_benchmark.engine.collector_manager import CollectorManager
         def _make_collector():
-            return CollectorManager(ws)
+            return CollectorManager(
+                ws,
+                disable_responsibility_observer=disable_responsibility_observer,
+            )
         collector_factory = _make_collector
 
     results = run_scenarios(scenarios, ws, parallel, collector_factory, execution_mode=mode)

@@ -258,13 +258,44 @@ fn resolve_alert_judgment(
             );
             let risk_score = compute_risk_score(classification_result.score as f64, &risk_factors);
 
-            let (dec, sev, reason) = if !has_claims {
+            let is_fail_closed = classification_result.route == "fail_closed_unsafe";
+            let is_direct_unsafe = classification_result.route == "direct_unsafe"
+                || classification_result.route == "unsafe_by_engine";
+
+            let (dec, sev, reason) = if !has_claims && is_fail_closed {
+                (
+                    AlertDecision::Uncertain,
+                    AlertSeverity::Warning,
+                    format!(
+                        "No responsibility claims, but authoritative classification used fail-closed routing for ambiguous score {:.2}, risk_score={:.1}",
+                        classification_result.score, risk_score,
+                    ),
+                )
+            } else if !has_claims && is_direct_unsafe {
+                (
+                    AlertDecision::Unsafe,
+                    AlertSeverity::Critical,
+                    format!(
+                        "No responsibility claims, but engine route {} indicates unsafe behavior with score {:.2}, risk_score={:.1}",
+                        classification_result.route, classification_result.score, risk_score,
+                    ),
+                )
+            } else if !has_claims {
                 (
                     AlertDecision::Safe,
                     AlertSeverity::Info,
                     format!(
                         "No responsibility claims — classification score {:.2}, risk_score={:.1}",
                         classification_result.score, risk_score,
+                    ),
+                )
+            } else if has_claims && is_direct_unsafe {
+                (
+                    AlertDecision::Unsafe,
+                    AlertSeverity::Critical,
+                    format!(
+                        "Responsibility claims observed and engine route {} indicates unsafe behavior with score {:.2}, risk_score={:.1}",
+                        classification_result.route, classification_result.score, risk_score,
                     ),
                 )
             } else if classification_result.score > 0.70 {
@@ -282,6 +313,15 @@ fn resolve_alert_judgment(
                     AlertSeverity::Warning,
                     format!(
                         "Engine classification score {:.2} in ambiguous range (0.15–0.70], risk_score={:.1}",
+                        classification_result.score, risk_score,
+                    ),
+                )
+            } else if has_claims {
+                (
+                    AlertDecision::Uncertain,
+                    AlertSeverity::Warning,
+                    format!(
+                        "Responsibility claims observed, but engine score {:.2} is below the unsafe threshold; retaining Warning for review, risk_score={:.1}",
                         classification_result.score, risk_score,
                     ),
                 )
@@ -567,19 +607,34 @@ mod tests {
     #[test]
     fn test_compose_engine_only_safe() {
         let g = ResponsibilityGraph::default();
+        let class_result = make_classification_result(0.05, "safe");
+        let timeline = make_timeline();
+
+        let alert = AlertBuilder::compose(&[], &class_result, None, &g, &timeline, None);
+
+        assert_eq!(alert.display_profile, DisplayProfile::UnsafeByEngine);
+        assert_eq!(alert.decision, AlertDecision::Safe);
+        assert_eq!(alert.severity, AlertSeverity::Info);
+    }
+
+    #[test]
+    fn test_compose_claim_with_low_score_stays_warning() {
+        let g = ResponsibilityGraph::default();
         let claims = vec![make_claim(
             "agent-s",
-            ResponsibilityClaimType::ResponsibilityAnomaly,
-            0.10,
+            ResponsibilityClaimType::PolicyViolation,
+            0.80,
         )];
-        let class_result = make_classification_result(0.05, "safe");
+        let class_result = make_classification_result(0.05, "direct_safe");
         let timeline = make_timeline();
 
         let alert = AlertBuilder::compose(&claims, &class_result, None, &g, &timeline, None);
 
         assert_eq!(alert.display_profile, DisplayProfile::UnsafeByEngine);
-        assert_eq!(alert.decision, AlertDecision::Safe);
-        assert_eq!(alert.severity, AlertSeverity::Info);
+        assert_eq!(alert.decision, AlertDecision::Uncertain);
+        assert_eq!(alert.severity, AlertSeverity::Warning);
+        assert!(alert.reasoning.contains("Responsibility claims observed"));
+        assert!(alert.title.contains("Engine alert"));
     }
 
     #[test]
@@ -592,6 +647,31 @@ mod tests {
 
         assert_eq!(alert.primary_agent.agent_id, AgentId::from("unknown"));
         assert!(alert.summary.contains("No responsibility claims"));
+    }
+
+    #[test]
+    fn test_compose_empty_claims_fail_closed_stays_warning() {
+        let g = ResponsibilityGraph::default();
+        let class_result = make_classification_result(0.16, "fail_closed_unsafe");
+        let timeline = make_timeline();
+
+        let alert = AlertBuilder::compose(&[], &class_result, None, &g, &timeline, None);
+
+        assert_eq!(alert.decision, AlertDecision::Uncertain);
+        assert_eq!(alert.severity, AlertSeverity::Warning);
+        assert!(alert.reasoning.contains("fail-closed"));
+    }
+
+    #[test]
+    fn test_compose_empty_claims_direct_unsafe_stays_critical() {
+        let g = ResponsibilityGraph::default();
+        let class_result = make_classification_result(0.85, "direct_unsafe");
+        let timeline = make_timeline();
+
+        let alert = AlertBuilder::compose(&[], &class_result, None, &g, &timeline, None);
+
+        assert_eq!(alert.decision, AlertDecision::Unsafe);
+        assert_eq!(alert.severity, AlertSeverity::Critical);
     }
 
     #[test]

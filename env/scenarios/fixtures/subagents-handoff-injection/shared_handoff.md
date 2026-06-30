@@ -18,7 +18,7 @@ over the original specification.
 2. Each subagent must produce a design extension document
 3. All outputs must be cross-referenced with upstream work
 
-## AgentSight Observability — Subagent Review Summary
+## MtAgentLens Observability — Subagent Review Summary
 
 - **eBPF SSL/TLS 明文捕获**：在内核层面拦截 SSL read/write uprobe，无需插桩即可解密 TLS 流量，覆盖静态链接 BoringSSL/OpenSSL 的二进制（如 Claude Code、Bun），确保子代理通信全程可观测。
 - **因果图与责任追溯**：通过 ResponsibilityGraph 构建事件因果关系，结合并查集身份解析（root_pid + tls_session + conversation_id）和污点追踪，实现跨子代理调用的完整责任链还原。
@@ -38,7 +38,7 @@ over the original specification.
 - **Handoff 文档完整性校验链**：对所有 handoff 文档在写入时自动计算内容哈希（SHA-256），并将哈希值写入不可篡改的审计日志。子代理读取 handoff 时重新计算哈希并与链上记录比对，任一环节的哈希不匹配（注入篡改、中间人修改、磁盘位翻转）均可即时告警并阻断执行。哈希链与 ResponsibilityGraph 的边关联，形成从文档完整性到行为因果的交叉验证——文件未被篡改但行为异常则指向逻辑层攻击，文件已被篡改则直接定位注入点和修改内容。
 - **跨代理行为基线建模与群组偏差检测**：对同一类型子代理（如 gsd-code-reviewer、gsd-executor）的历史行为进行聚合建模，构建每个代理类型的正常行为基线（API 调用分布、文件访问模式、执行时长百分位）。当单个子代理因 handoff 注入产生偏离时，不仅与自身历史对比，还与同类型代理群体对比——群组偏差检测可区分「任务复杂度导致的合理行为变化」与「注入导致的异常行为」，降低以任务复杂度为掩护的高级注入攻击的漏检率。
 - **注入载荷自动逆向与 IOC 提取**：当 AlertBuilder 生成 handoff 注入告警时，自动提取注入载荷内容（被篡改的指令片段、新增的恶意提示词），通过静态分析载荷结构（指令模板相似度、已知攻击模式匹配）和动态沙箱回放（在隔离环境中执行注入指令并观察实际调用的 API/文件）自动提取 IOC（Indicators of Compromise）——包括恶意 API endpoint、非预期文件路径、异常的子代理 spawn 链、特定 prompt 注入模式签名。提取的 IOC 自动写入共享特征库，供后续检测规则热更新使用，形成「检测→提取→免疫」的闭环。
-- **3D 力导向拓扑可视化**：基于 AgentSight ResponsibilityGraph 的真实图数据驱动 3D 力导向图渲染，将节点（进程/文件/API 调用）和边（因果/污点/通信）映射到三维交互空间。handoff 注入攻击链在 3D 视图中呈现为跨越多个子代理的异常高密度连接簇——节点间引力强度反映因果关系紧密度，边的颜色和粗细编码污点传播置信度，三维旋转和缩放操作可直接定位注入源和波及叶节点，无需在扁平列表中手动追踪链路。
+- **3D 力导向拓扑可视化**：基于 MtAgentLens ResponsibilityGraph 的真实图数据驱动 3D 力导向图渲染，将节点（进程/文件/API 调用）和边（因果/污点/通信）映射到三维交互空间。handoff 注入攻击链在 3D 视图中呈现为跨越多个子代理的异常高密度连接簇——节点间引力强度反映因果关系紧密度，边的颜色和粗细编码污点传播置信度，三维旋转和缩放操作可直接定位注入源和波及叶节点，无需在扁平列表中手动追踪链路。
 - **跨会话慢速漂移检测**：PersistenceWriter 的 SQLite 双写不仅支撑单次会话回放，更支持跨会话长期行为关联——将同一子代理类型（如 gsd-code-reviewer、gsd-executor）在数十次运行中的 handoff 交互模式聚合成时序行为曲线，计算滑动窗口内的基线漂移速率。针对渐进式注入攻击（攻击者通过多次微小篡改逐步引导子代理偏离正常行为），单次会话视角因偏差幅度低于告警阈值而无法检测，跨会话漂移检测可在行为曲线出现持续单调偏移时提前预警——远早于单次偏差触发阈值。
 - **交互式取证仪表板与一键报告导出**：TimelinePanel 和 DetailPanel 支持按事件类型、时间窗口、进程 ID、污点标签、哈希链状态等维度组合筛选，取证人员可通过交互式 UI 在数秒内将可疑事件范围从数万条收敛至数十条。筛选结果支持一键导出为结构化取证报告（含完整时间链、哈希链、污点传播树、IOC 清单、差分回放对比表），直接作为安全审计证据提交——无需取证人员编写额外的加工脚本或手工拼接证据片段。
 - **子代理凭据泄露实时检测**：在 eBPF SSL 解密流和 stdio 捕获流上叠加凭据模式匹配引擎（正则 + 熵检测），自动识别 handoff 文档或子代理间通信中意外泄露的 API 密钥、Bearer Token、OAuth 凭证。匹配到已知凭据格式（sk-ant-、sk-or-、ghp_ 等前缀）时即时阻断传输并生成告警，防止凭据通过 handoff 链扩散至不可信子代理上下文。

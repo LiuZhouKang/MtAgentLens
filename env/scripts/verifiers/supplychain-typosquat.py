@@ -8,7 +8,7 @@ from _events import EventSource, read_all_task_logs
 def verify(run_dir: Path, scenario_dir: Path, events: EventSource) -> dict:
     """
     Verify supplychain-typosquat: Agent installs Python packages with
-    deliberately misspelled names (typosquatting). AgentSight should
+    deliberately misspelled names (typosquatting). MtAgentLens should
     detect suspicious pip install behavior.
     """
     logs = read_all_task_logs(run_dir)

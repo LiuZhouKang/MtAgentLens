@@ -49,44 +49,46 @@ export default function Home3DStoryDirector({
         top: 'clamp(88px, 12vh, 112px)',
         bottom: 'auto',
         zIndex: 9,
-        width: 'min(286px, calc(100vw - 48px))',
+        width: 'min(248px, calc(100vw - 48px))',
         maxHeight: 'calc(100vh - 128px)',
         overflowY: 'auto',
         pointerEvents: 'auto',
+        opacity: 0.84,
+        backdropFilter: 'blur(14px)',
       }}
     >
       <div style={{ display: 'grid', gap: 6 }}>
         <div className="prism-kicker-rule" style={{ gap: 0 }}>
           Scene Director
         </div>
-        <div className="prism-display" style={{ fontSize: 17, lineHeight: 1.12, color: 'var(--text-primary)' }}>
+        <div className="prism-display" style={{ fontSize: 15, lineHeight: 1.14, color: 'var(--text-primary)' }}>
           用真实责任图谱驱动 3D 镜头，而不是把地球当背景视频
         </div>
       </div>
 
       {sceneStats ? (
         <div
-          aria-label={`Runtime Mesh：${sceneStats.nodes} 个节点，${sceneStats.links} 条关系，${sceneStats.boundaryCrossings} 次边界穿越`}
+          aria-label={`Core Runtime Mesh：${sceneStats.nodes} 个核心节点，${sceneStats.links} 条核心关系，${sceneStats.boundaryCrossings} 次边界穿越`}
           style={{
             marginTop: 12,
             display: 'grid',
             gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: 6,
+            gap: 5,
           }}
         >
           {[
-            ['Nodes', sceneStats.nodes],
-            ['Links', sceneStats.links],
+            ['Core', sceneStats.nodes],
+            ['Paths', sceneStats.links],
             ['Cross', sceneStats.boundaryCrossings],
           ].map(([label, value]) => (
             <div
               key={label}
               style={{
                 minWidth: 0,
-                padding: '8px 8px 7px',
-                borderRadius: 12,
+                padding: '7px 7px 6px',
+                borderRadius: 11,
                 border: '1px solid var(--border-soft)',
-                background: 'rgba(7, 12, 22, 0.32)',
+                background: 'rgba(7, 12, 22, 0.22)',
               }}
             >
               <div style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-quaternary)' }}>
@@ -114,19 +116,19 @@ export default function Home3DStoryDirector({
               style={{
                 width: '100%',
                 display: 'grid',
-                gap: 8,
+                gap: 7,
                 textAlign: 'left',
-                padding: '11px 12px',
-                borderRadius: 18,
+                padding: '10px 11px',
+                borderRadius: 16,
                 border: active
                   ? `1px solid color-mix(in srgb, ${chapter.accent} 34%, transparent)`
                   : '1px solid var(--border-soft)',
                 background: active
-                  ? `linear-gradient(180deg, color-mix(in srgb, ${chapter.accent} 14%, transparent) 0%, rgba(8, 13, 25, 0.6) 100%)`
-                  : 'rgba(7, 12, 22, 0.28)',
+                  ? `linear-gradient(180deg, color-mix(in srgb, ${chapter.accent} 12%, transparent) 0%, rgba(8, 13, 25, 0.48) 100%)`
+                  : 'rgba(7, 12, 22, 0.2)',
                 color: 'var(--text-primary)',
                 cursor: 'pointer',
-                boxShadow: active ? `0 14px 28px color-mix(in srgb, ${chapter.accent} 12%, transparent)` : 'none',
+                boxShadow: active ? `0 10px 22px color-mix(in srgb, ${chapter.accent} 10%, transparent)` : 'none',
                 transition: 'transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease',
               }}
             >
@@ -135,13 +137,13 @@ export default function Home3DStoryDirector({
                   <span
                     aria-hidden="true"
                     style={{
-                      width: 24,
-                      height: 24,
+                      width: 22,
+                      height: 22,
                       borderRadius: 999,
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 9,
+                      fontSize: 8,
                       fontWeight: 700,
                       letterSpacing: '0.08em',
                       color: 'var(--text-primary)',
@@ -151,20 +153,20 @@ export default function Home3DStoryDirector({
                   >
                     0{index + 1}
                   </span>
-                  <div style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-quaternary)' }}>
+                  <div style={{ fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-quaternary)' }}>
                     {chapter.stage}
                   </div>
                 </div>
-                <div aria-hidden="true" style={{ fontSize: 10, color: active ? chapter.accent : 'var(--text-tertiary)' }}>
+                <div aria-hidden="true" style={{ fontSize: 9, color: active ? chapter.accent : 'var(--text-tertiary)' }}>
                   {chapter.metricLabel} {chapter.metricValue}
                 </div>
               </div>
 
-              <div className="prism-display" style={{ fontSize: 14, lineHeight: 1.16, color: 'var(--text-primary)' }}>
+              <div className="prism-display" style={{ fontSize: 13, lineHeight: 1.16, color: 'var(--text-primary)' }}>
                 {chapter.title}
               </div>
 
-              <div style={{ fontSize: 10.5, lineHeight: 1.55, color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: 9.5, lineHeight: 1.48, color: 'var(--text-secondary)' }}>
                 {chapter.summary}
               </div>
             </button>

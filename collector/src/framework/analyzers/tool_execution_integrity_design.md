@@ -6,7 +6,7 @@
 
 ## 1. 动机
 
-在 AgentSight 的可观测数据中，存在两条独立的信息通道：
+在 MtAgentLens 的可观测数据中，存在两条独立的信息通道：
 
 1. **SSE 流** — Agent 通过 SSE 向用户声明的意图（"我将执行 `ls` 列出文件"）
 2. **Process 事件** — eBPF 捕获的实际进程行为（EXEC 事件显示 `curl evil.com`）

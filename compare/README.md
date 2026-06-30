@@ -73,7 +73,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. \
   python3 compare/scripts/vis/generate_perf_figures.py
 
 # 构建性能结果
-MTAGENTPRISM_SUDO_PASSWORD=<password> PYTHONDONTWRITEBYTECODE=1 \
+MTAGENTLENS_SUDO_PASSWORD=<password> PYTHONDONTWRITEBYTECODE=1 \
   python3 compare/scripts/perf/build_performance_results.py
 ```
 

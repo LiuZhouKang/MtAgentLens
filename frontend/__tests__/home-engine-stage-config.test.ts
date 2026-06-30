@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GraphData, ResponsibilityEdge, ResponsibilityNode } from '@/lib/types';
-import { buildForceLink, buildForceNode, createBackgroundGraph } from '@/components/ui/home-engine-stage-config';
+import { buildForceLink, buildForceNode, buildStageGraph, createBackgroundGraph } from '@/components/ui/home-engine-stage-config';
 
 function makeNode(node_id: string, node_type: ResponsibilityNode['node_type']): ResponsibilityNode {
   return {
@@ -32,7 +32,7 @@ describe('home engine stage config', () => {
     const resource = buildForceNode(makeNode('file:/tmp/demo', 'Resource'));
     const boundary = buildForceNode(makeNode('boundary:prod', 'PolicyBoundary'));
 
-    expect(agent.val).toBeLessThan(3.2);
+    expect(agent.val).toBeLessThan(4.1);
     expect(resource.val).toBeLessThan(agent.val);
     expect(boundary.val).toBeLessThan(agent.val);
 
@@ -40,7 +40,7 @@ describe('home engine stage config', () => {
     expect(resource.fx).toBeUndefined();
     expect(boundary.fx).toBeUndefined();
 
-    expect(Math.hypot(agent.x ?? 0, agent.y ?? 0, agent.z ?? 0)).toBeLessThan(110);
+    expect(Math.hypot(agent.x ?? 0, agent.y ?? 0, agent.z ?? 0)).toBeLessThan(150);
     expect(Math.hypot(boundary.x ?? 0, boundary.y ?? 0, boundary.z ?? 0)).toBeGreaterThan(180);
   });
 
@@ -48,11 +48,14 @@ describe('home engine stage config', () => {
     const boundary = buildForceLink(makeEdge('edge:boundary', 'PolicyBoundaryCrossing', 'a', 'b'));
     const delegation = buildForceLink(makeEdge('edge:delegate', 'AgentDelegatesTo', 'a', 'b'));
     const plain = buildForceLink(makeEdge('edge:intent', 'IntentCausesAction', 'a', 'b'));
+    const taint = buildForceLink(makeEdge('edge:taint', 'TaintPropagatesTo', 'a', 'b'));
 
-    expect(boundary.width).toBeLessThan(1);
+    expect(boundary.width).toBeLessThan(1.4);
     expect(delegation.width).toBeLessThan(boundary.width);
     expect(plain.width).toBeLessThan(delegation.width);
-    expect(plain.particles).toBe(0);
+    expect(boundary.particles).toBeGreaterThan(taint.particles);
+    expect(taint.particles).toBeGreaterThan(plain.particles);
+    expect(plain.particles).toBeGreaterThan(0);
   });
 
   it('builds a denser background graph than the foreground input', () => {
@@ -73,5 +76,32 @@ describe('home engine stage config', () => {
     expect(background.nodes.length).toBeGreaterThan(graph.nodes.length * 20);
     expect(background.links.length).toBeGreaterThan(graph.edges.length * 20);
     expect(background.nodes.every((node) => node.val < 0.2)).toBe(true);
+  });
+
+  it('builds a large-graph style stage cloud around real nodes and edges', () => {
+    const graph: GraphData = {
+      nodes: [
+        makeNode('agent:root', 'Agent'),
+        makeNode('resource:1', 'Resource'),
+        makeNode('boundary:prod', 'PolicyBoundary'),
+      ],
+      edges: [
+        makeEdge('edge:1', 'AgentDelegatesTo', 'agent:root', 'resource:1'),
+        makeEdge('edge:2', 'PolicyBoundaryCrossing', 'resource:1', 'boundary:prod'),
+      ],
+    };
+
+    const stage = buildStageGraph(graph);
+    const coreNodes = stage.nodes.filter((node) => node.kind === 'core');
+    const satelliteNodes = stage.nodes.filter((node) => node.kind === 'satellite');
+    const realLinks = stage.links.filter((link) => link.kind === 'real');
+    const bridgeLinks = stage.links.filter((link) => link.kind === 'bridge');
+
+    expect(coreNodes).toHaveLength(graph.nodes.length);
+    expect(satelliteNodes.length).toBeGreaterThan(graph.nodes.length * 10);
+    expect(realLinks).toHaveLength(graph.edges.length);
+    expect(bridgeLinks.length).toBeGreaterThan(0);
+    expect(bridgeLinks.length).toBeLessThan(satelliteNodes.length);
+    expect(new Set(stage.nodes.map((node) => node.color)).size).toBeGreaterThan(4);
   });
 });

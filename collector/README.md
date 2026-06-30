@@ -68,9 +68,12 @@ MtAgentLens 的 Rust 核心引擎。编译为单个静态二进制 `mtagentlens`
 |                                                               |
 | HTTP Server (Hyper 1.0)  .  :7395                            |
 | Embedded frontend (rust-embed) . Next.js 16 static export     |
-| SSE real-time push        .  /api/events                     |
-| REST API                  .  /api/graph . alerts . evidence  |
-| TOTP 2FA                  .  /api/auth                       |
+| Legacy event stream       .  /api/events                     |
+| REST API                  .  /api/runs/{id}/alerts           |
+|                           .  /api/runs/{id}/correlation-evidence |
+|                           .  /api/runs/{id}/events           |
+|                           .  /api/runs/{id}/diff             |
+|                           .  /api/runs/{id}/graph-analysis   |
 +---------------------------------------------------------------+
 ```
 

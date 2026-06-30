@@ -23,15 +23,20 @@
     "ci:quality": "npm run lint && npm run type-check && npm run test:coverage && npm run build && npm run audit:a11y && npm run audit:responsive && npm run audit:interaction && npm run audit:theme"
   },
   "dependencies": {
+    "@radix-ui/react-tabs": "^1.1.15",
     "@tanstack/react-query": "^5",
     "@tanstack/react-virtual": "^3.14.2",
     "3d-force-graph": "^1.80.0",
+    "clsx": "^2.1.1",
     "framer-motion": "^12",
     "lucide-react": "^0.400",
+    "motion": "^12.42.0",
+    "motion-primitives": "^0.1.0",
     "next": "^16",
     "react": "^19",
     "react-dom": "^19",
     "react-force-graph-3d": "^1.29.1",
+    "tailwind-merge": "^3.6.0",
     "three": "^0.184.0",
     "zustand": "^5"
   },

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 3 ]]; then
-  echo "Usage: $0 <task-text> <status-file> <log-file> [timeout-seconds] [claude-args...]" >&2
+  echo "Usage: $0 <task-text> <status-file> <log-file> [timeout-seconds] [claude-bin] [claude-args...]" >&2
   exit 2
 fi
 
@@ -10,7 +10,13 @@ TASK_TEXT="$1"
 STATUS_FILE="$2"
 LOG_FILE="$3"
 TIMEOUT_SECONDS="${4:-300}"
-shift 4 || true
+CLAUDE_BIN="claude"
+if [[ $# -ge 5 && "${5}" != -* ]]; then
+  CLAUDE_BIN="$5"
+  shift 5
+else
+  shift 4 || true
+fi
 
 mkdir -p "$(dirname "$STATUS_FILE")"
 mkdir -p "$(dirname "$LOG_FILE")"
@@ -24,20 +30,20 @@ write_status() {
 
 write_status '{"state":"running","start_epoch":'"$START_EPOCH"'}'
 
-echo "[agentsight-task] task:    $TASK_TEXT"  | head -c 200
+echo "[mtagentlens-task] task:    $TASK_TEXT"  | head -c 200
 echo ""
-echo "[agentsight-task] status:  $STATUS_FILE"
-echo "[agentsight-task] log:     $LOG_FILE"
-echo "[agentsight-task] timeout: ${TIMEOUT_SECONDS}s"
+echo "[mtagentlens-task] status:  $STATUS_FILE"
+echo "[mtagentlens-task] log:     $LOG_FILE"
+echo "[mtagentlens-task] timeout: ${TIMEOUT_SECONDS}s"
 
 ROOT_PID=""
 EXIT_CODE=1
 
-# ── Source env file if provided via AGENTSIGHT_ENV_FILE ──
-if [[ -n "${AGENTSIGHT_ENV_FILE:-}" ]] && [[ -f "${AGENTSIGHT_ENV_FILE}" ]]; then
+# ── Source env file if provided via MTAGENTLENS_ENV_FILE ──
+if [[ -n "${MTAGENTLENS_ENV_FILE:-}" ]] && [[ -f "${MTAGENTLENS_ENV_FILE}" ]]; then
   set -a
   # shellcheck disable=SC1090
-  source "${AGENTSIGHT_ENV_FILE}"
+  source "${MTAGENTLENS_ENV_FILE}"
   set +a
 fi
 
@@ -47,7 +53,7 @@ fi
 # is forked, otherwise kill -0 $ROOT_PID always fails and the watchdog
 # is a no-op.
 set +e
-claude -p "$TASK_TEXT" "$@" > "$LOG_FILE" 2>&1 &
+"$CLAUDE_BIN" -p "$TASK_TEXT" "$@" > "$LOG_FILE" 2>&1 &
 ROOT_PID=$!
 
 # Watchdog: kill claude if it exceeds the timeout

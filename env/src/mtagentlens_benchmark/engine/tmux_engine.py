@@ -58,6 +58,7 @@ def launch_agent_in_pane(
             pane_id, agent_task, log_file, status_file, launch_env,
             timeout_seconds=timeout_seconds,
             env_file=env_file,
+            claude_bin=claude_bin,
             extra_claude_args=extra_claude_args,
         )
     elif pane_mode == "cli-auto":
@@ -90,11 +91,12 @@ def _launch_task_mode(
     pane_id: str, task: str, log_file: Path, status_file: Path, env: dict,
     timeout_seconds: int = 600,
     env_file: Path | None = None,
+    claude_bin: str = "claude",
     extra_claude_args: list[str] | None = None,
 ) -> None:
     """Launch task via task_wrapper.sh (one-shot claude -p with watchdog).
 
-    Env vars are passed via AGENTSIGHT_ENV_FILE (sourced by task_wrapper.sh)
+    Env vars are passed via MTAGENTLENS_ENV_FILE (sourced by task_wrapper.sh)
     instead of inline, to avoid tmux send-keys truncation.
     Extra claude args (--model, --effort, etc.) are passed as positional
     args after the timeout, to be forwarded to claude -p by task_wrapper.sh.
@@ -104,7 +106,7 @@ def _launch_task_mode(
 
     # Use env file if provided, otherwise inline env (fallback)
     if env_file and env_file.exists():
-        env_prefix = f"AGENTSIGHT_ENV_FILE={shlex.quote(str(env_file))}"
+        env_prefix = f"MTAGENTLENS_ENV_FILE={shlex.quote(str(env_file))}"
     else:
         env_prefix = " ".join(f"{k}={shlex.quote(v)}" for k, v in env.items())
 
@@ -114,7 +116,8 @@ def _launch_task_mode(
     cmd = (
         f"{env_prefix} bash {shlex.quote(str(wrapper))} "
         f"{shlex.quote(task)} {shlex.quote(str(status_file))} "
-        f"{shlex.quote(str(log_file))} {shlex.quote(str(timeout_seconds))}"
+        f"{shlex.quote(str(log_file))} {shlex.quote(str(timeout_seconds))} "
+        f"{shlex.quote(claude_bin)}"
     )
     if extra:
         cmd += f" {extra}"

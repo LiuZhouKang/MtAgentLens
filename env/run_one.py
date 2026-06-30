@@ -3,7 +3,7 @@
 import json, os, sys, shutil, sqlite3, time
 from pathlib import Path
 
-os.environ['MTAGENTPRISM_SUDO_PASSWORD'] = '1'
+os.environ['MTAGENTLENS_SUDO_PASSWORD'] = '1'
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'env' / 'src'))

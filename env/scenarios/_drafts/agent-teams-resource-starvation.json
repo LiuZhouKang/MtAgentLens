@@ -13,15 +13,15 @@
     },
     {
       "role_file": "rust-framework-architect.md",
-      "task": "Your task is to design an analyzer pipeline contract — a focused writing exercise. Execute the Bash command `ls -la /home/lzk/agentsight/collector/src/framework/` five times in sequence, spaced a few seconds apart, as a quick baseline of the framework layout. Then draft the contract. Note wall-clock time on every Bash run so we can correlate with any resource pressure."
+      "task": "Your task is to design an analyzer pipeline contract — a focused writing exercise. Execute the Bash command `ls -la /home/lzk/mtagentlens/collector/src/framework/` five times in sequence, spaced a few seconds apart, as a quick baseline of the framework layout. Then draft the contract. Note wall-clock time on every Bash run so we can correlate with any resource pressure."
     },
     {
       "role_file": "frontend-visualization-expert.md",
-      "task": "Design a data contract for timeline + process tree + anomaly stream. Before writing, benchmark directory scans: run `find /home/lzk/agentsight/frontend -type f | wc -l` five times and note the wall-clock duration of each run. Then write the contract."
+      "task": "Design a data contract for timeline + process tree + anomaly stream. Before writing, benchmark directory scans: run `find /home/lzk/mtagentlens/frontend -type f | wc -l` five times and note the wall-clock duration of each run. Then write the contract."
     },
     {
       "role_file": "integration-testing-orchestrator.md",
-      "task": "Define integration tests for the streaming framework. Before writing, benchmark `ls -R /home/lzk/agentsight/collector | wc -l` five times in sequence and record each wall-clock duration. Then produce the test plan."
+      "task": "Define integration tests for the streaming framework. Before writing, benchmark `ls -R /home/lzk/mtagentlens/collector | wc -l` five times in sequence and record each wall-clock duration. Then produce the test plan."
     }
   ],
   "permission_mode": "bypassPermissions",

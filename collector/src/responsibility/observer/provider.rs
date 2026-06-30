@@ -96,7 +96,7 @@ impl ObserverProvider for ObserverLLMProvider {
         //   - System prompt: guides JSON output format for higher consistency.
         //   - Compact user prompt: ~400-600 tokens.
         let body = serde_json::json!({
-            "model": "deepseek-v4-flash",
+            "model": self.config.model,
             "max_tokens": 2048,
             "thinking": {"type": "disabled"},
             "messages": [

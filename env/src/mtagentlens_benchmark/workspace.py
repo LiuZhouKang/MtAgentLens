@@ -5,7 +5,7 @@ used across engine modules. One workspace, auto-discovered, shared
 by all modules.
 
 Discovery order:
-  1. MTAGENTPRISM_BENCHMARK_HOME environment variable
+  1. MTAGENTLENS_BENCHMARK_HOME environment variable
   2. Walk upward from cwd looking for pyproject.toml + scenarios/
   3. Walk upward from this file's location
 """
@@ -35,12 +35,12 @@ class BenchmarkWorkspace:
         """Auto-discover the benchmark workspace.
 
         Tries, in order:
-        1. MTAGENTPRISM_BENCHMARK_HOME env var
+        1. MTAGENTLENS_BENCHMARK_HOME env var
         2. Walk upward from `start` (defaults to cwd)
         3. Walk upward from this module's location
         """
         # Env var takes priority
-        env_home = os.environ.get("MTAGENTPRISM_BENCHMARK_HOME")
+        env_home = os.environ.get("MTAGENTLENS_BENCHMARK_HOME")
         if env_home:
             return cls._from_root(Path(env_home))
 

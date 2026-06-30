@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import signal
+import sqlite3
 import subprocess
 import time
 from pathlib import Path
@@ -222,7 +223,7 @@ def _verify_uprobes_attached(binary_path: str, timeout: float = 5.0) -> dict:
 
         if not diag["uprobe_events_accessible"]:
             try:
-                sudo_pass = os.environ.get("MTAGENTPRISM_SUDO_PASSWORD", "")
+                sudo_pass = os.environ.get("MTAGENTLENS_SUDO_PASSWORD", "")
                 if sudo_pass:
                     result = subprocess.run(
                         ["sudo", "-S", "cat", UPROBE_EVENTS_PATH],
@@ -407,6 +408,114 @@ def _parse_runtime_metrics_from_logs(
     return metrics
 
 
+def _count_observer_calls(err_log_text: str) -> int:
+    summary_match = re.search(r"Observer calls:\s*(\d+)", err_log_text)
+    if summary_match:
+        return int(summary_match.group(1))
+    return len(re.findall(r"\[classify\]\s+Observer LLM:", err_log_text))
+
+
+def _read_responsibility_db_metrics(db_path: Path) -> dict:
+    metrics = {
+        "responsibility_db_exists": db_path.exists(),
+        "tls_sessions": 0,
+        "process_events": 0,
+        "graph_nodes": 0,
+        "graph_edges": 0,
+        "pbc_edges": 0,
+        "correlation_evidence": 0,
+        "responsibility_claims": 0,
+        "responsibility_alerts": 0,
+        "policy_evaluations": 0,
+    }
+    if not db_path.exists():
+        return metrics
+
+    try:
+        with sqlite3.connect(str(db_path)) as conn:
+            tables = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+            queries = {
+                "tls_sessions": ("tls_sessions", "SELECT COUNT(*) FROM tls_sessions"),
+                "process_events": ("process_events", "SELECT COUNT(*) FROM process_events"),
+                "graph_nodes": ("graph_nodes", "SELECT COUNT(*) FROM graph_nodes"),
+                "graph_edges": ("graph_edges", "SELECT COUNT(*) FROM graph_edges"),
+                "pbc_edges": (
+                    "graph_edges",
+                    "SELECT COUNT(*) FROM graph_edges WHERE edge_type='PolicyBoundaryCrossing'",
+                ),
+                "correlation_evidence": (
+                    "correlation_evidence",
+                    "SELECT COUNT(*) FROM correlation_evidence",
+                ),
+                "responsibility_claims": (
+                    "responsibility_claims",
+                    "SELECT COUNT(*) FROM responsibility_claims",
+                ),
+                "responsibility_alerts": (
+                    "responsibility_alerts",
+                    "SELECT COUNT(*) FROM responsibility_alerts",
+                ),
+                "policy_evaluations": (
+                    "policy_evaluations",
+                    "SELECT COUNT(*) FROM policy_evaluations",
+                ),
+            }
+            for key, (table, query) in queries.items():
+                if table in tables:
+                    metrics[key] = int(conn.execute(query).fetchone()[0])
+    except sqlite3.Error as exc:
+        metrics["responsibility_db_error"] = str(exc)
+    return metrics
+
+
+def _read_stable_responsibility_db_metrics(
+    db_path: Path,
+    attempts: int = 4,
+    delay_seconds: float = 0.2,
+) -> dict:
+    """Read responsibility DB metrics after writer shutdown has settled.
+
+    The collector exits quickly after SIGINT, while SQLite/WAL visibility can lag
+    by a very short interval on busy runs. For health summaries, prefer the last
+    stable snapshot and keep monotonically increasing counters at their maximum.
+    """
+    last: dict | None = None
+    best: dict | None = None
+    count_keys = {
+        "tls_sessions",
+        "process_events",
+        "graph_nodes",
+        "graph_edges",
+        "pbc_edges",
+        "correlation_evidence",
+        "responsibility_claims",
+        "responsibility_alerts",
+        "policy_evaluations",
+    }
+    for idx in range(max(attempts, 1)):
+        current = _read_responsibility_db_metrics(db_path)
+        if best is None:
+            best = dict(current)
+        else:
+            for key, value in current.items():
+                if key in count_keys:
+                    best[key] = max(int(best.get(key, 0)), int(value or 0))
+                else:
+                    best[key] = value
+
+        if last is not None and current == last:
+            return current
+        last = current
+        if idx < attempts - 1:
+            time.sleep(delay_seconds)
+    return best or _read_responsibility_db_metrics(db_path)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  CollectorManager
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -440,6 +549,7 @@ class CollectorManager(CollectorInterface):
         uprobe_verify_timeout: float = 5.0,
         canary_test: bool = True,
         canary_timeout: float = 10.0,
+        disable_responsibility_observer: bool = False,
     ):
         self._workspace = workspace
         self.binary = binary
@@ -453,8 +563,10 @@ class CollectorManager(CollectorInterface):
         self.uprobe_verify_timeout = uprobe_verify_timeout
         self.canary_test = canary_test
         self.canary_timeout = canary_timeout
+        self.disable_responsibility_observer = disable_responsibility_observer
         self._process: subprocess.Popen | None = None
         self._tcpdump: subprocess.Popen | None = None
+        self._err_log = None
         self._output_dir: Path | None = None
         self._health_snapshot: dict = {}
 
@@ -464,8 +576,9 @@ class CollectorManager(CollectorInterface):
         output_dir.mkdir(parents=True, exist_ok=True)
         self._output_dir = output_dir
 
-        sudo_pass = os.environ.get("MTAGENTPRISM_SUDO_PASSWORD", "")
+        sudo_pass = os.environ.get("MTAGENTLENS_SUDO_PASSWORD", "")
         err_log = open(str(output_dir / "trace.err.log"), "w")
+        self._err_log = err_log
 
         # ── 0. Resolve claude binary with diagnostics ──
         claude_bin, binary_diag = _find_claude_binary_with_diagnostics()
@@ -484,6 +597,7 @@ class CollectorManager(CollectorInterface):
                     ["sudo", "-S"] + tcpdump_cmd,
                     stdin=subprocess.PIPE,
                     stdout=tcpdump_log, stderr=tcpdump_log,
+                    start_new_session=True,
                 )
                 if self._tcpdump.stdin:
                     self._tcpdump.stdin.write((sudo_pass + "\n").encode())
@@ -492,11 +606,13 @@ class CollectorManager(CollectorInterface):
                 self._tcpdump = subprocess.Popen(
                     ["sudo", "-n"] + tcpdump_cmd,
                     stdout=tcpdump_log, stderr=tcpdump_log,
+                    start_new_session=True,
                 )
             else:
                 self._tcpdump = subprocess.Popen(
                     tcpdump_cmd,
                     stdout=tcpdump_log, stderr=tcpdump_log,
+                    start_new_session=True,
                 )
         except Exception:
             self._tcpdump = None
@@ -509,6 +625,8 @@ class CollectorManager(CollectorInterface):
             "--comm", self.comm,
             "-o", str(log_path),
         ] + self.trace_args
+        if self.disable_responsibility_observer:
+            collector_cmd.append("--disable-responsibility-observer")
 
         # When SSL is enabled, pass --binary-path so tls_capture can attach
         # uprobes to Claude Code via byte-pattern matching (no symbols needed).
@@ -523,12 +641,14 @@ class CollectorManager(CollectorInterface):
 
         try:
             if self.sudo and sudo_pass:
-                # Preserve Observer LLM env vars through sudo so the collector
-                # can call the DeepSeek/Anthropic API for LLM arbitration.
-                cmd = ["sudo", "-S", "--preserve-env=ANTHROPIC_BASE_URL,ANTHROPIC_AUTH_TOKEN,MODEL"] + collector_cmd
+                cmd = ["sudo", "-S"]
+                if os.environ.get("MTAGENTLENS_PRESERVE_OBSERVER_ENV") == "1":
+                    cmd.append("--preserve-env=ANTHROPIC_BASE_URL,ANTHROPIC_AUTH_TOKEN,MODEL")
+                cmd += collector_cmd
                 self._process = subprocess.Popen(
                     cmd, stdin=subprocess.PIPE,
                     stdout=err_log, stderr=subprocess.STDOUT,
+                    start_new_session=True,
                 )
                 if self._process and self._process.stdin:
                     self._process.stdin.write((sudo_pass + "\n").encode())
@@ -537,10 +657,12 @@ class CollectorManager(CollectorInterface):
                 cmd = ["sudo", "-n"] + collector_cmd
                 self._process = subprocess.Popen(
                     cmd, stdout=err_log, stderr=subprocess.STDOUT,
+                    start_new_session=True,
                 )
             else:
                 self._process = subprocess.Popen(
                     collector_cmd, stdout=err_log, stderr=subprocess.STDOUT,
+                    start_new_session=True,
                 )
             self._check_collector_startup(output_dir / "trace.err.log")
         except Exception:
@@ -554,8 +676,8 @@ class CollectorManager(CollectorInterface):
             self._health_snapshot["uprobe_verification"] = uprobe_diag
             if not uprobe_diag.get("attached"):
                 self._health_snapshot["uprobe_verification"]["warning"] = (
-                    f"uprobe not detected for {claude_bin}; "
-                    "TLS capture will not work. Check debugfs mount and permissions."
+                    f"startup check did not observe an active uprobe for {claude_bin}; "
+                    "final TLS capture health is determined from runtime metrics"
                 )
 
         # ── 4. TLS canary test ──
@@ -578,13 +700,16 @@ class CollectorManager(CollectorInterface):
             if self._output_dir:
                 self._collect_runtime_metrics()
             return
-        self._process.send_signal(signal.SIGINT)
+        self._signal_process_group(self._process, signal.SIGINT)
         try:
             self._process.wait(timeout=wait_seconds)
         except subprocess.TimeoutExpired:
-            self._process.kill()
+            self._signal_process_group(self._process, signal.SIGKILL)
             self._process.wait()
         self._process = None
+        if self._err_log is not None:
+            self._err_log.close()
+            self._err_log = None
 
         # Collect post-stop runtime metrics
         if self._output_dir:
@@ -597,6 +722,7 @@ class CollectorManager(CollectorInterface):
 
         err_log = self._output_dir / "trace.err.log"
         trace_out = self._output_dir / self.log_file
+        responsibility_db = self._output_dir / f"{self.log_file}.responsibility.db"
 
         if err_log.exists():
             try:
@@ -607,6 +733,39 @@ class CollectorManager(CollectorInterface):
             text = ""
 
         metrics = _parse_runtime_metrics_from_logs(text, trace_out)
+        db_metrics = _read_stable_responsibility_db_metrics(responsibility_db)
+        metrics.update(db_metrics)
+
+        metrics["tls_capture_active"] = bool(
+            metrics.get("tls_sessions", 0) > 0
+            or "BoringSSL detected! Attaching by offset" in text
+            or metrics.get("ssl_events", 0) > 0
+        )
+        metrics["process_monitor_active"] = metrics.get("process_events", 0) > 0
+        metrics["responsibility_runtime_active"] = bool(
+            metrics.get("graph_edges", 0) > 0
+            or metrics.get("correlation_evidence", 0) > 0
+            or metrics.get("policy_evaluations", 0) > 0
+        )
+        metrics["observer_active"] = "Responsibility Observer LLM enabled" in text
+        metrics["observer_calls"] = _count_observer_calls(text)
+        metrics["observer_used"] = metrics["observer_calls"] > 0
+
+        metrics["ssl_uprobe_healthy"] = metrics["tls_capture_active"]
+        metrics["pbc_detection_healthy"] = metrics.get("pbc_edges", 0) > 0
+        metrics["scoring_healthy"] = bool(
+            metrics.get("correlation_evidence", 0) > 0
+            or metrics.get("graph_edges", 0) > 0
+            or metrics.get("max_has_signal", 0) > 0
+            or metrics.get("max_clusters", 0) > 0
+        )
+        metrics["overall_healthy"] = all([
+            metrics["tls_capture_active"],
+            metrics["process_monitor_active"],
+            metrics["responsibility_runtime_active"],
+            metrics["pbc_detection_healthy"],
+            metrics["scoring_healthy"],
+        ])
         self._health_snapshot["runtime_metrics"] = metrics
 
     def _check_collector_startup(self, err_log_path: Path) -> None:
@@ -629,14 +788,23 @@ class CollectorManager(CollectorInterface):
     def _stop_tcpdump(self) -> None:
         if self._tcpdump is not None:
             try:
-                self._tcpdump.terminate()
+                self._signal_process_group(self._tcpdump, signal.SIGTERM)
                 self._tcpdump.wait(timeout=3)
             except Exception:
                 try:
-                    self._tcpdump.kill()
+                    self._signal_process_group(self._tcpdump, signal.SIGKILL)
                 except Exception:
                     pass
             self._tcpdump = None
+
+    @staticmethod
+    def _signal_process_group(proc: subprocess.Popen, sig: int) -> None:
+        try:
+            os.killpg(proc.pid, sig)
+        except ProcessLookupError:
+            pass
+        except PermissionError:
+            proc.send_signal(sig)
 
     # ── properties ─────────────────────────────────────────────────────
 

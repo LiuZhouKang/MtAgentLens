@@ -5,8 +5,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 interface HomeGlobeIntroProps {
   src: string;
   onComplete: () => void;
-  minimumVisibleMs?: number;
-  maxVisibleMs?: number;
   exitDurationMs?: number;
 }
 
@@ -39,8 +37,8 @@ export default function HomeGlobeIntro({
 
       const messageType = 'type' in event.data ? event.data.type : null;
       if (
-        messageType === 'agentsight:intro-enter-main-stage' ||
-        messageType === 'agentsight:intro-skip'
+        messageType === 'mtagentlens:intro-enter-main-stage' ||
+        messageType === 'mtagentlens:intro-skip'
       ) {
         complete();
       }

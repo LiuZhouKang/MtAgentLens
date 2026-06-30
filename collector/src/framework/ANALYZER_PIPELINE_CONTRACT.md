@@ -14,7 +14,7 @@
 
 ## 1. Overview
 
-This contract defines the interface, data flow, composition rules, and lifecycle for chaining analyzers in the AgentSight framework. It ensures type safety, predictable behavior, and composability across the 6-stage detection pipeline.
+This contract defines the interface, data flow, composition rules, and lifecycle for chaining analyzers in the MtAgentLens framework. It ensures type safety, predictable behavior, and composability across the 6-stage detection pipeline.
 
 The pipeline follows a **Builder → Orchestrator** pattern: a `PipelineBuilder` accumulates analyzers per stage, validates stage contracts, then produces a `PipelineOrchestrator` that drives the event loop through a state machine.
 

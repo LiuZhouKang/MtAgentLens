@@ -1,4 +1,4 @@
-// Demo data simulating a real AgentSight monitoring session.
+// Demo data simulating a real MtAgentLens monitoring session.
 // Used when /api/demo backend endpoint is unavailable.
 
 import type { CorrelationEvidence, ResponsibilityAlert, GraphData, GraphSnapshot } from './types';

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   Activity,
   AlertTriangle,
@@ -18,11 +19,16 @@ import {
   TerminalSquare,
 } from 'lucide-react';
 import ObservatoryHeader from '@/components/system/observatory-header';
+import ObservatoryPageHero from '@/components/system/observatory-page-hero';
 import PrismButton from '@/components/ui/prism-button';
 import PrismPanel from '@/components/ui/prism-panel';
-import { demoAlerts, demoEvidence } from '@/lib/demo-data';
+import { demoAlerts } from '@/lib/demo-data';
+import { useAppStore } from '@/lib/store';
 import { buildInvestigationHref } from '@/lib/investigation-route';
+import { buildTraceHref, parseTraceAlertId } from '@/lib/trace-route';
 import { buildTraceRunModel, type TraceEventKind, type TraceRunModel } from '@/lib/trace-workbench';
+import { useRunEvidence } from '@/lib/use-run-evidence';
+import { useHashRouteState } from '@/lib/use-hash-route-state';
 
 const kindIcon: Record<TraceEventKind, typeof Activity> = {
   agent: GitBranch,
@@ -90,13 +96,30 @@ function pickDefaultEventId(events: TraceRunModel['timeline']) {
 }
 
 export default function TracesPageClient() {
+  const searchParams = useSearchParams();
+  const currentRunId = useAppStore((state) => state.activeRunId);
+  const storeAlerts = useAppStore((state) => state.alerts);
+  const { selectedValue: routeAlertId, setRouteValue: setHashAlertId } = useHashRouteState({
+    searchParams,
+    parseValue: parseTraceAlertId,
+    buildHref: buildTraceHref,
+  });
+  const alerts = storeAlerts.length ? storeAlerts : demoAlerts;
+  const { evidenceItems } = useRunEvidence(currentRunId);
   const runs = useMemo(
-    () => demoAlerts.map((alert) => buildTraceRunModel(alert, demoEvidence)),
-    [],
+    () => alerts.map((alert) => buildTraceRunModel(alert, evidenceItems)),
+    [alerts, evidenceItems],
   );
-  const [activeRunId, setActiveRunId] = useState(runs[0]?.id ?? '');
+  const [activeTraceId, setActiveTraceId] = useState(routeAlertId ?? runs[0]?.id ?? '');
   const [activeFilter, setActiveFilter] = useState<TraceEventKind | 'all'>('all');
-  const activeRun = runs.find((run) => run.id === activeRunId) ?? runs[0];
+  const activeRun = runs.find((run) => run.id === activeTraceId) ?? runs[0];
+
+  useEffect(() => {
+    const nextTraceId = routeAlertId ?? runs[0]?.id ?? '';
+    if (nextTraceId && nextTraceId !== activeTraceId) {
+      setActiveTraceId(nextTraceId);
+    }
+  }, [activeTraceId, routeAlertId, runs]);
   const filteredTimeline = useMemo(
     () => activeFilter === 'all'
       ? activeRun.timeline
@@ -109,6 +132,11 @@ export default function TracesPageClient() {
     setActiveFilter('all');
     setSelectedEventId(pickDefaultEventId(activeRun.timeline));
   }, [activeRun.id, activeRun.timeline]);
+
+  const handleSelectRun = (runId: string) => {
+    setActiveTraceId(runId);
+    setHashAlertId(runId);
+  };
 
   useEffect(() => {
     if (!filteredTimeline.length) {
@@ -206,9 +234,50 @@ export default function TracesPageClient() {
           backHref="/"
           backLabel="返回首页"
           stats={[
-            `${runs.length} demo runs`,
+            `${runs.length} trace runs`,
             `${filteredTimeline.length}/${activeRun.timeline.length} timeline events`,
             `${activeRun.evidenceCount} evidence links`,
+          ]}
+        />
+
+        <ObservatoryPageHero
+          eyebrow="Trace Drilldown"
+          title={`把 ${activeRun.primaryAgent} 的单次运行压成可裁决的时间线`}
+          description="参考 SigNoz 的 trace drilldown 与 Grafana Explore 的查询节奏，把 event timeline、evidence pressure、boundary verdict 与调查入口收束成同一条回放主线。"
+          statusLabel={activeRun.severity === 'Critical' ? 'live escalation' : 'replay aligned'}
+          chips={[
+            `${activeRun.timeline.length} timeline events`,
+            `${evidenceEvents.length} evidence-backed steps`,
+            `${activeRun.boundaryEvents} boundary crossings`,
+          ]}
+          stats={[
+            {
+              label: 'Decision',
+              value: activeRun.decision,
+              hint: activeRun.verdict.headline,
+            },
+            {
+              label: 'Trace Risk',
+              value: `${riskScore}/100`,
+              hint: `${highRiskEvents.length} escalated events detected`,
+            },
+            {
+              label: 'Window',
+              value: formatDuration(activeRun.durationMs),
+              hint: routeAlertId ? 'deep linked from command deck' : 'active replay window',
+            },
+          ]}
+          actions={[
+            {
+              label: '打开调查',
+              href: buildInvestigationHref(activeRun.id),
+              hint: '把当前回放直接落到案件法证舞台',
+            },
+            {
+              label: '回到总览',
+              href: '/overview',
+              hint: '把单次运行重新放回全局态势中',
+            },
           ]}
         />
 
@@ -319,7 +388,7 @@ export default function TracesPageClient() {
                   className="trace-run-row"
                   data-active={run.id === activeRun.id}
                   type="button"
-                  onClick={() => setActiveRunId(run.id)}
+                  onClick={() => handleSelectRun(run.id)}
                 >
                   <span className="trace-run-row__tone" data-tone={severityTone(run.severity)} />
                   <span className="trace-run-row__body">

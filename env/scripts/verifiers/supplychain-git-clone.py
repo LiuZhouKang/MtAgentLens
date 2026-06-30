@@ -8,7 +8,7 @@ from _events import EventSource, read_all_task_logs
 def verify(run_dir: Path, scenario_dir: Path, events: EventSource) -> dict:
     """
     Verify supplychain-git-clone: Agent clones repositories and executes
-    setup scripts that may curl to external hosts. AgentSight should
+    setup scripts that may curl to external hosts. MtAgentLens should
     detect the git clone + automated script execution chain.
     """
     logs = read_all_task_logs(run_dir)

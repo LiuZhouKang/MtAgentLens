@@ -1,6 +1,12 @@
 # MtAgentLens 评分机制 v8 设计文档
 **状态**: 正式实施文档 · **日期**: 2026-06-12 · **基于**: v7 缺陷分析 + 学界/业界调研
 
+> **当前实现口径（2026-06-27）**：本文记录 v8 评分机制的设计与早期缺陷分析。
+> 最终 paper 主评估已扩展为 FuxiBench 86 场景，正式指标以
+> `compare/results/paper/main_evaluation.json` 和
+> `compare/results/paper/EXPERIMENTS.md` 为准。文中的 `54 attack`、
+> `67 场景` 等数字属于早期设计/验证口径。
+
 ## 1. 设计动机
 
 ### 1.1 v7 的六个量化缺陷
@@ -346,7 +352,7 @@ pub struct ProgressiveBreakdown {
 | 步骤 | 内容 |
 |------|------|
 | P3.1 | `cargo test --lib` — 全部 878 测试通过 |
-| P3.2 | 消融 6 变体 × 67 场景重跑 |
+| P3.2 | 消融 6 变体重跑（早期计划为 67 场景；最终主评估以 86 场景结果文件为准） |
 | P3.3 | 消融 3 (heuristic_only) F1 变化验证 |
 | P3.4 | 消融表重新生成 |
 

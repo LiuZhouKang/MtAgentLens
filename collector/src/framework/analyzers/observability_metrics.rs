@@ -210,7 +210,7 @@ impl Analyzer for ObservabilityMetricsAnalyzer {
                         yield Event::new(
                             "observability_metrics".to_string(),
                             0,
-                            "agentsight".to_string(),
+                            "mtagentlens".to_string(),
                             data,
                         );
                     }

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import {
-  Activity,
   ArrowRight,
   FileSearch,
   GitBranch,
@@ -12,6 +11,7 @@ import {
   Zap,
 } from 'lucide-react';
 import ObservatoryHeader from '@/components/system/observatory-header';
+import ObservatoryPageHero from '@/components/system/observatory-page-hero';
 import { HandoffDashboardShell } from '@/components/ui/handoff-dashboard-shell';
 import PrismButton from '@/components/ui/prism-button';
 import PrismPanel from '@/components/ui/prism-panel';
@@ -203,6 +203,40 @@ export default function HandoffPage() {
             `${store.metrics.total_spawned} spawned`,
             store.loading ? '同步 handoff 数据中…' : store.useBackend ? 'live backend' : 'demo fallback',
           ]}
+        />
+
+        <ObservatoryPageHero
+          eyebrow="Delegation Mission Board"
+          title={leadLane ? `先压实 ${leadLane.agentId} 主导的委托扩散链` : '先压实当前主导 lane，再展开委托扩散链'}
+          description="参考 mission-control 的 operator shell 与 security analytics 的风险分发视图，把 delegation chain、payload drift、orphaned artifacts 与下一步动作压成同一张 handoff 指挥面。"
+          statusLabel={store.useBackend ? 'live handoff backend' : 'demo handoff seeded'}
+          chips={[
+            `${store.metrics.total_spawned} spawned`,
+            `${store.metrics.active_count} active lanes`,
+            `${criticalEventCount} critical signals`,
+          ]}
+          stats={[
+            {
+              label: 'Current Holder',
+              value: leadLane?.agentId ?? 'awaiting lane',
+              hint: leadLane ? `L${leadLane.depth} active lane` : '等待主导 lane 收束',
+            },
+            {
+              label: 'Payload Drift',
+              value: `${store.metrics.orphaned_artifacts}`,
+              hint: '需要回收的 orphaned artifacts 数量',
+            },
+            {
+              label: 'Trust Survival',
+              value: formatPercent(store.metrics.workspace_tag_survival_rate),
+              hint: '上下文与 workspace tag 的存活率',
+            },
+          ]}
+          actions={quickActions.slice(0, 2).map((action) => ({
+            label: action.label,
+            href: action.href,
+            hint: '从委托扩散视角继续进入调查或总览',
+          }))}
         />
 
         <div className="handoff-stage-shell">

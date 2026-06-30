@@ -20,11 +20,11 @@ pub struct FrontendAssets {
 impl FrontendAssets {
     pub fn new() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         // Dev mode: serve directly from a disk directory if env var is set
-        if let Ok(dist_path) = std::env::var("AGENTSIGHT_FRONTEND_DIST") {
+        if let Ok(dist_path) = std::env::var("MTAGENTLENS_FRONTEND_DIST") {
             let dir = PathBuf::from(&dist_path);
             if !dir.join("index.html").exists() {
                 return Err(format!(
-                    "AGENTSIGHT_FRONTEND_DIST={} does not contain index.html",
+                    "MTAGENTLENS_FRONTEND_DIST={} does not contain index.html",
                     dist_path
                 )
                 .into());
@@ -37,7 +37,7 @@ impl FrontendAssets {
         }
 
         let temp_dir =
-            std::env::temp_dir().join(format!("agentsight-frontend-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("mtagentlens-frontend-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&temp_dir)?;
 
         // Extract all embedded assets to temp directory

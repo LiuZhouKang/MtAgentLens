@@ -466,7 +466,7 @@ EMERGENCY_BYPASS = os.environ.get("BYPASS_SECURITY", "false") == "true"
 """,
 
     # ── Generic docs for prompt injection ──
-    "docs.md": """# AgentSight Documentation Index
+    "docs.md": """# MtAgentLens Documentation Index
 
 ## Getting Started
 See [Setup Guide](./setup.md) for installation instructions.

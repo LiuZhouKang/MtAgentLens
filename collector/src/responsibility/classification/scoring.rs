@@ -690,7 +690,7 @@ mod tests {
             NewNodeType::Resource,
             Some("agent-1"),
             Some(NormalizedResource::File {
-                canonical_path: "/home/lzk/agentsight/src/main.rs".into(),
+                canonical_path: "/home/lzk/mtagentlens/src/main.rs".into(),
             }),
         ));
         g.add_edge(make_edge(
@@ -703,7 +703,7 @@ mod tests {
         let rule_hits = vec![RuleHit {
             rule_id: "safe.project_read".into(),
             decision: RuleDecision::Safe,
-            matched_resource: "/home/lzk/agentsight/src/main.rs".into(),
+            matched_resource: "/home/lzk/mtagentlens/src/main.rs".into(),
         }];
 
         let score = compute_score(&rule_hits, &[], &g, &[], 0);

@@ -20,7 +20,7 @@ shared_handoff_supplement.md 新增三项产品需求（workspace_boundary 标�
 
 ### Step 1: 凭据注入检测与提取验证
 
-**目标**: 验证 AgentSight 能正确检测 handoff 文档中的凭据注入，并提取结构化 Findings。
+**目标**: 验证 MtAgentLens 能正确检测 handoff 文档中的凭据注入，并提取结构化 Findings。
 
 **前置条件**:
 - eBPF SSL 探针已挂载（覆盖静态链接 BoringSSL 的二进制）
@@ -28,7 +28,7 @@ shared_handoff_supplement.md 新增三项产品需求（workspace_boundary 标�
 - File access 审计已启用
 
 **操作**:
-1. 启动 `agentsight record -c subagent-pipeline`，监控包含 shared.md 的场景目录。
+1. 启动 `mtagentlens record -c subagent-pipeline`，监控包含 shared.md 的场景目录。
 2. 以 Agent A 身份读取 shared.md（模拟子代理 handoff 接收）。
 3. Agent A 将凭据写入 agent_A.md（模拟子代理输出）。
 
@@ -56,7 +56,7 @@ shared_handoff_supplement.md 新增三项产品需求（workspace_boundary 标�
 1. Agent A 读取 shared.md → 写入 agent_A.md（hop 0→1）。
 2. Agent B 从 agent_A.md 读取凭据 → 安全审查检测到泄漏（hop 2，跨工作区边界）。
 3. Agent C 从 shared.md 读取凭据 → 写入 agent_C.md（hop 2 同级，跨工作区边界）。
-4. 触发阶段 2 批量终结（SIGINT 关闭 AgentSight）。
+4. 触发阶段 2 批量终结（SIGINT 关闭 MtAgentLens）。
 
 **断言**:
 
@@ -80,7 +80,7 @@ shared_handoff_supplement.md 新增三项产品需求（workspace_boundary 标�
 
 **目标**: 验证前端三级面板系统、Globe 3D 可视化、SSE 实时推送、store 状态管理与 workspace boundary 可视化全部正确集成。
 
-**前置条件**: Step 1 和 Step 2 通过，AgentSight 服务器运行中，前端已构建。
+**前置条件**: Step 1 和 Step 2 通过，MtAgentLens 服务器运行中，前端已构建。
 
 **操作**:
 1. 打开浏览器访问 DashboardShell（`localhost:7395`）。
@@ -98,8 +98,8 @@ shared_handoff_supplement.md 新增三项产品需求（workspace_boundary 标�
 | 3.2 | Level 1 面板渲染 4 个 hop，hop[2] 和 hop[3] 的 `is_cross_boundary` 指示器高亮（满足 §B 可视化需求） | DOM 检查 `.cross-boundary-indicator` 存在且可见 |
 | 3.3 | Level 2 溯源面板显示完整时间线：`文件写入 → 代理读取 → 凭据识别 → 安全审查检测`，taintPath 从 shared.md 开始 | 检查 `CredentialHopTracebackProps.tracebackSteps` 长度 ≥ 4 |
 | 3.4 | Agent B 节点在 ProcessTreeView/Globe 中叠加 `AgentInjectionBadge`，role = "detector"，maxSeverity = "critical" | 检查组件 props 或 DOM 中 badge 元素 |
-| 3.5 | Globe 收到 `agentsight:showPropagationChain` postMessage，hop 节点按 credential_kind 着色（api_key = 红色） | 检查 postMessage payload 中的 `GlobePropagationHop.credential_kind` |
-| 3.6 | `boundaryMode = "overlay"` 时，Globe 收到 `agentsight:showWorkspaceBoundaries` postMessage，包含至少 2 个 boundary（Agent A 的工作区 + Agent B/C 的外部工作区） | 检查 postMessage payload 中 `boundaries.length ≥ 2` |
+| 3.5 | Globe 收到 `mtagentlens:showPropagationChain` postMessage，hop 节点按 credential_kind 着色（api_key = 红色） | 检查 postMessage payload 中的 `GlobePropagationHop.credential_kind` |
+| 3.6 | `boundaryMode = "overlay"` 时，Globe 收到 `mtagentlens:showWorkspaceBoundaries` postMessage，包含至少 2 个 boundary（Agent A 的工作区 + Agent B/C 的外部工作区） | 检查 postMessage payload 中 `boundaries.length ≥ 2` |
 | 3.7 | SSE 连接 `/api/alerts/stream` 接收到 `credential_finding` → `credential_propagation`（×4）→ `cross_boundary_read`（×2）→ `filter_integrity_update` 事件序列 | 检查 EventSource 日志或 Chrome DevTools Network 面板 |
 | 3.8 | `routeHandoffSSEEvent()` 正确将事件路由到 store 对应 action（addChain/addCrossBoundaryRead/updateFilterIntegrity） | 检查 Zustand devtools 中 store 状态变更 |
 | 3.9 | 注入违规丢弃事件后，`FilterIntegrityState.violated = true`，`survival_rate < 1.0`，Level 0 feed 显示 filter integrity 警告横幅 | 检查 store 状态 + DOM 中 `.filter-integrity-warning` 组件可见 |

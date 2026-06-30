@@ -57,7 +57,7 @@ class VerifierEventSourceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
             (run_dir / 'trace.log').write_text(
-                '{"source":"alert","comm":"agentsight","data":{"event":"alert","rule_id":"SUSPICIOUS_NETWORK_CONNECT","evidence_source":"causal"}}\n',
+                '{"source":"alert","comm":"mtagentlens","data":{"event":"alert","rule_id":"SUSPICIOUS_NETWORK_CONNECT","evidence_source":"causal"}}\n',
                 encoding='utf-8',
             )
             events = events_module.EventSource(run_dir)

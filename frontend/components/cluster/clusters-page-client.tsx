@@ -1,22 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Activity, ArrowLeft, ArrowRight, GitBranch, Radar, Sparkles, Target, Waypoints } from 'lucide-react';
 import PrismPanel from '@/components/ui/prism-panel';
 import PrismButton from '@/components/ui/prism-button';
 import ObservatoryHeader from '@/components/system/observatory-header';
-import { api } from '@/lib/api';
+import ObservatoryPageHero from '@/components/system/observatory-page-hero';
 import { useAppStore } from '@/lib/store';
-import { demoEvidence } from '@/lib/demo-data';
 import { deriveClusterIds } from '@/lib/stellar-directory';
 import { buildClusterModel, compareClusterModels } from '@/lib/cluster-model';
 import { buildClusterHref, parseClusterId } from '@/lib/cluster-route';
 import { buildAgentHref } from '@/lib/agent-route';
 import { buildInvestigationHref } from '@/lib/investigation-route';
 import type { ResponsibilityAlert } from '@/lib/types';
+import { useRunEvidence } from '@/lib/use-run-evidence';
+import { useHashRouteState } from '@/lib/use-hash-route-state';
 
 function getSeverityTone(severity: string | null) {
   if (severity === 'Critical') return 'danger';
@@ -45,50 +45,22 @@ function buildSparklineValues(seed: number, amplitude: number) {
 }
 
 export default function ClustersPageClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const activeRunId = useAppStore((state) => state.activeRunId);
   const alerts = useAppStore((state) => state.alerts);
   const graph = useAppStore((state) => state.graph);
-  const [hashClusterId, setHashClusterId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const syncHashCluster = () => {
-      setHashClusterId(parseClusterId(new URLSearchParams(), window.location.hash));
-    };
-
-    syncHashCluster();
-    window.addEventListener('hashchange', syncHashCluster);
-    return () => window.removeEventListener('hashchange', syncHashCluster);
-  }, []);
-
-  const evidenceQuery = useQuery({
-    queryKey: ['run-evidence', activeRunId],
-    enabled: !!activeRunId,
-    retry: false,
-    queryFn: async () => {
-      if (!activeRunId) {
-        return {
-          evidence: [],
-          intents: [],
-          actions: [],
-          non_links: [],
-        };
-      }
-
-      return api.getEvidence(activeRunId);
-    },
+  const { selectedValue: hashClusterId, setRouteValue: setHashClusterId } = useHashRouteState({
+    searchParams,
+    parseValue: parseClusterId,
+    buildHref: buildClusterHref,
   });
 
-  const evidenceItems = useMemo(
-    () => (activeRunId ? evidenceQuery.data?.evidence ?? [] : demoEvidence),
-    [activeRunId, evidenceQuery.data?.evidence],
-  );
+  const { evidenceItems } = useRunEvidence(activeRunId);
 
   const clusterIds = useMemo(() => deriveClusterIds(alerts, graph), [alerts, graph]);
   const selectedClusterId = useMemo(() => {
-    return parseClusterId(searchParams, hashClusterId ? `#clusterId=${encodeURIComponent(hashClusterId)}` : null);
-  }, [hashClusterId, searchParams]);
+    return hashClusterId;
+  }, [hashClusterId]);
 
   const clusterModels = useMemo(
     () =>
@@ -107,16 +79,8 @@ export default function ClustersPageClient() {
   const criticalClusterCount = clusterModels.filter((model) => model.highestSeverity === 'Critical').length;
 
   const handleSelectCluster = useCallback((clusterId: string) => {
-    const nextHref = buildClusterHref(clusterId);
     setHashClusterId(clusterId);
-
-    if (typeof window !== 'undefined') {
-      window.history.replaceState(window.history.state, '', nextHref);
-      return;
-    }
-
-    router.replace(nextHref);
-  }, [router]);
+  }, [setHashClusterId]);
 
   if (!selectedModel) {
     return (
@@ -213,6 +177,47 @@ export default function ClustersPageClient() {
           `${clusterModels.length} clusters`,
           `${criticalClusterCount} critical`,
           `avg pressure ${avgPressure}`,
+        ]}
+      />
+
+      <ObservatoryPageHero
+        eyebrow="Cluster Observatory"
+        title={`先判断 ${selectedModel.title} 是否值得直接立案`}
+        description="参考 OpenObserve 的统一遥测节奏与 OpenSearch Security Analytics 的 findings workflow，把 cluster pressure、边界撕裂、主 Agent 与推荐动作收成同一层责任工作台。"
+        statusLabel={selectedModel.highestSeverity === 'Critical' ? 'critical cluster live' : 'watching cluster drift'}
+        chips={[
+          `${selectedModel.alertIds.length} alert links`,
+          `${selectedModel.boundaryCrossingCount} boundary seams`,
+          `${selectedModel.surfacedResources.length} surfaced signals`,
+        ]}
+        stats={[
+          {
+            label: 'Lead Agent',
+            value: selectedModel.leadAgentId ?? 'awaiting focus',
+            hint: '当前最适合继续下钻的责任主体',
+          },
+          {
+            label: 'Pressure',
+            value: `${selectedModel.pressureScore}`,
+            hint: `${selectedModel.relatedAgentIds.length} related agents in field`,
+          },
+          {
+            label: 'Evidence',
+            value: `${selectedModel.linkedEvidence.length}`,
+            hint: `${evidenceItems.length} total materials available`,
+          },
+        ]}
+        actions={[
+          {
+            label: '进入主调查',
+            href: selectedModel.leadAlertId ? buildInvestigationHref(selectedModel.leadAlertId) : '/investigations',
+            hint: '直接跳到该集群最值得裁决的案件',
+          },
+          {
+            label: '打开主 Agent',
+            href: selectedModel.leadAgentId ? buildAgentHref(selectedModel.leadAgentId) : '/agents',
+            hint: '转到主体画像继续看单点责任面',
+          },
         ]}
       />
 

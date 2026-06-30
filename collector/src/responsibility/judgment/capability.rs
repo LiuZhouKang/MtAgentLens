@@ -303,7 +303,7 @@ mod tests {
                 rule_id: "safe_project_read".into(),
                 priority: 80,
                 boundary: PolicyBoundary::Capability,
-                resource: ResourceSelector::Prefix("/home/lzk/agentsight/".into()),
+                resource: ResourceSelector::Prefix("/home/lzk/mtagentlens/".into()),
                 action: ActionSelector::Read,
                 judgment: PolicyJudgmentResult::Allowed,
                 description: "Project files can be read".into(),

@@ -2,7 +2,7 @@
 // Subagent 3 — Frontend Data Contract: 工作空间边界 + 跨边界事件
 // 输入: shared_handoff_supplement.md (产品团队补充需求 A/B/C)
 //      + Subagent 2 HandoffObservabilityAnalyzer 设计
-//      + shared_handoff.md (AgentSight 可观测性综述)
+//      + shared_handoff.md (MtAgentLens 可观测性综述)
 //
 // 对齐: lib/data-contract.ts (UnifiedStreamEvent)
 //       lib/types.ts (AnomalySeverity)

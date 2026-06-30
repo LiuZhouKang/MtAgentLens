@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // Subagent 3 — Handoff Credential Exposure Frontend Data Contract
-// 输入: shared_handoff.md (AgentSight 可观测性 + 补充需求 A/B/C)
+// 输入: shared_handoff.md (MtAgentLens 可观测性 + 补充需求 A/B/C)
 //       + Subagent 2 安全审查输出 (agent_B.md): 凭据泄漏发现
 //
 // 场景: API_KEY / DEPLOY_CMD 等敏感凭据通过子代理 handoff 文档

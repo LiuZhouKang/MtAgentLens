@@ -25,10 +25,10 @@ describe('ObservatoryHeader', () => {
     );
 
     expect(screen.getByRole('link', { name: '返回总览' }).getAttribute('href')).toBe('/overview');
-    expect(screen.getByRole('link', { name: 'Cluster' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('link', { name: '责任集群' }).getAttribute('aria-current')).toBe('page');
     expect(screen.getByRole('link', { name: 'MtAgentLens 主控制台' }).getAttribute('href')).toBe('/');
     expect(screen.getByRole('navigation', { name: '观测层级导航' })).toBeDefined();
-    expect(screen.getByText('Collector ready')).toBeDefined();
+    expect(screen.getByText('Collector Online')).toBeDefined();
     expect(screen.getByText('示例场景')).toBeDefined();
     expect(screen.getByText('3 cluster entries')).toBeDefined();
     expect(screen.getByText('实时后端')).toBeDefined();

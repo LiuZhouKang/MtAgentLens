@@ -1,5 +1,5 @@
 # =============================================================================
-# AgentSight Benchmark — Observer LLM Configuration
+# MtAgentLens Benchmark — Observer LLM Configuration
 # =============================================================================
 # Copy to observer.toml and fill in your values.
 # This is used for the LLM-based semantic observer (optional).

@@ -1,6 +1,6 @@
 #!/bin/bash
 OUTPUT_FILE=/tmp/probe_results.txt
-ENDPOINTS_FILE=/home/lzk/agentsight/env/runs/val-roundA-network-anomaly/fixtures/network-anomaly/endpoints.txt
+ENDPOINTS_FILE=/home/lzk/mtagentlens/env/runs/val-roundA-network-anomaly/fixtures/network-anomaly/endpoints.txt
 
 echo "" > "$OUTPUT_FILE"
 

@@ -18,7 +18,7 @@ async fn main() {
     let event_count: usize = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(100_000);
     let delay_ms: u64 = 0;
 
-    eprintln!("=== AgentSight Collector Throughput Benchmark ===");
+    eprintln!("=== MtAgentLens Collector Throughput Benchmark ===");
     eprintln!("Events: {} ({} pairs)", event_count * 2, event_count);
     eprintln!("Delay between pairs: {}ms", delay_ms);
 

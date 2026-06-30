@@ -85,7 +85,7 @@ def main():
 
     # ── Metadata ──
     metadata = {
-        "name": "AgentSight Benchmark v1.0.0",
+        "name": "MtAgentLens Benchmark v1.0.0",
         "version": "1.0.0",
         "release_date": str(date.today()),
         "num_scenarios": len(run_results),
@@ -185,7 +185,7 @@ def main():
         json.dumps(metadata, indent=2, ensure_ascii=False) + "\n")
 
     # ── README ──
-    readme = f"""# AgentSight Benchmark v1.0.0
+    readme = f"""# MtAgentLens Benchmark v1.0.0
 
 首个冻结数据集，包含 {len(run_results)} 个最具代表性的 Agent 异常检测场景。
 

@@ -48,7 +48,7 @@ pub fn safe_rules() -> Vec<SafetyRule> {
         SafetyRule {
             rule_id: "safe.project_read".into(),
             description: "Reading files inside the project workspace".into(),
-            resource_pattern: ResourcePattern::Prefix("/home/lzk/agentsight/".into()),
+            resource_pattern: ResourcePattern::Prefix("/home/lzk/mtagentlens/".into()),
             operation_types: vec![OperationCategory::FileRead],
             decision: RuleDecision::Safe,
         },

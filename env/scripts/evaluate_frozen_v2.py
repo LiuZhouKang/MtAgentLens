@@ -28,7 +28,7 @@ from compare.tools.base import EvaluationCase, FindingRecord, ToolMetadata  # no
 from compare.tools.datasets import FrozenDatasetAdapter  # noqa: E402
 from compare.tools.evaluator_v2 import evaluate_v2  # noqa: E402
 from env.scripts.evaluate_frozen import (  # noqa: E402
-    MTAGENTPRISM_TOOL,
+    MTAGENTLENS_TOOL,
     load_mtagentlens_findings,
     load_quality_manifest,
     summarize_by,
@@ -71,7 +71,7 @@ def evaluate_dataset_v2(dataset_dir: Path) -> dict[str, Any]:
     adapter = FrozenDatasetAdapter(dataset_dir)
     cases = adapter.load_cases()
     findings = list(load_mtagentlens_findings(cases))
-    metrics = evaluate_v2(MTAGENTPRISM_TOOL, cases, findings)
+    metrics = evaluate_v2(MTAGENTLENS_TOOL, cases, findings)
     manifest = load_quality_manifest(dataset_dir)
 
     missing_db = [
@@ -143,7 +143,7 @@ def render_report_v2(result: dict[str, Any]) -> str:
 
     lines = [
         "=" * 78,
-        "  MTAGENTPRISM EVALUATION — GT v3 (Non-Circular, Independent Annotation)",
+        "  MTAGENTLENS EVALUATION — GT v3 (Non-Circular, Independent Annotation)",
         "=" * 78,
         "",
         f"  Dataset: {result['dataset']}",

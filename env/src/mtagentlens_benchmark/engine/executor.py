@@ -24,16 +24,57 @@ from mtagentlens_benchmark.workspace import BenchmarkWorkspace
 STATUS_POLL_INTERVAL = 1.0  # seconds between status file polls
 
 
-def _kill_leftover_claude() -> None:
-    """Kill any leftover Claude processes from previous runs.
+def _copy_claude_hooks_for_visualizer(settings: dict) -> None:
+    """Copy Claude hooks only when explicitly requested for UI recording."""
+    if os.environ.get("MTAGENTLENS_ENABLE_CLAUDE_HOOKS") != "1":
+        return
 
-    Ghost processes (e.g. stale 'claude' subprocesses) can persist across
-    runs if the parent shell exits before children. Their TLS traffic
-    pollutes identity resolution with phantom agent identities.
+    source = Path.home() / ".claude" / "settings.json"
+    if not source.exists():
+        return
+
+    try:
+        source_settings = json.loads(source.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return
+
+    hooks = source_settings.get("hooks")
+    if isinstance(hooks, dict):
+        settings["hooks"] = hooks
+
+
+def _kill_leftover_claude() -> None:
+    """Clean up benchmark-owned tmux sessions and stale Claude processes.
+
+    Ghost Claude processes can persist across runs if the parent shell exits
+    before children. Because TLS capture hooks the Claude Code binary, any
+    unrelated live Claude session can pollute intent extraction. For benchmark
+    recording, start from a clean Claude/tmux surface.
     """
     try:
+        sessions = subprocess.run(
+            ["tmux", "ls"],
+            timeout=5, capture_output=True, text=True,
+        )
+        if sessions.returncode == 0:
+            for line in sessions.stdout.splitlines():
+                name = line.split(":", 1)[0].strip()
+                if name.startswith("agtlab-"):
+                    subprocess.run(
+                        ["tmux", "kill-session", "-t", name],
+                        timeout=5, capture_output=True,
+                    )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    try:
+        for pattern in ("claude", "claude.exe"):
+            subprocess.run(
+                ["pkill", "-x", pattern],
+                timeout=5, capture_output=True,
+            )
         subprocess.run(
-            ["pkill", "-f", "claude.exe"],
+            ["pkill", "-f", r"/claude-code/.*/claude"],
             timeout=5, capture_output=True,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -128,9 +169,10 @@ def execute_scenario(
 
             uprobe = collector_hs.get("uprobe_verification", {})
             if uprobe and not uprobe.get("attached") and uprobe.get("errors"):
-                collector_health["uprobe_warning"] = (
-                    f"eBPF uprobe not attached; TLS capture will not work. "
-                    f"Errors: {uprobe['errors']}"
+                collector_health["uprobe_startup_note"] = (
+                    "Startup check did not observe an active TLS uprobe yet; "
+                    "final status is determined from runtime TLS sessions and responsibility DB metrics. "
+                    f"Details: {uprobe['errors']}"
                 )
 
             binary_diag = collector_hs.get("binary_detection", {})
@@ -183,26 +225,27 @@ def execute_scenario(
                 collector_health["runtime_metrics"] = runtime
                 collector_health["overall_healthy"] = runtime.get("overall_healthy", False)
 
-                if not runtime.get("has_trace_output"):
+                if (
+                    not runtime.get("has_trace_output")
+                    and not runtime.get("responsibility_db_exists")
+                ):
                     collector_health["trace_output_warning"] = (
                         "Collector trace output file is EMPTY (0 bytes). "
                         "No events were logged. Check collector stderr for errors."
                     )
                 if not runtime.get("pbc_detection_healthy"):
                     collector_health["pbc_warning"] = (
-                        "No PolicyBoundaryCrossing edges detected (pbc_in_graph=0). "
+                        "No PolicyBoundaryCrossing edges detected. "
                         "Without PBC edges, no detection is possible. "
-                        "This usually means TLS uprobe did not attach."
+                        "Check TLS capture, process events, and responsibility graph construction."
                     )
                 if not runtime.get("ssl_uprobe_healthy"):
                     collector_health["ssl_warning"] = (
-                        "SSL uprobe appears unhealthy — no SSL events captured "
-                        "and SSLFilter has no metrics."
+                        "TLS capture appears unhealthy — no TLS sessions or SSL events were observed."
                     )
                 if not runtime.get("scoring_healthy"):
                     collector_health["scoring_warning"] = (
-                        "Scoring produced no signals and no clusters. "
-                        "Even if edges exist, nothing was classified as anomalous."
+                        "Responsibility scoring produced no graph or evidence signals."
                     )
 
     collector_out = collector_dir / "trace.log" if collector_started else None
@@ -492,6 +535,7 @@ def _apply_benchmark_env(env: dict, run_dir: Path) -> None:
         "includeCoAuthoredBy": False,
         "skipDangerousModePermissionPrompt": True,
     }
+    _copy_claude_hooks_for_visualizer(settings)
     (isolated_config / "settings.json").write_text(
         json.dumps(settings, indent=2), encoding="utf-8",
     )
@@ -566,8 +610,8 @@ def _verify_collector_output(
         diag["trace_size_bytes"] = trace_path.stat().st_size
         diag["trace_non_empty"] = trace_path.stat().st_size > 0
         if not diag["trace_non_empty"]:
-            diag["warnings"].append(
-                "trace file exists but is EMPTY — collector ran but captured no events"
+            diag["trace_note"] = (
+                "trace JSONL is empty; responsibility data may still be available in SQLite"
             )
     else:
         diag["warnings"].append(
@@ -607,8 +651,7 @@ def _verify_collector_output(
             diag["warnings"].append("trace.pcap is empty — tcpdump captured no packets")
 
     diag["all_healthy"] = (
-        diag["trace_non_empty"]
-        and diag["responsibility_db_exists"]
+        diag["responsibility_db_exists"]
         and diag.get("responsibility_db_tables", 0) > 0
         and not diag["warnings"]
     )

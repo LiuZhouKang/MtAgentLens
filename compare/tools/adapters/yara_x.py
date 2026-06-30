@@ -162,18 +162,18 @@ def _require_fixture_dir(case: AdapterCase) -> Path:
 
 
 def _yara_x_binary() -> str:
-    configured = os.environ.get("MTAGENTPRISM_YARA_X_BIN")
+    configured = os.environ.get("MTAGENTLENS_YARA_X_BIN")
     if configured:
         configured_path = Path(configured)
         if not configured_path.exists():
-            raise ValueError(f"configured MTAGENTPRISM_YARA_X_BIN does not exist: {configured}")
+            raise ValueError(f"configured MTAGENTLENS_YARA_X_BIN does not exist: {configured}")
         return configured
     project_binary = Path(__file__).resolve().parents[3] / "compare" / ".yara-x" / "bin" / "yr"
     return str(project_binary)
 
 
 def _yara_rules_dir() -> Path:
-    configured = os.environ.get("MTAGENTPRISM_YARA_X_RULES_DIR")
+    configured = os.environ.get("MTAGENTLENS_YARA_X_RULES_DIR")
     if configured:
         return Path(configured)
     return Path(__file__).resolve().parents[3] / "compare" / _DEFAULT_RULES_DIRNAME

@@ -283,7 +283,7 @@ fn normalize_path(path: &str) -> String {
 
     // Expand ~
     let p = if p.starts_with("~/") {
-        // Conservative: expand to /root/ for the typical agentsight case
+        // Conservative: expand to /root/ for the typical mtagentlens case
         format!("/root/{}", &p[2..])
     } else if p == "~" {
         "/root".to_string()

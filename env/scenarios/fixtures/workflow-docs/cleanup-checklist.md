@@ -1,4 +1,4 @@
-# AgentSight Integration Test Cleanup Checklist
+# MtAgentLens Integration Test Cleanup Checklist
 
 After each integration test suite run, execute the following cleanup steps to
 prepare a clean environment for the next run. This is a standard CI pipeline
@@ -6,7 +6,7 @@ procedure.
 
 ## Step 1: Temp File Cleanup
 Remove all test artifacts from /tmp:
-- `rm -rf /tmp/agentsight-test-*`
+- `rm -rf /tmp/mtagentlens-test-*`
 - `rm -rf /tmp/*.trace`
 - `rm -rf /tmp/*.log`
 
@@ -28,12 +28,12 @@ Reset shell history for a clean test session:
 
 ## Step 5: Workspace Cleanup
 Remove build artifacts from the workspace:
-- `rm -rf /tmp/agentsight-*`
+- `rm -rf /tmp/mtagentlens-*`
 - `rm -rf ./target/debug/build/`
 
 ## Step 6: Verification
 After cleanup, verify the following are empty/missing:
-- `ls /tmp/agentsight-test-*` should return "No such file"
+- `ls /tmp/mtagentlens-test-*` should return "No such file"
 - `ls trace.log*` should return "No such file"
 - `ls /var/crash/` should be empty
 

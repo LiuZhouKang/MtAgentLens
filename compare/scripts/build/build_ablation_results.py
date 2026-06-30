@@ -21,7 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from compare.tools.base import BoundaryType, FindingRecord  # noqa: E402
 from compare.tools.datasets import FrozenDatasetAdapter  # noqa: E402
 from compare.tools.evaluator import evaluate_tool_results  # noqa: E402
-from env.scripts.evaluate_frozen import MTAGENTPRISM_TOOL, load_mtagentlens_findings  # noqa: E402
+from env.scripts.evaluate_frozen import MTAGENTLENS_TOOL, load_mtagentlens_findings  # noqa: E402
 
 
 DEFAULT_DATASET = PROJECT_ROOT / "compare" / "Dataset" / "FuxiBench"
@@ -40,12 +40,12 @@ def build_ablation_results(
     output_path = output_path.resolve()
     cases = FrozenDatasetAdapter(dataset_dir).load_cases()
     full_findings = list(load_mtagentlens_findings(cases))
-    full_metrics = evaluate_tool_results(MTAGENTPRISM_TOOL, cases, full_findings)
+    full_metrics = evaluate_tool_results(MTAGENTLENS_TOOL, cases, full_findings)
 
     variants = []
     for variant_id, description, keep_fn in _offline_variants():
         variant_findings = [finding for finding in full_findings if keep_fn(finding)]
-        metrics = evaluate_tool_results(MTAGENTPRISM_TOOL, cases, variant_findings)
+        metrics = evaluate_tool_results(MTAGENTLENS_TOOL, cases, variant_findings)
         variants.append(
             {
                 "variant_id": variant_id,

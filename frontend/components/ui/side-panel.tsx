@@ -23,7 +23,7 @@ export default function SidePanel() {
       'Drag to rotate the globe, scroll to zoom',
       'Click nodes for details, double-click to expand',
       'Cmd+K opens the command palette',
-      'Run agentsight record to start monitoring',
+      'Run mtagentlens record to start monitoring',
     ];
     let i = 0;
     const timer = setInterval(() => {
@@ -149,7 +149,7 @@ export default function SidePanel() {
             'Drag to rotate the globe, scroll to zoom',
             'Click nodes for details, double-click to expand',
             'Cmd+K opens the command palette',
-            'Run agentsight record to start monitoring',
+            'Run mtagentlens record to start monitoring',
           ][onboardingStep]}
         </div>
       )}

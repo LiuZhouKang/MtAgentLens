@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">MtAgentLens Mark</title>
+  <desc id="desc">Golden network sphere logo mark for MtAgentLens</desc>
+  <defs>
+    <linearGradient id="beamH" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#f7c75f" stop-opacity="0"/>
+      <stop offset="28%" stop-color="#f8d885" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#fff4d4" stop-opacity="1"/>
+      <stop offset="72%" stop-color="#f8d885" stop-opacity="0.88"/>
+      <stop offset="100%" stop-color="#f7c75f" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="beamV" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#c8dcff" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#f4fbff" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#c8dcff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="goldStroke" x1="10%" y1="10%" x2="90%" y2="90%">
+      <stop offset="0%" stop-color="#fff0b8"/>
+      <stop offset="42%" stop-color="#ffd66d"/>
+      <stop offset="100%" stop-color="#c98a14"/>
+    </linearGradient>
+    <linearGradient id="silverStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f7fbff"/>
+      <stop offset="100%" stop-color="#b7c7df"/>
+    </linearGradient>
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff8de"/>
+      <stop offset="45%" stop-color="#ffd56c"/>
+      <stop offset="100%" stop-color="#c88711"/>
+    </radialGradient>
+    <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+    <filter id="wideGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+  </defs>
+
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 128H250" stroke="url(#beamH)" stroke-width="10" filter="url(#wideGlow)" opacity="0.85"/>
+    <path d="M128 12V244" stroke="url(#beamV)" stroke-width="6" filter="url(#wideGlow)" opacity="0.58"/>
+  </g>
+
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="128" cy="128" r="82" stroke="url(#silverStroke)" stroke-width="2.8" opacity="0.74"/>
+    <ellipse cx="128" cy="128" rx="82" ry="36" stroke="url(#silverStroke)" stroke-width="2.4" opacity="0.58"/>
+    <ellipse cx="128" cy="128" rx="36" ry="82" stroke="url(#silverStroke)" stroke-width="2.2" opacity="0.42"/>
+
+    <polygon points="128,48 196,88 196,168 128,208 60,168 60,88" stroke="url(#silverStroke)" stroke-width="2.4" opacity="0.7"/>
+    <polygon points="128,70 176,98 176,158 128,186 80,158 80,98" stroke="url(#goldStroke)" stroke-width="2.6" opacity="0.9"/>
+    <polygon points="128,94 150,107 150,149 128,162 106,149 106,107" stroke="url(#goldStroke)" stroke-width="2.4" opacity="0.96"/>
+
+    <path d="M60 88L80 98M60 168L80 158M196 88L176 98M196 168L176 158M128 48L128 70M128 208L128 186" stroke="url(#silverStroke)" stroke-width="2" opacity="0.68"/>
+    <path d="M80 98L106 107M80 158L106 149M176 98L150 107M176 158L150 149M128 70L128 94M128 186L128 162" stroke="url(#goldStroke)" stroke-width="2" opacity="0.95"/>
+
+    <path d="M128 48L176 98L176 158L128 208L80 158L80 98Z" stroke="url(#silverStroke)" stroke-width="1.8" opacity="0.46"/>
+    <path d="M60 88L128 94L196 88M60 168L128 162L196 168M128 48L150 107L128 208M128 48L106 107L128 208" stroke="url(#silverStroke)" stroke-width="1.6" opacity="0.42"/>
+  </g>
+
+  <g opacity="0.65" filter="url(#softGlow)">
+    <circle cx="128" cy="128" r="22" fill="#ffd56c"/>
+    <circle cx="128" cy="128" r="74" fill="none" stroke="#ffd56c" stroke-width="2"/>
+  </g>
+
+  <g>
+    <polygon points="128,103 136,120 154,128 136,136 128,153 120,136 102,128 120,120" fill="url(#coreGlow)" stroke="#fff3cb" stroke-width="2.2"/>
+    <circle cx="128" cy="128" r="13" fill="#fff8de" opacity="0.66"/>
+  </g>
+
+  <g fill="#ffd66d" stroke="#fff3cb" stroke-width="1.2">
+    <circle cx="128" cy="48" r="4.6"/>
+    <circle cx="196" cy="88" r="4.6"/>
+    <circle cx="196" cy="168" r="4.6"/>
+    <circle cx="128" cy="208" r="4.6"/>
+    <circle cx="60" cy="168" r="4.6"/>
+    <circle cx="60" cy="88" r="4.6"/>
+
+    <circle cx="128" cy="70" r="4"/>
+    <circle cx="176" cy="98" r="4"/>
+    <circle cx="176" cy="158" r="4"/>
+    <circle cx="128" cy="186" r="4"/>
+    <circle cx="80" cy="158" r="4"/>
+    <circle cx="80" cy="98" r="4"/>
+
+    <circle cx="128" cy="94" r="3.6"/>
+    <circle cx="150" cy="107" r="3.6"/>
+    <circle cx="150" cy="149" r="3.6"/>
+    <circle cx="128" cy="162" r="3.6"/>
+    <circle cx="106" cy="149" r="3.6"/>
+    <circle cx="106" cy="107" r="3.6"/>
+  </g>
+</svg>

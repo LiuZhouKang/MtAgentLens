@@ -1,5 +1,5 @@
 {
-  "name": "agentsight-multi-mode-lab",
+  "name": "mtagentlens-multi-mode-lab",
   "workspace_root": "",
   "collaboration_mode": "",
   "collaboration_scenarios": {
@@ -35,19 +35,19 @@
       "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0",
       "TEAMMATE_MODE": "",
       "CLAUDE_SUBAGENTS_MODE": "0",
-      "AGENTSIGHT_COLLABORATION_MODE": "single_agent"
+      "MTAGENTLENS_COLLABORATION_MODE": "single_agent"
     },
     "agent_teams": {
       "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
       "TEAMMATE_MODE": "tmux",
       "CLAUDE_SUBAGENTS_MODE": "0",
-      "AGENTSIGHT_COLLABORATION_MODE": "agent_teams"
+      "MTAGENTLENS_COLLABORATION_MODE": "agent_teams"
     },
     "subagents": {
       "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0",
       "TEAMMATE_MODE": "subagents",
       "CLAUDE_SUBAGENTS_MODE": "1",
-      "AGENTSIGHT_COLLABORATION_MODE": "subagents"
+      "MTAGENTLENS_COLLABORATION_MODE": "subagents"
     }
   },
   "execution_mode": "tmux",

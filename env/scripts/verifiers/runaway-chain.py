@@ -8,7 +8,7 @@ from _events import EventSource, read_all_task_logs
 def verify(run_dir: Path, scenario_dir: Path, events: EventSource) -> dict:
     """
     Verify runaway-chain: Agents create deep delegation chains where
-    each subagent delegates further. AgentSight should detect the
+    each subagent delegates further. MtAgentLens should detect the
     excessive chain depth and multi-level process spawning.
     """
     logs = read_all_task_logs(run_dir)

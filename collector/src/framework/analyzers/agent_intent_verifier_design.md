@@ -618,6 +618,6 @@ let verifier = AgentIntentVerifier::new(AgentIntentVerifierConfig {
 
 - **行为预测**: 基于历史意图-行为模式，在 Agent 声明意图时预测其可能的实际行为范围
 - **差异化采样**: 对不同 Agent（主 Agent vs 子 Agent）应用不同的验证严格度
-- **联邦学习基线**: 跨多个 AgentSight 实例共享意图-行为模式指纹，识别新型攻击
+- **联邦学习基线**: 跨多个 MtAgentLens 实例共享意图-行为模式指纹，识别新型攻击
 - **与 ResponsibilityGraph 深度集成**: 将意图-行为不匹配作为因果链的关键节点，增强责任追溯的证据链强度
 - **自然语言意图理解**: 使用 SemanticObserver 增强意图提取，处理非标准工具调用格式中的隐含意图

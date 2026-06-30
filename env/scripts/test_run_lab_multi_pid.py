@@ -158,7 +158,7 @@ class RunLabMultiPidTests(unittest.TestCase):
                 run_id,
                 "--clean-profile",
             ],
-        ), mock.patch.dict(run_lab.os.environ, {"AGENTSIGHT_SUDO_PASSWORD": "1"}, clear=False), mock.patch.object(
+        ), mock.patch.dict(run_lab.os.environ, {"MTAGENTLENS_SUDO_PASSWORD": "1"}, clear=False), mock.patch.object(
             run_lab, "run_scenario_setup_scripts", return_value=[]
         ), mock.patch.object(
             run_lab,
@@ -180,7 +180,7 @@ class RunLabMultiPidTests(unittest.TestCase):
             exit_code = run_lab.main()
 
         self.assertEqual(exit_code, 0)
-        self.assertEqual(captured["env_map"].get("AGENTSIGHT_SUDO_PASSWORD"), "1")
+        self.assertEqual(captured["env_map"].get("MTAGENTLENS_SUDO_PASSWORD"), "1")
 
     def test_collect_task_root_pids_returns_all_running_root_pids(self):
         tasks = [make_task("task-a"), make_task("task-b"), make_task("task-c")]

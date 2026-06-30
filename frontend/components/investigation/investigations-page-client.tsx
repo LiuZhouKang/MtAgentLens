@@ -2,13 +2,12 @@
 
 import { useMemo, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
 import InvestigationWorkbench from './investigation-workbench';
 import { useAppStore } from '@/lib/store';
-import { api } from '@/lib/api';
 import { buildInvestigationModel } from '@/lib/investigation';
 import { buildInvestigationHref, parseInvestigationAlertId } from '@/lib/investigation-route';
-import { demoEvidence } from '@/lib/demo-data';
+import { useRunEvidence } from '@/lib/use-run-evidence';
+import { useHashRouteState } from '@/lib/use-hash-route-state';
 
 export default function InvestigationsPageClient() {
   const router = useRouter();
@@ -16,50 +15,18 @@ export default function InvestigationsPageClient() {
   const activeRunId = useAppStore((state) => state.activeRunId);
   const alerts = useAppStore((state) => state.alerts);
   const graph = useAppStore((state) => state.graph);
-  const [hashAlertId, setHashAlertId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const syncHashAlert = () => {
-      setHashAlertId(parseInvestigationAlertId(new URLSearchParams(), window.location.hash));
-    };
-
-    syncHashAlert();
-    window.addEventListener('hashchange', syncHashAlert);
-    return () => window.removeEventListener('hashchange', syncHashAlert);
-  }, []);
-
-  const alertId = useMemo(
-    () => parseInvestigationAlertId(searchParams, hashAlertId ? `#alertId=${encodeURIComponent(hashAlertId)}` : null),
-    [hashAlertId, searchParams],
-  );
+  const { selectedValue: alertId, setRouteValue: setHashAlertId } = useHashRouteState({
+    searchParams,
+    parseValue: parseInvestigationAlertId,
+    buildHref: buildInvestigationHref,
+  });
 
   const selectedAlert = useMemo(() => {
     if (!alerts.length) return null;
     return alerts.find((item) => item.alert_id === alertId) ?? alerts[0];
   }, [alertId, alerts]);
 
-  const evidenceQuery = useQuery({
-    queryKey: ['run-evidence', activeRunId],
-    enabled: !!activeRunId,
-    retry: false,
-    queryFn: async () => {
-      if (!activeRunId) {
-        return {
-          evidence: [],
-          intents: [],
-          actions: [],
-          non_links: [],
-        };
-      }
-
-      return api.getEvidence(activeRunId);
-    },
-  });
-
-  const evidenceItems = useMemo(
-    () => (activeRunId ? evidenceQuery.data?.evidence ?? [] : demoEvidence),
-    [activeRunId, evidenceQuery.data?.evidence],
-  );
+  const { evidenceItems, evidenceLoading, evidenceError } = useRunEvidence(activeRunId);
 
   const model = useMemo(() => {
     if (!selectedAlert) return null;
@@ -85,8 +52,8 @@ export default function InvestigationsPageClient() {
       activeRunId={activeRunId}
       availableAlerts={alerts}
       onSelectAlert={handleSelectAlert}
-      evidenceLoading={!!activeRunId && evidenceQuery.isLoading}
-      evidenceError={activeRunId && evidenceQuery.error instanceof Error ? evidenceQuery.error.message : null}
+      evidenceLoading={evidenceLoading}
+      evidenceError={evidenceError}
     />
   );
 }

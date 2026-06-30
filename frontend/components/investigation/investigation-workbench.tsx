@@ -8,6 +8,7 @@ import PrismPanel from '@/components/ui/prism-panel';
 import PrismStatCard from '@/components/ui/prism-stat-card';
 import ForensicTopologyAtlas from '@/components/ui/forensic-topology-atlas';
 import ObservatoryHeader from '@/components/system/observatory-header';
+import ObservatoryPageHero from '@/components/system/observatory-page-hero';
 import { buildClusterHref } from '@/lib/cluster-route';
 import { buildAgentHref } from '@/lib/agent-route';
 import { getSeverityPalette } from '@/lib/severity-palette';
@@ -127,6 +128,49 @@ export default function InvestigationWorkbench({
             activeRunId ? `观测会话 ${activeRunId.slice(0, 12)}...` : '示例场景',
             `${model.timelineSteps.length} Steps`,
             `${model.linkedEvidence.length} Evidence`,
+          ]}
+        />
+      </div>
+
+      <div className="px-4 pb-4 sm:px-6 lg:px-8">
+        <ObservatoryPageHero
+          eyebrow="Case Command Deck"
+          title={`先定责 ${alert.title}，再展开完整法证舞台`}
+          description="参考 OpenSearch Security Analytics 的 finding workflow 与 SigNoz 的逐层下钻方式，把案件结论、关键证据、主要主体与下一步动作压缩成一条更强的调查入口。"
+          statusLabel={alert.severity === 'Critical' ? 'critical case live' : 'forensic review active'}
+          chips={[
+            `${model.timelineSteps.length} timeline steps`,
+            `${model.evidenceRefs.length} evidence refs`,
+            `${model.boundaryCrossingCount} boundary crossings`,
+          ]}
+          stats={[
+            {
+              label: 'Decision',
+              value: alert.decision,
+              hint: '先确认结论，再回看谁把边界推开',
+            },
+            {
+              label: 'Primary Agent',
+              value: model.primaryAgentId ?? 'awaiting anchor',
+              hint: '当前案件最关键的责任主体',
+            },
+            {
+              label: 'Confidence',
+              value: alert.confidence.toFixed(2),
+              hint: '证据链对结论的支撑强度',
+            },
+          ]}
+          actions={[
+            {
+              label: '查看所属 Cluster',
+              href: buildClusterHref(model.parentClusterId),
+              hint: '把案件放回集群扩散压力场',
+            },
+            {
+              label: '查看 Agent Cockpit',
+              href: model.primaryAgentId ? buildAgentHref(model.primaryAgentId) : '/agents',
+              hint: '继续下钻主体画像与资源暴露面',
+            },
           ]}
         />
       </div>

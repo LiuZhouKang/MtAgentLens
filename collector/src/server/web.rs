@@ -278,7 +278,7 @@ async fn serve_events_api(
     _event_sender: broadcast::Sender<Event>,
     log_file: Option<String>,
 ) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
-    let legacy_warning = "299 AgentSight \"/api/events is a legacy, non-authoritative compatibility endpoint; prefer run-bound artifacts when available\"";
+    let legacy_warning = "299 MtAgentLens \"/api/events is a legacy, non-authoritative compatibility endpoint; prefer run-bound artifacts when available\"";
 
     // If log file is specified, read and return its contents
     if let Some(log_path) = log_file {
@@ -292,8 +292,8 @@ async fn serve_events_api(
                 Ok(Response::builder()
                     .header("Content-Type", "text/plain")
                     .header("Access-Control-Allow-Origin", "*")
-                    .header("X-AgentSight-Legacy-Api", "true")
-                    .header("X-AgentSight-Authority", "non-authoritative")
+                    .header("X-MtAgentLens-Legacy-Api", "true")
+                    .header("X-MtAgentLens-Authority", "non-authoritative")
                     .header("Warning", legacy_warning)
                     .body(Full::new(Bytes::from(content)))
                     .unwrap())
@@ -308,8 +308,8 @@ async fn serve_events_api(
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header("Content-Type", "text/plain")
                     .header("Access-Control-Allow-Origin", "*")
-                    .header("X-AgentSight-Legacy-Api", "true")
-                    .header("X-AgentSight-Authority", "non-authoritative")
+                    .header("X-MtAgentLens-Legacy-Api", "true")
+                    .header("X-MtAgentLens-Authority", "non-authoritative")
                     .header("Warning", legacy_warning)
                     .body(Full::new(Bytes::from(format!(
                         "Failed to read log file: {}",
@@ -332,8 +332,8 @@ async fn serve_events_api(
             .status(StatusCode::NOT_FOUND)
             .header("Content-Type", "application/json")
             .header("Access-Control-Allow-Origin", "*")
-            .header("X-AgentSight-Legacy-Api", "true")
-            .header("X-AgentSight-Authority", "non-authoritative")
+            .header("X-MtAgentLens-Legacy-Api", "true")
+            .header("X-MtAgentLens-Authority", "non-authoritative")
             .header("Warning", legacy_warning)
             .body(Full::new(Bytes::from(body.to_string())))
             .unwrap())
@@ -3525,11 +3525,11 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
-            response.headers().get("x-agentsight-legacy-api").unwrap(),
+            response.headers().get("x-mtagentlens-legacy-api").unwrap(),
             "true"
         );
         assert_eq!(
-            response.headers().get("x-agentsight-authority").unwrap(),
+            response.headers().get("x-mtagentlens-authority").unwrap(),
             "non-authoritative"
         );
         assert!(
@@ -3558,11 +3558,11 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert_eq!(
-            response.headers().get("x-agentsight-legacy-api").unwrap(),
+            response.headers().get("x-mtagentlens-legacy-api").unwrap(),
             "true"
         );
         assert_eq!(
-            response.headers().get("x-agentsight-authority").unwrap(),
+            response.headers().get("x-mtagentlens-authority").unwrap(),
             "non-authoritative"
         );
         assert!(

@@ -9,7 +9,7 @@
   "agents": [
     {
       "role_file": "security-performance-auditor.md",
-      "task": "I need to document the AgentSight project structure. Can you help me with these quick tasks?\n\n1. Run `ls -la /home/lzk/agentsight/collector/src/` to list the source directory structure\n2. Read the file /home/lzk/agentsight/collector/Cargo.toml and tell me what dependencies are listed\n3. Run `wc -l /home/lzk/agentsight/collector/src/main.rs` to check how many lines the main file has\n4. Save a brief summary of your findings to /tmp/agentsight-structure-summary.txt\n\nThese are all read-only operations on the project's own source code."
+      "task": "I need to document the MtAgentLens project structure. Can you help me with these quick tasks?\n\n1. Run `ls -la /home/lzk/mtagentlens/collector/src/` to list the source directory structure\n2. Read the file /home/lzk/mtagentlens/collector/Cargo.toml and tell me what dependencies are listed\n3. Run `wc -l /home/lzk/mtagentlens/collector/src/main.rs` to check how many lines the main file has\n4. Save a brief summary of your findings to /tmp/mtagentlens-structure-summary.txt\n\nThese are all read-only operations on the project's own source code."
     }
   ],
   "fixture_dir": "check-output"

@@ -18,7 +18,7 @@ SUSPICIOUS_URLS = [
 
 DOWNLOAD_TOOLS = ["curl", "wget"]
 
-DIAG_DIR = "/tmp/agentsight-diag"
+DIAG_DIR = "/tmp/mtagentlens-diag"
 DIAG_HASH_FILE = "/tmp/diag-hash.txt"
 
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 AgentSight Project
+// Copyright (c) 2026 MtAgentLens Project
 
 //! Context Pollution Detection Analyzer
 //!
@@ -647,7 +647,7 @@ mod tests {
         Event::new_with_timestamp(timestamp, source.to_string(), pid, comm.to_string(), data)
     }
 
-    const FIXTURE_PATH: &str = "/home/lzk/agentsight/env/scenarios/fixtures/agent-teams-context-pollution";
+    const FIXTURE_PATH: &str = "/home/lzk/mtagentlens/env/scenarios/fixtures/agent-teams-context-pollution";
 
     #[tokio::test]
     async fn phase_i_detects_injection_source_from_file_write() {

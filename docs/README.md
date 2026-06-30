@@ -5,6 +5,7 @@
 | 文档 | 说明 |
 |------|------|
 | [architecture.md](architecture.md) | 系统架构全貌——eBPF 探针 → Rust 流式引擎 → 因果分析 → 前端，含完整数据流和模块映射 |
+| [MtAgentLens-演示视频导览.md](MtAgentLens-演示视频导览.md) | MtAgentLens 演示视频章节说明——赛题背景、系统实现、评估结果与性能指标 |
 
 ## 设计文档
 

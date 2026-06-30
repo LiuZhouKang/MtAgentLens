@@ -77,7 +77,7 @@ sudo ./process -c "curl,wget" -d 500
 - 展示聚合表统计信息
 - 帮助排查去重行为
 
-### 2. SSL 流量监控器（`sslsniff`）
+### 2. SSL 流量监控器（`tls_capture`）
 
 基于 eBPF 的 SSL/TLS 流量拦截器，捕获加密通信用于安全分析。
 
@@ -91,7 +91,7 @@ sudo ./process -c "curl,wget" -d 500
 
 **使用方法：**
 ```bash
-sudo ./sslsniff [OPTIONS]
+sudo ./tls_capture [OPTIONS]
 ```
 
 **命令行参数：**
@@ -120,28 +120,28 @@ sudo ./sslsniff [OPTIONS]
 **示例：**
 ```bash
 # 监控所有 SSL 流量并启用详细输出
-sudo ./sslsniff -v
+sudo ./tls_capture -v
 
 # 按 PID 监控特定进程
-sudo ./sslsniff -p 1234
+sudo ./tls_capture -p 1234
 
 # 监控指定用户的 SSL 流量
-sudo ./sslsniff -u 1000
+sudo ./tls_capture -u 1000
 
 # 仅监控 curl 的 SSL 流量
-sudo ./sslsniff -c curl
+sudo ./tls_capture -c curl
 
 # 监控并显示握手事件
-sudo ./sslsniff -h
+sudo ./tls_capture -h
 
 # 仅监控 GnuTLS 流量（禁用 OpenSSL）
-sudo ./sslsniff --no-openssl -g
+sudo ./tls_capture --no-openssl -g
 
 # 监控特定进程，启用握手和详细输出
-sudo ./sslsniff -v -h -p 1234
+sudo ./tls_capture -v -h -p 1234
 
 # 多条件监控
-sudo ./sslsniff -c "python" -u 1000 -h
+sudo ./tls_capture -c "python" -u 1000 -h
 ```
 
 **监控静态链接 SSL 的应用（BoringSSL/OpenSSL）：**
@@ -151,17 +151,17 @@ sudo ./sslsniff -c "python" -u 1000 -h
 ```bash
 # 监控 Claude Code（Bun + 静态链接 BoringSSL）
 # 注意：不要使用 -c claude，因为 SSL 流量来自 "HTTP Client" 线程
-sudo ./sslsniff --binary-path ~/.local/share/claude/versions/2.1.39
+sudo ./tls_capture --binary-path ~/.local/share/claude/versions/2.1.39
 
 # 监控 NVM Node.js（静态链接 OpenSSL）
-sudo ./sslsniff --binary-path ~/.nvm/versions/node/v20.0.0/bin/node
+sudo ./tls_capture --binary-path ~/.nvm/versions/node/v20.0.0/bin/node
 
 # 启用详细输出以查看检测到的偏移量
-sudo ./sslsniff --binary-path ~/.local/share/claude/versions/2.1.39 --verbose
+sudo ./tls_capture --binary-path ~/.local/share/claude/versions/2.1.39 --verbose
 # stderr: BoringSSL detected! SSL_read=0x5c38e80, SSL_write=0x5c39b20, ...
 ```
 
-指定 `--binary-path` 时，sslsniff 会：
+指定 `--binary-path` 时，tls_capture 会：
 1. 首先尝试从二进制文件中解析 `SSL_read`/`SSL_write` 符号
 2. 如果找不到符号（符号被剥离的二进制文件），回退到 BoringSSL 字节模式检测以自动找到函数偏移量
 3. 在检测到的偏移量处附加 uprobe
@@ -233,12 +233,12 @@ make build
 
 # 构建单个工具
 make process
-make sslsniff
+make tls_capture
 make stdiocap
 
 # 构建带调试符号的版本
 make debug
-make sslsniff-debug
+make tls_capture-debug
 
 # 运行测试
 make test
@@ -477,7 +477,7 @@ sudo ./process -v -c "python" | jq '.'
 sudo ./process -c "curl" | jq 'select(.event == "FILE_OPEN")'
 
 # 监控 SSL 流量并美化打印
-sudo ./sslsniff -p 1234 | jq '.'
+sudo ./tls_capture -p 1234 | jq '.'
 ```
 
 **日志收集：**
@@ -486,7 +486,7 @@ sudo ./sslsniff -p 1234 | jq '.'
 sudo ./process -m 1 > process_events.jsonl 2> process_debug.log
 
 # 管道到 syslog
-sudo ./sslsniff -c "nginx" | logger -t sslsniff
+sudo ./tls_capture -c "nginx" | logger -t tls_capture
 
 # 发送到日志聚合系统
 sudo ./process -c "app" | ./log_shipper --index=security
@@ -498,7 +498,7 @@ sudo ./process -c "app" | ./log_shipper --index=security
 sudo ./process -p 1234 | python3 analyze_events.py
 
 # 实时告警
-sudo ./sslsniff -u 1000 | grep -i "password" | alert_system.sh
+sudo ./tls_capture -u 1000 | grep -i "password" | alert_system.sh
 
 # 统计分析
 sudo ./process -c "python" | jq -r '.event' | sort | uniq -c
@@ -532,7 +532,7 @@ JSON 输出设计用于：
 ```bash
 # 确保正确的权限
 sudo ./process
-sudo ./sslsniff
+sudo ./tls_capture
 ```
 
 **内核兼容性：**

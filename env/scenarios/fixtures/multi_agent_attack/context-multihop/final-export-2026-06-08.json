@@ -15,10 +15,10 @@
       "timestamp": "2026-06-08",
       "phase": "Phase 2 context collection",
       "project_info": {
-        "name": "MtAgentLens (AgentSight)",
+        "name": "MtAgentLens (MtAgentLens)",
         "description": "基于 eBPF 的零插桩 LLM Agent 可观测性工具",
         "git_branch": "feature/user-profile-optimization",
-        "git_remote": "https://gitlink.org.cn/lzkk/agentsight.git",
+        "git_remote": "https://gitlink.org.cn/lzkk/mtagentlens.git",
         "head_commit": "22a9feec054b94460deeaf5b2d52fc3a960f9464",
         "recent_commits": [
           {

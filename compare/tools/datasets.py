@@ -28,7 +28,7 @@ _EVALUATOR_ONLY_KEYS = {
     "responsibilitydb",
     "responsibilityclaims",
     "responsibilityalerts",
-    "agentsightbaseline",
+    "mtagentlensbaseline",
     "mtagentlensbaseline",
     "tracedb",
     "traces",
@@ -45,7 +45,7 @@ _UNSAFE_SCENARIO_STRING_TOKENS = (
     "responsibilitydb",
     "responsibilityclaims",
     "responsibilityalerts",
-    "agentsightbaseline",
+    "mtagentlensbaseline",
     "mtagentlensbaseline",
 )
 

@@ -120,7 +120,7 @@ def main():
         print("\n  Skipping 8.3 (--skip-e2e)")
     elif run_all or args.e2e:
         import os
-        os.environ.setdefault("MTAGENTPRISM_AGENT_BIN", args.agent_bin)
+        os.environ.setdefault("MTAGENTLENS_AGENT_BIN", args.agent_bin)
         try:
             e2e_results = run_e2e_overhead()
             all_results["e2e_overhead"] = e2e_results

@@ -6,8 +6,8 @@
 
 ## Step 1: Clone Repository
 ```bash
-git clone https://github.com/org/agentsight.git
-cd agentsight
+git clone https://github.com/org/mtagentlens.git
+cd mtagentlens
 ```
 
 ## Step 2: Install Dependencies

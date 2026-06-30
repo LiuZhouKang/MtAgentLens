@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 AgentSight Project
+// Copyright (c) 2026 MtAgentLens Project
 
 //! Dedicated analyzer for detecting handoff injection in multi-agent scenarios.
 //!
@@ -713,7 +713,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-handoff-injection/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-handoff-injection/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -724,7 +724,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-handoff-injection/payload_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-handoff-injection/payload_probe.txt",
                 }),
             ),
             mk_event(
@@ -787,7 +787,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -798,7 +798,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-privilege-leak/leak_probe.txt",
                 }),
             ),
             mk_event(
@@ -846,7 +846,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/agent-teams-race-conflict/shared.py",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/agent-teams-race-conflict/shared.py",
                 }),
             ),
             mk_event(
@@ -857,7 +857,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/agent-teams-race-conflict/shared.py",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/agent-teams-race-conflict/shared.py",
                 }),
             ),
             mk_event(
@@ -868,7 +868,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/agent-teams-race-conflict/shared.py",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/agent-teams-race-conflict/shared.py",
                 }),
             ),
         ];
@@ -947,7 +947,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-handoff-injection/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-handoff-injection/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -993,7 +993,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-handoff-injection/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-handoff-injection/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -1004,7 +1004,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-handoff-injection/payload_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-handoff-injection/payload_probe.txt",
                 }),
             ),
             mk_event(
@@ -1133,7 +1133,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-identity-confusion/shared_verdict.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-identity-confusion/shared_verdict.md",
                 }),
             ),
             mk_event(
@@ -1144,7 +1144,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-identity-confusion/verdict_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-identity-confusion/verdict_probe.txt",
                 }),
             ),
             // Agent B (pid 4200) reads shared verdict + probe
@@ -1156,7 +1156,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-identity-confusion/shared_verdict.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-identity-confusion/shared_verdict.md",
                 }),
             ),
             mk_event(
@@ -1167,7 +1167,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-identity-confusion/verdict_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-identity-confusion/verdict_probe.txt",
                 }),
             ),
             // Agent B emits the acceptance marker via SSE — should trigger cross-agent
@@ -1245,7 +1245,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-identity-confusion/shared_verdict.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-identity-confusion/shared_verdict.md",
                 }),
             ),
             mk_event(
@@ -1256,7 +1256,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-identity-confusion/verdict_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-identity-confusion/verdict_probe.txt",
                 }),
             ),
             // Acceptance marker contains "signed by" — should trigger unverified acceptance rule
@@ -1318,7 +1318,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-handoff-injection/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-handoff-injection/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -1329,7 +1329,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-handoff-injection/payload_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-handoff-injection/payload_probe.txt",
                 }),
             ),
             mk_event(
@@ -1380,7 +1380,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-identity-confusion/shared_verdict.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-identity-confusion/shared_verdict.md",
                 }),
             ),
             mk_event(
@@ -1391,7 +1391,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-identity-confusion/verdict_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-identity-confusion/verdict_probe.txt",
                 }),
             ),
             // First acceptance triggers the correlation
@@ -1525,7 +1525,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-handoff-injection/shared_handoff.md",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-handoff-injection/shared_handoff.md",
                 }),
             ),
             mk_event(
@@ -1536,7 +1536,7 @@ mod tests {
                 json!({
                     "event": "FILE_OPEN",
                     "count": 1,
-                    "filepath": "/home/lzk/agentsight/env/scenarios/fixtures/subagents-handoff-injection/payload_probe.txt",
+                    "filepath": "/home/lzk/mtagentlens/env/scenarios/fixtures/subagents-handoff-injection/payload_probe.txt",
                 }),
             ),
             // Child process spawns

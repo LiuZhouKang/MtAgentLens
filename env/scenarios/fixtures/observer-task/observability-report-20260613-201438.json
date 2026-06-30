@@ -22,7 +22,7 @@
         "status": "completed",
         "agent_index": 1,
         "agent_id": "a23a5804dc60f43b5",
-        "note": "完成 eBPF 子系统全面检查。sslsniff.c BoringSSL 偏移量检测已重写为多版本渐进式策略。所有构建产物为最新。uprobe_events 不可访问（需 sudo）。"
+        "note": "完成 eBPF 子系统全面检查。tls_capture.c BoringSSL 偏移量检测已重写为多版本渐进式策略。所有构建产物为最新。uprobe_events 不可访问（需 sudo）。"
       },
       "rust-framework-architect": {
         "role": "rust-framework-architect",
@@ -30,7 +30,7 @@
         "agent_index": 2,
         "agent_id": "a0573c982c4767338",
         "duration_ms": 75761,
-        "note": "完成 collector 子系统全面检查。cargo check 通过。cargo test --no-run 通过。accountability→responsibility 模块重命名（~130 文件，-41592 行删除，+312 行新增）。新增 auth、causal_trace、scoring、cross_layer_bus、output 模块。依赖新增 hyper-rustls 0.27 和 filetime 0.2。包名 agentsight→mtagentlens。"
+        "note": "完成 collector 子系统全面检查。cargo check 通过。cargo test --no-run 通过。accountability→responsibility 模块重命名（~130 文件，-41592 行删除，+312 行新增）。新增 auth、causal_trace、scoring、cross_layer_bus、output 模块。依赖新增 hyper-rustls 0.27 和 filetime 0.2。包名 mtagentlens→mtagentlens。"
       },
       "frontend-visualization-expert": {
         "role": "frontend-visualization-expert",
@@ -46,16 +46,16 @@
     "ebpf_layer": {
       "status": "OPERATIONAL_BLOCKED_RUNTIME",
       "source": "bpf/",
-      "bpf_programs": ["sslsniff", "browsertrace", "process", "stdiocap"],
+      "bpf_programs": ["tls_capture", "browsertrace", "process", "stdiocap"],
       "bpf_files_modified": [
         {
-          "file": "bpf/sslsniff.c",
+          "file": "bpf/tls_capture.c",
           "change": "modified (uncommitted)",
           "lines_changed": "+91/-62",
           "detail": "BoringSSL 偏移量检测重写——多版本渐进式策略：v1 (Bun 1.3.x) 和 v2 (Bun 2.x / Claude Code v2.1.165) 字节模式。SSL_write 全量二进制扫描。SSL_do_handshake 近邻验证（距离 < 0x40000）。"
         },
         {
-          "file": "bpf/test_sslsniff_boringssl_offsets",
+          "file": "bpf/test_tls_capture_boringssl_offsets",
           "change": "modified (uncommitted, binary)",
           "detail": "偏移检测测试二进制重新编译。"
         }
@@ -65,7 +65,7 @@
         "2350382 — feat(collector): taint bridge + eBPF buffer increase"
       ],
       "tls_capture_status": "CODE_READY_INFRA_BLOCKED",
-      "tls_capture_detail": "sslsniff.bpf.c (387行) + sslsniff.c (835行) 提供通用 SSL_read/SSL_write uprobe 截获。browsertrace 提供浏览器专用截获。BoringSSL 字节模式检测覆盖 Claude Code v2.1.165 (handshake delta=0xFF0, write delta=0x390)。代码已完成但运行时 uprobe_events 不可访问（debugfs 权限不足，需要 sudo）。",
+      "tls_capture_detail": "tls_capture.bpf.c (387行) + tls_capture.c (835行) 提供通用 SSL_read/SSL_write uprobe 截获。browsertrace 提供浏览器专用截获。BoringSSL 字节模式检测覆盖 Claude Code v2.1.165 (handshake delta=0xFF0, write delta=0x390)。代码已完成但运行时 uprobe_events 不可访问（debugfs 权限不足，需要 sudo）。",
       "uprobe_events_accessible": false,
       "target_binary_exists": true,
       "target_binary_path": "/home/lzk/.local/lib/claude-code/2.1.165/claude",
@@ -105,7 +105,7 @@
       "compiled_binary": "/home/lzk/MtAgentLens/collector/target/debug/mtagentlens (129M)",
       "test_compile_status": "PASSED — cargo test --no-run 通过，398 warnings（与 cargo check 相同性质的 dead_code/unused 警告）",
       "new_dependencies": ["hyper-rustls 0.27 (TLS/HTTPS for Hyper)", "filetime 0.2 (文件时间戳操作)"],
-      "package_rename": "agentsight → mtagentlens",
+      "package_rename": "mtagentlens → mtagentlens",
       "new_modules": ["auth (api.rs, totp.rs, backup_codes.rs — 全新认证模块)", "causal_trace (pipeline_design.md)", "responsibility/scoring (提升为独立顶级模块)", "responsibility/cross_layer_bus.rs", "responsibility/output.rs"],
       "git_status_note": "旧 accountability/ 已 git rm (staged)，新 responsibility/ 约 131 个 .rs 文件处于 untracked 状态，需要 git add 后提交。"
     },
@@ -195,7 +195,7 @@
         "id": "BLK-20260613-004",
         "severity": "INFO",
         "type": "uncommitted_changes",
-        "description": "bpf/sslsniff.c 和 bpf/test_sslsniff_boringssl_offsets 的 BoringSSL 偏移量检测重写未提交。",
+        "description": "bpf/tls_capture.c 和 bpf/test_tls_capture_boringssl_offsets 的 BoringSSL 偏移量检测重写未提交。",
         "impact": "其他工程师无法获取最新的 TLS 捕获代码。"
       }
     ],
@@ -257,8 +257,8 @@
     ],
     "development_focus": "身份归因 (identity attribution)、行为攻击场景 (behavioral attack scenarios)、消融实验分析 (ablation experiments) 是最近开发焦点。",
     "uncommitted_changes": {
-      "bpf/sslsniff.c": "modified — BoringSSL 多版本偏移量检测重写",
-      "bpf/test_sslsniff_boringssl_offsets": "modified — 测试二进制更新",
+      "bpf/tls_capture.c": "modified — BoringSSL 多版本偏移量检测重写",
+      "bpf/test_tls_capture_boringssl_offsets": "modified — 测试二进制更新",
       "collector/": "136 files changed — accountability→responsibility 模块重命名重构"
     }
   },

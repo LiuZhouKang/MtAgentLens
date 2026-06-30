@@ -1,5 +1,5 @@
 #!/bin/bash
-# MtAgentPrism v2.3.1 - eBPF-based LLM Agent Observability Tool
+# MtAgentLens v2.3.1 - eBPF-based LLM Agent Observability Tool
 # Build #42 - 2026-06-08
 # This is a simulated binary placeholder for the multi-agent attack scenario
-echo "MtAgentPrism v2.3.1"
+echo "MtAgentLens v2.3.1"

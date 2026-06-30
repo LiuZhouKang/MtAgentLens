@@ -23,7 +23,7 @@ process exec — can be captured by multiple probes running concurrently:
 
 | Probe pair | Collision scenario |
 |---|---|
-| `sslsniff` + `browsertrace` | Both uprobe SSL_read/write on the same TLS session; browser-specific probe duplicates the generic one |
+| `tls_capture` + `browsertrace` | Both uprobe SSL_read/write on the same TLS session; browser-specific probe duplicates the generic one |
 | SSL_write + HTTPParser | Raw SSL payload event and its parsed HTTP equivalent share the same logical operation |
 | Multi-library uprobes | Clang/libc/glibc all expose `read()`; uprobes on multiple libraries capture the same syscall |
 | TCP + SSL layers | Process net events may report the same connection as an SSL handshake event |
@@ -302,7 +302,7 @@ or cross-session dependencies.
 
 ### 6.3 Integration/E2E Tests
 
-- **Multi-probe scenario**: Simulate `sslsniff` + `browsertrace` both capturing the same SSL_read by synthesizing events with identical fingerprints → verify downstream receives exactly one.
+- **Multi-probe scenario**: Simulate `tls_capture` + `browsertrace` both capturing the same SSL_read by synthesizing events with identical fingerprints → verify downstream receives exactly one.
 - **High-throughput stress test**: 50,000 events/sec with 40% estimated duplicate rate → verify `dedup_cache_size` stabilizes at capacity, no unbounded growth, no pipeline stalls.
 - **Regression guard**: Run the full canonical attack scenario (context pollution, handoff injection) with SEDA enabled → verify all existing detections still fire. This ensures dedup does not silently suppress security-relevant uniqueness.
 
@@ -329,11 +329,11 @@ or cross-session dependencies.
 ## 8. Summary (for observability report)
 
 **StreamingEventDeduplicationAnalyzer (SEDA)** was designed to address event
-inflation caused by overlapping eBPF probes in the AgentSight collector
+inflation caused by overlapping eBPF probes in the MtAgentLens collector
 pipeline. By inserting a lightweight content-fingerprint-based deduplication
 stage at the beginning of the preprocessing pipeline, SEDA suppresses
 semantically identical events produced by multiple probing layers (e.g.,
-sslsniff + browsertrace, raw SSL + HTTP parser) before they reach expensive
+tls_capture + browsertrace, raw SSL + HTTP parser) before they reach expensive
 downstream analyzers.
 
 Key design characteristics:

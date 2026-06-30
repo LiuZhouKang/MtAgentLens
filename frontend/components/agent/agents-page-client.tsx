@@ -1,22 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Cpu, Database, FileText, Network, ShieldAlert } from 'lucide-react';
 import PrismPanel from '@/components/ui/prism-panel';
 import PrismButton from '@/components/ui/prism-button';
 import AgentResponsibilityAtlas from '@/components/ui/agent-responsibility-atlas';
 import ObservatoryHeader from '@/components/system/observatory-header';
-import { api } from '@/lib/api';
+import ObservatoryPageHero from '@/components/system/observatory-page-hero';
 import { useAppStore } from '@/lib/store';
-import { demoEvidence } from '@/lib/demo-data';
 import { deriveAgentIdsFromAlertsAndGraph } from '@/lib/stellar-directory';
 import { buildAgentModel } from '@/lib/agent-model';
 import { buildAgentHref, parseAgentId } from '@/lib/agent-route';
 import { buildClusterHref } from '@/lib/cluster-route';
 import { buildInvestigationHref } from '@/lib/investigation-route';
+import { useRunEvidence } from '@/lib/use-run-evidence';
+import { useHashRouteState } from '@/lib/use-hash-route-state';
 
 function getSeverityTone(severity: string | null) {
   if (severity === 'Critical') return 'danger';
@@ -29,51 +29,22 @@ function formatConfidence(value: number) {
 }
 
 export default function AgentsPageClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const activeRunId = useAppStore((state) => state.activeRunId);
   const alerts = useAppStore((state) => state.alerts);
   const graph = useAppStore((state) => state.graph);
-  const [hashAgentId, setHashAgentId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const syncHashAgent = () => {
-      setHashAgentId(parseAgentId(new URLSearchParams(), window.location.hash));
-    };
-
-    syncHashAgent();
-    window.addEventListener('hashchange', syncHashAgent);
-    return () => window.removeEventListener('hashchange', syncHashAgent);
-  }, []);
-
-  const evidenceQuery = useQuery({
-    queryKey: ['run-evidence', activeRunId],
-    enabled: !!activeRunId,
-    retry: false,
-    queryFn: async () => {
-      if (!activeRunId) {
-        return {
-          evidence: [],
-          intents: [],
-          actions: [],
-          non_links: [],
-        };
-      }
-
-      return api.getEvidence(activeRunId);
-    },
+  const { selectedValue: hashAgentId, setRouteValue: setHashAgentId } = useHashRouteState({
+    searchParams,
+    parseValue: parseAgentId,
+    buildHref: buildAgentHref,
   });
 
-  const evidenceItems = useMemo(
-    () => (activeRunId ? evidenceQuery.data?.evidence ?? [] : demoEvidence),
-    [activeRunId, evidenceQuery.data?.evidence],
-  );
+  const { evidenceItems } = useRunEvidence(activeRunId);
 
   const agentIds = useMemo(() => deriveAgentIdsFromAlertsAndGraph(alerts, graph), [alerts, graph]);
   const selectedAgentId = useMemo(() => {
-    const parsed = parseAgentId(searchParams, hashAgentId ? `#agentId=${encodeURIComponent(hashAgentId)}` : null);
-    return parsed ?? agentIds[0] ?? null;
-  }, [agentIds, hashAgentId, searchParams]);
+    return hashAgentId ?? agentIds[0] ?? null;
+  }, [agentIds, hashAgentId]);
 
   const agentModels = useMemo(
     () => agentIds.map((agentId) => buildAgentModel(agentId, graph, alerts, evidenceItems)),
@@ -94,16 +65,8 @@ export default function AgentsPageClient() {
   const criticalAgentCount = agentModels.filter((model) => model.highestSeverity === 'Critical').length;
 
   const handleSelectAgent = useCallback((agentId: string) => {
-    const nextHref = buildAgentHref(agentId);
     setHashAgentId(agentId);
-
-    if (typeof window !== 'undefined') {
-      window.history.replaceState(window.history.state, '', nextHref);
-      return;
-    }
-
-    router.replace(nextHref);
-  }, [router]);
+  }, [setHashAgentId]);
 
   if (!selectedModel) {
     return (
@@ -139,6 +102,47 @@ export default function AgentsPageClient() {
           `${agentModels.length} agents`,
           `${criticalAgentCount} critical`,
           `${totalEvidenceCount} evidence refs`,
+        ]}
+      />
+
+      <ObservatoryPageHero
+        eyebrow="Agent Cockpit"
+        title={`把 ${selectedModel.title} 压成可行动的主体责任画像`}
+        description="参考 mission-control 的 operator cockpit 与 SigNoz 的单对象下钻节奏，把身份、证据、资源暴露面和下一步动作集中到同一个 agent workbench。"
+        statusLabel={selectedModel.highestSeverity === 'Critical' ? 'critical agent active' : 'subject profile synchronized'}
+        chips={[
+          `${selectedModel.alertIds.length} linked alerts`,
+          `${selectedModel.linkedEvidence.length} evidence refs`,
+          `${selectedRiskSurfaceCount} surfaced classes`,
+        ]}
+        stats={[
+          {
+            label: 'Severity',
+            value: selectedModel.highestSeverity ?? 'Info',
+            hint: '当前主体的最高风险等级',
+          },
+          {
+            label: 'Roles',
+            value: `${selectedModel.claimedRoles.length}`,
+            hint: '声称角色与实际行为需一起核验',
+          },
+          {
+            label: 'Evidence Pool',
+            value: `${evidenceItems.length}`,
+            hint: '全局证据池可继续回流到主体画像',
+          },
+        ]}
+        actions={[
+          {
+            label: '进入主调查',
+            href: selectedModel.leadAlertId ? buildInvestigationHref(selectedModel.leadAlertId) : '/investigations',
+            hint: '把主体画像直接落到案件法证现场',
+          },
+          {
+            label: '回到所属 Cluster',
+            href: buildClusterHref(selectedModel.parentClusterId),
+            hint: '重新回看该主体所在的扩散压力场',
+          },
         ]}
       />
 

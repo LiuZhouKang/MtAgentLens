@@ -477,8 +477,8 @@ impl ReplayExecutor {
         let candidates = &[
             "trace.log.responsibility.db",
             "responsibility.db",
-            "/tmp/agentsight/responsibility.db",
-            "/var/lib/agentsight/responsibility.db",
+            "/tmp/mtagentlens/responsibility.db",
+            "/var/lib/mtagentlens/responsibility.db",
         ];
 
         for candidate in candidates {

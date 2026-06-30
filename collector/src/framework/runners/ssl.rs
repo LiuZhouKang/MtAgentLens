@@ -139,15 +139,15 @@ mod tests {
 
     #[test]
     fn test_ssl_runner_creation() {
-        let runner = SslRunner::from_binary_extractor("/fake/path/sslsniff");
+        let runner = SslRunner::from_binary_extractor("/fake/path/tls_capture");
         assert_eq!(runner.name(), "ssl");
         assert_eq!(runner.id(), "ssl");
     }
 
     #[test]
     fn test_ssl_runner_with_custom_config() {
-        let runner =
-            SslRunner::from_binary_extractor("/fake/path/sslsniff").tls_version("1.2".to_string());
+        let runner = SslRunner::from_binary_extractor("/fake/path/tls_capture")
+            .tls_version("1.2".to_string());
 
         assert_eq!(runner.id(), "ssl");
     }
@@ -174,7 +174,7 @@ mod tests {
     /// To run this test: `cargo test test_ssl_runner_with_real_binary -- --ignored`
     ///
     /// Prerequisites:
-    /// - The sslsniff binary must be built and available at ../src/sslsniff
+    /// - The tls_capture binary must be built and available at ../../bpftools/.output/bin/tls_capture
     /// - Sufficient privileges to run eBPF programs (usually requires sudo)
     ///
     /// Note: This test may fail if:
@@ -194,12 +194,12 @@ mod tests {
             .is_test(true)
             .try_init();
 
-        let binary_path = "../src/sslsniff";
+        let binary_path = "../../bpftools/.output/bin/tls_capture";
 
         // Check if binary exists before attempting to run
         if !Path::new(binary_path).exists() {
             eprintln!("SSL binary not found at {}", binary_path);
-            eprintln!("   Build the binary first: cd ../src && make sslsniff");
+            eprintln!("   Build the binary first: make -C ../../bpftools tls_capture");
             return;
         }
 

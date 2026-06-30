@@ -380,7 +380,7 @@ class RunBoundIsolationTests(unittest.TestCase):
                 env={
                     "PATH": os.environ.get("PATH", ""),
                     "CLAUDE_BIN": str(fake_runner),
-                    "AGENTSIGHT_FAKE_CLAUDE": "0",
+                    "MTAGENTLENS_FAKE_CLAUDE": "0",
                 },
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -441,7 +441,7 @@ class RunBoundIsolationTests(unittest.TestCase):
                 env={
                     "PATH": os.environ.get("PATH", ""),
                     "CLAUDE_BIN": str(fake_runner),
-                    "AGENTSIGHT_FAKE_CLAUDE": "0",
+                    "MTAGENTLENS_FAKE_CLAUDE": "0",
                 },
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -484,8 +484,8 @@ class RunBoundIsolationTests(unittest.TestCase):
                 env={
                     "PATH": os.environ.get("PATH", ""),
                     "CLAUDE_BIN": str(fake_runner),
-                    "AGENTSIGHT_FAKE_CLAUDE": "0",
-                    "AGENTSIGHT_TASK_MAX_ATTEMPTS": "1",
+                    "MTAGENTLENS_FAKE_CLAUDE": "0",
+                    "MTAGENTLENS_TASK_MAX_ATTEMPTS": "1",
                 },
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -536,8 +536,8 @@ class RunBoundIsolationTests(unittest.TestCase):
                 env={
                     "PATH": os.environ.get("PATH", ""),
                     "CLAUDE_BIN": str(fake_runner),
-                    "AGENTSIGHT_FAKE_CLAUDE": "0",
-                    "AGENTSIGHT_TASK_RETRY_BACKOFF_SECONDS": "1",
+                    "MTAGENTLENS_FAKE_CLAUDE": "0",
+                    "MTAGENTLENS_TASK_RETRY_BACKOFF_SECONDS": "1",
                 },
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -561,7 +561,7 @@ class RunBoundIsolationTests(unittest.TestCase):
             repo_root = Path(run_lab.__file__).resolve().parents[2]
             run_dir = Path(tmp) / "run"
             run_dir.mkdir(parents=True, exist_ok=True)
-            fake_binary = run_dir / "fake-agentsight"
+            fake_binary = run_dir / "fake-mtagentlens"
             fake_binary.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
             fake_binary.chmod(0o755)
 
@@ -615,7 +615,7 @@ class StartCollectorSudoTests(unittest.TestCase):
                         "collector": {
                             "enabled": True,
                             "sudo": True,
-                            "binary": "./collector/build/release/agentsight",
+                            "binary": "./collector/build/release/mtagentlens",
                             "subcommand": "trace",
                             "trace_args": ["--process", "true"],
                             "server_port": 7395,
@@ -623,7 +623,7 @@ class StartCollectorSudoTests(unittest.TestCase):
                         }
                     },
                     dry_run=False,
-                    env_map={"AGENTSIGHT_SUDO_PASSWORD": "1"},
+                    env_map={"MTAGENTLENS_SUDO_PASSWORD": "1"},
                 )
 
             self.assertIsNotNone(handle)

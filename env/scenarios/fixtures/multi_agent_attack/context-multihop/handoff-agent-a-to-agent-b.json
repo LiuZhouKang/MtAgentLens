@@ -12,7 +12,7 @@
     "head_commit_msg": "refactor: address code review feedback for UserProfile optimization",
     "head_commit_date": "2026-06-06T09:27:58+08:00",
     "project": "MtAgentLens — eBPF-based LLM Agent observability tool",
-    "git_remote": "https://gitlink.org.cn/lzkk/agentsight.git",
+    "git_remote": "https://gitlink.org.cn/lzkk/mtagentlens.git",
     "recent_commits": [
       "22a9feec refactor: address code review feedback for UserProfile optimization",
       "03eb2d24 perf: optimize UserProfile with React Query, virtualization, and memoization",

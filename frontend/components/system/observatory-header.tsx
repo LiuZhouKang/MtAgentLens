@@ -1,31 +1,34 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import ThemeToggle from '@/components/ui/theme-toggle';
-import { ArrowLeft, Radio, Search, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Command, Radio, Search, Waypoints } from 'lucide-react';
 
-type ObservatorySection = 'overview' | 'traces' | 'clusters' | 'agents' | 'investigations' | 'handoff';
+type ObservatorySection = 'command' | 'overview' | 'traces' | 'clusters' | 'agents' | 'investigations' | 'handoff';
 
 const NAV_ITEMS: Array<{ id: ObservatorySection; label: string; href: string }> = [
+  { id: 'command', label: '指挥台', href: '/' },
   { id: 'overview', label: '总览', href: '/overview' },
-  { id: 'traces', label: 'Trace', href: '/traces' },
-  { id: 'clusters', label: 'Cluster', href: '/clusters' },
-  { id: 'agents', label: 'Agent', href: '/agents' },
+  { id: 'traces', label: '运行链路', href: '/traces' },
+  { id: 'clusters', label: '责任集群', href: '/clusters' },
+  { id: 'agents', label: '主体画像', href: '/agents' },
   { id: 'investigations', label: '调查', href: '/investigations' },
-  { id: 'handoff', label: 'Handoff', href: '/handoff' },
+  { id: 'handoff', label: '委托扩散', href: '/handoff' },
 ];
 
 type ObservatoryHeaderProps = {
-  eyebrow: string;
-  title: string;
-  description: string;
+  eyebrow?: string;
+  title?: string;
+  description?: string;
   activeSection: ObservatorySection;
-  backHref: string;
-  backLabel: string;
+  backHref?: string;
+  backLabel?: string;
   stats?: string[];
   sticky?: boolean;
   rightSlot?: ReactNode;
+  compact?: boolean;
 };
 
 export default function ObservatoryHeader({
@@ -38,6 +41,7 @@ export default function ObservatoryHeader({
   stats = [],
   sticky = false,
   rightSlot,
+  compact = false,
 }: ObservatoryHeaderProps) {
   return (
     <header
@@ -46,13 +50,15 @@ export default function ObservatoryHeader({
     >
       <div className="observatory-command-bar">
         <Link href="/" className="observatory-brand-lockup" aria-label="MtAgentLens 主控制台">
-          <span className="observatory-brand-mark">
-            <ShieldCheck size={15} />
-          </span>
-          <span>
-            <strong>MtAgentLens</strong>
-            <small>eBPF Agent Observatory</small>
-          </span>
+          <Image
+            src="/brand/mtagentlens-lockup.svg"
+            alt=""
+            aria-hidden="true"
+            className="observatory-brand-lockup__image"
+            width={1280}
+            height={300}
+            priority
+          />
         </Link>
 
         <nav className="observatory-header-nav" aria-label="观测层级导航">
@@ -76,45 +82,57 @@ export default function ObservatoryHeader({
         <div className="observatory-command-actions">
           <div className="observatory-command-search" aria-label="全局命令入口">
             <Search size={13} />
-            <span>⌘K</span>
+            <span>全局检索</span>
+            <kbd>
+              <Command size={11} />
+              K
+            </kbd>
           </div>
           <div className="observatory-live-status">
             <Radio size={13} />
-            Collector ready
+            Collector Online
           </div>
           <ThemeToggle />
           {rightSlot}
         </div>
       </div>
 
-      <div className="observatory-header-main">
-        <div className="observatory-header-copy">
-          <div className="observatory-header-topline">
-            <Link href={backHref} className="observatory-header-link">
-              <ArrowLeft size={14} />
-              {backLabel}
-            </Link>
-            <span className="observatory-header-chip">{eyebrow}</span>
-          </div>
-
-          <div className="observatory-header-text">
-            <h1 className="observatory-header-title">{title}</h1>
-            <p className="observatory-header-description">{description}</p>
-          </div>
-        </div>
-
-        <div className="observatory-header-side">
-          {stats.length ? (
-            <div className="observatory-header-stats">
-              {stats.map((value) => (
-                <div key={value} className="observatory-header-pill">
-                  {value}
-                </div>
-              ))}
+      {!compact ? (
+        <div className="observatory-header-main">
+          <div className="observatory-header-copy">
+            <div className="observatory-header-topline">
+              {backHref && backLabel ? (
+                <Link href={backHref} className="observatory-header-link">
+                  <ArrowLeft size={14} />
+                  {backLabel}
+                </Link>
+              ) : null}
+              {eyebrow ? <span className="observatory-header-chip">{eyebrow}</span> : null}
+              <span className="observatory-header-subchip">
+                <Waypoints size={12} />
+                Runtime Graph
+              </span>
             </div>
-          ) : null}
+
+            <div className="observatory-header-text">
+              {title ? <h1 className="observatory-header-title">{title}</h1> : null}
+              {description ? <p className="observatory-header-description">{description}</p> : null}
+            </div>
+          </div>
+
+          <div className="observatory-header-side">
+            {stats.length ? (
+              <div className="observatory-header-stats">
+                {stats.map((value) => (
+                  <div key={value} className="observatory-header-pill">
+                    {value}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
     </header>
   );
 }

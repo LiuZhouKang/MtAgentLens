@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 AgentSight Project
+// Copyright (c) 2026 MtAgentLens Project
 
 //! Core data types for Causal Trace (Subproject 1)
 //!
@@ -726,7 +726,7 @@ mod tests {
             "agent-1".to_string(),
             5500000,
             "WebSearch".to_string(),
-            serde_json::json!({"query": "latest agentsight docs"}),
+            serde_json::json!({"query": "latest mtagentlens docs"}),
         );
 
         assert_eq!(intent.intent_class, IntentClass::SideEffect);

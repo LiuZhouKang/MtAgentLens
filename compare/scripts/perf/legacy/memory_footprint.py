@@ -103,7 +103,7 @@ def run_memory_footprint() -> dict:
     print(f"  Collector PID: {collector_pid}")
 
     # 同时启动一个简单的 Agent 任务来产生负载
-    agent_bin = os.environ.get("MTAGENTPRISM_AGENT_BIN", "claude")
+    agent_bin = os.environ.get("MTAGENTLENS_AGENT_BIN", "claude")
     agent_proc = subprocess.Popen(
         [agent_bin, "-p",
          "List all Python files in compare/scripts/ directory. "

@@ -173,7 +173,7 @@ export async function initEngine(container: HTMLElement): Promise<EngineAPI> {
     .height(container.clientHeight || window.innerHeight)
     .backgroundColor('rgba(0,0,0,0)')
     .showNavInfo(false)
-    .enableNodeDrag(false)
+    .enableNodeDrag(true)
     .linkOpacity(0.82)
     .linkColor((link) => highlightedEdgeIds.has(link.edge_id) ? '#b8f3ff' : link.color)
     .linkWidth((link) => {
@@ -353,9 +353,9 @@ export async function initEngine(container: HTMLElement): Promise<EngineAPI> {
   }
   animateExtras();
 
-  (window as any).__agentsight_scene = scene;
-  (window as any).__agentsight_camera = camera;
-  (window as any).__agentsight_graphRenderer = graph;
+  (window as any).__mtagentlens_scene = scene;
+  (window as any).__mtagentlens_camera = camera;
+  (window as any).__mtagentlens_graphRenderer = graph;
 
   return {
     setVisualizationMode(mode: string) {

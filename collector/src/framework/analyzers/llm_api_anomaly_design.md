@@ -11,7 +11,7 @@
 
 **LLMApiUsageAnomalyAnalyzer (LAUA)**
 
-监控 LLM API 调用模式，基于已解析的 HTTP 流量检测用量异常。AgentSight 已捕获并解析所有
+监控 LLM API 调用模式，基于已解析的 HTTP 流量检测用量异常。MtAgentLens 已捕获并解析所有
 SSL/TLS HTTP 流量——但现有的 anomaly 检测侧重于进程行为（命令循环、资源风暴），而非
 API 用量模式。LAUA 填补了这一空白。
 
@@ -473,7 +473,7 @@ async fn process(&mut self, stream: EventStream) -> Result<EventStream, Analyzer
 
 ## 9. 摘要（供可观测性报告使用）
 
-**LLMApiUsageAnomalyAnalyzer (LAUA)** 用于解决 AgentSight 分析器套件中缺失的
+**LLMApiUsageAnomalyAnalyzer (LAUA)** 用于解决 MtAgentLens 分析器套件中缺失的
 问题：现有系统捕获所有 LLM HTTP 流量，但没有分析器检测 API *用量*层面的异常。
 LAUA 维护每个 agent 的滚动窗口记录，追踪 API 调用频率、payload 去重、响应大小
 及端点多样性，并在模式表明 agent 行为异常时发出结构化异常事件。

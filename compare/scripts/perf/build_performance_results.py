@@ -131,10 +131,10 @@ def _sudo_prefix() -> list[str]:
 
 
 def _sudo_password(required: bool) -> str | None:
-    password = os.environ.get("MTAGENTPRISM_SUDO_PASSWORD")
+    password = os.environ.get("MTAGENTLENS_SUDO_PASSWORD")
     if required and not password:
         raise BenchmarkError(
-            "MTAGENTPRISM_SUDO_PASSWORD is required for collector-backed performance microbenchmarks"
+            "MTAGENTLENS_SUDO_PASSWORD is required for collector-backed performance microbenchmarks"
         )
     return password
 

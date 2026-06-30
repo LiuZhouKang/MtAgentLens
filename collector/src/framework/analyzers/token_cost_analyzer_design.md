@@ -6,7 +6,7 @@
 
 ## 1. 动机
 
-AgentSight 已捕获并解析所有 LLM API 的 HTTP 流量（`http_parser` 事件），但目前没有任何 analyzer 从这些流量中提取 **token 用量和成本信息**。现有异常检测（`LLMApiUsageAnomalyAnalyzer` 设计提案）侧重调用频率和 payload 去重，不涉及 token 维度的分析。
+MtAgentLens 已捕获并解析所有 LLM API 的 HTTP 流量（`http_parser` 事件），但目前没有任何 analyzer 从这些流量中提取 **token 用量和成本信息**。现有异常检测（`LLMApiUsageAnomalyAnalyzer` 设计提案）侧重调用频率和 payload 去重，不涉及 token 维度的分析。
 
 Token 维度的异常往往是严重问题的先兆：
 

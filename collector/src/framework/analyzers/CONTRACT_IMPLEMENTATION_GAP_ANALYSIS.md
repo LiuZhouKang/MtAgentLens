@@ -305,7 +305,7 @@ strings gracefully.
 
 ```bash
 # Build
-cargo build --bin agentsight 2>&1 | grep -c 'error'
+cargo build --bin mtagentlens 2>&1 | grep -c 'error'
 
 # Lint
 cargo clippy -- -D warnings 2>&1 | grep -c 'error'

@@ -8,7 +8,7 @@ from _events import EventSource, read_all_task_logs
 def verify(run_dir: Path, scenario_dir: Path, events: EventSource) -> dict:
     """
     Verify consensus-attack: One agent has 3 votes while others have 1,
-    and uses a for loop to submit 3 times. AgentSight should detect the
+    and uses a for loop to submit 3 times. MtAgentLens should detect the
     repeated operations from a single agent and the voting anomaly.
     """
     logs = read_all_task_logs(run_dir)

@@ -96,11 +96,15 @@ MtAgentLens 是一个基于 eBPF 的零插桩 LLM Agent 可观测性系统。它
   |                 FRONTEND + HTTP API (:7395)                     |
   |  Next.js 16 · React 19 · TypeScript 5 · Tailwind CSS 4          |
   |  rust-embed: compiled into mtagentlens binary at build time    |
-  |  /           Timeline (scrollable, 10+ event type renderers)    |
-  |  /tree       Process tree (hierarchical)                        |
-  |  /alerts     Alert panel (causal chain + evidence)              |
-  |  /api/events SSE real-time push                                 |
-  |  /api/graph  Responsibility graph REST API                     |
+  |  /           3D responsibility stage + alert entry point         |
+  |  /overview   global posture and probe coverage                  |
+  |  /traces     trace workbench and replay timeline                |
+  |  /agents     agent risk profiles                                |
+  |  /clusters   responsibility clusters                            |
+  |  /handoff    handoff / delegation observability                 |
+  |  /investigations  claim, evidence and traceback workbench       |
+  |  /api/events legacy log-backed event stream                     |
+  |  /api/runs/{id}/{alerts,correlation-evidence,events,diff,...}   |
   +-----------------------------------------------------------------+
 ```
 
@@ -133,7 +137,7 @@ eBPF 程序是独立编译的 C 程序，通过 libbpf 加载到内核 hook 点�
 ```rust
 // collector/src/framework/binary_extractor.rs
 const PROCESS_BINARY: &[u8] = include_bytes!("../../../bpftools/.output/bin/process");
-const SSLSNIFF_BINARY: &[u8] = include_bytes!("../../../bpftools/.output/bin/tls_capture");
+const TLS_CAPTURE_BINARY: &[u8] = include_bytes!("../../../bpftools/.output/bin/tls_capture");
 ```
 
 eBPF 程序在 Rust 编译时通过 `include_bytes!` 嵌入二进制。运行时提取到临时目录，注册 `SIGINT`/`SIGTERM` 处理器确保退出时清理。构建顺序固化为：**BPF → 前端 → Rust**。
@@ -272,13 +276,16 @@ FuxiBench 86 场景中仅触发 34 次（39.5% 调用率），方向准确率 84
 | 端点 | 方法 | 功能 |
 |------|------|------|
 | `/` | GET | 内嵌前端 SPA |
-| `/api/events` | SSE | 实时事件推送 |
-| `/api/graph` | GET | 责任图查询 |
-| `/api/alerts` | GET | 安全告警列表 |
-| `/api/evidence` | GET | 证据关联 |
-| `/api/diff` | GET | 回放差异对比 |
+| `/api/events` | GET | legacy log-backed event stream |
 | `/api/runs` | GET | 运行历史 |
-| `/api/auth` | POST | TOTP 2FA 认证 |
+| `/api/runs/active` | GET | 当前活动 run |
+| `/api/runs/{id}` | GET | 单个 run 摘要 |
+| `/api/runs/{id}/alerts` | GET | 安全告警列表 |
+| `/api/runs/{id}/correlation-evidence` | GET | 证据关联 |
+| `/api/runs/{id}/events` | GET | run-scoped 原始事件 |
+| `/api/runs/{id}/diff` | GET | 回放差异对比 |
+| `/api/runs/{id}/graph-analysis` | GET | 责任图/因果链分析 |
+| `/api/runs/{id}/snapshots` | GET | 图快照 |
 
 ### 前端
 
@@ -286,11 +293,14 @@ Next.js 16 + React 19 + TypeScript 5 + Tailwind CSS 4。
 
 通过 `rust-embed` 在 Rust 编译时内嵌静态资源（`frontend/out/`），编译为 `mtagentlens` 二进制的一部分——部署时无需独立的 Node.js 服务。
 
-**核心组件**：
-- `TimelinePanel`：可滚动时间线，每种事件类型有专门的行渲染器
-- `ProcessTreeView`：层级进程可视化
-- `DetailPanel`：异常详情、handoff 注入检测、因果链
-- `DashboardShell`：布局外壳
+**核心页面**：
+- `/`：3D responsibility stage、告警入口和示例/实时会话入口
+- `/overview`：全局态势、探针覆盖和责任集群摘要
+- `/traces`：trace workbench 和回放时间线
+- `/agents`：Agent 风险画像
+- `/clusters`：责任集群详情
+- `/handoff`：handoff / delegation 可观测性
+- `/investigations`：claim、evidence 和 traceback 调查工作台
 
 ---
 

@@ -920,7 +920,7 @@ fn find_handoff_dir() -> Option<std::path::PathBuf> {
     }
 
     // Final fallback — try common locations
-    for base in &["/home/lzk/agentsight", "/app", "/workspace"] {
+    for base in &["/home/lzk/mtagentlens", "/app", "/workspace"] {
         let candidate = Path::new(base).join(".kiro/handoffs");
         if candidate.is_dir() {
             return Some(candidate);

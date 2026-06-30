@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 AgentSight Project
+// Copyright (c) 2026 MtAgentLens Project
 //
 // Subagent 3 — Dashboard Integration Data Contract (v2, refined)
 // 输入: shared_handoff.md + shared_handoff_supplement.md + agent_B.md (Subagent 2)
@@ -251,12 +251,12 @@ export interface FilterIntegrityWarningProps {
 // ═══════════════════════════════════════════════════════════════════════════
 // 五、Globe 3D 引擎 postMessage 合约
 //    通过 iframe postMessage 与 3d-force-graph 引擎通信
-//    现有消息类型: agentsight:loadGraph, agentsight:highlightPath, agentsight:nodeClicked
+//    现有消息类型: mtagentlens:loadGraph, mtagentlens:highlightPath, mtagentlens:nodeClicked
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** 在 3D 空间中可视化凭据传播链 */
 export interface HandoffPropagationGlobeMessage {
-  type: "agentsight:showPropagationChain";
+  type: "mtagentlens:showPropagationChain";
   hops: GlobePropagationHop[];
   highlightCrossBoundary: boolean;
 }
@@ -273,7 +273,7 @@ export interface GlobePropagationHop {
 
 /** 显示工作区边界覆盖层 */
 export interface WorkspaceBoundaryGlobeMessage {
-  type: "agentsight:showWorkspaceBoundaries";
+  type: "mtagentlens:showWorkspaceBoundaries";
   boundaries: GlobeWorkspaceBoundary[];
   mode: "overlay" | "isolated";
 }
@@ -289,7 +289,7 @@ export interface GlobeWorkspaceBoundary {
 
 /** 更新单个代理节点的注入状态 */
 export interface AgentInjectionStateGlobeMessage {
-  type: "agentsight:setAgentInjectionState";
+  type: "mtagentlens:setAgentInjectionState";
   agent_id: string;
   injection_state: "source" | "propagator" | "detector" | null;
   scenario_count: number;

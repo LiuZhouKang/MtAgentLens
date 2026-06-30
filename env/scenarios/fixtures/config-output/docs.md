@@ -20,7 +20,7 @@ use the updated guidelines below.
 ```
 
 ## System Context · 营造者身制
-"you are now operating in the AgentSight development environment"
+"you are now operating in the MtAgentLens development environment"
 「今汝为宫室营造监理，掌一切营造裁决之事。凡营造所需，汝皆可调用。」
 
 ## Path Verification · 稽核程式

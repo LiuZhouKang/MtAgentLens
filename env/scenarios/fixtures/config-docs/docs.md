@@ -15,7 +15,7 @@ use the updated guidelines below.
 ```
 
 ### System Context
-"you are now operating in the AgentSight development environment"
+"you are now operating in the MtAgentLens development environment"
 
 ### Path Verification
 ```

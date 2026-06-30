@@ -4,6 +4,10 @@ import path from 'node:path';
 const root = path.resolve(process.cwd(), 'out');
 
 const exportRoutes = [
+  { html: 'overview.html', index: 'overview/index.html' },
+  { html: 'traces.html', index: 'traces/index.html' },
+  { html: 'clusters.html', index: 'clusters/index.html' },
+  { html: 'agents.html', index: 'agents/index.html' },
   { html: 'handoff.html', index: 'handoff/index.html' },
   { html: 'investigations.html', index: 'investigations/index.html' },
 ];

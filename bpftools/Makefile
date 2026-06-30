@@ -97,7 +97,9 @@ tls_capture-debug:
 clean:
 	$(call msg,CLEAN)
 	$(Q)rm -rf $(OUTPUT)
-	$(Q)rm -f $(APPS)
+	$(Q)for app in $(APPS); do \
+		if [ -f "$$app" ]; then rm -f "$$app"; fi; \
+	done
 
 .PHONY: help
 help:
@@ -133,7 +135,7 @@ test: $(addprefix $(BIN_DIR)/,test_process_utils test_process_filter test_proces
 	@$(BIN_DIR)/test_process_header
 
 .PHONY: test-tls_capture-boringssl-offsets
-test-tls_capture-boringssl-offsets: test_tls_capture_boringssl_offsets
+test-tls_capture-boringssl-offsets: $(BIN_DIR)/test_tls_capture_boringssl_offsets
 	@echo "Running tls_capture BoringSSL offset tests..."
 	@$(BIN_DIR)/test_tls_capture_boringssl_offsets
 

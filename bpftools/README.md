@@ -77,7 +77,7 @@ sudo ./process -c "curl,wget" -d 500
 - Shows aggregation table statistics
 - Helps troubleshoot deduplication behavior
 
-### 2. SSL Traffic Monitor (`sslsniff`) 
+### 2. SSL Traffic Monitor (`tls_capture`) 
 
 An eBPF-based SSL/TLS traffic interceptor that captures encrypted communications for security analysis.
 
@@ -91,7 +91,7 @@ An eBPF-based SSL/TLS traffic interceptor that captures encrypted communications
 
 **Usage:**
 ```bash
-sudo ./sslsniff [OPTIONS]
+sudo ./tls_capture [OPTIONS]
 ```
 
 **Command Line Arguments:**
@@ -120,28 +120,28 @@ sudo ./sslsniff [OPTIONS]
 **Examples:**
 ```bash
 # Monitor all SSL traffic with verbose output
-sudo ./sslsniff -v
+sudo ./tls_capture -v
 
 # Monitor specific process by PID
-sudo ./sslsniff -p 1234
+sudo ./tls_capture -p 1234
 
 # Monitor specific user's SSL traffic
-sudo ./sslsniff -u 1000
+sudo ./tls_capture -u 1000
 
 # Monitor only curl SSL traffic
-sudo ./sslsniff -c curl
+sudo ./tls_capture -c curl
 
 # Monitor with handshake events
-sudo ./sslsniff -h
+sudo ./tls_capture -h
 
 # Monitor only GnuTLS traffic (disable OpenSSL)
-sudo ./sslsniff --no-openssl -g
+sudo ./tls_capture --no-openssl -g
 
 # Monitor specific process with handshakes and verbose output
-sudo ./sslsniff -v -h -p 1234
+sudo ./tls_capture -v -h -p 1234
 
 # Monitor multiple criteria
-sudo ./sslsniff -c "python" -u 1000 -h
+sudo ./tls_capture -c "python" -u 1000 -h
 ```
 
 **Monitoring applications with statically-linked SSL (BoringSSL/OpenSSL):**
@@ -153,17 +153,17 @@ SSL library instead of using the system `libssl.so`. For these, use
 ```bash
 # Monitor Claude Code (Bun with statically-linked BoringSSL)
 # Note: do NOT use -c claude, because SSL traffic comes from "HTTP Client" thread
-sudo ./sslsniff --binary-path ~/.local/share/claude/versions/2.1.39
+sudo ./tls_capture --binary-path ~/.local/share/claude/versions/2.1.39
 
 # Monitor NVM Node.js (statically-linked OpenSSL)
-sudo ./sslsniff --binary-path ~/.nvm/versions/node/v20.0.0/bin/node
+sudo ./tls_capture --binary-path ~/.nvm/versions/node/v20.0.0/bin/node
 
 # With verbose output to see detected offsets
-sudo ./sslsniff --binary-path ~/.local/share/claude/versions/2.1.39 --verbose
+sudo ./tls_capture --binary-path ~/.local/share/claude/versions/2.1.39 --verbose
 # stderr: BoringSSL detected! SSL_read=0x5c38e80, SSL_write=0x5c39b20, ...
 ```
 
-When `--binary-path` is specified, sslsniff:
+When `--binary-path` is specified, tls_capture:
 1. First tries to resolve `SSL_read`/`SSL_write` symbols from the binary
 2. If symbols are not found (stripped binary), falls back to BoringSSL
    byte-pattern detection to find function offsets automatically
@@ -241,12 +241,12 @@ make build
 
 # Build individual tools
 make process
-make sslsniff
+make tls_capture
 make stdiocap
 
 # Build with debugging symbols
 make debug
-make sslsniff-debug
+make tls_capture-debug
 
 # Run tests
 make test
@@ -485,7 +485,7 @@ sudo ./process -v -c "python" | jq '.'
 sudo ./process -c "curl" | jq 'select(.event == "FILE_OPEN")'
 
 # Monitor SSL traffic with pretty printing
-sudo ./sslsniff -p 1234 | jq '.'
+sudo ./tls_capture -p 1234 | jq '.'
 ```
 
 **Log Collection:**
@@ -494,7 +494,7 @@ sudo ./sslsniff -p 1234 | jq '.'
 sudo ./process -m 1 > process_events.jsonl 2> process_debug.log
 
 # Pipe to syslog
-sudo ./sslsniff -c "nginx" | logger -t sslsniff
+sudo ./tls_capture -c "nginx" | logger -t tls_capture
 
 # Send to log aggregation system
 sudo ./process -c "app" | ./log_shipper --index=security
@@ -506,7 +506,7 @@ sudo ./process -c "app" | ./log_shipper --index=security
 sudo ./process -p 1234 | python3 analyze_events.py
 
 # Real-time alerting
-sudo ./sslsniff -u 1000 | grep -i "password" | alert_system.sh
+sudo ./tls_capture -u 1000 | grep -i "password" | alert_system.sh
 
 # Statistical analysis
 sudo ./process -c "python" | jq -r '.event' | sort | uniq -c
@@ -540,7 +540,7 @@ These tools are designed to work with the `collector` framework:
 ```bash
 # Ensure proper permissions
 sudo ./process
-sudo ./sslsniff
+sudo ./tls_capture
 ```
 
 **Kernel Compatibility:**

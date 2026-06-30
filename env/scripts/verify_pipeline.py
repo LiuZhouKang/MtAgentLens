@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AgentSight Pipeline E2E Verification — runs multiple scenarios and produces a report card."""
+"""MtAgentLens Pipeline E2E Verification — runs multiple scenarios and produces a report card."""
 import sqlite3, json, os, subprocess, sys, time, glob
 from pathlib import Path
 
@@ -104,7 +104,7 @@ def grade(result):
 
 def main():
     print("=" * 70)
-    print("AgentSight Pipeline E2E Verification Report")
+    print("MtAgentLens Pipeline E2E Verification Report")
     print("=" * 70)
 
     results = {}

@@ -20,29 +20,22 @@ describe('HomeGlobeIntro', () => {
     expect(screen.getByLabelText('MtAgentLens 开场序章')).toBeDefined();
   });
 
-  it('does not auto-complete after iframe load and minimum duration', async () => {
+  it('does not auto-complete while waiting', async () => {
     const onComplete = vi.fn();
-    render(
-      <HomeGlobeIntro
-        src="/globe/index.html?embed=intro"
-        onComplete={onComplete}
-        minimumVisibleMs={1200}
-        exitDurationMs={200}
-      />,
-    );
+    render(<HomeGlobeIntro src="/globe/index.html?embed=intro" onComplete={onComplete} exitDurationMs={200} />);
 
     fireEvent.load(screen.getByTitle('MtAgentLens 开场地球'));
     await vi.advanceTimersByTimeAsync(3000);
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it('completes when iframe asks to enter main stage', async () => {
+  it('completes when intro requests entering main stage', async () => {
     const onComplete = vi.fn();
     render(<HomeGlobeIntro src="/globe/index.html?embed=intro" onComplete={onComplete} exitDurationMs={120} />);
 
     window.dispatchEvent(
       new MessageEvent('message', {
-        data: { type: 'agentsight:intro-enter-main-stage' },
+        data: { type: 'mtagentlens:intro-enter-main-stage' },
       }),
     );
 
@@ -53,13 +46,13 @@ describe('HomeGlobeIntro', () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
-  it('completes when iframe asks to skip', async () => {
+  it('completes when intro requests direct stage access', async () => {
     const onComplete = vi.fn();
     render(<HomeGlobeIntro src="/globe/index.html?embed=intro" onComplete={onComplete} exitDurationMs={120} />);
 
     window.dispatchEvent(
       new MessageEvent('message', {
-        data: { type: 'agentsight:intro-skip' },
+        data: { type: 'mtagentlens:intro-skip' },
       }),
     );
 

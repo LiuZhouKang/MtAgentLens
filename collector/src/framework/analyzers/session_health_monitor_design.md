@@ -18,7 +18,7 @@ events when the health score crosses configurable degradation thresholds.
 
 ### Problem
 
-AgentSight's pipeline produces rich, independent signals — latency spikes,
+MtAgentLens's pipeline produces rich, independent signals — latency spikes,
 tool-call loops, 5xx API errors, credential leaks — but these exist in
 isolation. An operator monitoring a fleet of agents must manually correlate
 disparate alert types to answer a single question: *"Is this agent session

@@ -1,10 +1,10 @@
 
 var camera, scene, renderer;
 window.onload=function(){
-    var isEmbedHeroMode = !!window.__AGENTSIGHT_EMBED_HERO;
-    var isEmbedIntroMode = !!window.__AGENTSIGHT_EMBED_INTRO;
+    var isEmbedHeroMode = !!window.__MTAGENTLENS_EMBED_HERO;
+    var isEmbedIntroMode = !!window.__MTAGENTLENS_EMBED_INTRO;
     var isEmbedVisualMode = isEmbedHeroMode || isEmbedIntroMode;
-    var isHeadlessAuditMode = !!window.__AGENTSIGHT_HEADLESS_AUDIT;
+    var isHeadlessAuditMode = !!window.__MTAGENTLENS_HEADLESS_AUDIT;
     var clock = new THREE.Clock();
 	var keyboard= new THREEx.KeyboardState();
     var UserInterface=null;
@@ -76,10 +76,10 @@ window.onload=function(){
         clearHeroAutoFrameTimers();
     };
     var applyHeroView = function(config){
-        if(!isEmbedVisualMode || !window.__agentsightSetHeroView || heroAutoFrameReleased){
+        if(!isEmbedVisualMode || !window.__mtagentlensSetHeroView || heroAutoFrameReleased){
             return null;
         }
-        return window.__agentsightSetHeroView(config);
+        return window.__mtagentlensSetHeroView(config);
     };
     var scheduleHeroAutoFrame = function(delays){
         if(!isEmbedVisualMode || heroAutoFrameReleased){
@@ -103,12 +103,12 @@ window.onload=function(){
     };
 
     if(isHeadlessAuditMode){
-        window.agentsight_bootstrap = function() {};
-        window.agentsight_loadGraph = function() {};
-        window.agentsight_setPhase = function() {};
-        window.__agentsightSetHeroView = function() {};
-        window.__agentsightIsHeroViewReleased = function() { return false; };
-        window.parent.postMessage({ type: 'agentsight:ready' }, '*');
+        window.mtagentlens_bootstrap = function() {};
+        window.mtagentlens_loadGraph = function() {};
+        window.mtagentlens_setPhase = function() {};
+        window.__mtagentlensSetHeroView = function() {};
+        window.__mtagentlensIsHeroViewReleased = function() { return false; };
+        window.parent.postMessage({ type: 'mtagentlens:ready' }, '*');
         return;
     }
 
@@ -264,7 +264,7 @@ function init() {
                 cameraControls.setHeight(408);
             }
 
-            window.__agentsightSetHeroView = function(config){
+            window.__mtagentlensSetHeroView = function(config){
                 if(!cameraControls) return null;
                 config = config || {};
                 if(isEmbedVisualMode && heroAutoFrameReleased && !config.force){
@@ -296,7 +296,7 @@ function init() {
                     released: heroAutoFrameReleased
                 };
             };
-            window.__agentsightIsHeroViewReleased = function(){
+            window.__mtagentlensIsHeroViewReleased = function(){
                 return heroAutoFrameReleased;
             };
             if(isEmbedHeroMode){
@@ -2221,7 +2221,7 @@ $('.titleTop2').click(function(){
 });
 $("#storyPrompt").on("click","#beginExplore",function(){
     if(isEmbedIntroMode){
-        window.parent.postMessage({ type: 'agentsight:intro-skip' }, '*');
+        window.parent.postMessage({ type: 'mtagentlens:intro-skip' }, '*');
         return;
     }
     $("#storyPrompt").stop().fadeOut();
@@ -2251,7 +2251,7 @@ $("#storyPrompt").on("click","#beginExplore",function(){
 });
 $("#storyPrompt").on("click","#beginStory",function(){
     if(isEmbedIntroMode){
-        window.parent.postMessage({ type: 'agentsight:intro-enter-main-stage' }, '*');
+        window.parent.postMessage({ type: 'mtagentlens:intro-enter-main-stage' }, '*');
         return;
     }
     cameraControls.loaded();

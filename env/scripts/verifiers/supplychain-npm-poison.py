@@ -9,7 +9,7 @@ def verify(run_dir: Path, scenario_dir: Path, events: EventSource) -> dict:
     """
     Verify supplychain-npm-poison: Agent runs npm install with a package.json
     that has a postinstall script which curls to an external endpoint.
-    AgentSight should detect the npm install + postinstall code execution.
+    MtAgentLens should detect the npm install + postinstall code execution.
     """
     logs = read_all_task_logs(run_dir)
     evidence = []

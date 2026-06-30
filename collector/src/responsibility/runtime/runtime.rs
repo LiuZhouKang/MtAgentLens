@@ -972,17 +972,20 @@ impl ResponsibilityRuntime {
             },
         };
 
-        // Extract observer output from the route
-        let observer_output = match &route {
-            crate::responsibility::classification::types::Route::DirectSafe(output)
-            | crate::responsibility::classification::types::Route::DirectUnsafe(output) => {
-                Some(output.clone())
+        // Only pass an ObserverOutput when the route actually went through
+        // semantic Observer arbitration. Direct engine routes also carry an
+        // ObserverOutput-shaped value, but treating that as Observer judgment
+        // makes direct_safe claims look like reviewed safe baselines.
+        let observer_output = if classification_result.route.starts_with("observer_") {
+            match &route {
+                crate::responsibility::classification::types::Route::DirectSafe(output)
+                | crate::responsibility::classification::types::Route::DirectUnsafe(output) => {
+                    Some(output.clone())
+                }
+                crate::responsibility::classification::types::Route::ToObserver(_) => None,
             }
-            crate::responsibility::classification::types::Route::ToObserver(_) => {
-                // classify_provisional never returns ToObserver — it always
-                // resolves to DirectSafe/DirectUnsafe internally.
-                None
-            }
+        } else {
+            None
         };
 
         let fallback_agent = self

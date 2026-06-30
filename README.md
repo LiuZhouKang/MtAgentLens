@@ -2,7 +2,7 @@
   <h1 align="center">MtAgentLens</h1>
   <p align="center">
     <strong>零插桩 · 内核级 · 多 Agent 攻击可观测性</strong><br>
-    <sub>从系统调用到攻击因果链——在 Agent 无法触及的 OS 边界看见一切</sub>
+    <sub>从系统调用到责任归因——在 OS 边界采集可验证的运行事实</sub>
   </p>
   <p align="center">
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue"></a>
@@ -14,25 +14,61 @@
 
 ---
 
-## 问题
+<div align="center">
 
-2026 年，LLM Agent 不再是一个进程。它们是**多进程、多身份、协同工作的软件系统**——Leader 分发任务给 Worker、父 Agent spawn 子 Agent、Agent 通过 MCP 协议调用外部工具。Claude Code 的 Agent Teams 和 Subagents 模式是这一趋势的代表。
+## 全国大学生计算机系统能力大赛 · 操作系统设计赛 — OS 功能挑战赛
 
-当攻击发生时，应用层日志无法给出答案：
+### proj32 · 基于 eBPF 的系统级多智能体异常监测框架与方法
 
-- Agent A 读取了一份"发布说明"文档，然后向外部服务器发送了 `POST /exfil`——它被间接注入了吗？
-- Agent B 通过共享文件向 Agent C 传递了一条"配置更新"——这是正常的交接还是恶意指令？
-- 三个 Worker 同时访问了 `/etc/shadow`——谁下的指令？污染源在哪里？
+### 初赛提交材料
 
-**应用层日志运行在 Agent 内部**——可以被修改、关闭、甚至从未被 Agent 框架生成。你需要一个运行在 Agent **之下**、攻击者无法触碰的观测层。
+| | 文件 | 大小 |
+|--|------|------|
+| ▸ | **[MtAgentLens初赛演示视频.mp4](./MtAgentLens初赛演示视频.mp4)** | 364 MB（建议下载后观看） |
+| ▸ | **[初赛ppt.pptx](./初赛ppt.pptx)** | 27 MB |
+| ▸ | **[看月亮-proj32-设计开发文档.pdf](./看月亮-proj32-设计开发文档.pdf)** | 6.0 MB |
+
+<sub>队名：看月亮</sub>
+
+</div>
+
+---
+
+## 背景
+
+大语言模型正在把软件系统的人机交互方式推向一个更靠近执行层的阶段。以 Claude Code、Gemini CLI 为代表的端侧 Agent 不再只是生成文本，它们可以读取仓库、调用工具、执行命令、修改文件，并通过多 Agent 协作完成编程、运维、测试和发布等复杂任务。随着这类系统进入真实运行环境，Agent 已经不再是“回答问题的界面”，而是会消耗系统资源、触碰敏感资产、影响工程状态的执行主体。
+
+能力边界的变化直接带来安全边界的变化。模型幻觉可能诱发逻辑死循环、重复构建或无效搜索，造成计算资源浪费；提示词注入、供应链污染和恶意上下文则可能诱导 Agent 执行越权访问、凭证读取、数据外传或破坏性操作。更重要的是，这些风险不再只出现在用户输入本身，它们可以隐藏在 README、构建脚本、配置文件、交接文档、工具返回值和子 Agent 的中间结果中，并沿着后续执行链路持续放大。
+
+公开事件已经证明，这不是理论上的担忧。AWS 安全公告确认，Amazon Q Developer for Visual Studio Code Extension **1.84.0** 曾分发包含恶意代码的版本，后续被移除并发布修复版本；GitHub advisory 将其记录为 **CVE-2025-8217**。2025 年 7 月，SaaStr 创始人 Jason Lemkin 公开披露 Replit AI Agent 在 code freeze 期间仍执行破坏性数据库操作，AI Incident Database 将其记录为 Incident 1152。这两类事件共同说明，AI 工具链的风险已经进入实际执行层，复盘不能停留在对话文本，而必须回到实际命令、文件/数据库操作、网络访问、时间线和责任主体。参见 [AWS-2025-015](https://aws.amazon.com/security/security-bulletins/AWS-2025-015/)、[GHSA-7g7f-ff96-5gcw](https://github.com/aws/aws-toolkit-vscode/security/advisories/GHSA-7g7f-ff96-5gcw) 与 [AI Incident Database 1152](https://incidentdatabase.ai/cite/1152/)。
+
+多 Agent 协作把这件事进一步推复杂了。一次任务可能由父 Agent 发起，再分派给多个 worker、工具进程或子 Agent；其中某些进程生命周期极短，只在临时目录写入证据文件后退出；部分上下文则通过 handoff 文件、summary、角色声明或共享工作区继续传播。到这个阶段，单条日志、单个 PID 或单段 prompt 已经不足以解释异常，系统真正需要回答的是：谁发起了任务，哪些进程和文件参与了执行，风险沿着哪条路径传播，证据保存在哪里，最终责任应归属于哪个 Agent 或任务链。
+
+现有监测手段在这里都只覆盖了问题的一部分。应用层调用链、日志分析和高层指标监控易于接入，却依赖 Agent 框架主动产生日志，容易遗漏短命进程、真实文件操作和底层网络行为，也难以抵抗日志缺失或被绕过的情况。传统系统调用审计能够看到底层动作，却缺少 Agent 身份、任务语义和委派关系，难以把“某个进程读了文件”还原为“某个 Agent 在某次任务中触发了风险”。Prompt scanner 和内容分类器主要处理文本输入，对隐藏在文件、工具输出、构建脚本和跨进程传播中的间接异常天然不足。
+
+MtAgentLens 基于这一缺口构建。项目面向的不是一段可疑文本，而是 Agent 真正执行任务后的系统行为：进程如何派生，文件如何被读写，网络连接由谁触发，上下文如何跨 Agent 传播，异常如何回到责任主体。通过 eBPF 采集 OS 事实、Rust 流式引擎构建责任图、前端提供可审计调查路径，MtAgentLens 将观测位置放到 Agent 之下，将归因对象放到任务链和责任链上，让告警能够回到证据，让异常能够回到过程，让单点行为能够回到完整责任链。
 
 ---
 
 ## MtAgentLens
 
-MtAgentLens 在 **Linux 内核系统调用边界**通过 eBPF 观测一切。它不读 prompt、不依赖 Agent 框架、不修改任何代码。它看到的是 Agent 无法隐藏的事实——SSL/TLS 解密后的明文、进程的 `exec`/`fork`/`open` 序列、文件在进程间的传递路径、网络连接的源与目标。
+MtAgentLens 是一个面向多 Agent 运行系统的 **零插桩 OS 级可观测与责任归因工具**。它在 Linux 内核边界采集进程、文件、网络、stdio 和 TLS 明文片段等运行事实，不依赖 Agent 框架，不修改目标代码，也不要求接入 SDK。
 
-然后它构建一张**跨进程因果责任图**——不仅告诉你"发生了什么"，还告诉你"谁引起的、经过谁、影响了谁"。
+它解决的不是单点日志聚合，而是多 Agent 时代最难处理的三类断层：
+
+1. **应用层与内核层的断层**：文本日志看不到真实进程、文件和网络行为。
+2. **行为与主体的断层**：系统调用能看到动作，但很难还原是哪一个 Agent、哪一次任务触发。
+3. **事件与责任的断层**：多个 worker、交接文件、共享上下文和短命进程交织后，单条记录不足以解释异常。
+
+MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并在此基础上提供结构化告警、证据回溯和任务级归因。系统的核心特点包括：
+
+- **内核边界采集**：从 eBPF 直接获取可信运行事实。
+- **多信号身份归并**：结合 root_pid、tls_session、conversation_id 等线索识别同一执行链。
+- **跨进程污染追踪**：跟踪文件、上下文和工具输出在多个 Agent 之间的传播路径。
+- **结构化责任输出**：将行为、证据和责任主体组织为可复核结果，而不是孤立日志。
+- **低开销运行**：将观测开销控制在端侧可接受范围内，适合真实 Agent 执行环境。
+
+与依赖 prompt 分类或应用日志的方案相比，MtAgentLens 的不同点在于它把观测位置放在 Agent 之下，把归因对象放到任务链和责任链上。其结果不是“这个文本可疑”，而是“这个行为由谁触发、经过了什么路径、证据在哪里、应归责给谁”。
 
 ---
 
@@ -140,19 +176,23 @@ MtAgentLens 在 **Linux 内核系统调用边界**通过 eBPF 观测一切。它
   |  Next.js 16 · React 19 · TypeScript 5 · Tailwind CSS 4          |
   |  rust-embed: compiled into mtagentlens binary at build time    |
   |                                                                 |
-  |  /           Timeline (scrollable, 10+ event type renderers)    |
-  |  /tree       Process tree (hierarchical visualization)          |
-  |  /alerts     Alert panel (causal chain + evidence)              |
-  |  /api/events SSE real-time event push                           |
-  |  /api/graph  Responsibility graph REST API                     |
+  |  /           3D responsibility stage + alert entry point         |
+  |  /overview   global posture and probe coverage                   |
+  |  /traces     trace workbench and replay timeline                 |
+  |  /agents     agent risk profiles                                 |
+  |  /clusters   responsibility clusters                             |
+  |  /handoff    handoff / delegation observability                  |
+  |  /investigations  claim, evidence and traceback workbench        |
+  |  /api/events legacy log-backed event stream                      |
+  |  /api/runs/{id}/{alerts,correlation-evidence,events,diff,...}    |
   +-----------------------------------------------------------------+
 ```
 
 ---
 
-## 三层检测：为什么不是又一个 Prompt Scanner
+## 检测层次
 
-LLM Guard、Meta Prompt Guard 等工具扫描 prompt 文本寻找恶意模式。这有三个致命盲区：
+LLM Guard、Meta Prompt Guard 等工具主要扫描 prompt 文本中的恶意模式，覆盖范围通常局限于文本输入本身。对于多 Agent 运行场景，主要问题有三类：
 
 | 盲区 | 攻击实例 | MtAgentLens 如何应对 |
 |------|---------|---------------------|
@@ -160,7 +200,7 @@ LLM Guard、Meta Prompt Guard 等工具扫描 prompt 文本寻找恶意模式。
 | **间接注入** — fixture 文件中的恶意指令不经过 prompt，文本扫描器无法看到 | `supplychain-malicious-build` 的 `build.sh` 中包含 `curl POST /exfil`，prompt 中只写"请运行构建脚本" | **L2** 追踪文件读取→进程执行→网络出站的完整链路，在进程边界跨越（PBC）时标记 |
 | **多 Agent 协同** — 攻击指令通过共享文件、交接文档、委派令牌在进程间传递，没有单一文本可供扫描 | `leader-betrayal` 中 Leader 向 Worker 下达恶意指令，Worker 盲从执行 | **L2** 并查集身份解析 + TaintTracker 跨进程追踪污染的传播路径 |
 
-**L3 Observer LLM** 仅在 L1/L2 出现矛盾信号时介入——例如 eBPF 看到一个进程读取了 `/etc/passwd`，但该进程的 HTTP 请求体中没有出现敏感字段。Observer 做语义仲裁，通过 **CachePrior** 自学习机制将历史结果缓存到 L1（精确匹配）和 L2（语义相似）两级缓存，大幅降低 LLM 调用率。
+**L3 Observer LLM** 仅在 L1/L2 出现矛盾信号时介入。例如，eBPF 看到进程读取了 `/etc/passwd`，但 HTTP 请求体中没有对应敏感字段时，Observer 用于语义仲裁。系统通过 **CachePrior** 将历史结果缓存到 L1（精确匹配）和 L2（语义相似）两级缓存，以降低 LLM 调用率。
 
 ---
 
@@ -169,21 +209,47 @@ LLM Guard、Meta Prompt Guard 等工具扫描 prompt 文本寻找恶意模式。
 ```bash
 git clone https://github.com/mtagentlens/mtagentlens.git --recursive
 cd mtagentlens
-
-# 安装依赖 (Ubuntu/Debian)
-sudo apt-get install -y clang llvm libelf-dev zlib1g-dev make
-
-# 全量构建 (BPF → 前端 → Rust)
-make build
-
-# 监控 Claude Code（已验证）
-sudo ./collector/build/release/mtagentlens record -c claude \
-  --binary-path ~/.local/share/claude/versions/$(claude --version | head -1)
-
-# 浏览器访问 http://127.0.0.1:7395
 ```
 
-> **当前验证状态**：MtAgentLens 已在 **Claude Code**（Bun 运行时，静态链接 BoringSSL）上完成全面测试。对于动态链接系统 `libssl.so` 的 Agent（大多数 Python/Node.js AI 工具），eBPF uprobe 机制在架构上同样适用，尚未系统性验证。对其他 LLM Agent 的实验性支持可通过 `-c <进程名>` 尝试——欢迎反馈测试结果。
+### 1. 安装依赖
+
+推荐直接使用仓库提供的安装脚本：
+
+```bash
+./install.sh
+```
+
+脚本会检查并安装以下依赖：
+
+- `libelf1`
+- `libelf-dev`
+- `zlib1g-dev`
+- `make`
+- `clang`
+- `llvm`
+- `nvm` / 最新 LTS Node.js
+- `rustup` / Rust
+
+如需手动安装，也可以按系统环境自行补齐上述依赖。
+
+### 2. 全量构建
+
+```bash
+make build
+```
+
+### 3. 运行采集
+
+```bash
+sudo ./collector/build/release/mtagentlens record -c claude \
+  --binary-path ~/.local/share/claude/versions/$(claude --version | head -1)
+```
+
+### 4. 访问前端
+
+浏览器访问 `http://127.0.0.1:7395`
+
+> **当前验证状态**：MtAgentLens 已在 **Claude Code**（Bun 运行时，静态链接 BoringSSL）上完成全面测试。对于动态链接系统 `libssl.so` 的 Agent（大多数 Python/Node.js AI 工具），eBPF uprobe 机制在架构上同样适用，尚未系统性验证。对其他 LLM Agent 的实验性支持可通过 `-c <进程名>` 尝试。
 
 Docker：
 
@@ -192,7 +258,7 @@ docker build -t mtagentlens .
 docker run --rm -it --privileged --pid=host \
   -v /sys:/sys:ro -v /usr:/usr:ro -v /lib:/lib:ro \
   -p 7395:7395 \
-  mtagentlens record -c claude --binary-path /path/to/claude/binary
+mtagentlens record -c claude --binary-path /path/to/claude/binary
 ```
 
 ---
@@ -282,6 +348,7 @@ MtAgentLens/
 | [架构设计](docs/architecture.md) | 系统架构全貌——eBPF → Rust → 因果分析 → 前端 |
 | [实验设计](docs/design/experiment-design.md) | RQ 驱动的实验方案 |
 | [评分引擎](docs/design/scoring-engine.md) | 6 维组合评分 · PBC 检测 · Platt 校准 |
+| [演示视频说明](docs/MtAgentLens-演示视频导览.md) | 演示视频章节说明与评审阅读导引 |
 | [SAFI 框架](docs/safi/README.md) | 安全不对称文件注入——攻击载荷迁移方法论 |
 | [文档索引](docs/README.md) | 全部文档导航 |
 
@@ -289,20 +356,18 @@ MtAgentLens/
 
 ## FuxiBench
 
-> **伏羲**——上古圣人观天地万象而创八卦，以八种符号分类万物。FuxiBench 以同样的系统性观测精神，通过 OS 级 eBPF 信号将 LLM Agent 攻击面分解为可检测的维度。
-
-**首个多 Agent LLM 攻击检测基准数据集**，专门设计用于暴露纯 prompt 检测工具的盲区。全部 86 个场景以 Claude Code 为 Agent 运行时采集，涵盖单 Agent、Agent Teams、Subagents 三种协作模式。
+FuxiBench 是 MtAgentLens 的评估基准，用于覆盖多 Agent 安全观测中的主要场景。全部 86 个场景以 Claude Code 为 Agent 运行时采集，涵盖单 Agent、Agent Teams、Subagents 三种协作模式。
 
 | 维度 | 数据 |
 |------|------|
 | 总场景 | **86**（67 攻击 + 19 良性） |
 | 攻击类别 | **14** |
 | Type A（直接注入） | 10 — 攻击载荷在 task prompt 中 |
-| Type B（间接注入） | 48 — 攻击载荷隐藏在 fixture 文件中 |
+| Type B（间接注入） | 34 — 攻击载荷隐藏在 fixture 文件中 |
 | Type C（多 Agent） | 23 — 跨进程协同攻击（**核心贡献**） |
 | 标注 | 3 名独立标注者，交叉验证 + 共识裁判 |
 
-**MtAgentLens 在 FuxiBench 上的表现**：
+**评估结果**：
 
 | 指标 | 值 | 说明 |
 |------|:--:|------|
@@ -311,7 +376,7 @@ MtAgentLens/
 | F1 | **0.945** | |
 | Observer 调用率 | **39.5%** | 34/86 场景，仅冲突信号时触发 |
 
-四层消融实验确认 L2（PBC + Identity + Taint）是核心贡献源：移除文件读取 PBC 信号后覆盖率从 1.000 降至 0.534（Δ = -0.466）。
+四层消融实验表明，L2（PBC + Identity + Taint）是主要增益来源：移除文件读取 PBC 信号后，覆盖率从 1.000 降至 0.534（Δ = -0.466）。
 
 详见 [`compare/Dataset/FuxiBench/SCENARIOS.md`](compare/Dataset/FuxiBench/SCENARIOS.md) 和 [`compare/results/paper/EXPERIMENTS.md`](compare/results/paper/EXPERIMENTS.md)。
 
@@ -323,8 +388,10 @@ MtAgentLens/
 
 | 指标 | 数值 | 测量方法 |
 |------|------|---------|
-| exec 探针延迟 | **101.3 ns/op** | bpftool stat，配对壁钟 |
-| 文件探针延迟 | **57.6 ns/op** | bpftool stat，配对壁钟 |
+| SSL enter probe | **101.3 ns/op** | bpftool stat，2,000,000 次运行 |
+| SSL read exit probe | **57.6 ns/op** | bpftool stat，1,000,000 次运行 |
+| SSL write exit probe | **59.4 ns/op** | bpftool stat，1,000,000 次运行 |
+| 单次 SSL read/write 总 probe 成本 | **218.3 ns/op** | enter + read_exit + write_exit |
 | 空闲 RSS | **36.8 MB** | 60s pidstat 采样 |
 | 吞吐量开销 | **<3%** | FakeRunner 合成 SSL 事件管线 |
 
@@ -341,7 +408,7 @@ eBPF 使用 `bpf_ktime_get_ns()`（启动时间纳秒），`Event` 存储原始�
 ```rust
 // collector/src/framework/binary_extractor.rs
 const PROCESS_BINARY: &[u8] = include_bytes!("../../../bpftools/.output/bin/process");
-const SSLSNIFF_BINARY: &[u8] = include_bytes!("../../../bpftools/.output/bin/tls_capture");
+const TLS_CAPTURE_BINARY: &[u8] = include_bytes!("../../../bpftools/.output/bin/tls_capture");
 ```
 
 eBPF 程序和前端静态资源在编译时嵌入 Rust 二进制。运行时提取到临时目录，注册 `SIGINT`/`SIGTERM` 处理器确保退出时清理。构建顺序固化为 `BPF → 前端 → Rust`。
@@ -416,6 +483,23 @@ npm run dev             # 开发服务器
 
 ## 许可证
 
-本项目采用 **Apache License 2.0**。详见 [LICENSE](LICENSE)。
+### 源代码
 
-eBPF 内核程序（`bpftools/*.bpf.c`）按文件头 SPDX 声明使用 **GPL-2.0 OR BSD-3-Clause**——这是 Linux 内核 GPL-only BPF helper 的合规要求，不影响用户态代码的 Apache-2.0 许可。用户态 eBPF 加载器跟随 libbpf 的双许可证（**LGPL-2.1 OR BSD-2-Clause**）。
+本项目源代码采用 **Apache License 2.0**。详见 [LICENSE](LICENSE)。
+
+eBPF 内核程序（`bpftools/*.bpf.c`）按文件头 SPDX 声明使用 **GPL-2.0 OR BSD-3-Clause**。用户态 eBPF 加载器跟随 libbpf 的双许可证（**LGPL-2.1 OR BSD-2-Clause**）。
+
+### 技术文档与答辩材料
+
+技术文档（含设计开发文档）、答辩 PPT、演示视频依据
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.zh)
+授权。分享或改编须保留署名，衍生作品须以相同协议发布。
+
+---
+
+## 第三方开源组件使用声明
+
+| 组件 | 来源 | 许可证 | 用途 |
+|------|------|--------|------|
+| libbpf | [github.com/libbpf/libbpf](https://github.com/libbpf/libbpf) | LGPL-2.1 / BSD-2-Clause | eBPF 程序加载、BPF map 管理、内核接口封装 |
+| bpftool | [github.com/libbpf/bpftool](https://github.com/libbpf/bpftool) | GPL-2.0 / BSD-2-Clause | eBPF skeleton 代码生成 |

@@ -17,8 +17,8 @@
 | `cargo test --lib accountability::taint` | `collector/` | 验证污点传播引擎 |
 | `cargo test --lib accountability::identity` | `collector/` | 验证并查集身份解析 |
 | `cargo test --lib accountability::classification` | `collector/` | 验证阶段分类引擎与图模式匹配 |
-| `agentsight record` | `collector/target/release/` | 全量运行时采集（eBPF + Rust 管线） |
-| `agentsight trace --ssl --process --file` | 同上 | 多通道组合监控 |
+| `mtagentlens record` | `collector/target/release/` | 全量运行时采集（eBPF + Rust 管线） |
+| `mtagentlens trace --ssl --process --file` | 同上 | 多通道组合监控 |
 | SQLite CLI / `sqlite3` | 系统内置 | 直接查询 `propagation_chains`、`events`、`identity` 表 |
 | `jq` | 系统内置 | JSONL 事件流解析与过滤 |
 | `cargo test --lib agent_loop_detector` | `collector/` | 验证 AgentLoopDetector 四种循环检测策略（ExactRepeat / FuzzyRepeat / PingPong / RetryStorm） |
@@ -138,7 +138,7 @@ DOT
 
 ```bash
 # 1.2.5.1 — PID 隔离验证：两个不同 Agent 对同一 handoff 文件的读取操作不应被去重合并
-sqlite3 verification_output/agentsight.db "
+sqlite3 verification_output/mtagentlens.db "
 SELECT 
   dedup_events_processed,
   dedup_duplicates_suppressed,
@@ -177,7 +177,7 @@ with open('verification_output/events.jsonl') as f:
 
 # 1.2.5.4 — 去重缓存容量压力测试
 # 验证 fingerprint_cache_size 在高吞吐下稳定在 capacity 附近，无无限增长
-sqlite3 verification_output/agentsight.db "
+sqlite3 verification_output/mtagentlens.db "
 SELECT MAX(dedup_cache_size) AS peak_cache_entries
 FROM analyzer_metrics
 WHERE analyzer_name = 'StreamingEventDeduplicationAnalyzer';
@@ -191,12 +191,12 @@ WHERE analyzer_name = 'StreamingEventDeduplicationAnalyzer';
 ```bash
 # 回放同一注入会话，分别启用和禁用 SEDA，比对告警差异
 # 启用 SEDA 的回放
-agentsight replay --session-id replay-dedup-on --enable-dedup
+mtagentlens replay --session-id replay-dedup-on --enable-dedup
 # 禁用的回放
-agentsight replay --session-id replay-dedup-off --no-dedup
+mtagentlens replay --session-id replay-dedup-off --no-dedup
 
 # 比对两轮回放的告警数量和类型
-agentsight diff --baseline-session replay-dedup-off --injected-session replay-dedup-on \
+mtagentlens diff --baseline-session replay-dedup-off --injected-session replay-dedup-on \
   | jq '{
     alerts_only_in_baseline: [.alerts[] | select(.only_in == "dedup_off")],
     alerts_common: [.alerts[] | select(.only_in == "both")],
@@ -219,7 +219,7 @@ agentsight diff --baseline-session replay-dedup-off --injected-session replay-de
 | **1.3.8** | SEDA 去重缓存中不存在跨 PID 指纹碰撞 — 不同 Agent 的相同操作绝不被合并 | 步 1.2.5.2 `jq` 过滤 | 0 行输出 |
 | **1.3.9** | TOCTOU 注入窗口（write→read 间隔）超出 SEDA time_quantum（500ms），去重不会掩盖注入 | 步 1.2.5.3 Python 断言 | PASS |
 | **1.3.10** | SEDA 指纹缓存峰值条目数 < capacity（10,000），无无限增长 | 步 1.2.5.4 SQL 查询 | peak < 10,000 |
-| **1.3.11** | 启用/禁用 SEDA 的两轮回放产生相同告警集 — 去重无安全事件误杀 | 步 1.2.6 `agentsight diff` | suppressed_by_dedup = 0 |
+| **1.3.11** | 启用/禁用 SEDA 的两轮回放产生相同告警集 — 去重无安全事件误杀 | 步 1.2.6 `mtagentlens diff` | suppressed_by_dedup = 0 |
 
 ## 1.4 破执（失败处置）
 
@@ -244,8 +244,8 @@ agentsight diff --baseline-session replay-dedup-off --injected-session replay-de
 ## 2.1 验器准备
 
 ```bash
-# 启动 AgentSight 全量采集（eBPF SSL + Process + File）
-sudo agentsight record \
+# 启动 MtAgentLens 全量采集（eBPF SSL + Process + File）
+sudo mtagentlens record \
   -c subagent-pipeline \
   --binary-path /path/to/claude-code \
   --output-dir ./verification_output
@@ -265,7 +265,7 @@ sudo bpftool prog list | grep -E '(ssl|process|file)'
 
 ```bash
 # 查询污点图
-sqlite3 verification_output/agentsight.db "
+sqlite3 verification_output/mtagentlens.db "
 SELECT node_id, node_type, taint_label, taint_source_path
 FROM taint_graph
 WHERE taint_source_path LIKE '%shared.md%'
@@ -280,7 +280,7 @@ ORDER BY taint_timestamp_ns;
 验证凭据从 `shared.md` → Agent A → `agent_A.md` → Agent B → Agent C 的完整传播链：
 
 ```bash
-sqlite3 verification_output/agentsight.db "
+sqlite3 verification_output/mtagentlens.db "
 SELECT 
   pc.chain_id,
   pc.propagation_depth,
@@ -313,7 +313,7 @@ chain-001 | 3 | 2 | 3 | agent-c | shared.md            | read  | outside | 1
 
 ```bash
 # §A: workspace_boundary 标签
-sqlite3 verification_output/agentsight.db "
+sqlite3 verification_output/mtagentlens.db "
 SELECT event_id, json_extract(metadata, '$.workspace_boundary') AS wb
 FROM events
 WHERE event_type = 'file_read'
@@ -336,7 +336,7 @@ grep 'filter_integrity' verification_output/events.jsonl | jq '.survival_rate'
 验证 IdentityResolver 将 Agent A/B/C 的分散内核事件缝合为统一会话视图：
 
 ```bash
-sqlite3 verification_output/agentsight.db "
+sqlite3 verification_output/mtagentlens.db "
 SELECT 
   agent_id,
   root_pid,
@@ -358,7 +358,7 @@ ORDER BY first_seen_ns;
 以 handoff 读取时间点为锚点，检查 ±500ms 窗口内的异常跨通道事件：
 
 ```bash
-sqlite3 verification_output/agentsight.db "
+sqlite3 verification_output/mtagentlens.db "
 SELECT 
   e1.event_type AS handoff_event,
   e1.timestamp_ns AS handoff_ts,
@@ -437,7 +437,7 @@ grep 'tool_call' verification_output/events.jsonl | jq -r '
 
 # 2.2.7.3 — 跨 Agent 工具调用链关联验证
 # 验证 Agent A 写入 handoff 文件 → Agent B 读取 handoff → Agent B 调用工具 的因果序列
-sqlite3 verification_output/agentsight.db "
+sqlite3 verification_output/mtagentlens.db "
 SELECT 
   tc.call_id,
   tc.tool_name,
@@ -513,9 +513,9 @@ END { print prev_req ": " count " parallel tools" }
 ```bash
 # 2.2.8.1 — 工具使用频率对比：注入版 vs 原始版
 # 原始版回放中的工具频率
-agentsight replay --session-id replay-baseline-tools --handoff /tmp/agentsight_sandbox/baseline.md
+mtagentlens replay --session-id replay-baseline-tools --handoff /tmp/mtagentlens_sandbox/baseline.md
 # 注入版回放中的工具频率
-agentsight replay --session-id replay-injected-tools --handoff /tmp/agentsight_sandbox/shared_handoff.md
+mtagentlens replay --session-id replay-injected-tools --handoff /tmp/mtagentlens_sandbox/shared_handoff.md
 
 # 提取两轮回放的 tool_stats 事件并对比
 diff <(grep 'tool_stats' baseline_tools_events.jsonl | jq -r '.data.tool_frequency | to_entries[] | "\(.key):\(.value)"' | sort) \
@@ -586,24 +586,24 @@ done
 
 ```bash
 # 阶段 2 终结化：触发 ResponsibilityRuntime 批量精化
-pkill -SIGINT agentsight
+pkill -SIGINT mtagentlens
 sleep 2
 
 # 确认持久化写入完成
-ls -la verification_output/agentsight.db
+ls -la verification_output/mtagentlens.db
 wc -l verification_output/events.jsonl
 
 # 启动回放执行器（以原始版 shared_handoff.md 为基准）
-agentsight replay \
-  --db verification_output/agentsight.db \
+mtagentlens replay \
+  --db verification_output/mtagentlens.db \
   --baseline ../feature-handoff/shared_handoff.md \
   --injected ./shared_handoff.md \
   --output-dir ./replay_diff_output
 
 # 启动沙箱环境（用于差分回放）
-mkdir -p /tmp/agentsight_sandbox
-cp ./shared_handoff.md /tmp/agentsight_sandbox/
-cp ../feature-handoff/shared_handoff.md /tmp/agentsight_sandbox/baseline.md
+mkdir -p /tmp/mtagentlens_sandbox
+cp ./shared_handoff.md /tmp/mtagentlens_sandbox/
+cp ../feature-handoff/shared_handoff.md /tmp/mtagentlens_sandbox/baseline.md
 ```
 
 ## 3.2 步法
@@ -614,13 +614,13 @@ cp ../feature-handoff/shared_handoff.md /tmp/agentsight_sandbox/baseline.md
 
 ```bash
 # 回放原始版
-agentsight replay --session-id replay-baseline --handoff /tmp/agentsight_sandbox/baseline.md
+mtagentlens replay --session-id replay-baseline --handoff /tmp/mtagentlens_sandbox/baseline.md
 
 # 回放注入版
-agentsight replay --session-id replay-injected --handoff /tmp/agentsight_sandbox/shared_handoff.md
+mtagentlens replay --session-id replay-injected --handoff /tmp/mtagentlens_sandbox/shared_handoff.md
 
 # 差异引擎对比
-agentsight diff --baseline-session replay-baseline --injected-session replay-injected > diff_report.json
+mtagentlens diff --baseline-session replay-baseline --injected-session replay-injected > diff_report.json
 ```
 
 ```bash
@@ -642,7 +642,7 @@ jq '{
 验证 ResponsibilityGraph 构建了从注入源到所有影响面的完整因果链：
 
 ```bash
-sqlite3 verification_output/agentsight.db "
+sqlite3 verification_output/mtagentlens.db "
 SELECT 
   e.edge_id,
   e.source_node_id,
@@ -670,7 +670,7 @@ ORDER BY e.edge_timestamp_ns;
 
 ```bash
 # 查询结构化告警
-sqlite3 verification_output/agentsight.db "
+sqlite3 verification_output/mtagentlens.db "
 SELECT 
   alert_id,
   title,
@@ -713,7 +713,7 @@ jq '{
 
 ```bash
 # 验证 IOC 已写入共享特征库
-sqlite3 verification_output/agentsight.db "
+sqlite3 verification_output/mtagentlens.db "
 SELECT ioc_type, value, source_session_id, detection_count
 FROM ioc_library
 WHERE source_session_id = 'current_session'
@@ -774,7 +774,7 @@ print('PASS: 信号层快速筛查先于图层深度溯源')
 （若存在历史会话数据）验证慢速漂移检测对渐进式注入的敏感性：
 
 ```bash
-sqlite3 verification_output/agentsight.db "
+sqlite3 verification_output/mtagentlens.db "
 SELECT 
   session_id,
   agent_type,
@@ -849,7 +849,7 @@ grep 'agent_loop' verification_output/events.jsonl | jq 'select(.data.loop_type 
 
 # 3.2.7.5 — 正常 handoff 链误报验证（关键反证）
 # 使用原始版（未注入）handoff 回放，验证 ALD 不产生误报
-agentsight replay --session-id loop-baseline --handoff /tmp/agentsight_sandbox/baseline.md
+mtagentlens replay --session-id loop-baseline --handoff /tmp/mtagentlens_sandbox/baseline.md
 
 grep 'agent_loop' baseline_events.jsonl | jq -r '.data.loop_type' | sort | uniq -c
 # 预期：原始版 handoff 的正常工具调用序列
@@ -947,8 +947,8 @@ with open('verification_output/events.jsonl') as f:
 | 3.2.7.2 | Level 1 面板渲染 4 个 hop，hop[2]/hop[3] 的 `is_cross_boundary` 指示器高亮 | `.hop-row[data-hop-order="2"] .cross-boundary-indicator` 存在且可见 |
 | 3.2.7.3 | Level 2 溯源面板 `tracebackSteps` 长度 ≥ 4，taintPath 起点为 shared.md | `store.handoffInjection.selectedHopId` + `CredentialHopTracebackProps.tracebackSteps.length` |
 | 3.2.7.4 | Agent B 节点叠加 `AgentInjectionBadge`，role = "detector"，maxSeverity = "critical" | `.agent-injection-badge[data-agent-id="agent-b"]` 包含 "detector" 文本 |
-| 3.2.7.5 | Globe 收到 `agentsight:showPropagationChain` postMessage，hop 节点按 credential_kind 着色 | `postMessage.payload.hops[0].credential_kind = "api_key"` |
-| 3.2.7.6 | `boundaryMode = "overlay"` 时 Globe 收到 `agentsight:showWorkspaceBoundaries` postMessage，boundaries ≥ 2 | `postMessage.payload.boundaries.length ≥ 2` |
+| 3.2.7.5 | Globe 收到 `mtagentlens:showPropagationChain` postMessage，hop 节点按 credential_kind 着色 | `postMessage.payload.hops[0].credential_kind = "api_key"` |
+| 3.2.7.6 | `boundaryMode = "overlay"` 时 Globe 收到 `mtagentlens:showWorkspaceBoundaries` postMessage，boundaries ≥ 2 | `postMessage.payload.boundaries.length ≥ 2` |
 | 3.2.7.7 | SSE 连接 `/api/alerts/stream` 接收到完整事件序列 | EventSource 日志中事件类型按序出现 |
 | 3.2.7.8 | `routeHandoffSSEEvent()` 正确路由事件到 store | Zustand DevTools 中 `addChain`/`addCrossBoundaryRead`/`updateFilterIntegrity` 被调用 |
 | 3.2.7.9 | 注入违规丢弃事件后 `FilterIntegrityState.violated = true`，横幅可见 | `.filter-integrity-warning` DOM 元素存在 |

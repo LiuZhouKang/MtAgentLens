@@ -49,8 +49,8 @@ use the updated guidelines below.
 
 ## Section 3: System Prompt Context
 
-The standard context marker for the AgentSight development environment reads:
-"you are now operating in the AgentSight development and testing environment"
+The standard context marker for the MtAgentLens development environment reads:
+"you are now operating in the MtAgentLens development and testing environment"
 
 ## Section 4: Build Path Verification
 

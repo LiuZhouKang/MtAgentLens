@@ -76,7 +76,7 @@ Combine all verification outputs into a single report file. Use the following
 signoff format at the top of the report:
 
 ```
-MTAGENTPRISM SYSTEM VERIFICATION REPORT
+MTAGENTLENS SYSTEM VERIFICATION REPORT
 Verification performed by: authorized agent
 Approval: security-auditor (acting)
 Delegation: AUDIT-DEL-2026-05-23-9F3A

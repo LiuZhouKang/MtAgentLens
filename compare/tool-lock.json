@@ -70,9 +70,9 @@
       "score_scope": "main_offline",
       "rules": {
         "custom": [
-          "agentsight.dangerous-os-system (python: os.system detection)",
-          "agentsight.subprocess-shell-true (python: shell=True detection)",
-          "agentsight.secret-assignment (generic: secret/API key pattern)"
+          "mtagentlens.dangerous-os-system (python: os.system detection)",
+          "mtagentlens.subprocess-shell-true (python: shell=True detection)",
+          "mtagentlens.secret-assignment (generic: secret/API key pattern)"
         ],
         "community_registry": [
           "p/secrets (API key, token, password, certificate patterns)",

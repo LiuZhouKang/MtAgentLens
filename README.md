@@ -22,7 +22,8 @@
 
 ### 初赛提交材料
 
-<table align="center">
+<center>
+<table align="center" style="margin-left:auto;margin-right:auto;">
   <tr>
     <th></th>
     <th>文件</th>
@@ -44,6 +45,7 @@
     <td>6.0 MB</td>
   </tr>
 </table>
+</center>
 
 <sub>队名：看月亮</sub>
 

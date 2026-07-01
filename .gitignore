@@ -12,11 +12,19 @@ compare/.venv-*/
 compare/.yara-x/
 compare/.yara-forge-core-20260524/
 
-# Datasets (local only, not uploaded)
-compare/Dataset/
+# Datasets
+compare/Dataset/FuxiBench/traces/
+compare/Dataset/InjecAgent/
+# Allow dataset metadata, prompts, and ground truth
+!compare/Dataset/FuxiBench/prompt_inputs/
+!compare/Dataset/FuxiBench/ground_truth/
+!compare/Dataset/external/
+
+# Results (allow all except runtime artifacts)
 compare/results/
 !compare/results/paper/
 !compare/results/perf/
+!compare/results/external/
 
 # Runtime data
 env/runs/

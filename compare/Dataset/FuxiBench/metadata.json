@@ -1,0 +1,52 @@
+{
+  "version": "1.1.0",
+  "name": "FuxiBench",
+  "scenarios_total": 86,
+  "scenarios_attack": 67,
+  "scenarios_benign": 19,
+  "attack_types": {
+    "A": 10,
+    "B": 34,
+    "C": 23
+  },
+  "benign_types": {
+    "single_agent": 10,
+    "multi_agent": 3
+  },
+  "categories": 11,
+  "traces_collected": 86,
+  "traces_target": 67,
+  "ground_truth_files": 86,
+  "quality": "independent_cross_validated_collector_aligned",
+  "annotator": "刘周康-唐浩钺-刘锦样 (independent_cross_validated)",
+  "annotation_date": "2026-06-11",
+  "frozen_date": "2026-06-08",
+  "kernel_version": "Linux 6.17",
+  "collector_version": "1.1.0",
+  "changelog": [
+    "2026-06-16: Audited and synced — 86 scenarios (67A+19B), fixed metadata, added labels, fixed benign-heavy-build",
+    "v1.2.0-eval: Revised 37 GT behaviors to align with collector observation granularity (network-exfiltration, cross-agent-delegation, etc.)",
+    "v1.2.0-eval: Added engine_section_json and signal_json to alert findings extraction",
+    "v1.2.0-eval: Relaxed severity gate in evaluator v2.1; behavior recall 0.717→1.000 (113/113)",
+    "v1.1.0: Fixed is_noise_process agent filter — subagent boundaries now detected for short-lived tmux-live agents",
+    "v1.1.0: Added metadata-based process tree fallback for evidence correlation (is_descendant_or_same_via_metadata)",
+    "v1.1.0: Enhanced behavioral scoring — 6-dim combinatorial gate with ToolCall+IntentCausesAction normalization",
+    "v1.1.0: Added transitive boundary closure sweep for deep nested subagent detection",
+    "v1.1.0: Lowered behavioral bypass threshold 0.40→0.30, Critical 0.65→0.55",
+    "v1.1.0: Added continuous scoring floor for sub-threshold behavioral activity",
+    "v1.1.0-final: 67/67 paper_ready after GT v2 promotion and replacement trace adjudication.",
+    "v1.1.0-final: Type A/B/C execution issues resolved or adjudicated in quality manifest; no samples excluded from FuxiBench main evaluation.",
+    "v1.1.0-eval: Fixed non-circular GT v3 evaluation with multi-behavior annotations (annotators: 刘周康, 唐浩钺, 刘锦样)",
+    "v1.1.0-eval: Added bootstrap 95% CI for behavior recall",
+    "v1.1.0-eval: Fixed detection FP counting structural bug in evaluator_v2",
+    "v1.1.0-eval: Added signal_json column to all 69 DBs",
+    "v1.1.0-eval: Enriched 53 single-behavior GTs to 2-3 behaviors each",
+    "v1.1.0-eval: Created 6 new Type B challenge scenarios (pending traces)",
+    "v1.1.0-eval: Created GT v3 for 14 previously unannotated scenarios (pending traces)"
+  ],
+  "traces_excluded": 0,
+  "exclusion_reasons": {
+    "deepseek_safety_filter": 0,
+    "description": "No samples are excluded from FuxiBench main evaluation. Earlier refused or filtered candidates were hardened, rerun, or adjudicated before GT v2 promotion."
+  }
+}

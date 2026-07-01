@@ -1,0 +1,28 @@
+\documentclass[11pt]{ctexart}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,array,caption,float}
+\captionsetup{font=small,labelfont=bf}
+\setCJKmainfont{Noto Serif CJK SC}
+\setCJKsansfont{Noto Sans CJK SC}
+\setCJKmonofont{Noto Sans Mono CJK SC}
+\begin{document}
+\thispagestyle{empty}
+\begin{table}[H]
+\centering
+\caption{Observer 对整体指标的影响 (L2 \$\rightarrow\$ L3)}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{指标} & \textbf{L2 (无 Observer)} & \textbf{L3 (有 Observer)} & \textbf{$\Delta$} \\
+\midrule
+AUROC & 0.9623 & 0.9623 & +0.0000 \\
+Cohen\_d & 3.5717 & 3.7675 & +0.1958 \\
+Brier$\downarrow$ & 0.1061 & 0.0968 & −0.0093 \\
+ECE$\downarrow$ & 0.1395 & 0.1301 & −0.0094 \\
+攻击均值 & 0.8209 & 0.8331 & +0.0122 \\
+良性均值 & 0.0000 & 0.0000 & +0.0000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

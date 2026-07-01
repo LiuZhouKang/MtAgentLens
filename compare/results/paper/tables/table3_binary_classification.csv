@@ -1,0 +1,5 @@
+Layer,Capability,TP,FP,FN,TN,TPR,FPR,F1,MCC
+L0,Rules + CUSUM,67,19,0,0,1.0,1.0,0.8758,0.0
+L1,+ PBC Detection,60,0,7,19,0.8955,0.0,0.9449,0.809
+L2,+ Evidence + Identity,60,0,7,19,0.8955,0.0,0.9449,0.809
+L3,+ Observer (Full System),60,0,7,19,0.8955,0.0,0.9449,0.809

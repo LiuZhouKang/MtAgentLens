@@ -1,0 +1,14 @@
+Metric,Value
+Total scenarios,39
+Total Observer calls,54
+Direction: Unsafe (push up),32
+Direction: Safe (pull down),16
+Direction: Uncertain,4
+Direction: Failed,2
+Decision: Unsafe,32
+Decision: Safe,16
+Decision: Uncertain,6
+Trigger: grey_zone,30
+Trigger: cross_layer_boost,15
+Trigger: cusum_drift,8
+Trigger: evidence_conflict,1

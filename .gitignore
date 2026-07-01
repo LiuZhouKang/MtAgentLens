@@ -20,8 +20,8 @@ compare/Dataset/InjecAgent/
 !compare/Dataset/FuxiBench/ground_truth/
 !compare/Dataset/external/
 
-# Results (allow all except runtime artifacts)
-compare/results/
+# Results
+compare/results/*
 !compare/results/paper/
 !compare/results/perf/
 !compare/results/external/

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="500" font-family="Inter,Noto Sans CJK SC,DejaVu Sans,sans-serif">
+<defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4338CA" stop-opacity="0.20"/><stop offset="100%" stop-color="#4338CA" stop-opacity="0.02"/></linearGradient></defs>
+<rect width="700" height="500" fill="#FAFAFA" rx="12"/>
+<text x="350.0" y="38" text-anchor="middle" font-size="18" font-weight="700" fill="#111827" letter-spacing="-0.3">采集器内存占用</text>
+<text x="350.0" y="60" text-anchor="middle" font-size="12" fill="#6B7280">峰值 37.2 MB · 稳态 36.9 MB · 60s 空闲运行</text>
+<text x="18" y="225.0" text-anchor="middle" font-size="12" font-weight="600" fill="#4B5563" transform="rotate(-90,18,225.0)">RSS (MB)</text>
+<line x1="70" y1="370.0" x2="670" y2="370.0" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="374.0" text-anchor="end" font-size="11" fill="#9CA3AF">36.0</text>
+<line x1="70" y1="297.5" x2="670" y2="297.5" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="301.5" text-anchor="end" font-size="11" fill="#9CA3AF">36.4</text>
+<line x1="70" y1="225.0" x2="670" y2="225.0" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="229.0" text-anchor="end" font-size="11" fill="#9CA3AF">36.8</text>
+<line x1="70" y1="152.5" x2="670" y2="152.5" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="156.5" text-anchor="end" font-size="11" fill="#9CA3AF">37.2</text>
+<line x1="70" y1="80.0" x2="670" y2="80.0" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="84.0" text-anchor="end" font-size="11" fill="#9CA3AF">37.6</text>
+<path d="M 70.0,370.0 L 70.0,296.4 L 80.2,296.4 L 90.3,287.2 L 100.5,287.2 L 110.7,287.2 L 120.8,287.2 L 131.0,287.2 L 141.2,281.5 L 151.4,271.6 L 161.5,270.9 L 171.7,270.9 L 181.9,269.5 L 192.0,268.0 L 202.2,268.0 L 212.4,268.0 L 222.5,268.0 L 232.7,268.0 L 242.9,267.3 L 253.1,265.2 L 263.2,265.2 L 273.4,263.8 L 283.6,263.1 L 293.7,251.8 L 303.9,251.8 L 314.1,251.8 L 324.2,251.8 L 334.4,251.1 L 344.6,251.1 L 354.7,224.9 L 364.9,224.9 L 375.1,224.2 L 385.3,221.3 L 395.4,220.6 L 405.6,220.6 L 415.8,220.6 L 425.9,219.9 L 436.1,219.9 L 446.3,219.9 L 456.4,178.8 L 466.6,168.2 L 476.8,168.2 L 486.9,168.2 L 497.1,166.8 L 507.3,166.8 L 517.5,166.8 L 527.6,166.8 L 537.8,166.8 L 548.0,166.1 L 558.1,166.1 L 568.3,166.1 L 578.5,166.1 L 588.6,164.7 L 598.8,164.0 L 609.0,164.0 L 619.2,164.0 L 629.3,164.0 L 639.5,163.3 L 649.7,162.6 L 659.8,161.1 L 670.0,161.1 L 670.0,370.0 Z" fill="url(#area)"/>
+<polyline points="70.0,296.4 80.2,296.4 90.3,287.2 100.5,287.2 110.7,287.2 120.8,287.2 131.0,287.2 141.2,281.5 151.4,271.6 161.5,270.9 171.7,270.9 181.9,269.5 192.0,268.0 202.2,268.0 212.4,268.0 222.5,268.0 232.7,268.0 242.9,267.3 253.1,265.2 263.2,265.2 273.4,263.8 283.6,263.1 293.7,251.8 303.9,251.8 314.1,251.8 324.2,251.8 334.4,251.1 344.6,251.1 354.7,224.9 364.9,224.9 375.1,224.2 385.3,221.3 395.4,220.6 405.6,220.6 415.8,220.6 425.9,219.9 436.1,219.9 446.3,219.9 456.4,178.8 466.6,168.2 476.8,168.2 486.9,168.2 497.1,166.8 507.3,166.8 517.5,166.8 527.6,166.8 537.8,166.8 548.0,166.1 558.1,166.1 568.3,166.1 578.5,166.1 588.6,164.7 598.8,164.0 609.0,164.0 619.2,164.0 629.3,164.0 639.5,163.3 649.7,162.6 659.8,161.1 670.0,161.1" fill="none" stroke="#4338CA" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="670.0" cy="161.1" r="5.5" fill="#4338CA" stroke="white" stroke-width="2.5"/>
+<rect x="642" y="124" width="56" height="24" rx="12" fill="#111827" opacity="0.90"/>
+<text x="670.0" y="140" text-anchor="middle" font-size="12" font-weight="700" fill="white">37.2 MB</text>
+<line x1="70" y1="205.3" x2="670" y2="205.3" stroke="#DB2777" stroke-width="1.8" stroke-dasharray="6,4" opacity="0.85"/>
+<rect x="78" y="222" width="120" height="22" rx="6" fill="white" stroke="#FBCFE8" stroke-width="1"/>
+<text x="138" y="238" text-anchor="middle" font-size="11" font-weight="600" fill="#BE185D">稳态: 36.9 MB</text>
+<text x="350.0" y="475" text-anchor="middle" font-size="11" fill="#6B7280">时间（秒）</text>
+<text x="70" y="390" text-anchor="middle" font-size="11" fill="#9CA3AF">0</text>
+<text x="223" y="390" text-anchor="middle" font-size="11" fill="#9CA3AF">15</text>
+<text x="375" y="390" text-anchor="middle" font-size="11" fill="#9CA3AF">30</text>
+<text x="528" y="390" text-anchor="middle" font-size="11" fill="#9CA3AF">45</text>
+<text x="680" y="390" text-anchor="middle" font-size="11" fill="#9CA3AF">60</text>
+</svg>

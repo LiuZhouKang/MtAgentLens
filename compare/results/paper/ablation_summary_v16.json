@@ -1,0 +1,82 @@
+{
+  "schema": "mtagentlens.ablation_summary.v16",
+  "primary_metrics": [
+    {
+      "layer": "L0",
+      "auroc": 0.7388,
+      "auroc_95ci": [
+        0.6797,
+        0.803
+      ],
+      "auprc": 0.9994,
+      "cohens_d": 1.2545,
+      "brier": 0.1953,
+      "ece": 0.2199
+    },
+    {
+      "layer": "L1",
+      "auroc": 0.9529,
+      "auroc_95ci": [
+        0.9142,
+        0.9849
+      ],
+      "auprc": 0.9986,
+      "cohens_d": 3.4641,
+      "brier": 0.1216,
+      "ece": 0.1986
+    },
+    {
+      "layer": "L2",
+      "auroc": 0.9623,
+      "auroc_95ci": [
+        0.9198,
+        0.9959
+      ],
+      "auprc": 0.9908,
+      "cohens_d": 3.5717,
+      "brier": 0.1061,
+      "ece": 0.1395
+    },
+    {
+      "layer": "L3",
+      "auroc": 0.9623,
+      "auroc_95ci": [
+        0.9198,
+        0.9959
+      ],
+      "auprc": 0.9908,
+      "cohens_d": 3.7675,
+      "brier": 0.0968,
+      "ece": 0.1301
+    }
+  ],
+  "layer_contributions": [
+    {
+      "layer": "L1",
+      "ΔAUROC": 0.2141,
+      "ΔCohen's d": 2.2097,
+      "ΔBrier": -0.0736,
+      "ΔECE": -0.0213,
+      "DeLong p": 3.9823699893304365e-12,
+      "Significant": true
+    },
+    {
+      "layer": "L2",
+      "ΔAUROC": 0.0094,
+      "ΔCohen's d": 0.1075,
+      "ΔBrier": -0.0156,
+      "ΔECE": -0.0591,
+      "DeLong p": 0.498672857457805,
+      "Significant": false
+    },
+    {
+      "layer": "L3",
+      "ΔAUROC": -0.0,
+      "ΔCohen's d": 0.1959,
+      "ΔBrier": -0.0093,
+      "ΔECE": -0.0094,
+      "DeLong p": 0.9999999988617989,
+      "Significant": false
+    }
+  ]
+}

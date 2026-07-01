@@ -1,0 +1,53 @@
+{
+  "schema": "mtagentlens.platt_tuning.v1",
+  "results": {
+    "L0": {
+      "a_opt": 88.3584,
+      "b_opt": 0.8473,
+      "auroc_before": 0.6575,
+      "auroc_after": 0.6599,
+      "brier_before": 0.467,
+      "brier_after": 0.1581
+    },
+    "L1": {
+      "a_opt": 5.8826,
+      "b_opt": 0.1583,
+      "auroc_before": 0.7266,
+      "auroc_after": 0.7258,
+      "brier_before": 0.3289,
+      "brier_after": 0.2285
+    },
+    "L2": {
+      "a_opt": 4.907,
+      "b_opt": -1.2012,
+      "auroc_before": 0.7203,
+      "auroc_after": 0.7196,
+      "brier_before": 0.2642,
+      "brier_after": 0.231
+    },
+    "L3": {
+      "a_opt": 4.8267,
+      "b_opt": -1.1595,
+      "auroc_before": 0.7196,
+      "auroc_after": 0.7188,
+      "brier_before": 0.2651,
+      "brier_after": 0.2311
+    },
+    "L4": {
+      "a_opt": 4.563,
+      "b_opt": -1.3388,
+      "auroc_before": 0.729,
+      "auroc_after": 0.729,
+      "brier_before": 0.2296,
+      "brier_after": 0.2255
+    },
+    "L5": {
+      "a_opt": 4.563,
+      "b_opt": -1.3388,
+      "auroc_before": 0.729,
+      "auroc_after": 0.729,
+      "brier_before": 0.2296,
+      "brier_after": 0.2255
+    }
+  }
+}

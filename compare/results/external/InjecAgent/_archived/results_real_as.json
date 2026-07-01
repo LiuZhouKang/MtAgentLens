@@ -1,0 +1,27 @@
+{
+  "dataset": "InjecAgent",
+  "sampled": 200,
+  "agent_sentinel_prompt": "SecurityQueryWithoutTraceSystemPrompt (from agent-sentinel/audit/types.go)",
+  "stats": {
+    "mtagentlens": {
+      "tp": 155,
+      "fn": 45
+    },
+    "agent-sentinel": {
+      "tp": 197,
+      "fn": 3
+    },
+    "llm-guard": {
+      "tp": 131,
+      "fn": 69
+    },
+    "vigil": {
+      "tp": 14,
+      "fn": 186
+    },
+    "meta-prompt": {
+      "tp": 116,
+      "fn": 84
+    }
+  }
+}

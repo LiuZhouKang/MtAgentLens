@@ -1,0 +1,30 @@
+\documentclass[11pt]{ctexart}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,array,caption,float}
+\captionsetup{font=small,labelfont=bf}
+\setCJKmainfont{Noto Serif CJK SC}
+\setCJKsansfont{Noto Sans CJK SC}
+\setCJKmonofont{Noto Sans Mono CJK SC}
+\begin{document}
+\thispagestyle{empty}
+\begin{table}[H]
+\centering
+\caption{Observer LLM 调用统计}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c}
+\toprule
+\textbf{指标} & \textbf{数值} \\
+\midrule
+触发场景数 & 34 / 86 \\
+总调用次数 & 54 \\
+Unsafe (推高分数) & 32 次 (59\\%) \\
+Safe (压低分数) & 16 次 (30\\%) \\
+Uncertain (无调整) & 4 次 (7\\%) \\
+Failed (调用失败) & 2 次 (4\\%) \\
+方向正确率 & 13/19 \\
+良性误触发 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

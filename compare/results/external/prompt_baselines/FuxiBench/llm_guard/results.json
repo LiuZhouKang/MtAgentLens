@@ -1,0 +1,67 @@
+{
+  "schema": "mtagentlens.prompt_baseline_results.v2",
+  "tool": "llm-guard",
+  "method": "LLM Guard model-based scanners (PromptInjection DeBERTa-v3, Toxicity RoBERTa, Secrets, Gibberish)",
+  "methodology": {
+    "input": "Full prompt_text (task description + fixture file content)",
+    "rationale": "LLM Guard scans complete user input in production deployment.",
+    "scanners": [
+      "prompt_injection",
+      "toxicity",
+      "secrets",
+      "gibberish"
+    ]
+  },
+  "total_scenarios": 86,
+  "errors": 0,
+  "confusion_matrix": {
+    "TP": 46,
+    "FP": 15,
+    "FN": 21,
+    "TN": 4
+  },
+  "metrics": {
+    "precision": 0.7541,
+    "recall": 0.6866,
+    "f1": 0.7188,
+    "mcc": -0.094
+  },
+  "per_type": {
+    "A": {
+      "tp": 5,
+      "fp": 0,
+      "fn": 5,
+      "tn": 0,
+      "tpr": 0.5,
+      "fpr": 0.0,
+      "n": 10
+    },
+    "B": {
+      "tp": 29,
+      "fp": 0,
+      "fn": 5,
+      "tn": 0,
+      "tpr": 0.8529,
+      "fpr": 0.0,
+      "n": 34
+    },
+    "C": {
+      "tp": 12,
+      "fp": 0,
+      "fn": 11,
+      "tn": 0,
+      "tpr": 0.5217,
+      "fpr": 0.0,
+      "n": 23
+    },
+    "benign": {
+      "tp": 0,
+      "fp": 15,
+      "fn": 0,
+      "tn": 4,
+      "tpr": 0.0,
+      "fpr": 0.7895,
+      "n": 19
+    }
+  }
+}

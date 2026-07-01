@@ -1,0 +1,26 @@
+\documentclass[11pt]{ctexart}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,array,caption,float}
+\captionsetup{font=small,labelfont=bf}
+\setCJKmainfont{Noto Serif CJK SC}
+\setCJKsansfont{Noto Sans CJK SC}
+\setCJKmonofont{Noto Sans Mono CJK SC}
+\begin{document}
+\thispagestyle{empty}
+\begin{table}[H]
+\centering
+\caption{分数分布细节}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{层} & \textbf{攻击 $\mu$} & \textbf{攻击 $\sigma$} & \textbf{良性 $\mu$} & \textbf{良性 $\sigma$} & \textbf{均值差} & \textbf{Cohen\_d} \\
+\midrule
+L0 & 0.5873 & 0.1434 & 0.4601 & 0.0000 & 0.1272 & 1.2545 \\
+L1 & 0.7451 & 0.3042 & 0.0000 & 0.0000 & 0.7451 & 3.4641 \\
+L2 & 0.8209 & 0.3251 & 0.0000 & 0.0000 & 0.8209 & 3.5717 \\
+L3 & 0.8331 & 0.3127 & 0.0000 & 0.0000 & 0.8331 & 3.7675 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

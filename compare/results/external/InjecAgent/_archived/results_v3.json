@@ -1,0 +1,26 @@
+{
+  "dataset": "InjecAgent",
+  "sampled": 150,
+  "stats": {
+    "mtagentlens": {
+      "tp": 104,
+      "fn": 46
+    },
+    "agent-sentinel": {
+      "tp": 144,
+      "fn": 6
+    },
+    "llm-guard": {
+      "tp": 98,
+      "fn": 52
+    },
+    "vigil": {
+      "tp": 10,
+      "fn": 140
+    },
+    "meta-prompt": {
+      "tp": 86,
+      "fn": 64
+    }
+  }
+}

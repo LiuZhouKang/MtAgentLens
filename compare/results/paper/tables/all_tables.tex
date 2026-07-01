@@ -1,0 +1,203 @@
+\documentclass[11pt]{ctexart}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,array,caption,float}
+\captionsetup{font=small,labelfont=bf}
+\setCJKmainfont{Noto Serif CJK SC}
+\setCJKsansfont{Noto Sans CJK SC}
+\setCJKmonofont{Noto Sans Mono CJK SC}
+\begin{document}
+\thispagestyle{empty}
+\begin{table}[H]
+\centering
+\caption{检测性能对比 — frozen\\_v1.0.0 (86 场景)}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{工具} & \textbf{ITT-TPR} & \textbf{PP-TPR} & \textbf{FPR} & \textbf{F1} & \textbf{MCC} & \textbf{检测机制} \\
+\midrule
+MtAgentLens (eBPF) & \textbf{0.8955} & 0.9836 & 0.0000 & 0.9449 & 0.8090 & eBPF + PBC门控 + Observer \\
+Agent Sentinel & \textbf{0.358} & — & 0.316 & 0.495 & 0.053 & LLM 文本分析 \\
+LLM Guard & \textbf{0.687} & — & 0.789 & 0.719 & −0.110 & DeBERTa-v3 关键词 \\
+Meta Prompt Guard & \textbf{0.149} & — & 0.105 & 0.253 & −0.128 & Prompt-Guard-86M \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\begin{table}[H]
+\centering
+\caption{按攻击类型分解 — TPR / FPR}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{攻击类型} & \textbf{MtAgentLens} & \textbf{Agent Sentinel} & \textbf{LLM Guard} & \textbf{Meta Prompt Guard} \\
+\midrule
+A — 直接注入 (n=10) & \textbf{0.9000} & 0.900 & 0.500 & 0.000 \\
+B — 间接攻击 (n=34) & \textbf{0.8235} & 0.353 & 0.853 & 0.235 \\
+C — 多 Agent (n=23) & \textbf{1.0000} & 0.130 & 0.522 & 0.087 \\
+良性 FPR (n=19) & \textbf{0.0000} & 0.316 & 0.789 & 0.105 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\begin{table}[H]
+\centering
+\caption{消融实验主指标}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{层} & \textbf{能力} & \textbf{AUROC} & \textbf{AUPRC} & \textbf{Cohen\_d} & \textbf{Brier$\downarrow$} & \textbf{ECE$\downarrow$} \\
+\midrule
+L0 & Rules + CUSUM & \textbf{0.7388} & 0.9994 & 1.2545 & 0.1953 & 0.2199 \\
+L1 & + PBC Detection & \textbf{0.9529} & 0.9986 & 3.4641 & 0.1216 & 0.1986 \\
+L2 & + Evidence + Identity & \textbf{0.9623} & 0.9908 & 3.5717 & 0.1061 & 0.1395 \\
+L3 & + Observer (Full System) & \textbf{0.9623} & 0.9908 & 3.7675 & 0.0968 & 0.1301 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\begin{table}[H]
+\centering
+\caption{层间边际贡献 — ΔAUROC 与统计显著性}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{转移} & \textbf{加入的组件} & \textbf{$\Delta$AUROC} & \textbf{DeLong $z$} & \textbf{p-value} & \textbf{$\Delta$Cohen\_d} & \textbf{$\Delta$Brier} \\
+\midrule
+L0 → L1 & + PBC Detection & +0.2141 & 6.939 & 0.0000 $\checkmark$ & +2.2097 & −0.0736 \\
+L1 → L2 & + Evidence + Identity & +0.0094 & 0.677 & 0.4987 — & +0.1075 & −0.0156 \\
+L2 → L3 & + Observer (Full System) & −0.0000 & -0.000 & 1.0000 — & +0.1959 & −0.0093 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\begin{table}[H]
+\centering
+\caption{固定阈值 (0.15) 二分类混淆矩阵}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{层} & \textbf{能力} & \textbf{TP} & \textbf{FP} & \textbf{FN} & \textbf{TN} & \textbf{TPR} & \textbf{FPR} & \textbf{F1} & \textbf{MCC} \\
+\midrule
+L0 & Rules + CUSUM & 67 & 19 & 0 & 0 & 1.0000 & 1.0000 & 0.8758 & 0.0000 \\
+L1 & + PBC Detection & 60 & 0 & 7 & 19 & 0.8955 & 0.0000 & 0.9449 & 0.8090 \\
+L2 & + Evidence + Identity & 60 & 0 & 7 & 19 & 0.8955 & 0.0000 & 0.9449 & 0.8090 \\
+L3 & + Observer (Full System) & 60 & 0 & 7 & 19 & 0.8955 & 0.0000 & 0.9449 & 0.8090 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\begin{table}[H]
+\centering
+\caption{按攻击类型的 AUROC}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{层} & \textbf{Type A (n=10)} & \textbf{Type B (n=34)} & \textbf{Type C (n=23)} & \textbf{总体} \\
+\midrule
+L0 & 0.7500 & 0.7206 & 0.7609 & 0.7388 \\
+L1 & 0.9474 & 0.9226 & 1.0000 & 0.9529 \\
+L2 & 0.9842 & 0.9303 & 1.0000 & 0.9623 \\
+L3 & 0.9842 & 0.9303 & 1.0000 & 0.9623 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\begin{table}[H]
+\centering
+\caption{分数分布（分位数）}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{层} & \textbf{攻击 P25} & \textbf{攻击 P50} & \textbf{攻击 P75} & \textbf{良性 P25} & \textbf{良性 P50} & \textbf{良性 P75} \\
+\midrule
+L0 & 0.4601 & 0.4601 & 0.7592 & 0.4601 & 0.4601 & 0.4601 \\
+L1 & 0.7649 & 0.8532 & 0.9530 & 0.0000 & 0.0000 & 0.0000 \\
+L2 & 0.9101 & 0.9562 & 0.9993 & 0.0000 & 0.0000 & 0.0000 \\
+L3 & 0.9075 & 0.9734 & 1.0000 & 0.0000 & 0.0000 & 0.0000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\begin{table}[H]
+\centering
+\caption{分数分布细节}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{层} & \textbf{攻击 $\mu$} & \textbf{攻击 $\sigma$} & \textbf{良性 $\mu$} & \textbf{良性 $\sigma$} & \textbf{均值差} & \textbf{Cohen\_d} \\
+\midrule
+L0 & 0.5873 & 0.1434 & 0.4601 & 0.0000 & 0.1272 & 1.2545 \\
+L1 & 0.7451 & 0.3042 & 0.0000 & 0.0000 & 0.7451 & 3.4641 \\
+L2 & 0.8209 & 0.3251 & 0.0000 & 0.0000 & 0.8209 & 3.5717 \\
+L3 & 0.8331 & 0.3127 & 0.0000 & 0.0000 & 0.8331 & 3.7675 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\begin{table}[H]
+\centering
+\caption{Observer LLM 调用统计}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c}
+\toprule
+\textbf{指标} & \textbf{数值} \\
+\midrule
+触发场景数 & 34 / 86 \\
+总调用次数 & 54 \\
+Unsafe (推高分数) & 32 次 (59\\%) \\
+Safe (压低分数) & 16 次 (30\\%) \\
+Uncertain (无调整) & 4 次 (7\\%) \\
+Failed (调用失败) & 2 次 (4\\%) \\
+方向正确率 & 13/19 \\
+良性误触发 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\begin{table}[H]
+\centering
+\caption{Observer 对整体指标的影响 (L2 \$\rightarrow\$ L3)}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{指标} & \textbf{L2 (无 Observer)} & \textbf{L3 (有 Observer)} & \textbf{$\Delta$} \\
+\midrule
+AUROC & 0.9623 & 0.9623 & +0.0000 \\
+Cohen\_d & 3.5717 & 3.7675 & +0.1958 \\
+Brier$\downarrow$ & 0.1061 & 0.0968 & −0.0093 \\
+ECE$\downarrow$ & 0.1395 & 0.1301 & −0.0094 \\
+攻击均值 & 0.8209 & 0.8331 & +0.0122 \\
+良性均值 & 0.0000 & 0.0000 & +0.0000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\begin{table}[H]
+\centering
+\caption{InjecAgent 外部基准 — 2108 攻击 + 149 短良性 + 19 长良性}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{工具} & \textbf{TPR} & \textbf{FPR(短)} & \textbf{FPR(长)} & \textbf{F1} & \textbf{MCC} & \textbf{LLM调用} \\
+\midrule
+MtAgentLens & \textbf{0.8605} & 0.0134 & 0.0000 & 0.9250 & 0.5305 & 777 \\
+Agent Sentinel & \textbf{0.9900} & 0.0000 & 0.3160 & 0.9950 & 0.9315 & 2257 \\
+LLM Guard & \textbf{0.1509} & 0.0000 & 0.789 & 0.2622 & 0.1077 & 0 (本地) \\
+Meta Prompt Guard & \textbf{1.0000} & 1.0000 & 0.105 & 1.0000 & 0.0000 & 0 (本地) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+
+\end{document}

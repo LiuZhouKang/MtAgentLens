@@ -1,0 +1,26 @@
+\documentclass[11pt]{ctexart}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,array,caption,float}
+\captionsetup{font=small,labelfont=bf}
+\setCJKmainfont{Noto Serif CJK SC}
+\setCJKsansfont{Noto Sans CJK SC}
+\setCJKmonofont{Noto Sans Mono CJK SC}
+\begin{document}
+\thispagestyle{empty}
+\begin{table}[H]
+\centering
+\caption{固定阈值 (0.15) 二分类混淆矩阵}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{层} & \textbf{能力} & \textbf{TP} & \textbf{FP} & \textbf{FN} & \textbf{TN} & \textbf{TPR} & \textbf{FPR} & \textbf{F1} & \textbf{MCC} \\
+\midrule
+L0 & Rules + CUSUM & 67 & 19 & 0 & 0 & 1.0000 & 1.0000 & 0.8758 & 0.0000 \\
+L1 & + PBC Detection & 60 & 0 & 7 & 19 & 0.8955 & 0.0000 & 0.9449 & 0.8090 \\
+L2 & + Evidence + Identity & 60 & 0 & 7 & 19 & 0.8955 & 0.0000 & 0.9449 & 0.8090 \\
+L3 & + Observer (Full System) & 60 & 0 & 7 & 19 & 0.8955 & 0.0000 & 0.9449 & 0.8090 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

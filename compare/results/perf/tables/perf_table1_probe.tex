@@ -1,0 +1,24 @@
+\documentclass[11pt]{ctexart}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,array,caption,float}
+\captionsetup{font=small,labelfont=bf}
+\setCJKmainfont{Noto Serif CJK SC}
+\begin{document}
+\thispagestyle{empty}
+\begin{table}[H]
+\centering
+\caption{eBPF 探针执行延迟（内核 bpftool 统计）}
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{探针名称} & \textbf{调用次数} & \textbf{总执行时间} & \textbf{平均延迟} & \textbf{字节码} \\
+\midrule
+read_exit & 1,000,000 & 57,576,311 ns & 57.6 ns & 1040 B \\
+rw_enter & 2,000,000 & 202,625,073 ns & 101.3 ns & 280 B \\
+write_exit & 1,000,000 & 59,373,587 ns & 59.4 ns & 1040 B \\
+\textbf{每次 SSL 操作合计} & — & — & \textbf{~218 ns} & — \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

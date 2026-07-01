@@ -1,0 +1,58 @@
+\documentclass[11pt]{ctexart}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,array,caption,float}
+\captionsetup{font=small,labelfont=bf}
+\setCJKmainfont{Noto Serif CJK SC}
+\begin{document}
+\thispagestyle{empty}
+\begin{table}[H]
+\centering
+\caption{eBPF 探针执行延迟（内核 bpftool 统计）}
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{探针名称} & \textbf{调用次数} & \textbf{总执行时间} & \textbf{平均延迟} & \textbf{字节码} \\
+\midrule
+read_exit & 1,000,000 & 57,576,311 ns & 57.6 ns & 1040 B \\
+rw_enter & 2,000,000 & 202,625,073 ns & 101.3 ns & 280 B \\
+write_exit & 1,000,000 & 59,373,587 ns & 59.4 ns & 1040 B \\
+\textbf{每次 SSL 操作合计} & — & — & \textbf{~218 ns} & — \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\begin{table}[H]
+\centering
+\caption{采集器内存占用}
+\small
+\begin{tabular}{lc}
+\toprule
+\textbf{指标} & \textbf{数值} \\
+\midrule
+平均 RSS & 36.8 MB \\
+峰值 RSS & 37.2 MB \\
+稳态 RSS & 36.9 MB \\
+采样时长 & 60s \\
+采样数 & 60 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\begin{table}[H]
+\centering
+\caption{端到端 Agent 任务开销}
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{指标} & \textbf{Baseline（无采集器）} & \textbf{Instrumented（有采集器）} & \textbf{Δ} \\
+\midrule
+平均耗时 & 0.20s & 0.19s & -3.2% \\
+标准差 & ±0.01s & ±0.01s & — \\
+P95 延迟 & 0.22s & 0.21s & — \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

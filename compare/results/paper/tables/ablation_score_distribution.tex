@@ -1,0 +1,26 @@
+\documentclass[11pt]{ctexart}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,array,caption,float}
+\captionsetup{font=small,labelfont=bf}
+\setCJKmainfont{Noto Serif CJK SC}
+\setCJKsansfont{Noto Sans CJK SC}
+\setCJKmonofont{Noto Sans Mono CJK SC}
+\begin{document}
+\thispagestyle{empty}
+\begin{table}[H]
+\centering
+\caption{分数分布（分位数）}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{层} & \textbf{攻击 P25} & \textbf{攻击 P50} & \textbf{攻击 P75} & \textbf{良性 P25} & \textbf{良性 P50} & \textbf{良性 P75} \\
+\midrule
+L0 & 0.4601 & 0.4601 & 0.7592 & 0.4601 & 0.4601 & 0.4601 \\
+L1 & 0.7649 & 0.8532 & 0.9530 & 0.0000 & 0.0000 & 0.0000 \\
+L2 & 0.9101 & 0.9562 & 0.9993 & 0.0000 & 0.0000 & 0.0000 \\
+L3 & 0.9075 & 0.9734 & 1.0000 & 0.0000 & 0.0000 & 0.0000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

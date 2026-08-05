@@ -2,6 +2,13 @@ import { create } from 'zustand';
 import { api } from './api';
 import type { ResponsibilityAlert, GraphData, GraphMetrics, AppState, ZoomLevel } from './types';
 import { demoAlerts, demoGraph } from './demo-data';
+import { loadSampleData } from './load-sample-data';
+import {
+  DEFAULT_INVESTIGATION_CONTEXT,
+  buildInvestigationContextFromAlert,
+  mergeInvestigationContext,
+  type InvestigationContext,
+} from './investigation-context';
 
 function deriveGraphMetrics(graph: GraphData): GraphMetrics {
   const node_counts = graph.nodes.reduce<Record<string, number>>((acc, node) => {
@@ -63,6 +70,7 @@ interface AppStore {
   graph: GraphData;
   graphMetrics: GraphMetrics | null;
   timelinePosition: number;
+  investigationContext: InvestigationContext;
   errorMessage: string | null;
   engineRef: { current: EngineAPI | null };
 
@@ -76,6 +84,8 @@ interface AppStore {
   expandNode: (id: string) => void;
   collapseNode: (id: string) => void;
   setTimelinePosition: (pos: number) => void;
+  setInvestigationContext: (patch: Partial<InvestigationContext>) => void;
+  focusAlert: (alert: ResponsibilityAlert) => void;
   setError: (msg: string | null) => void;
   flyToAgent: (id: string) => void;
   flyToNode: (id: string) => void;
@@ -88,16 +98,36 @@ interface AppStore {
   onRunActiveChanged: (active: boolean) => void;
 }
 
+// ── Live-stream coalescing ──
+// High-frequency alerts from live sessions are buffered and flushed at most
+// once per animation frame, so the store never re-renders the app per event.
+let alertBuffer: ResponsibilityAlert[] = [];
+let flushHandle: number | null = null;
+
+function flushAlertBuffer(get: () => AppStore, set: (partial: Partial<AppStore>) => void): void {
+  flushHandle = null;
+  if (alertBuffer.length === 0) return;
+  const batch = alertBuffer;
+  alertBuffer = [];
+  const state = get();
+  const existing = new Set(state.alerts.map((a) => a.alert_id));
+  const fresh = batch.filter((a) => !existing.has(a.alert_id));
+  if (fresh.length === 0) return;
+  set({ alerts: [...fresh, ...state.alerts].slice(0, 200) });
+  fresh.forEach((a) => state.engineRef.current?.showAlertPulse(a));
+}
+
 export const useAppStore = create<AppStore>((set, get) => ({
   appState: 'replay',
   activeRunId: null,
   zoomLevel: 0,
   selectedNodeId: null,
   expandedNodeIds: new Set(),
-  alerts: demoAlerts,
-  graph: demoGraph,
-  graphMetrics: deriveGraphMetrics(demoGraph),
+  alerts: [],
+  graph: { nodes: [], edges: [] },
+  graphMetrics: null,
   timelinePosition: 0,
+  investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
   errorMessage: null,
   engineRef: { current: null },
 
@@ -125,6 +155,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ expandedNodeIds: next });
   },
   setTimelinePosition: (pos) => set({ timelinePosition: pos }),
+  setInvestigationContext: (patch) => {
+    set({ investigationContext: mergeInvestigationContext(get().investigationContext, patch) });
+  },
+  focusAlert: (alert) => {
+    const investigationContext = buildInvestigationContextFromAlert(alert);
+    set({ investigationContext });
+    if (investigationContext.highlightedPathEdgeIds.length) {
+      get().engineRef.current?.highlightPath(investigationContext.highlightedPathEdgeIds);
+    }
+  },
   setError: (msg) => set({ errorMessage: msg }),
 
   // Engine bridge methods — require engineRef to be set by the React component.
@@ -140,15 +180,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ activeRunId: runId, appState: 'replay', errorMessage: null });
 
     try {
-      const [graph, alerts] = await Promise.all([
-        api.getGraph(runId),
-        api.getAlerts(runId),
-      ]);
+      const [graph, alerts] = await Promise.all([api.getGraph(runId), api.getAlerts(runId)]);
+
+      // Strip graph_snapshot from alerts
+      const leanAlerts = alerts.map(({ graph_snapshot, ...rest }: any) => rest);
 
       set({
         graph: { nodes: graph.nodes, edges: graph.edges },
         graphMetrics: deriveGraphMetrics({ nodes: graph.nodes, edges: graph.edges }),
-        alerts,
+        alerts: leanAlerts,
         selectedNodeId: null,
       });
     } catch (error) {
@@ -158,10 +198,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   onAlertReceived: (alert) => {
-    const existing = get().alerts.find((a) => a.alert_id === alert.alert_id);
-    if (existing) return;
-    set({ alerts: [alert, ...get().alerts].slice(0, 200) });
-    get().engineRef.current?.showAlertPulse(alert);
+    // Alerts are coalesced per animation frame; the graph snapshot below is
+    // applied immediately so the live network stays responsive.
+    alertBuffer.push(alert);
+    if (flushHandle == null) {
+      flushHandle =
+        typeof requestAnimationFrame === 'function'
+          ? (requestAnimationFrame(() => flushAlertBuffer(get, set)) as unknown as number)
+          : (setTimeout(() => flushAlertBuffer(get, set), 16) as unknown as number);
+    }
 
     // Extract graph_snapshot and update GraphRenderer (Live mode)
     if (alert.graph_snapshot?.nodes?.length) {
@@ -177,10 +222,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
           nodes: alert.graph_snapshot.nodes,
           edges: alert.graph_snapshot.edges || [],
         },
-        graphMetrics: alert.graph_snapshot.metrics ?? deriveGraphMetrics({
-          nodes: alert.graph_snapshot.nodes,
-          edges: alert.graph_snapshot.edges || [],
-        }),
+        graphMetrics:
+          alert.graph_snapshot.metrics ??
+          deriveGraphMetrics({
+            nodes: alert.graph_snapshot.nodes,
+            edges: alert.graph_snapshot.edges || [],
+          }),
       });
     }
   },
@@ -190,3 +237,70 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
   },
 }));
+
+// ── Data loader: API (live) → sample JSON → demo fixtures ──
+async function initData() {
+  try {
+    // Try runs list — works with both Rust backend and Python data server
+    const runs = await api.getRuns();
+    const runList = (runs as any)?.runs ?? runs ?? [];
+    if (runList.length > 0) {
+      // Find first run with data, preferring the latest
+      const firstWithData = runList.find((r: any) => r.has_data !== false) ?? runList[0];
+      const runId = firstWithData.run_id;
+      const [graphData, alertList] = await Promise.all([
+        api.getGraph(runId),
+        api.getAlerts(runId),
+      ]);
+      if (graphData.nodes?.length > 0) {
+        // Strip graph_snapshot from alerts to save memory (~800KB for 3 alerts)
+        const leanAlerts = alertList.map(({ graph_snapshot, ...rest }: any) => rest);
+        console.log(
+          `[MtAgentLens] API: ${graphData.nodes.length} nodes, ${graphData.edges.length} edges, ${leanAlerts.length} alerts (${runId})`
+        );
+        useAppStore.setState({
+          graph: graphData,
+          alerts: leanAlerts,
+          graphMetrics: deriveGraphMetrics(graphData),
+          activeRunId: runId,
+          appState: 'replay',
+        });
+        return;
+      }
+    }
+  } catch (err) {
+    console.log('[MtAgentLens] API unavailable, trying static data...');
+  }
+
+  // 3. Fall back to static JSON sample
+  try {
+    const data = await loadSampleData();
+    if (data) {
+      const leanAlerts = data.alerts.map(({ graph_snapshot, ...rest }: any) => rest);
+      console.log(
+        `[MtAgentLens] Sample data: ${data.graph.nodes.length} nodes, ${data.graph.edges.length} edges, ${leanAlerts.length} alerts`
+      );
+      useAppStore.setState({
+        graph: data.graph,
+        alerts: leanAlerts,
+        graphMetrics: data.metrics,
+      });
+      return;
+    }
+  } catch {
+    // ignore
+  }
+
+  // 4. Ultimate fallback — demo fixtures (silent, prevents infinite loading)
+  console.log('[MtAgentLens] Using demo fixtures.');
+  useAppStore.setState({
+    graph: demoGraph,
+    alerts: demoAlerts,
+    graphMetrics: deriveGraphMetrics(demoGraph),
+  });
+}
+
+// Only run on client — SSR would fail and block rendering
+if (typeof window !== 'undefined') {
+  initData();
+}

@@ -1,581 +1,309 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
+import { ArrowRight, CheckCircle2, Clock, FileSearch, GitBranch, ShieldAlert, TerminalSquare } from 'lucide-react';
+import { SectionPanel } from '@/components/ui/linear/section-panel';
+import { StatusBadge, type StatusTone } from '@/components/ui/linear/status-badge';
+import VirtualList from '@/components/ui/virtual-list';
 import type { ResponsibilityAlert } from '@/lib/types';
 import type { InvestigationModel } from '@/lib/investigation';
-import PrismButton from '@/components/ui/prism-button';
-import PrismPanel from '@/components/ui/prism-panel';
-import PrismStatCard from '@/components/ui/prism-stat-card';
-import ForensicTopologyAtlas from '@/components/ui/forensic-topology-atlas';
-import ObservatoryHeader from '@/components/system/observatory-header';
-import ObservatoryPageHero from '@/components/system/observatory-page-hero';
-import { buildClusterHref } from '@/lib/cluster-route';
-import { buildAgentHref } from '@/lib/agent-route';
-import { getSeverityPalette } from '@/lib/severity-palette';
-import { ArrowLeft, Clock3, FileSearch, ShieldAlert, Sparkles, GitBranch } from 'lucide-react';
 
-function formatTimelineOffset(timestampNs: number, startNs: number) {
-  const deltaMs = Math.max(0, Math.round((timestampNs - startNs) / 1_000_000));
-  if (deltaMs < 1000) return `T+${deltaMs}ms`;
-  return `T+${(deltaMs / 1000).toFixed(1)}s`;
-}
+const T = { xs: 9.5, sm: 10.5, md: 12, lg: 14, xl: 16 };
+const S = { xs: 2, sm: 4, md: 8, lg: 12, xl: 16 };
 
-function formatEvidenceMaterial(
-  matchedFields: {
-    canonical_path: string | null;
-    command: string | null;
-    host: string | null;
-    port: number | null;
-  },
-) {
-  if (matchedFields.canonical_path) return matchedFields.canonical_path;
-  if (matchedFields.command) return matchedFields.command;
-  if (matchedFields.host) return matchedFields.port ? `${matchedFields.host}:${matchedFields.port}` : matchedFields.host;
-  return 'No materialized field';
-}
+function fmtMs(ms: number) { return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`; }
+function sevTone(s: string): StatusTone { if (s === 'Critical') return 'danger'; if (s === 'Warning') return 'warning'; return 'info'; }
+function decisionTone(d: string): StatusTone { if (d === 'Unsafe') return 'danger'; if (d === 'Uncertain') return 'warning'; return 'success'; }
+function statusLabel(d: string) { if (d === 'Unsafe') return '需处置'; if (d === 'Uncertain') return '待复核'; return '已受控'; }
 
-export interface InvestigationWorkbenchProps {
-  alert: ResponsibilityAlert | null;
-  model: InvestigationModel | null;
-  activeRunId: string | null;
-  availableAlerts: ResponsibilityAlert[];
-  onSelectAlert: (alertId: string) => void;
-  evidenceLoading: boolean;
-  evidenceError: string | null;
-}
+const sevColor: Record<string, string> = { Critical: '#f87171', Warning: '#fbbf24', Info: '#60a5fa' };
+const sevBg: Record<string, string> = { Critical: 'rgba(248,113,113,0.10)', Warning: 'rgba(251,191,36,0.08)', Info: 'rgba(96,165,250,0.06)' };
+const evKindIcons: Record<string, typeof FileSearch> = {
+  role: ShieldAlert, delegation: GitBranch, boundary: ShieldAlert,
+  file: FileSearch, exec: TerminalSquare, default: Clock,
+};
 
-export default function InvestigationWorkbench({
-  alert,
-  model,
-  activeRunId,
-  availableAlerts,
-  onSelectAlert,
-  evidenceLoading,
-  evidenceError,
-}: InvestigationWorkbenchProps) {
-  if (!alert || !model) {
-    return (
-      <div
-        className="investigation-empty-shell"
-        style={{
-          minHeight: '100vh',
-          background: 'var(--investigation-stage-bg)',
-          color: 'var(--text-primary)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 32,
-        }}
-      >
-        <PrismPanel className="investigation-hero-panel" size="hero" shimmer style={{ width: 'min(560px, 100%)' }}>
-          <div className="investigation-empty-shell__eyebrow">
-            Investigation
-          </div>
-          <h1 className="investigation-empty-shell__title">当前没有可打开的风险事件</h1>
-          <p className="investigation-empty-shell__copy">
-            首页或实时态势接入真实观测会话后，这里会承接风险事件调查。现在你也可以先回到首页，加载示例场景验证责任链、时间线和证据链。
-          </p>
-          <Link href="/" style={{ marginTop: 20, display: 'inline-flex', textDecoration: 'none' }}>
-            <PrismButton variant="secondary" size="md">
-              <ArrowLeft size={14} />
-              返回首页
-            </PrismButton>
-          </Link>
-        </PrismPanel>
-      </div>
-    );
-  }
+interface Props { alert: ResponsibilityAlert; model: InvestigationModel; activeRunId: string | null; availableAlerts: ResponsibilityAlert[]; onSelectAlert: (id: string) => void; evidenceLoading: boolean; evidenceError: string | null; }
 
-  const tone = getSeverityPalette(alert.severity).color;
-  const timelineStartNs = model.timelineSteps[0]?.timestamp_ns ?? alert.timestamp_ns;
-  const leadEvidenceMaterial = model.linkedEvidence[0]
-    ? formatEvidenceMaterial(model.linkedEvidence[0].matched_fields)
-    : '证据链已建立，等待进一步展开物化字段';
-  const incidentSpatialCues = [
-    {
-      label: 'Authority Vector',
-      value: `${model.authority} -> ${alert.decision}`,
-      hint: '把声称的 authority 与最终决策拉成一条可以被回放的责任向量。',
-    },
-    {
-      label: 'Evidence Arc',
-      value: `${model.linkedEvidence.length} linked material`,
-      hint: `首个可物化对象是 ${leadEvidenceMaterial}，后续线索沿时间轴持续展开。`,
-    },
-    {
-      label: 'Fracture Window',
-      value: `${model.timelineSteps.length} scene steps`,
-      hint: '每一步都不是普通日志，而是可以推进镜头和归因判断的案卷节点。',
-    },
+export default function InvestigationWorkbench({ alert, model, availableAlerts, onSelectAlert }: Props) {
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const evidenceRef = useRef<HTMLDivElement>(null);
+
+  // GSAP entrance: timeline + evidence + verdict staggered
+  useGSAP(() => {
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    if (timelineRef.current) {
+      tl.fromTo('.tl-row', { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.4, stagger: 0.05, clearProps: 'transform' }, 0.1);
+    }
+    if (evidenceRef.current) {
+      tl.fromTo('.ev-card', { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.4, stagger: 0.06, clearProps: 'transform' }, 0.3);
+    }
+    tl.fromTo('.verdict-panel > *', { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.35, stagger: 0.06, clearProps: 'transform' }, 0.4);
+  }, { scope: timelineRef });
+
+  const kpi = [
+    { label: '时间线事件', value: model.timelineSteps.length, delta: `${model.boundaryCrossingCount} 边界穿越`, tone: 'info' as StatusTone },
+    { label: '证据链', value: model.evidenceRefs.length, delta: `${model.linkedEvidence.length} 关联`, tone: 'success' as StatusTone },
+    { label: '置信度', value: `${(alert.confidence * 100).toFixed(0)}%`, delta: alert.authority, tone: sevTone(alert.severity) },
+    { label: '涉及主体', value: model.involvedAgentIds.length, delta: model.primaryAgentId ?? '—', tone: 'info' as StatusTone },
   ];
 
   return (
-    <div
-      className="investigation-shell prism-grid-surface"
-    >
-      <div className="prism-scanline investigation-scanline" />
-
-      <div className="investigation-header-shell">
-        <ObservatoryHeader
-          eyebrow="Case Theatre"
-          title="把风险事件压成一张可以直接定责的法证舞台"
-          description="调查页不再只是信息汇总，它把 causality chain、timeline cadence、evidence voltage 与 verdict 收束成同一条可辩护的判断路径。"
-          activeSection="investigations"
-          backHref="/"
-          backLabel="返回首页"
-          sticky
-          stats={[
-            activeRunId ? `观测会话 ${activeRunId.slice(0, 12)}...` : '示例场景',
-            `${model.timelineSteps.length} Steps`,
-            `${model.linkedEvidence.length} Evidence`,
-          ]}
-        />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: S.lg }}>
+      {/* KPI row */}
+      <div className="ln-kpi-strip">
+        {kpi.map(i => (
+          <div key={i.label} className="ln-panel ln-metric">
+            <span className="ln-metric__label">{i.label}</span>
+            <strong className="ln-metric__value" style={{ fontSize: 20 }}>{i.value}</strong>
+            <span className="ln-metric__delta" data-tone={i.tone}>{i.delta}</span>
+          </div>
+        ))}
       </div>
 
-      <div className="px-4 pb-4 sm:px-6 lg:px-8">
-        <ObservatoryPageHero
-          eyebrow="Case Command Deck"
-          title={`先定责 ${alert.title}，再展开完整法证舞台`}
-          description="参考 OpenSearch Security Analytics 的 finding workflow 与 SigNoz 的逐层下钻方式，把案件结论、关键证据、主要主体与下一步动作压缩成一条更强的调查入口。"
-          statusLabel={alert.severity === 'Critical' ? 'critical case live' : 'forensic review active'}
-          chips={[
-            `${model.timelineSteps.length} timeline steps`,
-            `${model.evidenceRefs.length} evidence refs`,
-            `${model.boundaryCrossingCount} boundary crossings`,
-          ]}
-          stats={[
-            {
-              label: 'Decision',
-              value: alert.decision,
-              hint: '先确认结论，再回看谁把边界推开',
-            },
-            {
-              label: 'Primary Agent',
-              value: model.primaryAgentId ?? 'awaiting anchor',
-              hint: '当前案件最关键的责任主体',
-            },
-            {
-              label: 'Confidence',
-              value: alert.confidence.toFixed(2),
-              hint: '证据链对结论的支撑强度',
-            },
-          ]}
-          actions={[
-            {
-              label: '查看所属 Cluster',
-              href: buildClusterHref(model.parentClusterId),
-              hint: '把案件放回集群扩散压力场',
-            },
-            {
-              label: '查看 Agent Cockpit',
-              href: model.primaryAgentId ? buildAgentHref(model.primaryAgentId) : '/agents',
-              hint: '继续下钻主体画像与资源暴露面',
-            },
-          ]}
-        />
-      </div>
-
-      <div className="investigation-page-shell">
-        <PrismPanel className="investigation-hero-panel" size="hero" grid shimmer>
-            <div className="investigation-hero-main">
-              <div className="investigation-hero-lead">
-                <div className="investigation-signal-pill" style={{ ['--investigation-tone' as any]: tone, color: tone }}>
-                  <ShieldAlert size={14} />
-                  {alert.severity} Case Signal
+      {/* main layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr) 320px', gap: S.lg, alignItems: 'start' }}>
+        {/* ── LEFT: SentinelOne-style alert list ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: S.sm, position: 'sticky', top: 44 }}>
+          <span className="ln-eyebrow">告警队列</span>
+          {availableAlerts.map((a, i) => {
+            const active = a.alert_id === alert.alert_id;
+            const sc = sevColor[a.severity] ?? sevColor.Info;
+            const sb = sevBg[a.severity] ?? sevBg.Info;
+            return (
+              <button key={a.alert_id} className="alert-list-btn" onClick={() => onSelectAlert(a.alert_id)} style={{
+                display: 'flex', flexDirection: 'column', gap: 3, width: '100%', textAlign: 'left',
+                padding: '10px 12px', borderRadius: 7, cursor: 'pointer',
+                border: active ? `1px solid var(--ln-accent)` : `1px solid var(--ln-border)`,
+                borderLeft: `3px solid ${active ? 'var(--ln-accent)' : sc}`,
+                background: active ? 'var(--ln-accent-soft)' : 'transparent',
+                transition: 'all 120ms ease',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: T.sm, fontWeight: 600, color: active ? 'var(--ln-text)' : 'var(--ln-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{a.title}</span>
+                  <StatusBadge tone={sevTone(a.severity)}>{a.severity}</StatusBadge>
                 </div>
-              <h2 className="investigation-hero-title prism-display--hero">
-                  {alert.title}
-                </h2>
-                <p className="investigation-hero-copy">
-                  {alert.summary} 这一层的目标不是让你阅读更多记录，而是让你更快确认谁触发了跨越、哪一步让责任发生了偏移、哪一份证据足以托住结论。
-                </p>
-
-                <div className="investigation-case-strip">
-                  {[
-                    {
-                      label: 'Claimed Authority',
-                      value: model.authority,
-                      hint: '先确认谁声称自己有权做出这一步决策。',
-                    },
-                    {
-                      label: 'Observed Action',
-                      value: alert.decision,
-                      hint: alert.action_hint || '把决策与实际行为绑定到同一个调查现场。',
-                    },
-                    {
-                      label: 'First Materialized Evidence',
-                      value: leadEvidenceMaterial,
-                      hint: '结论必须被真实文件、命令或网络目标托住。',
-                    },
-                  ].map((item, index) => (
-                    <div
-                      key={item.label}
-                      className="investigation-record-chip"
-                      data-tone={index === 0 ? 'accent' : 'neutral'}
-                      style={index === 0 ? { ['--investigation-tone' as any]: tone } : undefined}
-                    >
-                      <div className="investigation-record-chip__label">
-                        {item.label}
-                      </div>
-                      <div className="investigation-record-chip__value">
-                        {item.value}
-                      </div>
-                      <div className="investigation-record-chip__hint">
-                        {item.hint}
-                      </div>
-                    </div>
-                  ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: T.xs, color: 'var(--ln-text-muted)' }}>
+                  <span style={{ fontFamily: 'var(--ln-mono)' }}>{a.primary_agent.agent_id}</span>
+                  <StatusBadge tone={decisionTone(a.decision)}>{statusLabel(a.decision)}</StatusBadge>
                 </div>
+              </button>
+            );
+          })}
+        </div>
 
-                  <div className="investigation-spatial-grid">
-                    {incidentSpatialCues.map((item, index) => (
-                      <div
-                        key={item.label}
-                        className="investigation-spatial-card"
-                        data-tone={index === 0 ? 'accent' : index === 1 ? 'violet' : 'amber'}
-                        style={index === 0 ? { ['--investigation-tone' as any]: tone } : undefined}
-                      >
-                        <div className="investigation-spatial-card__glow" />
-                        <div className="investigation-spatial-card__content">
-                          <div className="investigation-spatial-card__label">
-                            {item.label}
+        {/* ── CENTER: Datadog-style timeline + evidence ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: S.lg }}>
+          {/* timeline — premium visual design */}
+          <SectionPanel eyebrow="事件时间线" title={`${model.timelineSteps.length} 步`} meta={model.timelineSteps.length > 0 ? fmtMs(Math.max(0, (model.timelineSteps[model.timelineSteps.length - 1].timestamp_ns - model.timelineSteps[0].timestamp_ns) / 1_000_000)) : undefined} bodyClassName="ln-panel-body">
+            <div ref={timelineRef}>
+              {model.timelineSteps.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--ln-text-muted)', fontSize: T.sm }}>暂无时间线数据</div>
+              ) : (
+                <div style={{ height: 420, paddingRight: 4 }}>
+                  <VirtualList
+                    items={model.timelineSteps}
+                    estimateSize={72}
+                    dynamic
+                    renderRow={(step, i) => {
+                    const offset = i === 0 ? 0 : Math.max(0, Math.round((step.timestamp_ns - model.timelineSteps[0].timestamp_ns) / 1_000_000));
+                    const isLast = i === model.timelineSteps.length - 1;
+                    const evType = step.event_type?.toLowerCase() ?? '';
+                    const sc = sevColor[step.evidence_level === 'L1Exact' ? 'Critical' : 'Info'] ?? '#60a5fa';
+                    const Icon = Object.entries(evKindIcons).find(([k]) => evType.includes(k))?.[1] ?? evKindIcons.default;
+                    return (
+                      <div key={i} className="tl-row" style={{ display: 'flex', gap: 0, position: 'relative', minHeight: 56 }}>
+                        {/* timeline axis */}
+                        <div style={{ width: 64, minWidth: 64, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', paddingTop: 12 }}>
+                          <span style={{ fontSize: 10, fontFamily: 'var(--ln-mono)', color: 'var(--ln-text-muted)', lineHeight: 1, background: 'var(--ln-surface-0)', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--ln-border)' }}>T+{fmtMs(offset)}</span>
+                          {/* glowing dot */}
+                          <div style={{
+                            width: 8, height: 8, borderRadius: 999, background: sc,
+                            boxShadow: `0 0 8px ${sc}60`, marginTop: 8, flexShrink: 0,
+                            transition: 'box-shadow 200ms ease',
+                          }} />
+                          {!isLast && (
+                            <div style={{
+                              flex: 1, width: 1.5, minHeight: 16,
+                              background: `linear-gradient(180deg, ${sc}40, var(--ln-border))`,
+                            }} />
+                          )}
+                        </div>
+                        {/* event card */}
+                        <div style={{
+                          flex: 1, padding: '10px 14px', marginBottom: S.xs, marginLeft: S.sm,
+                          borderRadius: 8, background: 'var(--ln-surface-0)',
+                          border: '1px solid var(--ln-border)',
+                          transition: 'border-color 150ms ease, box-shadow 150ms ease',
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = sc + '50'; e.currentTarget.style.boxShadow = `0 2px 12px ${sc}14`; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--ln-border)'; e.currentTarget.style.boxShadow = 'none'; }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <Icon size={13} style={{ color: sc, flexShrink: 0 }} />
+                            <span style={{ fontSize: T.sm, fontWeight: 600, color: 'var(--ln-text)' }}>{step.event_type}</span>
+                            <div style={{ display: 'flex', gap: 4, marginLeft: 'auto', flexShrink: 0 }}>
+                              {step.evidence_ref && <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(74,222,128,0.12)', color: '#4ade80', fontFamily: 'var(--ln-mono)' }}>{step.evidence_ref.slice(0, 14)}</span>}
+                              {step.evidence_level === 'L1Exact' && <span style={{ fontSize: 9, padding: '2px 5px', borderRadius: 4, background: 'var(--ln-accent-soft)', color: 'var(--ln-accent)', fontFamily: 'var(--ln-mono)', fontWeight: 600 }}>L1</span>}
+                            </div>
                           </div>
-                          <div className="investigation-spatial-card__value prism-display">
-                            {item.value}
+                          <div style={{ fontSize: T.sm, color: 'var(--ln-text-secondary)', lineHeight: 1.6 }}>{step.description}</div>
+                          {step.resource && <div style={{ fontSize: 10, color: 'var(--ln-text-muted)', fontFamily: 'var(--ln-mono)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{step.resource}</div>}
+                        </div>
+                      </div>
+                    );
+                  }}
+                  />
+                </div>
+              )}
+            </div>
+          </SectionPanel>
+
+          {/* evidence chain — premium cards */}
+          <SectionPanel eyebrow="证据链" title={`${model.linkedEvidence.length} 条`} bodyClassName="ln-panel-body">
+            <div ref={evidenceRef}>
+              {model.linkedEvidence.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--ln-text-muted)', fontSize: T.sm }}>暂无关联证据</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0, maxHeight: 400, overflowY: 'auto', position: 'relative' }}>
+                  {model.linkedEvidence.slice(0, 12).map((ev, idx) => {
+                    const confPct = Math.round(ev.confidence * 100);
+                    const confColor = ev.confidence > 0.8 ? '#4ade80' : ev.confidence > 0.5 ? '#fbbf24' : '#f87171';
+                    const isLast = idx === Math.min(model.linkedEvidence.length, 12) - 1;
+                    return (
+                      <div key={ev.evidence_id} className="ev-card" style={{ display: 'flex', gap: 0, position: 'relative' }}>
+                        {/* exhibit number + connector */}
+                        <div style={{ width: 40, minWidth: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 14 }}>
+                          <span style={{
+                            width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: `${confColor}18`, border: `1.5px solid ${confColor}40`,
+                            fontSize: 10, fontWeight: 700, fontFamily: 'var(--ln-mono)', color: confColor,
+                          }}>{idx + 1}</span>
+                          {!isLast && (
+                            <div style={{
+                              flex: 1, width: 1.5, minHeight: 12,
+                              background: `linear-gradient(180deg, ${confColor}30, var(--ln-border))`,
+                            }} />
+                          )}
+                        </div>
+                        {/* card */}
+                        <div style={{
+                          flex: 1, padding: '10px 14px', marginBottom: 2,
+                          borderRadius: 8, background: 'var(--ln-surface-0)', border: '1px solid var(--ln-border)',
+                          transition: 'border-color 150ms ease, box-shadow 150ms ease',
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = confColor + '50'; e.currentTarget.style.boxShadow = `0 0 16px ${confColor}10`; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--ln-border)'; e.currentTarget.style.boxShadow = 'none'; }}>
+                          {/* header */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                            <span style={{ fontSize: 11, fontFamily: 'var(--ln-mono)', color: 'var(--ln-accent)', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.evidence_id}</span>
+                            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                              <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: `${confColor}16`, color: confColor, fontWeight: 600, fontFamily: 'var(--ln-mono)' }}>{confPct}%</span>
+                              <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'var(--ln-surface-2)', color: 'var(--ln-text-muted)', fontFamily: 'var(--ln-mono)' }}>{ev.match_level}</span>
+                            </div>
                           </div>
-                          <div className="investigation-spatial-card__hint">
-                            {item.hint}
+                          {/* confidence bar */}
+                          <div style={{ height: 3, borderRadius: 999, background: 'var(--ln-surface-2)', marginBottom: 8, overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%', width: `${confPct}%`, borderRadius: 999,
+                              background: `linear-gradient(90deg, ${confColor}88, ${confColor})`,
+                              transition: 'width 300ms ease',
+                            }} />
+                          </div>
+                          {/* material — structured key:value rows */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            {ev.matched_fields.canonical_path && (
+                              <div style={{ display: 'flex', gap: 6, fontSize: 10, overflow: 'hidden' }}>
+                                <span style={{ color: '#4ade80', flexShrink: 0, fontWeight: 600, fontFamily: 'var(--ln-mono)', width: 36 }}>path</span>
+                                <span style={{ color: 'var(--ln-text-secondary)', fontFamily: 'var(--ln-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.matched_fields.canonical_path}</span>
+                              </div>
+                            )}
+                            {ev.matched_fields.command && (
+                              <div style={{ display: 'flex', gap: 6, fontSize: 10, overflow: 'hidden' }}>
+                                <span style={{ color: '#60a5fa', flexShrink: 0, fontWeight: 600, fontFamily: 'var(--ln-mono)', width: 36 }}>cmd</span>
+                                <span style={{ color: 'var(--ln-text-secondary)', fontFamily: 'var(--ln-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.matched_fields.command}</span>
+                              </div>
+                            )}
+                            {ev.matched_fields.host && (
+                              <div style={{ display: 'flex', gap: 6, fontSize: 10, overflow: 'hidden' }}>
+                                <span style={{ color: '#a78bfa', flexShrink: 0, fontWeight: 600, fontFamily: 'var(--ln-mono)', width: 36 }}>host</span>
+                                <span style={{ color: 'var(--ln-text-secondary)', fontFamily: 'var(--ln-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.matched_fields.host}{ev.matched_fields.port ? `:${ev.matched_fields.port}` : ''}</span>
+                              </div>
+                            )}
+                            {ev.matched_fields.raw_args?.length ? (
+                              <div style={{ display: 'flex', gap: 6, fontSize: 10, overflow: 'hidden' }}>
+                                <span style={{ color: '#fb923c', flexShrink: 0, fontWeight: 600, fontFamily: 'var(--ln-mono)', width: 36 }}>args</span>
+                                <span style={{ color: 'var(--ln-text-secondary)', fontFamily: 'var(--ln-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.matched_fields.raw_args.join(' ')}</span>
+                              </div>
+                            ) : null}
+                            {!ev.matched_fields.canonical_path && !ev.matched_fields.command && !ev.matched_fields.host && !ev.matched_fields.raw_args?.length && (
+                              <span style={{ fontSize: 10, color: 'var(--ln-text-muted)', fontFamily: 'var(--ln-mono)' }}>{ev.evidence_id}</span>
+                            )}
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-              </div>
-
-              <ForensicTopologyAtlas
-                model={model}
-                tone={tone}
-                leadEvidenceMaterial={leadEvidenceMaterial}
-              />
-
-              <div className="investigation-hero-stats">
-                {[
-                  ['决策', alert.decision],
-                  ['可信度', alert.confidence.toFixed(2)],
-                  ['边界穿越', `${model.boundaryCrossingCount}`],
-                  ['证据引用', `${model.evidenceRefs.length}`],
-                ].map(([label, value]) => (
-                  <PrismStatCard
-                    key={label}
-                    label={label}
-                    value={value}
-                    toneColor={label === '边界穿越' ? tone : undefined}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="investigation-hero-followups">
-              <div className="investigation-inline-note">
-                <div className="investigation-inline-note__label">Case Narrative</div>
-                <div className="investigation-inline-note__copy">
-                  {alert.reasoning || '当前事件已经具备完整的委派、执行与证据链，可直接进入归因调查。'}
-                </div>
-              </div>
-
-              <div className="investigation-inline-note">
-                <div className="investigation-inline-note__label">Next Action</div>
-                <div className="investigation-inline-note__copy">
-                  {alert.action_hint || '优先核验主体身份绑定，再检查委派路径与边界策略是否被错误放宽。'}
-                </div>
-              </div>
-
-              <div className="investigation-inline-note">
-                <div className="investigation-inline-note__label">Narrative Bridge</div>
-                <div className="investigation-inline-note__copy">
-                  调查页负责把单个风险事件定责；如果你需要继续确认它是否扩散成委托拓扑级问题，就进入 handoff 工作台看 fanout、boundary 与 orphaned artifacts。
-                </div>
-                  <div className="investigation-bridge-actions">
-                    <Link href="/handoff" style={{ textDecoration: 'none' }}>
-                      <PrismButton variant="secondary" size="sm">
-                        <GitBranch size={13} />
-                      查看 Handoff
-                    </PrismButton>
-                  </Link>
-                  <Link href="/" aria-label="返回主舞台" style={{ textDecoration: 'none' }}>
-                    <PrismButton variant="ghost" size="sm">
-                      <ArrowLeft size={13} />
-                      返回主舞台
-                    </PrismButton>
-                  </Link>
-                </div>
-              </div>
-            </div>
-        </PrismPanel>
-
-        <div className="investigation-grid">
-            <aside className="investigation-sticky-column">
-              <PrismPanel className="investigation-section-panel" size="lg" grid shimmer>
-                <div className="investigation-section-label">
-                  Event Summary
-                </div>
-                <div className="investigation-summary-grid">
-                  <div>
-                    <div className="investigation-summary-label">Primary Agent</div>
-                    <div className="investigation-summary-value">
-                      {model.primaryAgentId ? (
-                        <Link href={buildAgentHref(model.primaryAgentId)} style={{ color: 'inherit', textDecoration: 'none' }}>
-                          {model.primaryAgentId}
-                        </Link>
-                      ) : (
-                        'N/A'
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="investigation-summary-label">Authority</div>
-                    <div className="investigation-summary-value">{model.authority}</div>
-                  </div>
-                  <div>
-                    <div className="investigation-summary-label">Timeline Window</div>
-                    <div className="investigation-summary-value">{model.timelineDurationMs}ms</div>
-                  </div>
-                  <div>
-                    <div className="investigation-summary-label">Participants</div>
-                    <div className="investigation-chip-stack">
-                      {model.involvedAgentIds.map((agentId) => (
-                        <Link
-                          key={agentId}
-                          href={buildAgentHref(agentId)}
-                          className="investigation-chip-link"
-                        >
-                          {agentId}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </PrismPanel>
-
-              <PrismPanel className="investigation-section-panel" size="lg" grid shimmer>
-                <div className="investigation-section-label">
-                  More Risk Events
-                </div>
-                <div className="investigation-event-list investigation-event-list--stack">
-                  {availableAlerts.slice(0, 5).map((item) => {
-                    const selected = item.alert_id === alert.alert_id;
-                    return (
-                      <PrismButton
-                        key={item.alert_id}
-                        onClick={() => onSelectAlert(item.alert_id)}
-                        className="investigation-event-button"
-                        data-selected={selected}
-                        variant="ghost"
-                      >
-                        <div className="investigation-event-button__title">{item.title}</div>
-                        <div className="investigation-event-button__copy">{item.summary}</div>
-                      </PrismButton>
                     );
                   })}
                 </div>
-              </PrismPanel>
-            </aside>
+              )}
+            </div>
+          </SectionPanel>
+        </div>
 
-            <main className="investigation-main-column">
-              <PrismPanel className="investigation-section-panel" size="lg" grid shimmer>
-                <div className="investigation-section-kicker">
-                  <Sparkles size={16} color="rgba(147, 197, 253, 0.92)" />
-                  <div className="investigation-section-label">
-                    Responsibility Chain
-                  </div>
-                </div>
-                <div className="investigation-chain-list">
-                  {model.pathEdges.map((edge) => (
-                    <div
-                      key={edge.edge_id}
-                      className="investigation-chain-card"
-                    >
-                      <div className="investigation-chain-card__label">
-                        {edge.edge_type}
-                      </div>
-                      <div className="investigation-chain-card__title">
-                        {`${edge.source} -> ${edge.target}`}
-                      </div>
-                      <div className="investigation-chain-card__meta">
-                        Confidence {edge.confidence.toFixed(2)} · Evidence {(edge.evidence_refs ?? []).length}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="investigation-node-chip-row">
-                  {model.pathNodes.map((node) => (
-                    <span
-                      key={node.nodeId}
-                      className="investigation-node-chip"
-                    >
-                      {node.label}
-                    </span>
-                  ))}
-                </div>
-                <div className="investigation-chain-stats">
-                  {[
-                    ['链路边', `${model.pathEdges.length}`],
-                    ['涉及节点', `${model.pathNodes.length}`],
-                    ['参与主体', `${model.involvedAgentIds.length}`],
-                  ].map(([label, value]) => (
-                    <PrismStatCard
-                      key={label}
-                      label={label}
-                      value={value}
-                    />
-                  ))}
-                </div>
-                {model.primaryAgentId ? (
-                  <div className="investigation-action-row">
-                    <Link href={buildClusterHref(model.parentClusterId)} style={{ textDecoration: 'none' }}>
-                      <PrismButton variant="secondary" size="sm">查看所属 Cluster</PrismButton>
-                    </Link>
-                    <Link href={buildAgentHref(model.primaryAgentId)} style={{ textDecoration: 'none' }}>
-                      <PrismButton variant="ghost" size="sm">查看 Agent Cockpit</PrismButton>
-                    </Link>
-                  </div>
-                ) : null}
-              </PrismPanel>
+        {/* ── RIGHT: Verdict + reasoning + actions ── */}
+        <div className="verdict-panel" style={{ display: 'flex', flexDirection: 'column', gap: S.lg, position: 'sticky', top: 44 }}>
+          {/* verdict */}
+          <SectionPanel eyebrow="判决" title={alert.decision} meta={alert.authority} bodyClassName="ln-panel-body">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: S.md }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <StatusBadge tone={sevTone(alert.severity)}>{alert.severity}</StatusBadge>
+                <StatusBadge tone={decisionTone(alert.decision)}>{statusLabel(alert.decision)}</StatusBadge>
+              </div>
 
-              <PrismPanel className="investigation-section-panel" size="lg" grid shimmer>
-                <div className="investigation-section-kicker">
-                  <Clock3 size={16} color="rgba(147, 197, 253, 0.92)" />
-                  <div className="investigation-section-label">
-                    Investigation Timeline · {model.timelineDurationMs}ms
-                  </div>
-                </div>
-                <div className="investigation-timeline">
-                  {model.timelineSteps.map((step, index) => (
-                    <div key={`${step.timestamp_ns}-${index}`} className="investigation-timeline__step" data-tone={step.operation === 'FileRead' ? 'info' : step.operation === 'Delegation' ? 'violet' : 'danger'}>
-                      <div className="investigation-timeline__dot" />
-                      <div className="investigation-timeline__head">
-                        <div className="investigation-timeline__time">
-                          {formatTimelineOffset(step.timestamp_ns, timelineStartNs)}
-                        </div>
-                        <span className="investigation-timeline__tag">
-                          {step.event_type}
-                        </span>
-                      </div>
-                      <div className="investigation-timeline__copy">{step.description}</div>
-                      <div className="investigation-timeline__meta">
-                        {step.resource ? <span>{step.resource}</span> : null}
-                        {step.evidence_ref ? <span>Evidence {step.evidence_ref}</span> : null}
-                        {step.agent_id ? <span>{step.agent_id}</span> : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </PrismPanel>
-            </main>
+              {/* summary */}
+              <div style={{ fontSize: T.sm, color: 'var(--ln-text-secondary)', lineHeight: 1.65, padding: S.md, borderRadius: 7, background: 'var(--ln-surface-0)', border: '1px solid var(--ln-border)' }}>
+                {alert.summary}
+              </div>
 
-            <aside className="investigation-sticky-column investigation-sticky-column--right">
-              <PrismPanel className="investigation-section-panel" size="lg" grid shimmer>
-                <div className="investigation-section-kicker">
-                  <FileSearch size={16} color="rgba(147, 197, 253, 0.92)" />
-                  <div className="investigation-section-label">
-                    Evidence Chain
-                  </div>
+              {/* reasoning */}
+              {alert.reasoning && (
+                <div style={{ padding: S.md, borderRadius: 7, background: 'rgba(94,106,210,0.05)', border: '1px solid rgba(94,106,210,0.14)' }}>
+                  <div style={{ fontSize: T.xs, fontWeight: 600, color: 'var(--ln-accent)', marginBottom: 4, letterSpacing: '0.03em', textTransform: 'uppercase' }}>AI 推理</div>
+                  <div style={{ fontSize: T.xs, color: 'var(--ln-text-secondary)', lineHeight: 1.6 }}>{alert.reasoning}</div>
                 </div>
-                <div className="investigation-section-copy">
-                  直接呈现当前事件命中的原始物料，优先把路径、命令与网络目标收拢到同一个证据侧栏。
+              )}
+
+              {/* action hint */}
+              {alert.action_hint && (
+                <div style={{ padding: S.md, borderRadius: 7, background: 'rgba(248,113,113,0.05)', border: '1px solid rgba(248,113,113,0.15)' }}>
+                  <div style={{ fontSize: T.xs, fontWeight: 600, color: '#f87171', marginBottom: 4, letterSpacing: '0.03em', textTransform: 'uppercase' }}>建议处置</div>
+                  <div style={{ fontSize: T.sm, color: 'var(--ln-text-secondary)', lineHeight: 1.55 }}>{alert.action_hint}</div>
                 </div>
-                {evidenceLoading ? (
-                  <div className="investigation-section-state">正在加载证据链...</div>
-                ) : evidenceError ? (
-                  <div className="investigation-section-state investigation-section-state--error">{evidenceError}</div>
-                ) : model.linkedEvidence.length > 0 ? (
-                  <div className="prism-premium-scroll investigation-evidence-list investigation-evidence-list--scroll">
-                    {model.linkedEvidence.map((item) => (
-                      <article
-                        key={item.evidence_id}
-                        className="investigation-evidence-card"
-                      >
-                        <div className="investigation-evidence-card__head">
-                          <div className="investigation-evidence-card__title">{`${alert.alert_id} / ${item.evidence_id}`}</div>
-                          <div className="investigation-evidence-card__badge">
-                            {item.match_level}
-                          </div>
-                        </div>
-                        <div className="investigation-evidence-card__copy">
-                          {formatEvidenceMaterial(item.matched_fields)}
-                        </div>
-                        <div className="investigation-evidence-card__meta">
-                          Confidence {item.confidence.toFixed(2)} · {item.derivation_mode}
-                        </div>
-                        <div className="investigation-evidence-card__meta">
-                          {item.matched_fields.command || item.intent_id}
-                        </div>
-                        <div className="investigation-chip-stack">
-                          {[item.action_id, item.intent_id].map((value) => (
-                            <span key={value} className="investigation-tag-chip">
-                              {value}
-                            </span>
-                          ))}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="investigation-section-state">
-                    当前会话还没有单独返回证据详情，先使用风险事件中内联的证据引用完成首轮调查。
-                  </div>
-                )}
-              </PrismPanel>
+              )}
+            </div>
+          </SectionPanel>
 
-              <PrismPanel className="investigation-section-panel" size="lg" grid shimmer>
-                <div className="investigation-section-label">
-                  Rule & Verdict
-                </div>
-                <div className="investigation-verdict-stack">
-                  <div className="investigation-verdict-grid">
-                    <PrismStatCard label="Rules" value={model.ruleCount} />
-                    <PrismStatCard label="Patterns" value={model.patternCount} />
-                  </div>
+          {/* agent info */}
+          <SectionPanel eyebrow="主体信息" title={alert.primary_agent.agent_id} bodyClassName="ln-panel-body">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: S.md }}>
+              <div><span className="ln-panel__meta">角色</span><div style={{ fontSize: T.sm, color: 'var(--ln-text)' }}>{alert.primary_agent.claimed_role ?? '—'}</div></div>
+              <div><span className="ln-panel__meta">权限</span><div style={{ fontSize: T.sm, color: 'var(--ln-text)' }}>{alert.authority}</div></div>
+              <div><span className="ln-panel__meta">关联主体</span><div style={{ fontSize: T.sm, color: 'var(--ln-text)', fontFamily: 'var(--ln-mono)' }}>{model.involvedAgentIds.length}</div></div>
+              <div><span className="ln-panel__meta">边界穿越</span><div style={{ fontSize: T.sm, color: 'var(--ln-text)', fontFamily: 'var(--ln-mono)' }}>{model.boundaryCrossingCount}</div></div>
+            </div>
+          </SectionPanel>
 
-                  {alert.engine.rule_verdicts.map((rule) => (
-                    <article
-                      key={rule.rule_id}
-                      className="investigation-verdict-card"
-                    >
-                      <div className="investigation-verdict-card__title">{rule.rule_id}</div>
-                      <div className="investigation-verdict-card__copy">
-                        {rule.description}
-                      </div>
-                      <div className="investigation-verdict-card__meta">
-                        {rule.matched_resource}
-                      </div>
-                    </article>
-                  ))}
-
-                  {alert.engine.pattern_verdicts.map((pattern) => (
-                    <article
-                      key={pattern.template_id}
-                      className="investigation-verdict-card"
-                    >
-                      <div className="investigation-verdict-card__title">{pattern.template_id}</div>
-                      <div className="investigation-verdict-card__copy">
-                        Match confidence {pattern.match_confidence.toFixed(2)}
-                      </div>
-                    </article>
-                  ))}
-
-                  <div className="investigation-verdict-card">
-                    <div className="investigation-verdict-card__label">行动建议</div>
-                    <div className="investigation-verdict-card__copy">
-                      {alert.action_hint || alert.reasoning}
-                    </div>
-                  </div>
-                </div>
-              </PrismPanel>
-            </aside>
-          </div>
+          {/* actions */}
+          <SectionPanel eyebrow="操作" title="后续步骤" bodyClassName="ln-panel-body">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <Link href="/traces" className="ln-btn" style={{ justifyContent: 'space-between', textDecoration: 'none' }}>追踪完整链路<ArrowRight size={13} /></Link>
+              <Link href="/overview" className="ln-btn" style={{ justifyContent: 'space-between', textDecoration: 'none' }}>返回仪表盘<ArrowRight size={13} /></Link>
+            </div>
+          </SectionPanel>
+        </div>
       </div>
-
     </div>
   );
 }

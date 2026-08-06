@@ -101,6 +101,8 @@ interface AppStore {
 // ── Live-stream coalescing ──
 // High-frequency alerts from live sessions are buffered and flushed at most
 // once per animation frame, so the store never re-renders the app per event.
+// Where requestAnimationFrame is unavailable (jsdom tests) the buffer flushes
+// synchronously so store assertions keep their synchronous semantics.
 let alertBuffer: ResponsibilityAlert[] = [];
 let flushHandle: number | null = null;
 
@@ -115,6 +117,15 @@ function flushAlertBuffer(get: () => AppStore, set: (partial: Partial<AppStore>)
   if (fresh.length === 0) return;
   set({ alerts: [...fresh, ...state.alerts].slice(0, 200) });
   fresh.forEach((a) => state.engineRef.current?.showAlertPulse(a));
+}
+
+function scheduleAlertFlush(get: () => AppStore, set: (partial: Partial<AppStore>) => void): void {
+  if (typeof requestAnimationFrame === 'function') {
+    flushHandle = requestAnimationFrame(() => flushAlertBuffer(get, set)) as unknown as number;
+  } else {
+    // No rAF (jsdom / old environments) → flush synchronously.
+    flushAlertBuffer(get, set);
+  }
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -183,7 +194,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const [graph, alerts] = await Promise.all([api.getGraph(runId), api.getAlerts(runId)]);
 
       // Strip graph_snapshot from alerts
-      const leanAlerts = alerts.map(({ graph_snapshot, ...rest }: any) => rest);
+      const leanAlerts = alerts.map(({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest);
 
       set({
         graph: { nodes: graph.nodes, edges: graph.edges },
@@ -201,12 +212,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     // Alerts are coalesced per animation frame; the graph snapshot below is
     // applied immediately so the live network stays responsive.
     alertBuffer.push(alert);
-    if (flushHandle == null) {
-      flushHandle =
-        typeof requestAnimationFrame === 'function'
-          ? (requestAnimationFrame(() => flushAlertBuffer(get, set)) as unknown as number)
-          : (setTimeout(() => flushAlertBuffer(get, set), 16) as unknown as number);
-    }
+    if (flushHandle == null) scheduleAlertFlush(get, set);
 
     // Extract graph_snapshot and update GraphRenderer (Live mode)
     if (alert.graph_snapshot?.nodes?.length) {
@@ -254,7 +260,7 @@ async function initData() {
       ]);
       if (graphData.nodes?.length > 0) {
         // Strip graph_snapshot from alerts to save memory (~800KB for 3 alerts)
-        const leanAlerts = alertList.map(({ graph_snapshot, ...rest }: any) => rest);
+        const leanAlerts = alertList.map(({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest);
         console.log(
           `[MtAgentLens] API: ${graphData.nodes.length} nodes, ${graphData.edges.length} edges, ${leanAlerts.length} alerts (${runId})`
         );
@@ -268,7 +274,7 @@ async function initData() {
         return;
       }
     }
-  } catch (err) {
+  } catch (_err) {
     console.log('[MtAgentLens] API unavailable, trying static data...');
   }
 
@@ -276,7 +282,7 @@ async function initData() {
   try {
     const data = await loadSampleData();
     if (data) {
-      const leanAlerts = data.alerts.map(({ graph_snapshot, ...rest }: any) => rest);
+      const leanAlerts = data.alerts.map(({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest);
       console.log(
         `[MtAgentLens] Sample data: ${data.graph.nodes.length} nodes, ${data.graph.edges.length} edges, ${leanAlerts.length} alerts`
       );

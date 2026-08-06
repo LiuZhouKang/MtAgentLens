@@ -34,7 +34,7 @@
 | `cluster` | > 20,000 节点 | 按集群聚合 |
 
 - `pickLodLevel(nodeCount, zoom?)`：规模 + 缩放共同决定层级；缩放钻入时升级细节。
-- 聚合在 **Web Worker** 中执行（10 万节点不可主线程聚合）。
+- 聚合为 **cluster 级直连路径**（`summarizeClusterDirect`）：O(n+e) 哈希桶直接聚合，跳过重型 adapter；10 万节点/50 万边 ~271ms（实测）。**不采用 Web Worker 聚合**——structuredClone 传输 74MB 图需 ~718ms 主线程，反而更慢。
 - 确定性位置：用 `fnv1a32` 哈希播种，LOD 切换时节点位置稳定，避免视觉跳变。
 - 输出类型：`LodGraph = { nodes, edges, level, rawCount }`。
 - 消费钩子：`useGraphLod(graph, zoom)` → 按（graph 指纹, 层级）memo，重聚合在 worker 中完成。

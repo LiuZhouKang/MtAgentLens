@@ -1,15 +1,14 @@
 'use client';
 
-import { ScrollShadow } from '@heroui/react';
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 import { useState, Fragment, useMemo, useEffect, useRef } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { CountUp, FluidBackground, Magnetic, ParallaxCard } from '@waffo/ui-fluid';
+import { CountUp, Magnetic } from '@waffo/ui-fluid';
 import { FluidHeader, FLUID_PALETTES } from '@/components/ui/fluid-header';
 import { LiquidGlass, useLiquidGlassEffects } from '@/components/system/liquid-glass';
 import { AnimatedDock, type DockItemData } from '@/components/ui/animated-dock';
-import { BentoGrid, BentoCard } from '@/components/ui/bento-grid';
+import { BentoCard } from '@/components/ui/bento-grid';
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { AnimatedList } from '@/components/ui/magic-animated-list';
 import { Codicon } from '@/components/ui/codicon';
@@ -469,43 +468,6 @@ function RailSurface({
   );
 }
 
-function FactGrid({ rows }: { rows: { label: string; value: string }[] }) {
-  return (
-    <div className="incident-fact-list" aria-label="调查事实">
-      {rows.map((fact) => (
-        <div key={fact.label} className="incident-fact-list__row">
-          <span>{fact.label}</span>
-          <strong>{fact.value}</strong>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function InspectorBlock({
-  title,
-  icon,
-  children,
-  tone = 'default'
-}: {
-  title: string;
-  icon: string;
-  children: ReactNode;
-  tone?: 'default' | 'danger' | 'warning' | 'info';
-}) {
-  return (
-    <section className="incident-inspector-block" aria-label={title}>
-      <div className="incident-inspector-block__head">
-        <span>
-          <Codicon name={icon} size={14} />
-          {title}
-        </span>
-      </div>
-      {children}
-    </section>
-  );
-}
-
 function SignalList({
   items,
   emptyLabel,
@@ -585,95 +547,6 @@ function ToolbenchStatus({ icon, label, value }: { icon: string; label: string; 
   );
 }
 
-function NarrativeRail({
-  icon,
-  label,
-  items,
-}: {
-  icon: string;
-  label: string;
-  items: { id: string; label: string; meta?: string }[];
-}) {
-  if (!items.length) {
-    return null;
-  }
-
-  return (
-    <div className="incident-story-rail" aria-label={label}>
-      <div className="incident-story-rail__head">
-        <span>
-          <Codicon name={icon} size={13} />
-          {label}
-        </span>
-      </div>
-      <div className="incident-story-rail__track">
-        {items.map((item, index) => (
-          <div
-            key={item.id}
-            className="incident-story-rail__node"
-            data-tail={index === items.length - 1 ? 'true' : 'false'}
-          >
-            <strong>{item.label}</strong>
-            {item.meta ? <small>{item.meta}</small> : null}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function QueueRow({
-  item,
-  selected,
-  anchorNs,
-  onSelect,
-  severityTone,
-  decisionLabel,
-  formatRuntimeAge,
-}: {
-  item: AlertWithModel;
-  selected: boolean;
-  anchorNs: number;
-  onSelect: () => void;
-  severityTone: IncidentRailProps['severityTone'];
-  decisionLabel: IncidentRailProps['decisionLabel'];
-  formatRuntimeAge: IncidentRailProps['formatRuntimeAge'];
-}) {
-  const confidencePercent = Math.round(item.alert.confidence * 100);
-
-  return (
-    <motion.button
-      type="button"
-      className="incident-queue-row"
-      data-selected={selected}
-      data-tone={severityTone(item.alert.severity)}
-      onClick={onSelect}
-      transition={{ duration: 0.18, ease: 'easeOut' }}
-    >
-      <span className="incident-queue-row__content">
-        <span className="incident-queue-row__meta">
-          <em data-tone={severityTone(item.alert.severity)}>
-            <Codicon name="circle-filled" size={10} />
-            {severityLabel(item.alert.severity)}
-          </em>
-          <i>{decisionLabel(item.alert.decision)}</i>
-        </span>
-        <strong>{item.alert.title}</strong>
-        <small>
-          {item.alert.primary_agent.agent_id}
-          {' / '}
-          {(item.model?.evidenceRefs.length ?? 0)} 条证据
-          {' / '}
-          {formatRuntimeAge(item.alert.timestamp_ns, anchorNs)}
-        </small>
-      </span>
-      <span className="incident-queue-row__score" aria-label={`${confidencePercent}% 置信度`}>
-        {confidencePercent}%
-      </span>
-    </motion.button>
-  );
-}
-
 function TheaterRailNav({ items }: { items: DockItemData[] }) {
   return (
     <div className="incident-rail__navlist">
@@ -702,14 +575,9 @@ export default function IncidentRail({
   selectedAlert,
   selectedModel,
   selectionSummary,
-  alertModels,
-  selectedAlertId,
-  anchorNs,
   openCount,
   criticalCount,
-  onSelect,
   formatPercent,
-  formatRuntimeAge,
   severityTone,
   decisionLabel,
   defaultExpanded = false,
@@ -724,7 +592,6 @@ export default function IncidentRail({
   const reduceMotion = useReducedMotion();
   const isTheater = layoutMode === 'theater';
   useLiquidGlassEffects({ cursor: !isTheater, spotlight: false, reveal: false, scroll: false });
-  const queueLabel = `${alertModels.length} 条事件`;
   const factRows = buildFactRows(selectedAlert, selectedModel);
   const evidenceRows = buildEvidenceRows(selectedModel);
   const traceRows = buildTraceRows(selectedModel);
@@ -758,12 +625,6 @@ export default function IncidentRail({
       meta: index === 0 ? '主证据' : undefined,
     };
   });
-  const traceItems = selectedModel.pathEdges.slice(0, 5).map((edge) => ({
-    id: edge.edge_id,
-    label: edge.edge_type,
-    detail: `${edge.source} -> ${edge.target}`,
-    meta: `${Math.round(edge.confidence * 100)}%`,
-  }));
   const agentItems = selectedModel.involvedAgentIds.slice(0, 5).map((agentId, index) => ({
     id: agentId,
     label: agentId,
@@ -836,8 +697,6 @@ export default function IncidentRail({
     })),
   );
   const primaryEvidence = evidenceItems[0]?.label ?? '待补强';
-  const primaryEvidenceDetail =
-    evidenceItems[0]?.detail ?? '当前事件还没有形成可以单独托住结论的主证据锚点。';
   const traceNarrative = buildNarrativeRailItems(
     selectedModel.pathEdges.map((edge, index) => ({
       id: edge.edge_id,
@@ -862,22 +721,6 @@ export default function IncidentRail({
   const panelTransition = reduceMotion
     ? { duration: 0 }
     : { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const };
-  const theaterReveal = (order: number) =>
-    reduceMotion
-      ? {
-          initial: false as const,
-          animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
-          transition: { duration: 0 },
-        }
-      : {
-          initial: { opacity: 0, y: 12, filter: 'blur(8px)' },
-          animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
-          transition: {
-            duration: 0.42,
-            delay: order * 0.05,
-            ease: [0.22, 1, 0.36, 1] as const,
-          },
-        };
   const activeLabel = dockItems.find((item) => item.id === activeTool)?.label ?? '事件';
   const inspectorTitle = `${activeLabel}工作台`;
   const activeLens = lensMeta[activeTool];
@@ -1077,27 +920,11 @@ export default function IncidentRail({
         minHeight: '34px',
       }
     : undefined;
-  const theaterSurfaceMainStyle: CSSProperties | undefined = isTheater
-    ? {
-        minHeight: 0,
-        height: 'auto',
-        overflow: 'visible',
-      }
-    : undefined;
-  const theaterSurfaceSideStyle: CSSProperties | undefined = isTheater
-    ? theaterSurfaceMainStyle
-    : undefined;
   const theaterSurfaceStyle: CSSProperties | undefined = isTheater
     ? {
         minHeight: 0,
         height: 'auto',
         overflow: 'visible',
-      }
-    : undefined;
-  const theaterQueueScrollStyle: CSSProperties | undefined = isTheater
-    ? {
-        minHeight: 0,
-        overflow: 'auto',
       }
     : undefined;
   const dockData: DockItemData[] = decoratedDockItems.map((item) => {

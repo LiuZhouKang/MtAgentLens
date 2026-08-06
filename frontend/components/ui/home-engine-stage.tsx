@@ -2,19 +2,31 @@
 
 import * as THREE from 'three';
 import ForceGraph3D, { type ForceGraph3DInstance } from '3d-force-graph';
+import ReactForceGraph3D, {
+  type ForceGraphMethods,
+  type LinkObject,
+  type NodeObject,
+} from 'react-force-graph-3d';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { AlertPulseOverlay } from '@/engine/alert-pulse';
+import { NeuralFlowRenderer, type NeuralFlowEdgeTone } from '@/engine/neural-flow';
 import { createShieldMaterial, MAX_HITS } from '@/lib/flow-shield-material';
 import { useAppStore } from '@/lib/store';
 import type { GraphData, ResponsibilityAlert } from '@/lib/types';
-import { adaptGraphToLargeGraph, type LargeGraphColorBy, type LargeGraphLink, type LargeGraphNode } from '@/lib/large-graph-adapter';
+import {
+  adaptGraphToLargeGraph,
+  type LargeGraphColorBy,
+  type LargeGraphLink,
+  type LargeGraphNode,
+} from '@/lib/large-graph-adapter';
 import {
   BOOTSTRAP_NODE_ID,
   buildStageGraph,
   type StageLink,
   type StageNode,
 } from '@/components/ui/home-engine-stage-config';
+import RuntimeTopologyStage from '@/components/ui/runtime-topology-stage';
 import type { ResponsibilityNode } from '@/lib/types';
 
 interface HomeEngineStageProps {
@@ -64,16 +76,23 @@ export type StageEdgeSelection = {
 
 function toRgba(color: string, alpha: number): string {
   if (color.startsWith('rgba(')) {
-    return color.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/, `rgba($1, $2, $3, ${alpha})`);
+    return color.replace(
+      /rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/,
+      `rgba($1, $2, $3, ${alpha})`,
+    );
   }
   if (color.startsWith('rgb(')) {
     return color.replace(/rgb\(([^,]+),\s*([^,]+),\s*([^)]+)\)/, `rgba($1, $2, $3, ${alpha})`);
   }
 
   const normalized = color.replace('#', '');
-  const value = normalized.length === 3
-    ? normalized.split('').map((char) => `${char}${char}`).join('')
-    : normalized;
+  const value =
+    normalized.length === 3
+      ? normalized
+          .split('')
+          .map((char) => `${char}${char}`)
+          .join('')
+      : normalized;
   const red = parseInt(value.slice(0, 2), 16);
   const green = parseInt(value.slice(2, 4), 16);
   const blue = parseInt(value.slice(4, 6), 16);
@@ -104,28 +123,45 @@ function colorFromSeed(seed: string, saturation = 0.74, lightness = 0.62): strin
 function getStageNodeColor(node: LargeGraphNode, mode: LargeGraphColorBy): string {
   if (mode === 'agent_id') {
     const seed = node.agent_id !== 'unassigned' ? node.agent_id : `${node.node_type}:${node.id}`;
-    return colorFromSeed(seed, 0.76, 0.62);
+    return colorFromSeed(seed, 0.68, 0.54);
   }
 
   if (mode === 'cluster_id') {
-    return colorFromSeed(node.cluster_id ?? node.id, 0.72, 0.6);
+    return colorFromSeed(node.cluster_id ?? node.id, 0.66, 0.52);
   }
 
+  // Security-semantic palette: Agent=accent blue, Resource=neutral steel, Boundary=alert amber
   switch (node.node_type) {
     case 'Agent':
-      return blendHex('#67e8f9', colorFromSeed(node.agent_id || node.id, 0.68, 0.58), 0.24);
+      return blendHex('#5e6ad2', colorFromSeed(node.agent_id || node.id, 0.62, 0.5), 0.16);
     case 'Resource':
-      return blendHex('#a78bfa', colorFromSeed(node.id, 0.72, 0.64), 0.42);
+      return blendHex('#6b7280', colorFromSeed(node.id, 0.18, 0.42), 0.12);
     case 'PolicyBoundary':
-      return blendHex('#fb7185', colorFromSeed(node.boundary_key ?? node.id, 0.78, 0.64), 0.18);
+      return blendHex('#f97316', colorFromSeed(node.boundary_key ?? node.id, 0.74, 0.56), 0.14);
     default:
-      return colorFromSeed(node.id, 0.7, 0.62);
+      return colorFromSeed(node.id, 0.6, 0.5);
   }
 }
 
 type StageRenderData = {
   nodes: Array<LargeGraphNode & { color: string }>;
   links: LargeGraphLink[];
+};
+
+type OSSDemoNode = {
+  id: string;
+  user?: string;
+  description?: string;
+};
+
+type OSSDemoLink = {
+  source: string;
+  target: string;
+};
+
+type OSSDemoData = {
+  nodes: OSSDemoNode[];
+  links: OSSDemoLink[];
 };
 
 type ShieldHandle = {
@@ -138,7 +174,10 @@ type ShieldHandle = {
   targetFresnelStrength: number;
 };
 
-function createStageRenderData(data: ReturnType<typeof adaptGraphToLargeGraph>, mode: LargeGraphColorBy): StageRenderData {
+function createStageRenderData(
+  data: ReturnType<typeof adaptGraphToLargeGraph>,
+  mode: LargeGraphColorBy,
+): StageRenderData {
   return {
     nodes: data.nodes.map((node) => ({
       id: node.id,
@@ -214,7 +253,10 @@ function getResourceIdentity(node: ResponsibilityNode): string | null {
   return null;
 }
 
-export function deriveAlertFocus(alert: ResponsibilityAlert | null): { nodeIds: Set<string>; edgeIds: Set<string> } {
+export function deriveAlertFocus(alert: ResponsibilityAlert | null): {
+  nodeIds: Set<string>;
+  edgeIds: Set<string>;
+} {
   if (!alert) {
     return { nodeIds: new Set(), edgeIds: new Set() };
   }
@@ -240,20 +282,29 @@ export function deriveAlertFocus(alert: ResponsibilityAlert | null): { nodeIds: 
     }
 
     const resourceIdentity = getResourceIdentity(node);
-    if (resourceIdentity && Array.from(resourceHints).some((hint) => resourceIdentity.includes(hint) || hint.includes(resourceIdentity))) {
+    if (
+      resourceIdentity &&
+      Array.from(resourceHints).some(
+        (hint) => resourceIdentity.includes(hint) || hint.includes(resourceIdentity),
+      )
+    ) {
       nodeIds.add(node.node_id);
       return;
     }
 
-    if (node.node_type === 'PolicyBoundary' && alert.timeline.steps.some((step) => step.event_type === 'boundary_cross')) {
+    if (
+      node.node_type === 'PolicyBoundary' &&
+      alert.timeline.steps.some((step) => step.event_type === 'boundary_cross')
+    ) {
       nodeIds.add(node.node_id);
     }
   });
 
   graphEdges.forEach((edge) => {
-    const isRiskEdge = edge.edge_type === 'PolicyBoundaryCrossing'
-      || edge.edge_type === 'TaintPropagatesTo'
-      || edge.edge_type === 'AgentDelegatesTo';
+    const isRiskEdge =
+      edge.edge_type === 'PolicyBoundaryCrossing' ||
+      edge.edge_type === 'TaintPropagatesTo' ||
+      edge.edge_type === 'AgentDelegatesTo';
     if (isRiskEdge) {
       edgeIds.add(edge.edge_id);
       nodeIds.add(edge.source);
@@ -268,6 +319,8 @@ export function deriveAlertFocus(alert: ResponsibilityAlert | null): { nodeIds: 
   return { nodeIds, edgeIds };
 }
 
+// Legacy semantic stage kept temporarily while the runtime topology stage fully replaces it.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function SemanticHomeEngineStage({
   active,
   featuredAlert,
@@ -297,9 +350,15 @@ function SemanticHomeEngineStage({
   const highlightedEdgeIdsRef = useRef(new Set<string>());
   const hoveredNodeIdRef = useRef<string | null>(null);
   const hoveredLinkIdRef = useRef<string | null>(null);
-  const stageGraphRef = useRef<{ nodes: StageNode[]; links: StageLink[] }>({ nodes: [], links: [] });
+  const stageGraphRef = useRef<{ nodes: StageNode[]; links: StageLink[] }>({
+    nodes: [],
+    links: [],
+  });
   const clusterMembersRef = useRef<Map<string, string[]>>(new Map());
-  const alertFocusRef = useRef<{ nodeIds: Set<string>; edgeIds: Set<string> }>({ nodeIds: new Set(), edgeIds: new Set() });
+  const alertFocusRef = useRef<{ nodeIds: Set<string>; edgeIds: Set<string> }>({
+    nodeIds: new Set(),
+    edgeIds: new Set(),
+  });
   const pinnedNodePositionsRef = useRef<Record<string, { x: number; y: number; z: number }>>({});
   const lastAppliedStageGraphRef = useRef<{ nodes: StageNode[]; links: StageLink[] } | null>(null);
   const previousGraphStateRef = useRef(graphState);
@@ -369,8 +428,12 @@ function SemanticHomeEngineStage({
       const hoveredLink = links.find((entry) => entry.id === hoveredLinkId);
       if (hoveredLink) {
         emphasizedLinks.add(hoveredLink.id);
-        addCluster(typeof hoveredLink.source === 'string' ? hoveredLink.source : hoveredLink.source.id);
-        addCluster(typeof hoveredLink.target === 'string' ? hoveredLink.target : hoveredLink.target.id);
+        addCluster(
+          typeof hoveredLink.source === 'string' ? hoveredLink.source : hoveredLink.source.id,
+        );
+        addCluster(
+          typeof hoveredLink.target === 'string' ? hoveredLink.target : hoveredLink.target.id,
+        );
       }
     }
 
@@ -391,9 +454,9 @@ function SemanticHomeEngineStage({
         const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
         const targetId = typeof link.target === 'string' ? link.target : link.target.id;
         if (
-          alertFocusRef.current.edgeIds.has(key)
-          || alertFocusRef.current.nodeIds.has(sourceId)
-          || alertFocusRef.current.nodeIds.has(targetId)
+          alertFocusRef.current.edgeIds.has(key) ||
+          alertFocusRef.current.nodeIds.has(sourceId) ||
+          alertFocusRef.current.nodeIds.has(targetId)
         ) {
           emphasizedLinks.add(link.id);
           addCluster(sourceId);
@@ -407,29 +470,32 @@ function SemanticHomeEngineStage({
     refreshHighlight();
   }, [refreshHighlight]);
 
-  const persistNodePosition = useCallback((node: Partial<StageNode> & { id?: string }, commit = false) => {
-    if (!node.id) return;
-    const x = typeof node.x === 'number' ? node.x : node.fx;
-    const y = typeof node.y === 'number' ? node.y : node.fy;
-    const z = typeof node.z === 'number' ? node.z : node.fz;
-    if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number') return;
+  const persistNodePosition = useCallback(
+    (node: Partial<StageNode> & { id?: string }, commit = false) => {
+      if (!node.id) return;
+      const x = typeof node.x === 'number' ? node.x : node.fx;
+      const y = typeof node.y === 'number' ? node.y : node.fy;
+      const z = typeof node.z === 'number' ? node.z : node.fz;
+      if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number') return;
 
-    node.fx = x;
-    node.fy = y;
-    node.fz = z;
+      node.fx = x;
+      node.fy = y;
+      node.fz = z;
 
-    if (commit) {
-      const current = pinnedNodePositionsRef.current;
-      const existing = current[node.id as string];
-      if (existing && existing.x === x && existing.y === y && existing.z === z) {
-        return;
+      if (commit) {
+        const current = pinnedNodePositionsRef.current;
+        const existing = current[node.id as string];
+        if (existing && existing.x === x && existing.y === y && existing.z === z) {
+          return;
+        }
+        pinnedNodePositionsRef.current = {
+          ...current,
+          [node.id as string]: { x, y, z },
+        };
       }
-      pinnedNodePositionsRef.current = {
-        ...current,
-        [node.id as string]: { x, y, z },
-      };
-    }
-  }, []);
+    },
+    [],
+  );
 
   const applyGraphAccessors = useCallback(() => {
     const graphInstance = graphRef.current;
@@ -445,13 +511,17 @@ function SemanticHomeEngineStage({
       })
       .nodeRelSize(0.58)
       .nodeResolution(6)
-      .nodeLabel((node) => node.kind === 'core'
-        ? `${node.nodeType}<br/>${node.label}<br/>${node.semanticGroup}`
-        : `${node.semanticGroup}<br/>${node.label}`)
+      .nodeLabel((node) =>
+        node.kind === 'core'
+          ? `${node.nodeType}<br/>${node.label}<br/>${node.semanticGroup}`
+          : `${node.semanticGroup}<br/>${node.label}`,
+      )
       .nodeColor((node) => {
         const emphasized = emphasizedNodeIdsRef.current.has(node.id);
         if (emphasized) {
-          return node.kind === 'core' ? blendHex(node.color, '#ffffff', 0.28) : blendHex(node.color, '#ffffff', 0.18);
+          return node.kind === 'core'
+            ? blendHex(node.color, '#ffffff', 0.28)
+            : blendHex(node.color, '#ffffff', 0.18);
         }
         return node.color;
       })
@@ -484,7 +554,9 @@ function SemanticHomeEngineStage({
       .linkDirectionalParticleThreeObject(() => null as unknown as THREE.Object3D)
       .linkDirectionalArrowLength(() => 0)
       .linkDirectionalArrowRelPos(0.78)
-      .linkDirectionalArrowColor((link) => emphasizedLinkIdsRef.current.has(link.id) ? '#ffffff' : link.color)
+      .linkDirectionalArrowColor((link) =>
+        emphasizedLinkIdsRef.current.has(link.id) ? '#ffffff' : link.color,
+      )
       .enableNodeDrag(panelLevel === 0)
       .enableNavigationControls(panelLevel === 0)
       .showPointerCursor(() => panelLevel === 0);
@@ -548,6 +620,9 @@ function SemanticHomeEngineStage({
     return () => observer.disconnect();
   }, [active, mounted]);
 
+  // Semantic stage initialization is one-shot; data/accessor updates are
+  // handled by follow-up effects to avoid tearing down ForceGraph mid-frame.
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (!mounted || !active || !containerRef.current || initializedRef.current) return;
 
@@ -563,6 +638,7 @@ function SemanticHomeEngineStage({
 
       graphRef.current = graphInstance;
       initializedRef.current = true;
+      graphInstance.pauseAnimation();
 
       graphInstance
         .backgroundColor('rgba(0,0,0,0)')
@@ -614,15 +690,15 @@ function SemanticHomeEngineStage({
       const bloomPass = composer
         ? new UnrealBloomPass(
             new THREE.Vector2(size.width || window.innerWidth, size.height || window.innerHeight),
-            0.28,
-            0.72,
-            0.34,
+            0.16,
+            0.52,
+            0.48,
           )
         : null;
 
       graphInstance.lights([
-        new THREE.AmbientLight(0xffffff, 0.95),
-        new THREE.HemisphereLight(0x88bbff, 0x02050f, 0.24),
+        new THREE.AmbientLight(0xf3f5f7, 0.88),
+        new THREE.HemisphereLight(0xb9c1c9, 0x030406, 0.18),
       ]);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6));
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -667,6 +743,9 @@ function SemanticHomeEngineStage({
         rafId: window.requestAnimationFrame(tick),
       };
 
+      graphInstance.d3ReheatSimulation();
+      graphInstance.resumeAnimation();
+
       sceneReadyRef.current = true;
       onReady?.();
       (window as any).__mtagentlens_scene = scene;
@@ -686,19 +765,20 @@ function SemanticHomeEngineStage({
       }
       extrasRef.current = { alertPulse: null, backdrop: null, rafId: null };
       sceneReadyRef.current = false;
+      graphRef.current?.pauseAnimation?.();
       graphRef.current?._destructor?.();
       graphRef.current = null;
       initializedRef.current = false;
       lastAppliedStageGraphRef.current = null;
     };
-  }, [active, applyGraphAccessors, mounted, onError, onReady, persistNodePosition, recomputeHighlightState, size.height, size.width, stageGraph]);
+  }, [active, mounted, onError, onReady, theme]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   useEffect(() => {
     const graphInstance = graphRef.current;
     if (!graphInstance) return;
 
     if (lastAppliedStageGraphRef.current !== stageGraph) {
-      graphInstance.pauseAnimation();
       graphInstance.graphData(stageGraph);
       lastAppliedStageGraphRef.current = stageGraph;
     }
@@ -710,12 +790,15 @@ function SemanticHomeEngineStage({
       .cooldownTicks(mode === 'focus' ? 160 : 320)
       .warmupTicks(120);
 
-    const chargeForce = graphInstance.d3Force('charge') as { strength?: (value: number) => unknown } | undefined;
+    const chargeForce = graphInstance.d3Force('charge') as
+      { strength?: (value: number) => unknown } | undefined;
     chargeForce?.strength?.(mode === 'focus' ? -88 : -112);
-    const linkForce = graphInstance.d3Force('link') as {
-      distance?: (fn: (link: StageLink) => number) => unknown;
-      strength?: (fn: (link: StageLink) => number) => unknown;
-    } | undefined;
+    const linkForce = graphInstance.d3Force('link') as
+      | {
+          distance?: (fn: (link: StageLink) => number) => unknown;
+          strength?: (fn: (link: StageLink) => number) => unknown;
+        }
+      | undefined;
     linkForce?.distance?.((link) => {
       if (link.kind === 'structural') return 8;
       if (link.kind === 'bridge') return 14;
@@ -729,8 +812,6 @@ function SemanticHomeEngineStage({
       if (link.kind === 'bridge') return 0.1;
       return link.edgeType === 'PolicyBoundaryCrossing' ? 0.13 : 0.1;
     });
-    graphInstance.d3ReheatSimulation();
-    graphInstance.resumeAnimation();
     graphInstance.zoomToFit(0, 60, (node) => node.id !== BOOTSTRAP_NODE_ID);
     recomputeHighlightState();
   }, [applyGraphAccessors, mode, recomputeHighlightState, stageGraph]);
@@ -762,31 +843,54 @@ function SemanticHomeEngineStage({
         const node = coreNodeLookup.get(agentId);
         if (!node || !graphRef.current) return;
         graphRef.current.cameraPosition(
-          { x: (node.x ?? node.fx ?? 0) + 58, y: (node.y ?? node.fy ?? 0) + 28, z: (node.z ?? node.fz ?? 0) + 110 },
+          {
+            x: (node.x ?? node.fx ?? 0) + 58,
+            y: (node.y ?? node.fy ?? 0) + 28,
+            z: (node.z ?? node.fz ?? 0) + 110,
+          },
           { x: node.x ?? node.fx ?? 0, y: node.y ?? node.fy ?? 0, z: node.z ?? node.fz ?? 0 },
           Math.round((duration ?? 1.2) * 1000),
         );
       },
       flyToNode(nodeId, duration) {
-        const node = coreNodeLookup.get(nodeId) ?? stageGraph.nodes.find((entry) => entry.id === nodeId);
+        const node =
+          coreNodeLookup.get(nodeId) ?? stageGraph.nodes.find((entry) => entry.id === nodeId);
         if (!node || !graphRef.current) return;
         graphRef.current.cameraPosition(
-          { x: (node.x ?? node.fx ?? 0) + 44, y: (node.y ?? node.fy ?? 0) + 24, z: (node.z ?? node.fz ?? 0) + 94 },
+          {
+            x: (node.x ?? node.fx ?? 0) + 44,
+            y: (node.y ?? node.fy ?? 0) + 24,
+            z: (node.z ?? node.fz ?? 0) + 94,
+          },
           { x: node.x ?? node.fx ?? 0, y: node.y ?? node.fy ?? 0, z: node.z ?? node.fz ?? 0 },
           Math.round((duration ?? 0.9) * 1000),
         );
       },
       flyToLevel(level, duration) {
-        const presets: Record<number, { position: { x: number; y: number; z: number }; lookAt: { x: number; y: number; z: number } }> = {
+        const presets: Record<
+          number,
+          {
+            position: { x: number; y: number; z: number };
+            lookAt: { x: number; y: number; z: number };
+          }
+        > = {
           0: { position: { x: 0, y: 12, z: 560 }, lookAt: { x: 0, y: 0, z: 0 } },
           1: { position: { x: 12, y: 8, z: 360 }, lookAt: { x: 0, y: 0, z: 0 } },
           2: { position: { x: 6, y: 2, z: 228 }, lookAt: { x: 0, y: 0, z: 0 } },
         };
         const preset = presets[level] ?? presets[0];
-        graphRef.current?.cameraPosition(preset.position, preset.lookAt, Math.round((duration ?? 1.1) * 1000));
+        graphRef.current?.cameraPosition(
+          preset.position,
+          preset.lookAt,
+          Math.round((duration ?? 1.1) * 1000),
+        );
       },
       resetCamera(duration) {
-        graphRef.current?.cameraPosition({ x: 0, y: 12, z: 560 }, { x: 0, y: 0, z: 0 }, Math.round((duration ?? 1.3) * 1000));
+        graphRef.current?.cameraPosition(
+          { x: 0, y: 12, z: 560 },
+          { x: 0, y: 0, z: 0 },
+          Math.round((duration ?? 1.3) * 1000),
+        );
       },
       updateGraph(nextGraph) {
         setGraphState(nextGraph);
@@ -806,11 +910,13 @@ function SemanticHomeEngineStage({
         extrasRef.current.alertPulse?.clear();
       },
       orbit(deltaX, deltaY) {
-        const controls = graphRef.current?.controls() as {
-          rotateLeft?: (value: number) => void;
-          rotateUp?: (value: number) => void;
-          update?: () => void;
-        } | undefined;
+        const controls = graphRef.current?.controls() as
+          | {
+              rotateLeft?: (value: number) => void;
+              rotateUp?: (value: number) => void;
+              update?: () => void;
+            }
+          | undefined;
         controls?.rotateLeft?.(deltaX * 0.0028);
         controls?.rotateUp?.(deltaY * 0.0028);
         controls?.update?.();
@@ -860,9 +966,10 @@ function SemanticHomeEngineStage({
         pointerEvents: panelLevel > 0 ? 'none' : 'auto',
         opacity: panelLevel === 0 ? 1 : panelLevel === 1 ? 0.72 : 0.38,
         transform: 'scale(1)',
-        filter: theme === 'light'
-          ? 'brightness(0.84) saturate(0.46)'
-          : 'brightness(1.08) saturate(1.02) contrast(1.08)',
+        filter:
+          theme === 'light'
+            ? 'brightness(0.84) saturate(0.46)'
+            : 'brightness(1.08) saturate(1.02) contrast(1.08)',
         transition: 'opacity 240ms ease, transform 320ms ease, filter 240ms ease',
       }}
     >
@@ -870,9 +977,10 @@ function SemanticHomeEngineStage({
         style={{
           position: 'absolute',
           inset: 0,
-          background: theme === 'light'
-            ? 'transparent'
-            : 'radial-gradient(circle at 50% 46%, rgba(255,255,255,0.03) 0%, rgba(2,5,13,0) 58%)',
+          background:
+            theme === 'light'
+              ? 'transparent'
+              : 'radial-gradient(circle at 50% 46%, rgba(255,255,255,0.03) 0%, rgba(2,5,13,0) 58%)',
           pointerEvents: 'none',
         }}
       />
@@ -902,17 +1010,44 @@ function OSSLargeGraphStage({
   const lastAppliedGraphRef = useRef<unknown>(null);
   const [size, setSize] = useState({ width: 1200, height: 900 });
   const appliedColorByRef = useRef<string | null>(null);
-  const [stageData, setStageData] = useState<ReturnType<typeof adaptGraphToLargeGraph> | null>(null);
+  const [stageData, setStageData] = useState<ReturnType<typeof adaptGraphToLargeGraph> | null>(
+    null,
+  );
+  const [ossDemoData, setOssDemoData] = useState<OSSDemoData | null>(null);
   const nodeIndexRef = useRef(new Map<string, LargeGraphNode>());
   const shieldRef = useRef(new Map<string, ShieldHandle>());
   const hoveredBoundaryRef = useRef<string | null>(null);
   const focusedRawEdgeIdsRef = useRef(new Set<string>());
   const focusedLinkIdsRef = useRef(new Set<string>());
   const focusedNodeIdsRef = useRef(new Set<string>());
+  const focusedLinkObjectsRef = useRef<LargeGraphLink[]>([]);
+  const neuralFlowRef = useRef<NeuralFlowRenderer | null>(null);
   const rafRef = useRef<number | null>(null);
+  const fitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusRefreshKey = useMemo(
     () => `${dataMode ?? 'oss-large-graph'}:${(focusEdgeIds ?? []).join('|')}`,
     [dataMode, focusEdgeIds],
+  );
+
+  const fitGraphToStage = useCallback(
+    (transitionMs = 1120, delayMs = 260) => {
+      if (dataMode === 'oss-demo') return;
+      if (fitTimerRef.current) {
+        clearTimeout(fitTimerRef.current);
+      }
+
+      fitTimerRef.current = setTimeout(() => {
+        const graphInstance = graphRef.current;
+        if (!graphInstance) return;
+
+        const padding = Math.max(
+          56,
+          Math.min(132, Math.round(Math.min(size.width, size.height) * 0.11)),
+        );
+        graphInstance.zoomToFit(transitionMs, padding);
+      }, delayMs);
+    },
+    [dataMode, size.height, size.width],
   );
 
   useEffect(() => {
@@ -920,11 +1055,47 @@ function OSSLargeGraphStage({
   }, []);
 
   useEffect(() => {
+    if (dataMode !== 'oss-demo') {
+      setOssDemoData(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    fetch('/oss/blocks.json', { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to load OSS demo graph: ${response.status}`);
+        }
+        return response.json() as Promise<OSSDemoData>;
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setOssDemoData(data);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled && !(error instanceof DOMException && error.name === 'AbortError')) {
+          onError?.(error instanceof Error ? error : new Error(String(error)));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [dataMode, onError]);
+
+  useEffect(() => {
     if (dataMode === 'oss-demo') {
       setStageData(null);
       return;
     }
     const adapted = adaptGraphToLargeGraph(graph, pinnedNodePositionsRef.current);
+    console.log(
+      `[MtAgentLens] Stage data adapted: ${adapted.nodes.length} nodes, ${adapted.links.length} links (from ${graph.nodes.length} raw nodes, ${graph.edges.length} raw edges)`
+    );
     nodeIndexRef.current = new Map(adapted.nodes.map((node) => [node.id, node]));
     setStageData(adapted);
   }, [dataMode, graph]);
@@ -978,7 +1149,20 @@ function OSSLargeGraphStage({
 
   useEffect(() => {
     const graphInstance = graphRef.current;
-    if (!graphInstance || !initializedRef.current || focusRefreshKey.startsWith('oss-demo:')) return;
+    if (!graphInstance || !initializedRef.current || dataMode === 'oss-demo') {
+      focusedLinkObjectsRef.current = [];
+      return;
+    }
+    const graphData = graphInstance.graphData();
+    const links = (graphData.links ?? []) as LargeGraphLink[];
+    const focusedLinkIds = focusedLinkIdsRef.current;
+    focusedLinkObjectsRef.current = links.filter((link) => focusedLinkIds.has(link.id));
+  }, [dataMode, focusRefreshKey, stageData]);
+
+  useEffect(() => {
+    const graphInstance = graphRef.current;
+    if (!graphInstance || !initializedRef.current || focusRefreshKey.startsWith('oss-demo:'))
+      return;
     const linkPositionUpdate = graphInstance.linkPositionUpdate();
     graphInstance
       .nodeColor(graphInstance.nodeColor())
@@ -994,16 +1178,70 @@ function OSSLargeGraphStage({
     }
   }, [focusRefreshKey, stageData]);
 
+  // This effect owns the ForceGraph instance lifecycle and must not re-run on
+  // every data/size change, otherwise the underlying simulation can be
+  // destructed mid-frame. Live graph updates are handled by the follow-up effects.
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (!mounted || !active || !containerRef.current || initializedRef.current) return;
     const shields = shieldRef.current;
-    const sourceLineMaterial = new THREE.LineBasicMaterial({
-      color: 0xffffff,
-      opacity: 1,
-      transparent: true,
-      fog: false,
-      toneMapped: false,
-      linewidth: 1,
+    const lineMaterialCache = new Map<string, THREE.LineBasicMaterial>();
+
+    const getLineMaterial = (params: {
+      focusMode: boolean;
+      focused: boolean;
+      edgeType: string;
+    }) => {
+      const edgeTone =
+        params.edgeType === 'PolicyBoundaryCrossing'
+          ? 'critical'
+          : params.edgeType === 'TaintPropagatesTo'
+            ? 'warning'
+            : 'neutral';
+      const key = `${params.focusMode ? 'focus' : 'base'}:${params.focused ? 'on' : 'off'}:${edgeTone}:${theme}`;
+      const cached = lineMaterialCache.get(key);
+      if (cached) return cached;
+
+      const opacity = params.focusMode
+        ? params.focused
+          ? 0.42
+          : 0.04
+        : edgeTone === 'critical'
+          ? 0.22
+          : edgeTone === 'warning'
+            ? 0.16
+            : 0.10;
+
+      const color =
+        params.focusMode && params.focused
+          ? edgeTone === 'critical'
+            ? '#f97316'
+            : edgeTone === 'warning'
+              ? '#f59e0b'
+              : '#5e6ad2'
+          : edgeTone === 'critical'
+            ? '#f97316'
+            : edgeTone === 'warning'
+              ? '#f59e0b'
+              : '#ffffff';
+
+      const material = new THREE.LineBasicMaterial({
+        color,
+        opacity,
+        transparent: true,
+        fog: false,
+        toneMapped: false,
+        linewidth: 1,
+        depthTest: false,
+      });
+      lineMaterialCache.set(key, material);
+      return material;
+    };
+
+    const sourceLineMaterial = getLineMaterial({
+      focusMode: false,
+      focused: false,
+      edgeType: 'neutral',
     });
     try {
       const graphInstance = new ForceGraph3D(containerRef.current, {
@@ -1017,16 +1255,31 @@ function OSSLargeGraphStage({
 
       graphRef.current = graphInstance;
       initializedRef.current = true;
+      graphInstance.pauseAnimation();
 
       graphInstance
         .backgroundColor('rgba(0,0,0,0)')
         .showNavInfo(false)
         .nodeLabel((node) => node.description)
-        .nodeOpacity(0.82)
+        .nodeVal((node) => {
+          const focused = focusedNodeIdsRef.current.has(node.id);
+          const base =
+            node.node_type === 'PolicyBoundary'
+              ? 9 + Math.log1p(node.boundary_count ?? 1) * 2.4
+              : node.node_type === 'Agent'
+                ? 7.5
+                : 5.5;
+          return focused ? base * 1.32 : base;
+        })
+        .nodeRelSize(6)
+        .nodeResolution(12)
+        .nodeOpacity(0.88)
         .nodeColor((node) => {
           const base = ((node as any).color as string | undefined) ?? '#9fb4ff';
           if (!focusedNodeIdsRef.current.size) return base;
-          return focusedNodeIdsRef.current.has(node.id) ? blendHex(base, '#ffffff', 0.18) : toRgba(base, 0.26);
+          return focusedNodeIdsRef.current.has(node.id)
+            ? blendHex(base, '#ffffff', 0.18)
+            : toRgba(base, 0.14);
         })
         .linkColor(() => '#ffffff')
         .linkOpacity(1)
@@ -1039,13 +1292,22 @@ function OSSLargeGraphStage({
           line.renderOrder = 12;
           return line;
         })
-        .linkPositionUpdate((lineObject, { start, end }) => {
+        .linkPositionUpdate((lineObject, { start, end }, link) => {
           const line = lineObject as THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
           const position = line.geometry.getAttribute('position') as THREE.BufferAttribute;
           position.setXYZ(0, start.x, start.y, start.z);
           position.setXYZ(1, end.x, end.y, end.z);
           position.needsUpdate = true;
           line.geometry.computeBoundingSphere();
+
+          if (link) {
+            const focusMode = focusedLinkIdsRef.current.size > 0;
+            const focused = focusMode && focusedLinkIdsRef.current.has((link as LargeGraphLink).id);
+            const edgeType = (link as LargeGraphLink).edge_type ?? 'neutral';
+            const material = getLineMaterial({ focusMode, focused, edgeType });
+            if (line.material !== material) line.material = material;
+          }
+
           return true;
         })
         .linkWidth(() => 0)
@@ -1059,7 +1321,7 @@ function OSSLargeGraphStage({
           const existing = shields.get(node.id);
           if (existing) return existing.obj;
           const seed = `${node.id}:${key}`;
-          const base = blendHex('#7dd3fc', '#a78bfa', (Math.abs(seed.length * 13) % 100) / 1000);
+          const base = blendHex('#f97316', '#ef4444', (Math.abs(seed.length * 13) % 100) / 1000);
           const handle = createBoundaryShieldHandle(seed, base);
           const count = node.boundary_count ?? 1;
           const scale = Math.min(2.2, 1.15 + Math.log1p(count) * 0.42);
@@ -1088,12 +1350,22 @@ function OSSLargeGraphStage({
           if (!handle) return;
           const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
           const sourceNode = nodeIndexRef.current.get(sourceId);
-          const sourcePos = sourceNode && typeof (sourceNode as any).x === 'number'
-            ? new THREE.Vector3((sourceNode as any).x, (sourceNode as any).y, (sourceNode as any).z)
-            : null;
-          const targetPos = boundaryNode && typeof (boundaryNode as any).x === 'number'
-            ? new THREE.Vector3((boundaryNode as any).x, (boundaryNode as any).y, (boundaryNode as any).z)
-            : null;
+          const sourcePos =
+            sourceNode && typeof (sourceNode as any).x === 'number'
+              ? new THREE.Vector3(
+                  (sourceNode as any).x,
+                  (sourceNode as any).y,
+                  (sourceNode as any).z,
+                )
+              : null;
+          const targetPos =
+            boundaryNode && typeof (boundaryNode as any).x === 'number'
+              ? new THREE.Vector3(
+                  (boundaryNode as any).x,
+                  (boundaryNode as any).y,
+                  (boundaryNode as any).z,
+                )
+              : null;
           if (!sourcePos || !targetPos) return;
 
           const dir = sourcePos.sub(targetPos).normalize();
@@ -1101,7 +1373,8 @@ function OSSLargeGraphStage({
           const idx = handle.hitIndex % MAX_HITS;
           handle.hitIndex += 1;
           (handle.material.uniforms.uHitPos.value as THREE.Vector3[])[idx].copy(localPoint);
-          (handle.material.uniforms.uHitTime.value as number[])[idx] = handle.material.uniforms.uTime.value as number;
+          (handle.material.uniforms.uHitTime.value as number[])[idx] = handle.material.uniforms
+            .uTime.value as number;
         })
         .onLinkClick((link) => {
           if (!link) return;
@@ -1125,11 +1398,12 @@ function OSSLargeGraphStage({
             nodeId: node.id,
             rawNodeIds: node.raw_node_ids,
             nodeType: node.node_type,
-            label: node.node_type === 'PolicyBoundary'
-              ? 'Policy Boundary'
-              : node.agent_id !== 'unassigned'
-                ? node.agent_id
-                : node.id,
+            label:
+              node.node_type === 'PolicyBoundary'
+                ? 'Policy Boundary'
+                : node.agent_id !== 'unassigned'
+                  ? node.agent_id
+                  : node.id,
             description: node.description,
             agentId: node.agent_id !== 'unassigned' ? node.agent_id : undefined,
             clusterId: node.cluster_id,
@@ -1156,6 +1430,9 @@ function OSSLargeGraphStage({
       const camera = graphInstance.camera() as THREE.PerspectiveCamera;
       const renderer = graphInstance.renderer();
       const composer = graphInstance.postProcessingComposer?.();
+      const neuralFlow = new NeuralFlowRenderer();
+      neuralFlow.attach(scene);
+      neuralFlowRef.current = neuralFlow;
       const bloomPass = composer
         ? new UnrealBloomPass(
             new THREE.Vector2(size.width || window.innerWidth, size.height || window.innerHeight),
@@ -1175,64 +1452,177 @@ function OSSLargeGraphStage({
       if (composer && bloomPass) {
         composer.addPass(bloomPass);
       }
-      scene.fog = new THREE.FogExp2(0x000000, dataMode === 'oss-demo' ? 0.00011 : 0.000028);
-      camera.position.set(0, dataMode === 'oss-demo' ? 32 : 0, dataMode === 'oss-demo' ? 1480 : 720);
+      scene.fog = new THREE.FogExp2(0x000000, dataMode === 'oss-demo' ? 0.00011 : 0.000038);
+      camera.position.set(
+        0,
+        dataMode === 'oss-demo' ? 32 : 18,
+        dataMode === 'oss-demo' ? 1480 : 520,
+      );
+
+      const edgeTone = (edgeType: string): NeuralFlowEdgeTone => {
+        if (edgeType === 'PolicyBoundaryCrossing') return 'critical';
+        if (edgeType === 'TaintPropagatesTo') return 'warning';
+        return 'neutral';
+      };
 
       const tick = () => {
         const now = performance.now() / 1000;
+        const last = (tick as any).last as number | undefined;
+        (tick as any).last = now;
+        const delta = typeof last === 'number' ? Math.max(0, Math.min(now - last, 0.06)) : 0.016;
+
         shields.forEach((handle, boundaryId) => {
           const isHovered = hoveredBoundaryRef.current === boundaryId;
           handle.material.uniforms.uTime.value = now;
 
-          const desiredOpacity = isHovered ? Math.min(0.92, handle.baseOpacity + 0.14) : handle.baseOpacity;
-          const desiredFresnel = isHovered ? handle.baseFresnelStrength * 1.2 : handle.baseFresnelStrength;
+          const desiredOpacity = isHovered
+            ? Math.min(0.92, handle.baseOpacity + 0.14)
+            : handle.baseOpacity;
+          const desiredFresnel = isHovered
+            ? handle.baseFresnelStrength * 1.2
+            : handle.baseFresnelStrength;
 
           handle.targetOpacity += (desiredOpacity - handle.targetOpacity) * 0.12;
           handle.targetFresnelStrength += (desiredFresnel - handle.targetFresnelStrength) * 0.12;
 
-          handle.material.uniforms.uOpacity.value += (handle.targetOpacity - (handle.material.uniforms.uOpacity.value as number)) * 0.18;
-          handle.material.uniforms.uFresnelStrength.value += (handle.targetFresnelStrength - (handle.material.uniforms.uFresnelStrength.value as number)) * 0.18;
+          handle.material.uniforms.uOpacity.value +=
+            (handle.targetOpacity - (handle.material.uniforms.uOpacity.value as number)) * 0.18;
+          handle.material.uniforms.uFresnelStrength.value +=
+            (handle.targetFresnelStrength -
+              (handle.material.uniforms.uFresnelStrength.value as number)) *
+            0.18;
         });
+
+        const activeLinks = focusedLinkObjectsRef.current;
+        if (neuralFlowRef.current) {
+          if (!activeLinks.length) {
+            neuralFlowRef.current.sync([]);
+          } else {
+            const frames = activeLinks
+              .map((link) => {
+                const source = typeof link.source === 'string' ? null : link.source;
+                const target = typeof link.target === 'string' ? null : link.target;
+                const sx =
+                  source && typeof (source as any).x === 'number'
+                    ? ((source as any).x as number)
+                    : null;
+                const sy =
+                  source && typeof (source as any).y === 'number'
+                    ? ((source as any).y as number)
+                    : null;
+                const sz =
+                  source && typeof (source as any).z === 'number'
+                    ? ((source as any).z as number)
+                    : null;
+                const tx =
+                  target && typeof (target as any).x === 'number'
+                    ? ((target as any).x as number)
+                    : null;
+                const ty =
+                  target && typeof (target as any).y === 'number'
+                    ? ((target as any).y as number)
+                    : null;
+                const tz =
+                  target && typeof (target as any).z === 'number'
+                    ? ((target as any).z as number)
+                    : null;
+                if (
+                  sx === null ||
+                  sy === null ||
+                  sz === null ||
+                  tx === null ||
+                  ty === null ||
+                  tz === null
+                )
+                  return null;
+                const confidence = typeof link.confidence === 'number' ? link.confidence : 0.62;
+                const count = typeof link.count === 'number' ? link.count : 1;
+                const intensity = Math.min(
+                  1,
+                  0.22 + confidence * 0.62 + Math.log1p(Math.max(count, 1)) * 0.09,
+                );
+                return {
+                  id: link.id,
+                  startX: sx,
+                  startY: sy,
+                  startZ: sz,
+                  endX: tx,
+                  endY: ty,
+                  endZ: tz,
+                  tone: edgeTone(link.edge_type),
+                  intensity,
+                };
+              })
+              .filter((value): value is NonNullable<typeof value> => Boolean(value));
+            neuralFlowRef.current.sync(frames);
+          }
+          neuralFlowRef.current.update(delta);
+        }
+
         rafRef.current = requestAnimationFrame(tick);
       };
       rafRef.current = requestAnimationFrame(tick);
 
       if (dataMode === 'oss-demo') {
         graphInstance
-          .backgroundColor('#02050d')
-          .jsonUrl('/oss/blocks.json')
+          .backgroundColor('#010101')
+          .graphData((ossDemoData ?? { nodes: [], links: [] }) as never)
           .nodeRelSize(4.4)
-          .linkOpacity(0.18)
-          .linkWidth(() => 0.18)
+          .nodeColor(() => '#d6dde3')
+          .linkColor(() => 'rgba(196, 204, 210, 0.12)')
+          .linkOpacity(0.12)
+          .linkWidth(() => 0.14)
           .linkDirectionalParticles(() => 0)
-          .nodeAutoColorBy('user');
-        const chargeForce = graphInstance.d3Force('charge') as { strength?: (value: number) => unknown } | undefined;
+          .nodeAutoColorBy(undefined as never);
+        const chargeForce = graphInstance.d3Force('charge') as
+          { strength?: (value: number) => unknown } | undefined;
         chargeForce?.strength?.(-48);
-        const linkForce = graphInstance.d3Force('link') as { distance?: (value: number) => unknown } | undefined;
+        const linkForce = graphInstance.d3Force('link') as
+          { distance?: (value: number) => unknown } | undefined;
         linkForce?.distance?.(24);
         graphInstance.d3VelocityDecay(0.22);
-        setTimeout(() => {
-          if (!graphRef.current || dataMode !== 'oss-demo') return;
-          graphRef.current.zoomToFit(800, 90);
-        }, 900);
         appliedColorByRef.current = 'user';
+        lastAppliedGraphRef.current = ossDemoData;
+        if (ossDemoData) {
+          setTimeout(() => {
+            if (!graphRef.current || dataMode !== 'oss-demo') return;
+            graphRef.current.zoomToFit(1000, 80);
+          }, 300);
+        }
       } else if (stageData) {
         const mode = colorBy ?? 'node_type';
         const renderData = createStageRenderData(stageData, mode);
-        graphInstance
-          .graphData(renderData);
+        graphInstance.graphData(renderData);
+        const chargeForce = graphInstance.d3Force('charge') as
+          { strength?: (value: number) => unknown } | undefined;
+        chargeForce?.strength?.(-118);
+        const linkForce = graphInstance.d3Force('link') as
+          { distance?: (value: number) => unknown } | undefined;
+        linkForce?.distance?.(42);
+        graphInstance.d3VelocityDecay(0.24);
         appliedColorByRef.current = mode;
         lastAppliedGraphRef.current = stageData;
+        fitGraphToStage();
       } else {
         const mode = colorBy ?? 'node_type';
         const initialData = adaptGraphToLargeGraph(graph, pinnedNodePositionsRef.current);
         const renderData = createStageRenderData(initialData, mode);
-        graphInstance
-          .graphData(renderData);
+        graphInstance.graphData(renderData);
+        const chargeForce = graphInstance.d3Force('charge') as
+          { strength?: (value: number) => unknown } | undefined;
+        chargeForce?.strength?.(-118);
+        const linkForce = graphInstance.d3Force('link') as
+          { distance?: (value: number) => unknown } | undefined;
+        linkForce?.distance?.(42);
+        graphInstance.d3VelocityDecay(0.24);
         appliedColorByRef.current = mode;
         lastAppliedGraphRef.current = initialData;
         setStageData(initialData);
+        fitGraphToStage();
       }
+
+      graphInstance.d3ReheatSimulation();
+      graphInstance.resumeAnimation();
 
       onReady?.();
     } catch (error) {
@@ -1244,7 +1634,13 @@ function OSSLargeGraphStage({
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
+      if (fitTimerRef.current) {
+        clearTimeout(fitTimerRef.current);
+        fitTimerRef.current = null;
+      }
       sourceLineMaterial.dispose();
+      neuralFlowRef.current?.dispose();
+      neuralFlowRef.current = null;
       shields.forEach((handle) => {
         handle.obj.traverse((child) => {
           const mesh = child as THREE.Mesh;
@@ -1254,21 +1650,51 @@ function OSSLargeGraphStage({
         });
       });
       shields.clear();
+      graphRef.current?.pauseAnimation?.();
       graphRef.current?._destructor?.();
       graphRef.current = null;
       initializedRef.current = false;
       lastAppliedGraphRef.current = null;
       appliedColorByRef.current = null;
     };
-  }, [active, colorBy, dataMode, graph, mounted, onEdgeSelected, onError, onNodeSelected, onReady, panelLevel, size.height, size.width, stageData]);
+  }, [
+    active,
+    dataMode,
+    fitGraphToStage,
+    mounted,
+    onEdgeSelected,
+    onError,
+    onNodeSelected,
+    onReady,
+    ossDemoData,
+    panelLevel,
+    theme,
+  ]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   useEffect(() => {
     const graphInstance = graphRef.current;
     if (!graphInstance || !initializedRef.current) return;
 
     if (dataMode === 'oss-demo') {
+      if (!ossDemoData) return;
+      if (lastAppliedGraphRef.current !== ossDemoData) {
+        graphInstance.graphData(ossDemoData as never);
+        lastAppliedGraphRef.current = ossDemoData;
+        graphInstance
+          .nodeColor(() => '#d6dde3')
+          .linkColor(() => 'rgba(196, 204, 210, 0.12)')
+          .nodeAutoColorBy(undefined as never);
+        setTimeout(() => {
+          if (!graphRef.current) return;
+          graphRef.current.zoomToFit(980, 84);
+        }, 220);
+      }
       if (appliedColorByRef.current !== 'user') {
-        graphInstance.nodeAutoColorBy('user');
+        graphInstance
+          .nodeColor(() => '#d6dde3')
+          .linkColor(() => 'rgba(196, 204, 210, 0.12)')
+          .nodeAutoColorBy(undefined as never);
         appliedColorByRef.current = 'user';
       }
       return;
@@ -1282,14 +1708,12 @@ function OSSLargeGraphStage({
 
     if (!shouldUpdateData && !shouldUpdateColor) return;
 
-    graphInstance.pauseAnimation();
     const renderData = createStageRenderData(stageData, nextColorBy);
     graphInstance.graphData(renderData);
     lastAppliedGraphRef.current = stageData;
     appliedColorByRef.current = nextColorBy;
-    graphInstance.d3ReheatSimulation();
-    graphInstance.resumeAnimation();
-  }, [colorBy, dataMode, stageData]);
+    fitGraphToStage(940, 220);
+  }, [colorBy, dataMode, fitGraphToStage, ossDemoData, stageData]);
 
   if (!mounted || !active) return null;
 
@@ -1304,9 +1728,10 @@ function OSSLargeGraphStage({
         pointerEvents: panelLevel > 0 ? 'none' : 'auto',
         opacity: panelLevel === 0 ? 1 : panelLevel === 1 ? 0.72 : 0.38,
         transform: 'scale(1)',
-        filter: theme === 'light'
-          ? 'brightness(0.84) saturate(0.46)'
-          : 'brightness(1.08) saturate(1.02) contrast(1.08)',
+        filter:
+          theme === 'light'
+            ? 'brightness(0.84) saturate(0.46)'
+            : 'brightness(0.96) saturate(0.24) contrast(1.02)',
         transition: 'opacity 240ms ease, transform 320ms ease, filter 240ms ease',
       }}
     >
@@ -1314,9 +1739,10 @@ function OSSLargeGraphStage({
         style={{
           position: 'absolute',
           inset: 0,
-          background: theme === 'light'
-            ? 'transparent'
-            : 'radial-gradient(circle at 50% 46%, rgba(24,44,120,0.04) 0%, rgba(0,0,0,0) 58%)',
+          background:
+            theme === 'light'
+              ? 'transparent'
+              : 'radial-gradient(circle at 50% 46%, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0) 56%)',
           pointerEvents: 'none',
         }}
       />
@@ -1325,10 +1751,168 @@ function OSSLargeGraphStage({
   );
 }
 
+function OSSDemoReactStage({ active, onError }: HomeEngineStageProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const graphRef = useRef<
+    ForceGraphMethods<NodeObject<OSSDemoNode>, LinkObject<OSSDemoNode, OSSDemoLink>> | undefined
+  >(undefined);
+  const hasInteractedRef = useRef(false);
+  const hasFramedRef = useRef(false);
+  const [mounted, setMounted] = useState(false);
+  const [size, setSize] = useState({ width: 1200, height: 900 });
+  const [graphData, setGraphData] = useState<OSSDemoData>({ nodes: [], links: [] });
+
+  const frameGraph = useCallback(
+    (transitionMs = 920) => {
+      const graphInstance = graphRef.current;
+      if (!graphInstance || !graphData.nodes.length || hasInteractedRef.current) return;
+      if (hasFramedRef.current) return;
+
+      const padding = size.width >= 1440 ? 136 : size.width >= 1180 ? 122 : 98;
+      graphInstance.zoomToFit(transitionMs, padding);
+      hasFramedRef.current = true;
+    },
+    [graphData.nodes.length, size.width],
+  );
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || !active || !containerRef.current) return undefined;
+    const container = containerRef.current;
+    const updateSize = () => {
+      const rect = container.getBoundingClientRect();
+      setSize({
+        width: Math.max(1, Math.round(rect.width)),
+        height: Math.max(1, Math.round(rect.height)),
+      });
+    };
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [active, mounted]);
+
+  useEffect(() => {
+    if (!mounted || !active || !containerRef.current) return undefined;
+
+    const markInteracted = () => {
+      hasInteractedRef.current = true;
+    };
+
+    const container = containerRef.current;
+    container.addEventListener('pointerdown', markInteracted, { passive: true });
+    container.addEventListener('wheel', markInteracted, { passive: true });
+    container.addEventListener('touchstart', markInteracted, { passive: true });
+
+    return () => {
+      container.removeEventListener('pointerdown', markInteracted);
+      container.removeEventListener('wheel', markInteracted);
+      container.removeEventListener('touchstart', markInteracted);
+    };
+  }, [active, mounted]);
+
+  useEffect(() => {
+    if (!mounted || !active) return undefined;
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    fetch('/oss/blocks.json', { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to load OSS demo graph: ${response.status}`);
+        }
+        return response.json() as Promise<OSSDemoData>;
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setGraphData(data);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled && !(error instanceof DOMException && error.name === 'AbortError')) {
+          onError?.(error instanceof Error ? error : new Error(String(error)));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      hasInteractedRef.current = false;
+      hasFramedRef.current = false;
+    };
+  }, [active, mounted, onError]);
+
+  useEffect(() => {
+    const graphInstance = graphRef.current as
+      ForceGraph3DInstance<OSSDemoNode, OSSDemoLink> | undefined;
+    if (!graphInstance || !graphData.nodes.length) return;
+
+    const chargeForce = graphInstance.d3Force('charge') as
+      { strength?: (value: number) => unknown } | undefined;
+    chargeForce?.strength?.(-42);
+
+    const linkForce = graphInstance.d3Force('link') as
+      { distance?: (value: number) => unknown } | undefined;
+    linkForce?.distance?.(28);
+  }, [graphData.nodes.length]);
+
+  useEffect(() => {
+    if (!mounted || !active || !graphData.nodes.length) return;
+    frameGraph();
+  }, [active, frameGraph, graphData.nodes.length, mounted, size.height, size.width]);
+
+  useEffect(
+    () => () => {
+    },
+    [],
+  );
+
+  if (!mounted || !active) return null;
+
+  return (
+    <div
+      id="home-engine-stage"
+      aria-hidden="true"
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 0,
+        pointerEvents: 'auto',
+      }}
+    >
+      <div ref={containerRef} style={{ position: 'absolute', inset: 0 }}>
+        <ReactForceGraph3D
+          ref={graphRef}
+          graphData={graphData}
+          width={size.width}
+          height={size.height}
+          d3AlphaDecay={0.026}
+          d3VelocityDecay={0.2}
+          cooldownTicks={140}
+          warmupTicks={80}
+          enableNodeDrag={false}
+          nodeLabel={(node) =>
+            `<div><b>${(node as OSSDemoNode).user ?? ''}</b>: ${(node as OSSDemoNode).description ?? ''}</div>`
+          }
+          nodeAutoColorBy="user"
+          linkDirectionalParticles={1}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function HomeEngineStage(props: HomeEngineStageProps) {
   const mode = props.dataMode ?? 'oss-large-graph';
+  if (mode === 'oss-demo') {
+    return <OSSDemoReactStage {...props} />;
+  }
   if (mode === 'semantic') {
-    return <SemanticHomeEngineStage {...props} />;
+    return <RuntimeTopologyStage {...props} />;
   }
   return <OSSLargeGraphStage {...props} />;
 }

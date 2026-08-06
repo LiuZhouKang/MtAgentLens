@@ -125,6 +125,13 @@ export function SigmaNetwork({
   const graphologyRef = useRef<Graph | null>(null);
   const callbacksRef = useRef({ onNodeClick, onNodeHover });
   const [built, setBuilt] = useState(false);
+  // Hover tooltip state — filled by the renderer's enterNode/mousemove events.
+  const [hoverInfo, setHoverInfo] = useState<{
+    x: number;
+    y: number;
+    label: string;
+    type: string;
+  } | null>(null);
 
   // Keep latest highlight list in a ref so it never re-triggers the build effect.
   // (`= []` default param is a NEW array every render — putting it in deps would
@@ -175,6 +182,7 @@ export function SigmaNetwork({
 
     const buildStart = Date.now(); // minimum loading-animation display timer
     let cancelled = false;
+    let builtTimer: ReturnType<typeof setTimeout> | null = null;
 
     const buildGraph = async () => {
       // cleanup previous renderer
@@ -279,10 +287,12 @@ export function SigmaNetwork({
         });
       }
 
-      // ── Drag state (closure-scoped) ──
+      // ── Drag + hover state (closure-scoped) ──
       let draggedNode: string | null = null;
       let isDragging = false;
+      let hoveredNode: string | null = null;
       const neighborSet = new Set<string>();
+      const hoverNeighborSet = new Set<string>();
       const connectedEdgeSet = new Set<string>();
 
       // Recompute highlight sets for a dragged node's neighborhood
@@ -321,6 +331,14 @@ export function SigmaNetwork({
       renderer.setSetting('nodeReducer', (node, data) => {
         if (node === draggedNode) {
           return { ...data, color: '#ffffff', size: (data.size ?? 5) * 1.7, label: data.label };
+        }
+        if (hoveredNode && !isDragging) {
+          if (node === hoveredNode) {
+            return { ...data, color: '#ffffff', size: (data.size ?? 5) * 1.4, label: data.label };
+          }
+          if (hoverNeighborSet.has(node)) {
+            return { ...data, color: lightenColor(data.color ?? NODE_DEFAULT, 0.22), size: (data.size ?? 5) * 1.1 };
+          }
         }
         if (neighborSet.has(node)) {
           return { ...data, color: lightenColor(data.color ?? NODE_DEFAULT, 0.35), size: (data.size ?? 5) * 1.15, label: data.label };
@@ -383,8 +401,38 @@ export function SigmaNetwork({
 
       // wire events
       renderer.on('clickNode', ({ node }) => callbacksRef.current.onNodeClick?.(node));
-      renderer.on('enterNode', ({ node }) => callbacksRef.current.onNodeHover?.(node));
-      renderer.on('leaveNode', () => callbacksRef.current.onNodeHover?.(null));
+
+      // ── Hover: neighbor highlight + floating tooltip ──
+      renderer.on('enterNode', ({ node }) => {
+        callbacksRef.current.onNodeHover?.(node);
+        hoveredNode = node;
+        hoverNeighborSet.clear();
+        g.forEachNeighbor(node, (n) => hoverNeighborSet.add(n));
+        const attrs = g.getNodeAttributes(node);
+        const pos = renderer.graphToViewport({ x: attrs.x as number, y: attrs.y as number });
+        setHoverInfo({
+          x: pos.x,
+          y: pos.y,
+          label: (attrs.label as string) ?? node,
+          type: (attrs.nodeType as string) ?? '',
+        });
+        renderer.refresh();
+      });
+      renderer.on('leaveNode', () => {
+        callbacksRef.current.onNodeHover?.(null);
+        hoveredNode = null;
+        hoverNeighborSet.clear();
+        setHoverInfo(null);
+        renderer.refresh();
+      });
+      // Track the cursor while hovering so the tooltip follows the mouse.
+      const trackHoverPos = (coords: { x: number; y: number }) => {
+        if (hoveredNode) {
+          setHoverInfo((prev) => (prev ? { ...prev, x: coords.x + 10, y: coords.y - 8 } : prev));
+        }
+      };
+      mouseCaptor.on('mousemove', trackHoverPos);
+      mouseCaptor.on('mousemovebody', trackHoverPos);
 
       sigmaRef.current = renderer;
       graphologyRef.current = g;
@@ -392,7 +440,7 @@ export function SigmaNetwork({
       // animate before the network replaces it (no invisible flash).
       const elapsed = Date.now() - buildStart;
       const remaining = Math.max(0, 600 - elapsed);
-      setTimeout(() => setBuilt(true), remaining);
+      builtTimer = setTimeout(() => setBuilt(true), remaining);
     };
 
     // Defer heavy work to idle — never block the main thread on mount
@@ -402,12 +450,13 @@ export function SigmaNetwork({
 
     return () => {
       cancelled = true;
-      // Cancel pending idle build
+      // Cancel pending idle build + the built-delay timer
       if ((window as any).cancelIdleCallback) {
         (window as any).cancelIdleCallback(idleHandle);
       } else {
         clearTimeout(idleHandle);
       }
+      if (builtTimer) clearTimeout(builtTimer);
       if (sigmaRef.current) {
         sigmaRef.current.kill();
         sigmaRef.current = null;
@@ -444,6 +493,31 @@ export function SigmaNetwork({
           }}
         >
           <NetworkLoading nodes={graph.nodes.length} edges={graph.edges.length} />
+        </div>
+      )}
+      {/* ── Hover tooltip (follows the cursor) ── */}
+      {hoverInfo && built && (
+        <div
+          style={{
+            position: 'absolute',
+            left: hoverInfo.x,
+            top: hoverInfo.y,
+            zIndex: 5,
+            pointerEvents: 'none',
+            background: 'rgba(10,12,16,0.92)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 6,
+            padding: '5px 9px',
+            boxShadow: '0 6px 24px rgba(0,0,0,0.4)',
+            maxWidth: 220,
+          }}
+        >
+          <div style={{ color: '#fafafa', fontWeight: 500, fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {hoverInfo.label}
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontFamily: 'var(--ln-mono, monospace)', marginTop: 2 }}>
+            {hoverInfo.type}
+          </div>
         </div>
       )}
     </div>

@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import Link from 'next/link';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
-import { ArrowRight, CheckCircle2, Clock, FileSearch, GitBranch, ShieldAlert, TerminalSquare } from 'lucide-react';
+import { ArrowRight, Clock, FileSearch, GitBranch, ShieldAlert, TerminalSquare } from 'lucide-react';
 import { SectionPanel } from '@/components/ui/linear/section-panel';
 import { StatusBadge, type StatusTone } from '@/components/ui/linear/status-badge';
 import VirtualList from '@/components/ui/virtual-list';
@@ -20,7 +20,6 @@ function decisionTone(d: string): StatusTone { if (d === 'Unsafe') return 'dange
 function statusLabel(d: string) { if (d === 'Unsafe') return '需处置'; if (d === 'Uncertain') return '待复核'; return '已受控'; }
 
 const sevColor: Record<string, string> = { Critical: '#f87171', Warning: '#fbbf24', Info: '#60a5fa' };
-const sevBg: Record<string, string> = { Critical: 'rgba(248,113,113,0.10)', Warning: 'rgba(251,191,36,0.08)', Info: 'rgba(96,165,250,0.06)' };
 const evKindIcons: Record<string, typeof FileSearch> = {
   role: ShieldAlert, delegation: GitBranch, boundary: ShieldAlert,
   file: FileSearch, exec: TerminalSquare, default: Clock,
@@ -69,10 +68,9 @@ export default function InvestigationWorkbench({ alert, model, availableAlerts, 
         {/* ── LEFT: SentinelOne-style alert list ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: S.sm, position: 'sticky', top: 44 }}>
           <span className="ln-eyebrow">告警队列</span>
-          {availableAlerts.map((a, i) => {
+          {availableAlerts.map((a) => {
             const active = a.alert_id === alert.alert_id;
             const sc = sevColor[a.severity] ?? sevColor.Info;
-            const sb = sevBg[a.severity] ?? sevBg.Info;
             return (
               <button key={a.alert_id} className="alert-list-btn" onClick={() => onSelectAlert(a.alert_id)} style={{
                 display: 'flex', flexDirection: 'column', gap: 3, width: '100%', textAlign: 'left',

@@ -16,10 +16,38 @@ afterEach(() => {
 });
 
 describe('InvestigationWorkbench', () => {
-  it('renders the case theatre workbench and uses the investigation cluster anchor for the cluster CTA', () => {
+  it('renders the workbench with alert queue, timeline and evidence chain', () => {
+    const model = buildInvestigationModel(demoAlerts[0], demoGraph, demoEvidence);
+
+    render(
+      <InvestigationWorkbench
+        alert={demoAlerts[0]}
+        model={model}
+        activeRunId={null}
+        availableAlerts={demoAlerts}
+        onSelectAlert={vi.fn()}
+        evidenceLoading={false}
+        evidenceError={null}
+      />,
+    );
+
+    // Left: alert queue
+    expect(screen.getByText('告警队列')).toBeDefined();
+    expect(screen.getAllByText(demoAlerts[0].title).length).toBeGreaterThan(0);
+    // Center: timeline + evidence chain
+    expect(screen.getByText('事件时间线')).toBeDefined();
+    expect(screen.getByText(`${model.timelineSteps.length} 步`)).toBeDefined();
+    expect(screen.getAllByText('证据链').length).toBeGreaterThan(0);
+    // Right: verdict + subject + actions
+    expect(screen.getByText('判决')).toBeDefined();
+    expect(screen.getByText('主体信息')).toBeDefined();
+    expect(screen.getByText('后续步骤')).toBeDefined();
+  });
+
+  it('shows an empty state when the timeline has no steps', () => {
     const model = {
       ...buildInvestigationModel(demoAlerts[0], demoGraph, demoEvidence),
-      parentClusterId: 'cluster-security-anchor',
+      timelineSteps: [],
     };
 
     render(
@@ -34,12 +62,6 @@ describe('InvestigationWorkbench', () => {
       />,
     );
 
-    expect(screen.getByText('Case Theatre')).toBeDefined();
-    expect(screen.getByText('Responsibility Chain')).toBeDefined();
-    expect(screen.getByText('Evidence Chain')).toBeDefined();
-    expect(screen.getByText('Rule & Verdict')).toBeDefined();
-    expect(screen.getByRole('link', { name: '查看所属 Cluster' }).getAttribute('href')).toBe(
-      '/clusters#clusterId=cluster-security-anchor',
-    );
+    expect(screen.getByText('暂无时间线数据')).toBeDefined();
   });
 });

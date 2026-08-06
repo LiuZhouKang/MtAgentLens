@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import InvestigationWorkbench from './investigation-workbench';
@@ -13,7 +13,6 @@ import { useRunEvidence } from '@/lib/use-run-evidence';
 import { useHashRouteState } from '@/lib/use-hash-route-state';
 
 export default function InvestigationsPageClient() {
-  const router = useRouter();
   const sp = useSearchParams();
   const activeRunId = useAppStore(s => s.activeRunId);
   const alerts = useAppStore(s => s.alerts);

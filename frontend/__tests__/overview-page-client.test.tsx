@@ -40,12 +40,31 @@ describe('OverviewPageClient', () => {
     cleanup();
   });
 
-  it('renders the runtime observatory shell with probe matrix, causal stage, and responsibility graph', () => {
+  it('renders the overview dashboard with KPI cards and the responsibility network', () => {
     render(<OverviewPageClient />, { wrapper: createWrapper() });
 
-    expect(screen.getByRole('heading', { name: 'Probe Matrix' })).toBeDefined();
-    expect(screen.getByRole('heading', { name: 'Runtime Causal Stage' })).toBeDefined();
-    expect(screen.getByRole('heading', { name: 'Responsibility Graph' })).toBeDefined();
-    expect(screen.getByRole('heading', { name: 'Priority Investigation Queue' })).toBeDefined();
+    // KPI strip
+    expect(screen.getByText('Active Agents')).toBeDefined();
+    expect(screen.getByText('Critical Alerts')).toBeDefined();
+    // Responsibility network stage
+    expect(screen.getByText('实时责任网络')).toBeDefined();
+    expect(screen.getByText('Collector Ready')).toBeDefined();
+    // Rail panels
+    expect(screen.getByText('集群压力')).toBeDefined();
+    expect(screen.getByText('责任告警')).toBeDefined();
+    expect(screen.getByText('事件流')).toBeDefined();
+  });
+
+  it('shows the lead cluster focus panel', () => {
+    render(<OverviewPageClient />, { wrapper: createWrapper() });
+
+    expect(screen.getByText('Lead Cluster')).toBeDefined();
+  });
+
+  it('shows the full-page loader when there is no data yet', () => {
+    useAppStore.setState({ alerts: [], graph: { nodes: [], edges: [] } });
+    render(<OverviewPageClient />, { wrapper: createWrapper() });
+
+    expect(screen.getAllByText('MtAgentLens').length).toBeGreaterThan(0);
   });
 });

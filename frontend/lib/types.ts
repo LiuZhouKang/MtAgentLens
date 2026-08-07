@@ -193,6 +193,80 @@ export interface Action {
   timestamp_ns: number;
 }
 
+// ═══ Claim & Overview Types ═══
+
+export type ClaimType =
+  | 'PolicyViolation' | 'AccountabilityAnomaly' | 'SuspiciousDelegation'
+  | 'TaintedContextUse' | 'UnauthorizedCapabilityUse' | 'BlockedAttempt';
+
+/** 实测 22 条 claim_state 分布：Inferred 18 / Confirmed 3 / Ambiguous 1。未知值由渲染侧灰显兜底。 */
+export type ClaimState = 'Inferred' | 'Confirmed' | 'Ambiguous';
+
+export interface ResponsibilityClaim {
+  claim_id: string;
+  claim_type: ClaimType;
+  subject_agent_id: string | null;
+  policy_id: string | null;
+  boundary_id: string | null;
+  claim_state: ClaimState;
+  severity: AlertSeverity;
+  confidence: number;
+  evidence_refs: string[];
+  competing_explanations: Array<{
+    label: string;
+    evidence_refs: string[];
+    rule_id: string;
+    rationale: string;
+    aligned_pattern: string | null;
+  }>;
+  traceback_ref: string | null;
+  phase: PhaseIndicator;
+  /** 由 phase 提取（phaseTimestampNs），用于声明列表排序。 */
+  timestamp_ns: number;
+}
+
+export interface ResponsibilityTraceback {
+  traceback_id: string;
+  claim_id: string;
+  chain_node_ids: string[];
+  chain_edge_ids: string[];
+  root_cause_node_id: string;
+  explanation_summary: string;
+  confidence: number;
+}
+
+/** 各表概要——"Claude Code 全景"统计卡片数据。所有计数来自 COUNT(*)/GROUP BY，无造数。 */
+export interface DatasetOverview {
+  run: {
+    run_id: string | null;
+    started_at_ns: number | null;
+    ended_at_ns: number | null;
+    scenario_id: string | null;
+    mode: string | null;
+    collector_version: string | null;
+  } | null;
+  snapshots: { count: number };
+  graph: { nodes: number; edges: number };
+  alerts: { count: number };
+  evidence: { count: number; by_match_level: Record<string, number> };
+  claims: { count: number; by_type: Record<string, number>; by_severity: Record<string, number> };
+  tracebacks: { count: number };
+  intents: { count: number; by_tool_name: Record<string, number>; by_authority_source: Record<string, number> };
+  actions: { count: number; by_action_type: Record<string, number>; by_signal_class: Record<string, number> };
+  pollution: { count: number };
+  policy_evaluations: { count: number };
+  processes: { count: number };
+  tls_sessions: { count: number };
+  identity_process_map: { count: number };
+  provisional_identities: { count: number };
+  agent_identities: { count: number };
+  message_bindings: { count: number };
+  delegation_records: { count: number };
+  subagent_boundaries: { count: number };
+  refinements: { claim: number; classification: number; evidence: number; graph: number; identity: number };
+  non_link_diagnostics: { count: number };
+}
+
 export interface NonLinkDiagnostic {
   schema_version: number;
   diagnostic_id: string;

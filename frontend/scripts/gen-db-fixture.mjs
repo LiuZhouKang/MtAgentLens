@@ -1,0 +1,286 @@
+// Generates __tests__/fixtures/db-sample.sqlite — a small SQLite database that
+// mirrors the real `collector.responsibility.db` tables the frontend consumes
+// (graph_snapshots / responsibility_alerts / correlation_evidence /
+// responsibility_tracebacks / responsibility_claims / intents / actions).
+// Kept in-repo so db-import tests are hermetic and fast (no 59MB real db,
+// no native deps).
+//
+// Run: node scripts/gen-db-fixture.mjs
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import initSqlJs from 'sql.js';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+const node = (id, type, agentId, resource, ts) => ({
+  node_id: id,
+  node_type: type,
+  agent_id: agentId,
+  resource,
+  evidence_refs: [],
+  timestamp_ns: ts,
+  phase: { Provisional: { timestamp_ns: ts } },
+});
+
+const edge = (id, type, source, target, conf, ts) => ({
+  edge_id: id,
+  edge_type: type,
+  source,
+  target,
+  evidence_refs: [],
+  confidence: conf,
+  phase: { Provisional: { timestamp_ns: ts } },
+  signal: null,
+});
+
+const nodesLatest = [
+  node('agent-a', 'Agent', 'agent-a', null, 1000),
+  node('file-sh', 'Resource', null, { File: { canonical_path: '/tmp/x.sh' } }, 1001),
+  node('proc-1', 'Process', null, { Process: { process_id: { pid: 42, start_time_ns: 1000 } } }, 1002),
+];
+const edgesLatest = [
+  edge('e1', 'IntentCausesAction', 'agent-a', 'proc-1', 0.9, 1002),
+  edge('e2', 'ContextFlowsFrom', 'file-sh', 'agent-a', 0.8, 1001),
+];
+const nodesOld = [node('agent-old', 'Agent', 'agent-old', null, 500)];
+const edgesOld = [];
+const metrics = {
+  node_counts: { Agent: 1, Resource: 1, Process: 1 },
+  edge_counts: { IntentCausesAction: 1, ContextFlowsFrom: 1 },
+  agent_count: 1,
+  cross_agent_edges: 0,
+  delegation_depth: 0,
+  taint_chains: 0,
+  avg_confidence: 0.85,
+};
+
+const alert = (over) => ({
+  alert_id: over.alert_id,
+  timestamp_ns: over.ts,
+  display_profile: over.display_profile ?? 'UnsafeByEngine',
+  decision: over.decision ?? 'Unsafe',
+  severity: over.severity ?? 'Warning',
+  confidence: 0.85,
+  authority: 'Authoritative',
+  reasoning: 'Shell artifact touched by process spawned after context injection.',
+  title: over.title ?? 'Suspicious shell resource use',
+  summary: 'Detected curl exiting right after exec',
+  action_hint: null,
+  primary_agent_id: 'agent-a',
+  involved_agents_json: JSON.stringify([{ agent_id: 'agent-a', claimed_role: null }]),
+  engine_section_json: JSON.stringify({
+    rule_verdicts: [{ rule_id: 'R-BOUNDARY-1', description: 'Boundary crossing', matched_resource: '/tmp/x.sh', llm_agreed: null, llm_comment: null }],
+    pattern_verdicts: [],
+    classification_score: 0.9,
+    classification_route: 'engine_unsafe',
+    score_breakdown: { rule_score: 1, pattern_score: 0, boundary_score: 0.9, evidence_score: 0.8, role_score: 0, repetition_score: 0, total: 0.9 },
+  }),
+  timeline_json: JSON.stringify({
+    steps: [
+      { timestamp_ns: over.ts - 500, event_type: 'EXEC', description: 'exec /bin/bash', resource: '/bin/bash', evidence_ref: null, agent_id: 'agent-a', operation: null, evidence_level: null, triggering_rule_ids: [], triggering_pattern_id: null, source_event_id: null },
+      { timestamp_ns: over.ts, event_type: 'FILE_WRITE', description: 'write /tmp/x.sh', resource: '/tmp/x.sh', evidence_ref: null, agent_id: 'agent-a', operation: 'write', evidence_level: null, triggering_rule_ids: ['R-BOUNDARY-1'], triggering_pattern_id: null, source_event_id: null },
+    ],
+    total_duration_ms: 1,
+  }),
+  graph_metrics_json: JSON.stringify({
+    snapshot_id: 'snap-latest',
+    timestamp_ns: over.ts,
+    nodes: nodesLatest,
+    edges: edgesLatest,
+    metrics,
+  }),
+  phase: over.phase,
+  provisional_ref: over.provisional_ref ?? null,
+  run_id: 'run-1',
+});
+
+const evidence = (id, intentId, actionId, matchLevel, conf, fields, phase, ts) => ({
+  evidence_id: id,
+  intent_id: intentId,
+  action_id: actionId,
+  match_level: matchLevel,
+  confidence: conf,
+  matched_fields_json: JSON.stringify(fields),
+  derivation_mode: 'Direct',
+  phase,
+  timestamp_ns: ts,
+  run_id: 'run-1',
+});
+
+async function main() {
+  const SQL = await initSqlJs();
+  const db = new SQL.Database();
+  db.run(`
+    CREATE TABLE graph_snapshots (
+      snapshot_id TEXT, timestamp_ns INTEGER,
+      nodes_json TEXT, edges_json TEXT, metrics_json TEXT, run_id TEXT
+    );
+    CREATE TABLE responsibility_alerts (
+      alert_id TEXT, timestamp_ns INTEGER, display_profile TEXT, decision TEXT,
+      severity TEXT, confidence REAL, authority TEXT, reasoning TEXT, title TEXT,
+      summary TEXT, action_hint TEXT, primary_agent_id TEXT,
+      involved_agents_json TEXT, engine_section_json TEXT, timeline_json TEXT,
+      graph_metrics_json TEXT, phase TEXT, provisional_ref TEXT, run_id TEXT
+    );
+    CREATE TABLE correlation_evidence (
+      evidence_id TEXT, intent_id TEXT, action_id TEXT, match_level TEXT,
+      confidence REAL, matched_fields_json TEXT, derivation_mode TEXT,
+      phase TEXT, timestamp_ns INTEGER, run_id TEXT
+    );
+    CREATE TABLE responsibility_tracebacks (
+      traceback_id TEXT, claim_id TEXT, chain_node_ids_json TEXT,
+      chain_edge_ids_json TEXT, root_cause_node_id TEXT,
+      explanation_summary TEXT, confidence REAL, run_id TEXT
+    );
+    CREATE TABLE responsibility_claims (
+      claim_id TEXT, claim_type TEXT, subject_agent_id TEXT, policy_id TEXT,
+      boundary_id TEXT, claim_state TEXT, severity TEXT, confidence REAL,
+      evidence_refs_json TEXT, competing_explanations_json TEXT,
+      traceback_ref TEXT, phase TEXT, run_id TEXT
+    );
+    CREATE TABLE intents (
+      intent_id TEXT, pid INTEGER, process_start_time_ns INTEGER, message_id TEXT,
+      tool_name TEXT, tool_args_json TEXT, intent_class TEXT, parse_state TEXT,
+      primary_matching_eligible INTEGER, authority_source TEXT,
+      timestamp_ns INTEGER, run_id TEXT
+    );
+    CREATE TABLE actions (
+      action_id TEXT, pid INTEGER, process_start_time_ns INTEGER, action_type TEXT,
+      normalized_args_json TEXT, derivation_mode TEXT, signal_class TEXT,
+      timestamp_ns INTEGER, run_id TEXT
+    );
+  `);
+
+  // Two snapshots; the loader must pick the latest.
+  db.run('INSERT INTO graph_snapshots VALUES (?,?,?,?,?,?)', [
+    'snap-old', 900, JSON.stringify(nodesOld), JSON.stringify(edgesOld), null, 'run-1',
+  ]);
+  db.run('INSERT INTO graph_snapshots VALUES (?,?,?,?,?,?)', [
+    'snap-latest', 1100, JSON.stringify(nodesLatest), JSON.stringify(edgesLatest),
+    JSON.stringify(metrics), 'run-1',
+  ]);
+
+  db.run(
+    'INSERT INTO responsibility_alerts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    [
+      'alert-1', 1100, 'UnsafeByEngine', 'Unsafe', 'Warning', 0.85, 'Authoritative',
+      'reasoning-1', 'Suspicious shell resource use', 'summary-1', null, 'agent-a',
+      '[{"agent_id":"agent-a","claimed_role":null}]',
+      JSON.stringify({
+        rule_verdicts: [],
+        pattern_verdicts: [],
+        classification_score: 0.9,
+        classification_route: 'engine_unsafe',
+        score_breakdown: { rule_score: 1, pattern_score: 0, boundary_score: 0.9, evidence_score: 0.8, role_score: 0, repetition_score: 0, total: 0.9 },
+      }),
+      JSON.stringify({ steps: [], total_duration_ms: 0 }),
+      JSON.stringify({ snapshot_id: 'snap-latest', timestamp_ns: 1100, nodes: nodesLatest, edges: edgesLatest, metrics }),
+      'Provisional { timestamp_ns: 1100 }', null, 'run-1',
+    ],
+  );
+  const authAlert = alert({
+    alert_id: 'alert-2', ts: 1200, decision: 'Safe', severity: 'Info',
+    display_profile: 'ObserverJudged', title: 'Benign pipeline',
+    phase: 'Authoritative { timestamp_ns: 1200, overrides: null }',
+    provisional_ref: 'alert-1',
+  });
+  db.run(
+    'INSERT INTO responsibility_alerts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    [
+      authAlert.alert_id, authAlert.timestamp_ns, authAlert.display_profile,
+      authAlert.decision, authAlert.severity, authAlert.confidence, authAlert.authority,
+      authAlert.reasoning, authAlert.title, authAlert.summary, authAlert.action_hint,
+      authAlert.primary_agent_id, authAlert.involved_agents_json,
+      authAlert.engine_section_json, authAlert.timeline_json,
+      authAlert.graph_metrics_json, authAlert.phase, authAlert.provisional_ref,
+      authAlert.run_id,
+    ],
+  );
+
+  const fieldsFull = { canonical_path: '/tmp/x.sh', host: null, port: null, command: 'bash /tmp/x.sh', raw_args: ['/tmp/x.sh'] };
+  for (const ev of [
+    evidence('ev-1', 'int-1', 'act-1', 'L1Exact', 0.95, fieldsFull, 'Provisional { timestamp_ns: 1000 }', 1000),
+    evidence('ev-2', 'int-2', 'act-1', 'L3Containment', 0.65, { canonical_path: null, host: null, port: null, command: null, raw_args: [] }, 'Provisional { timestamp_ns: 1050 }', 1050),
+    evidence('ev-3', 'int-1', 'act-2', 'L5Substring', 0.5, { canonical_path: null, host: null, port: null, command: null, raw_args: ['x'] }, 'Authoritative { timestamp_ns: 1200, overrides: null }', 1200),
+  ]) {
+    db.run('INSERT INTO correlation_evidence VALUES (?,?,?,?,?,?,?,?,?,?)', [
+      ev.evidence_id, ev.intent_id, ev.action_id, ev.match_level, ev.confidence,
+      ev.matched_fields_json, ev.derivation_mode, ev.phase, ev.timestamp_ns, ev.run_id,
+    ]);
+  }
+
+  db.run('INSERT INTO responsibility_tracebacks VALUES (?,?,?,?,?,?,?,?)', [
+    'tb-1', 'claim-1', '["agent-a"]', '["e1"]', 'agent-a', 'traceback summary', 0.9, 'run-1',
+  ]);
+
+  // claims — real schema, traceback_ref is NULL (matches real db: all 22 rows NULL)
+  db.run(
+    'INSERT INTO responsibility_claims VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    [
+      'claim-1', 'TaintedContextUse', 'agent-a', 'POLICY-1', 'BOUNDARY-1',
+      'Inferred', 'Critical', 0.9,
+      JSON.stringify(['ev-1', 'ev-2']),
+      JSON.stringify([
+        { label: 'Alternative path', evidence_refs: ['ev-3'], rule_id: 'R-ALT',
+          rationale: 'Context could flow via the shell', aligned_pattern: null },
+      ]),
+      null, // traceback_ref — real db all NULL, chain via tracebacksByClaimId reverse index
+      'Provisional { timestamp_ns: 1000 }', 'run-1',
+    ],
+  );
+  db.run(
+    'INSERT INTO responsibility_claims VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    [
+      'claim-2', 'PolicyViolation', 'agent-a', 'POLICY-1', null,
+      'Confirmed', 'Warning', 0.72,
+      JSON.stringify(['ev-3']),
+      '[]',
+      null, 'Authoritative { timestamp_ns: 1200, overrides: null }', 'run-1',
+    ],
+  );
+
+  // intents — tool_args_json real shape Array<{Command|Path}> (not NormalizedArgs object)
+  const intents = [
+    ['int-1', 42, 1000, 'msg-1', 'Bash', JSON.stringify([{ Command: 'ls -la /tmp' }]),
+     'FileSystem', 'Eligible', 1, 'SseResponseToolUse', 1000],
+    ['int-2', 42, 1000, 'msg-2', 'Read', JSON.stringify([{ Path: '/tmp/x.sh' }]),
+     'FileSystem', 'Eligible', 1, 'TextFallback', 1050],
+    // orphan intent — no correlation_evidence link (real data has 1), shown greyed out
+    ['int-3', 7, 2000, 'msg-3', 'Glob', JSON.stringify([{ Path: '/tmp/*.sh' }]),
+     'FileSystem', 'Ineligible', 0, 'TextFallback', 1100],
+  ];
+  for (const it of intents) {
+    db.run(
+      'INSERT INTO intents VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+      [...it, 'run-1'],
+    );
+  }
+
+  // actions — normalized_args_json real shape Array<{Path|Command}>
+  const actions = [
+    ['act-1', 42, 1000, 'FileWrite', JSON.stringify([{ Path: '/tmp/x.sh' }]),
+     'Direct', 'HighSignal', 1000],
+    ['act-2', 42, 1000, 'FileRead', JSON.stringify([{ Path: '/tmp/x.sh' }]),
+     'Direct', 'LowSignal', 1002],
+    // orphan action — no evidence link (real data has 300), shown greyed out
+    ['act-3', 7, 2000, 'ProcessExec', JSON.stringify([{ Path: '/bin/bash', Command: 'bash' }]),
+     'Derived', 'HighSignal', 1100],
+  ];
+  for (const ac of actions) {
+    db.run(
+      'INSERT INTO actions VALUES (?,?,?,?,?,?,?,?,?)',
+      [...ac, 'run-1'],
+    );
+  }
+
+  const bytes = db.export();
+  mkdirSync(join(root, '__tests__', 'fixtures'), { recursive: true });
+  writeFileSync(join(root, '__tests__', 'fixtures', 'db-sample.sqlite'), Buffer.from(bytes));
+  console.log('fixture written:', bytes.length, 'bytes');
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

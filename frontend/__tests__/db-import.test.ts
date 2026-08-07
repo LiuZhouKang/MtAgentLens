@@ -1,0 +1,253 @@
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import {
+  DatabaseImportError,
+  extractAlertsFromDb,
+  extractClaimsFromDb,
+  extractCountsFromDb,
+  extractEvidenceFromDb,
+  extractGraphFromDb,
+  extractTracebacksFromDb,
+  loadDatabase,
+  openDatabase,
+  parseMatchedFields,
+  parsePhaseIndicator,
+} from '@/lib/db-import';
+
+const fixtureBytes = (): Uint8Array => {
+  const buf = readFileSync(new URL('./fixtures/db-sample.sqlite', import.meta.url));
+  return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+};
+
+describe('db-import — SQLite query layer', () => {
+  it('opens a valid SQLite database from raw bytes', async () => {
+    const db = await openDatabase(fixtureBytes());
+    expect(db).toBeTruthy();
+    db.close();
+  });
+
+  it('extracts the latest graph snapshot (nodes, edges, metrics, run_id)', async () => {
+    const db = await openDatabase(fixtureBytes());
+    const { graph, metrics, runId } = extractGraphFromDb(db);
+    db.close();
+
+    // Latest snapshot has 3 nodes / 2 edges; the older one (2 nodes) must be skipped.
+    expect(graph.nodes).toHaveLength(3);
+    expect(graph.edges).toHaveLength(2);
+    expect(graph.nodes[0]).toMatchObject({ node_id: 'agent-a', node_type: 'Agent' });
+    expect(graph.nodes[1].resource).toEqual({ File: { canonical_path: '/tmp/x.sh' } });
+    expect(metrics).toMatchObject({
+      agent_count: 1,
+      node_counts: { Agent: 1, Resource: 1, Process: 1 },
+      avg_confidence: 0.85,
+    });
+    expect(runId).toBe('run-1');
+  });
+
+  it('maps responsibility_alerts into the frontend alert shape', async () => {
+    const db = await openDatabase(fixtureBytes());
+    const alerts = extractAlertsFromDb(db);
+    db.close();
+
+    expect(alerts).toHaveLength(2);
+
+    const first = alerts[0];
+    expect(first.alert_id).toBe('alert-1');
+    expect(first.title).toBe('Suspicious shell resource use');
+    expect(first.decision).toBe('Unsafe');
+    expect(first.severity).toBe('Warning');
+    expect(first.display_profile).toBe('UnsafeByEngine');
+    expect(first.primary_agent).toEqual({ agent_id: 'agent-a', claimed_role: null });
+    expect(first.involved_agents).toEqual([{ agent_id: 'agent-a', claimed_role: null }]);
+    expect(first.phase).toEqual({ Provisional: { timestamp_ns: 1100 } });
+    expect(first.engine.rule_verdicts).toHaveLength(0);
+    expect(first.timeline).toEqual({ steps: [], total_duration_ms: 0 });
+    // graph_snapshot is kept lean — nodes/edges stripped to save memory.
+    expect(first.graph_snapshot.nodes).toEqual([]);
+    expect(first.graph_snapshot.metrics.avg_confidence).toBe(0.85);
+    expect(first.provisional_ref).toBeNull();
+  });
+
+  it('parses Authoritative phase with overrides null', async () => {
+    const db = await openDatabase(fixtureBytes());
+    const alerts = extractAlertsFromDb(db);
+    db.close();
+
+    const second = alerts[1];
+    expect(second.alert_id).toBe('alert-2');
+    expect(second.phase).toEqual({
+      Authoritative: { timestamp_ns: 1200, overrides: null },
+    });
+    expect(second.provisional_ref).toBe('alert-1');
+    expect(second.decision).toBe('Safe');
+  });
+
+  it('maps correlation_evidence rows with parsed fields and phase', async () => {
+    const db = await openDatabase(fixtureBytes());
+    const evidence = extractEvidenceFromDb(db);
+    db.close();
+
+    expect(evidence).toHaveLength(3);
+    expect(evidence[0]).toEqual({
+      evidence_id: 'ev-1',
+      intent_id: 'int-1',
+      action_id: 'act-1',
+      match_level: 'L1Exact',
+      confidence: 0.95,
+      matched_fields: {
+        canonical_path: '/tmp/x.sh',
+        host: null,
+        port: null,
+        command: 'bash /tmp/x.sh',
+        raw_args: ['/tmp/x.sh'],
+      },
+      derivation_mode: 'Direct',
+      phase: { Provisional: { timestamp_ns: 1000 } },
+      timestamp_ns: 1000,
+    });
+    expect(evidence[2].phase).toEqual({
+      Authoritative: { timestamp_ns: 1200, overrides: null },
+    });
+    expect(evidence[2].match_level).toBe('L5Substring');
+  });
+
+  it('counts tracebacks, claims, intents and actions defensively', async () => {
+    const db = await openDatabase(fixtureBytes());
+    const counts = extractCountsFromDb(db);
+    db.close();
+
+    expect(counts.tracebackCount).toBe(1);
+    expect(counts.claimCount).toBe(2);
+    // fixture now includes intents/actions tables (Task 2): int-1/int-2/int-3 and act-1/act-2/act-3.
+    expect(counts.intentCount).toBe(3);
+    expect(counts.actionCount).toBe(3);
+  });
+
+  it('extracts responsibility_claims with phase-derived timestamps', async () => {
+    const db = await openDatabase(fixtureBytes());
+    const claims = extractClaimsFromDb(db);
+    db.close();
+
+    expect(claims).toHaveLength(2);
+    const first = claims[0];
+    expect(first.claim_id).toBe('claim-1');
+    expect(first.claim_type).toBe('TaintedContextUse');
+    expect(first.subject_agent_id).toBe('agent-a');
+    expect(first.policy_id).toBe('POLICY-1');
+    expect(first.boundary_id).toBe('BOUNDARY-1');
+    expect(first.claim_state).toBe('Inferred');
+    expect(first.severity).toBe('Critical');
+    expect(first.evidence_refs).toEqual(['ev-1', 'ev-2']);
+    expect(first.competing_explanations[0].rule_id).toBe('R-ALT');
+    // traceback_ref 真实 db 全 NULL —— 前端走反向索引，不按它取链
+    expect(first.traceback_ref).toBeNull();
+    // timestamp_ns 从 phase 提取（Provisional { timestamp_ns: 1000 }）
+    expect(first.timestamp_ns).toBe(1000);
+    expect(first.phase).toEqual({ Provisional: { timestamp_ns: 1000 } });
+    // Authoritative phase 提取
+    expect(claims[1].timestamp_ns).toBe(1200);
+  });
+
+  it('extracts responsibility_tracebacks with parsed chain ids', async () => {
+    const db = await openDatabase(fixtureBytes());
+    const tracebacks = extractTracebacksFromDb(db);
+    db.close();
+
+    expect(tracebacks).toHaveLength(1);
+    expect(tracebacks[0]).toEqual({
+      traceback_id: 'tb-1',
+      claim_id: 'claim-1',
+      chain_node_ids: ['agent-a'],
+      chain_edge_ids: ['e1'],
+      root_cause_node_id: 'agent-a',
+      explanation_summary: 'traceback summary',
+      confidence: 0.9,
+    });
+  });
+
+  it('loadDatabase produces the full consumable snapshot', async () => {
+    const result = await loadDatabase(fixtureBytes(), 'db-sample.sqlite');
+
+    expect(result.id).toBe('db:db-sample.sqlite');
+    expect(result.label).toBe('db-sample.sqlite');
+    expect(result.nodeCount).toBe(3);
+    expect(result.edgeCount).toBe(2);
+    expect(result.alertCount).toBe(2);
+    expect(result.evidenceCount).toBe(3);
+    expect(result.tracebackCount).toBe(1);
+    expect(result.claimCount).toBe(2);
+    expect(result.runId).toBe('run-1');
+    expect(result.hasConsumableData).toBe(true);
+    expect(result.metrics.avg_confidence).toBe(0.85);
+  });
+
+  it('rejects bytes that are not a SQLite database', async () => {
+    const junk = new TextEncoder().encode('this is definitely not a sqlite file at all');
+    await expect(loadDatabase(junk, 'bad.db')).rejects.toThrow(DatabaseImportError);
+  });
+
+  it('handles a database with no consumable tables gracefully', async () => {
+    const db = await openDatabase(fixtureBytes());
+    db.run('DROP TABLE graph_snapshots; DROP TABLE responsibility_alerts; DROP TABLE correlation_evidence;');
+    const bytes = db.export();
+    db.close();
+
+    const result = await loadDatabase(new Uint8Array(bytes), 'empty.db');
+    expect(result.graph).toEqual({ nodes: [], edges: [] });
+    expect(result.alerts).toEqual([]);
+    expect(result.evidence).toEqual([]);
+    expect(result.hasConsumableData).toBe(false);
+  });
+});
+
+describe('parsePhaseIndicator', () => {
+  it('parses Provisional', () => {
+    expect(parsePhaseIndicator('Provisional { timestamp_ns: 123 }')).toEqual({
+      Provisional: { timestamp_ns: 123 },
+    });
+  });
+
+  it('parses Authoritative with null overrides', () => {
+    expect(parsePhaseIndicator('Authoritative { timestamp_ns: 9, overrides: null }')).toEqual({
+      Authoritative: { timestamp_ns: 9, overrides: null },
+    });
+  });
+
+  it('returns null for non-phase strings and empty values', () => {
+    expect(parsePhaseIndicator('garbage')).toBeNull();
+    expect(parsePhaseIndicator(null)).toBeNull();
+    expect(parsePhaseIndicator(undefined)).toBeNull();
+    expect(parsePhaseIndicator('')).toBeNull();
+  });
+});
+
+describe('parseMatchedFields', () => {
+  it('parses a full fields object', () => {
+    expect(
+      parseMatchedFields('{"canonical_path":"/x","host":null,"port":null,"command":"ls","raw_args":["-l"]}'),
+    ).toEqual({
+      canonical_path: '/x',
+      host: null,
+      port: null,
+      command: 'ls',
+      raw_args: ['-l'],
+    });
+  });
+
+  it('returns the empty shape for missing or malformed input', () => {
+    expect(parseMatchedFields(null)).toEqual({
+      canonical_path: null,
+      host: null,
+      port: null,
+      command: null,
+      raw_args: [],
+    });
+    expect(parseMatchedFields('{broken')).toEqual({
+      canonical_path: null,
+      host: null,
+      port: null,
+      command: null,
+      raw_args: [],
+    });
+  });
+});

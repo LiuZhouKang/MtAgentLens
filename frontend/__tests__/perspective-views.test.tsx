@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { renderPerspectiveView } from '@/components/overview/monitoring/perspective-views';
 import type { MonitoringState, PerspectiveHealth, PerspectiveKey } from '@/lib/monitoring/monitoring-types';
 
@@ -45,7 +45,7 @@ describe('PerspectiveView — 六个视角详情', () => {
   });
 
   it('拓扑健康视图展示污染源 agent，点击走 focusAgent', () => {
-    const onFocus = () => {};
+    const onFocus = vi.fn();
     const monitoring = makeMonitoring({
       topologyHealth: {
         latest: null,
@@ -57,5 +57,7 @@ describe('PerspectiveView — 六个视角详情', () => {
     render(<>{renderPerspectiveView('topologyHealth', monitoring, onFocus)}</>);
     expect(screen.getByRole('button', { name: /agent-a/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /agent-b/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /agent-a/ }));
+    expect(onFocus).toHaveBeenCalledWith('agent-a');
   });
 });

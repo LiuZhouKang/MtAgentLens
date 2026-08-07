@@ -54,6 +54,27 @@ const metrics = {
   taint_chains: 0,
   avg_confidence: 0.85,
 };
+// 漂移帧 1：全零（早期帧），漂移基线不取它
+const metricsZero = {
+  node_counts: {},
+  edge_counts: {},
+  agent_count: 0,
+  cross_agent_edges: 0,
+  delegation_depth: 0,
+  taint_chains: 0,
+  avg_confidence: 0,
+};
+// 漂移帧 2：中间态（首个拓扑非零帧，漂移基线）。nodeCount=2（Agent1+Resource1），
+// edgeCount=2（IntentCausesAction2）。相对 snap-latest(nodeCount=3) → driftRatio=|3-2|/2=0.5 → warning。
+const metricsMid = {
+  node_counts: { Agent: 1, Resource: 1 },
+  edge_counts: { IntentCausesAction: 2 },
+  agent_count: 1,
+  cross_agent_edges: 0,
+  delegation_depth: 0,
+  taint_chains: 0,
+  avg_confidence: 0.6,
+};
 
 const alert = (over) => ({
   alert_id: over.alert_id,
@@ -154,6 +175,21 @@ async function main() {
       run_id TEXT, started_at_ns INTEGER, ended_at_ns INTEGER,
       scenario_id TEXT, mode TEXT, collector_version TEXT
     );
+    CREATE TABLE non_link_diagnostics (
+      diagnostic_id TEXT, intent_id TEXT, action_id TEXT, reason TEXT,
+      timestamp_ns INTEGER, run_id TEXT
+    );
+    CREATE TABLE context_pollution_events (
+      pollution_id INTEGER, source_agent_id TEXT, contaminated_artifact TEXT,
+      propagation_path_json TEXT, detected_at_ns INTEGER, run_id TEXT
+    );
+    CREATE TABLE policy_evaluations (
+      policy_id TEXT, boundary TEXT, judgment_json TEXT, subject_agent_id TEXT,
+      resource_json TEXT, evidence_refs_json TEXT, confidence REAL, reason TEXT, run_id TEXT
+    );
+    CREATE TABLE tls_sessions (
+      tls_session_id TEXT, pid INTEGER, start_time_ns INTEGER, timestamp_ns INTEGER, run_id TEXT
+    );
   `);
 
   // Run metadata — a single row with run_id populated, rest NULL.
@@ -161,7 +197,15 @@ async function main() {
     'run-1', null, null, null, null, null,
   ]);
 
-  // Two snapshots; the loader must pick the latest.
+  // Four snapshots; the loader must pick the latest.
+  db.run('INSERT INTO graph_snapshots VALUES (?,?,?,?,?,?)', [
+    'snap-zero', 800, JSON.stringify(nodesOld), JSON.stringify(edgesOld),
+    JSON.stringify(metricsZero), 'run-1',
+  ]);
+  db.run('INSERT INTO graph_snapshots VALUES (?,?,?,?,?,?)', [
+    'snap-mid', 850, JSON.stringify(nodesOld), JSON.stringify(edgesOld),
+    JSON.stringify(metricsMid), 'run-1',
+  ]);
   db.run('INSERT INTO graph_snapshots VALUES (?,?,?,?,?,?)', [
     'snap-old', 900, JSON.stringify(nodesOld), JSON.stringify(edgesOld), null, 'run-1',
   ]);
@@ -280,6 +324,53 @@ async function main() {
     db.run(
       'INSERT INTO actions VALUES (?,?,?,?,?,?,?,?,?)',
       [...ac, 'run-1'],
+    );
+  }
+
+  // ── 监控表（Task 1 新增）──
+  // non_link_diagnostics：3 行，reason 分布 BelowConfidenceCutoff×2 + NoArgumentMatch×1
+  for (const row of [
+    ['nld-1', 'int-1', 'BelowConfidenceCutoff'],
+    ['nld-2', 'int-2', 'BelowConfidenceCutoff'],
+    ['nld-3', 'int-3', 'NoArgumentMatch'],
+  ]) {
+    db.run('INSERT INTO non_link_diagnostics VALUES (?,?,?,?,?,?)', [
+      row[0], row[1], null, row[2], 1000, 'run-1',
+    ]);
+  }
+  // context_pollution_events：2 行，detected_at_ns 为时间列
+  for (const [pid, source, artifact, ts] of [
+    [1, 'agent-a', '/tmp/leaked.txt', 1000],
+    [2, 'agent-b', '/tmp/context.json', 1100],
+  ]) {
+    db.run(
+      'INSERT INTO context_pollution_events VALUES (?,?,?,?,?,?)',
+      [pid, source, artifact, JSON.stringify([]), ts, 'run-1'],
+    );
+  }
+  // policy_evaluations：3 行，其中 1 条 judgment_json.result=Violation
+  const judgment = (result) =>
+    JSON.stringify({ judgment_id: 'j-' + result, policy_id: 'pol-' + result, result });
+  for (const [policyId, boundary, subject, result] of [
+    ['pol-1', 'Capability', 'agent-a', 'Violation'],
+    ['pol-2', 'Capability', 'agent-a', 'Compliant'],
+    ['pol-3', 'Capability', 'agent-b', 'Compliant'],
+  ]) {
+    db.run(
+      'INSERT INTO policy_evaluations VALUES (?,?,?,?,?,?,?,?,?)',
+      [policyId, boundary, judgment(result), subject, null, '[]', 0.85, '', 'run-1'],
+    );
+  }
+  // tls_sessions：4 行跨 2 个时间桶（桶宽 60s = 60_000_000_000 ns）
+  for (const [sid, pid, ts] of [
+    ['s-1', 42, 1000],
+    ['s-2', 42, 5000],
+    ['s-3', 43, 61_000_000_000],
+    ['s-4', 43, 61_005_000_000],
+  ]) {
+    db.run(
+      'INSERT INTO tls_sessions VALUES (?,?,?,?,?)',
+      [sid, pid, 1000, ts, 'run-1'],
     );
   }
 

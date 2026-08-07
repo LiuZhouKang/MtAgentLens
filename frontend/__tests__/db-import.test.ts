@@ -260,7 +260,7 @@ describe('db-import — SQLite query layer', () => {
       mode: null,
       collector_version: null,
     });
-    expect(overview.snapshots.count).toBe(2);
+    expect(overview.snapshots.count).toBe(4);
     expect(overview.graph).toEqual({ nodes: 0, edges: 0 }); // fixture 无 graph_nodes 表 → 0
     expect(overview.alerts.count).toBe(2);
     expect(overview.evidence.count).toBe(3);
@@ -273,14 +273,14 @@ describe('db-import — SQLite query layer', () => {
     expect(overview.intents.by_tool_name).toEqual({ Bash: 1, Read: 1, Glob: 1 });
     expect(overview.actions.count).toBe(3);
     expect(overview.actions.by_action_type).toEqual({ FileWrite: 1, FileRead: 1, ProcessExec: 1 });
-    expect(overview.pollution.count).toBe(0);
-    expect(overview.policy_evaluations.count).toBe(0);
+    expect(overview.pollution.count).toBe(2);
+    expect(overview.policy_evaluations.count).toBe(3);
     expect(overview.processes.count).toBe(0);
-    expect(overview.tls_sessions.count).toBe(0);
+    expect(overview.tls_sessions.count).toBe(4);
     expect(overview.identity_process_map.count).toBe(0);
     expect(overview.provisional_identities.count).toBe(0);
     expect(overview.refinements).toEqual({ claim: 0, classification: 0, evidence: 0, graph: 0, identity: 0 });
-    expect(overview.non_link_diagnostics.count).toBe(0);
+    expect(overview.non_link_diagnostics.count).toBe(3);
   });
 });
 

@@ -160,12 +160,17 @@ describe('store — SQLite db data source', () => {
   test('loadRun reports an error when both the db and API paths fail', async () => {
     vi.mocked(api.getRunDb).mockRejectedValueOnce(new Error('HTTP 404'));
     vi.mocked(api.getGraph).mockRejectedValueOnce(new Error('HTTP 404'));
+    // 先注入 db（monitoring 有值），验证错误路径同样清空——错误态不残留上一次运行监控信号
+    const dbImport = await loadDatabaseFromBytes(new Uint8Array(fixtureBytes()), 'run-42.db');
+    useAppStore.getState().loadDatabase(dbImport);
+    expect(useAppStore.getState().monitoring).not.toBeNull();
 
     await useAppStore.getState().loadRun('run-1');
 
     const s = useAppStore.getState();
     expect(s.appState).toBe('error');
     expect(s.errorMessage).toBeTruthy();
+    expect(s.monitoring).toBeNull();
   });
 
   test('loadDatabase 派生并写入 monitoring（含 6 视角 health）', async () => {

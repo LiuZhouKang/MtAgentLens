@@ -305,7 +305,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      set({ errorMessage: message, appState: 'error' });
+      // 数据源不可用也清空 monitoring，防错误态残留上一次导入的运行监控信号
+      set({ errorMessage: message, appState: 'error', monitoring: null });
     }
   },
 

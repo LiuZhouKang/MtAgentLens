@@ -97,7 +97,7 @@ export function deriveDatasetSummary(overview: DatasetOverview): DatasetSummary 
       key: 'alerts',
       label: '告警',
       value: overview.alerts.count,
-      hint: `Warning ${overview.alerts.count}`,
+      hint: '',
       tone: criticalAlerts > 0 ? 'danger' : 'info',
     },
   ]

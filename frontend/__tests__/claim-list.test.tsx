@@ -35,8 +35,8 @@ const tracebacks: ResponsibilityTraceback[] = [
 
 const graph = {
   nodes: [
-    { node_id: 'agent-a', node_type: 'Agent', agent_id: 'agent-a', resource: null, evidence_refs: [], timestamp_ns: 0, phase: { Provisional: { timestamp_ns: 0 } } },
-    { node_id: 'root', node_type: 'Resource', agent_id: null, resource: { File: { canonical_path: '/tmp/x.sh' } }, evidence_refs: [], timestamp_ns: 0, phase: { Provisional: { timestamp_ns: 0 } } },
+    { node_id: 'agent-a', node_type: 'Agent' as const, agent_id: 'agent-a', resource: null, evidence_refs: [], timestamp_ns: 0, phase: { Provisional: { timestamp_ns: 0 } } },
+    { node_id: 'root', node_type: 'Resource' as const, agent_id: null, resource: { File: { canonical_path: '/tmp/x.sh' } }, evidence_refs: [], timestamp_ns: 0, phase: { Provisional: { timestamp_ns: 0 } } },
   ],
   edges: [],
 };

@@ -145,6 +145,11 @@ function applySnapshot(
     alerts: leanAlerts,
     graphMetrics: opts.metrics,
     evidence: [],
+    claims: [],
+    tracebacks: [],
+    intents: [],
+    actions: [],
+    overview: null,
     dataSource: opts.source,
     activeRunId: null,
     selectedNodeId: null,
@@ -285,6 +290,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
         graphMetrics: deriveGraphMetrics({ nodes: graph.nodes, edges: graph.edges }),
         alerts: leanAlerts,
         evidence: [],
+        claims: [],
+        tracebacks: [],
+        intents: [],
+        actions: [],
+        overview: null,
         selectedNodeId: null,
       });
     } catch (error) {

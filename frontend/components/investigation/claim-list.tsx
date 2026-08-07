@@ -34,6 +34,7 @@ export default function ClaimList({ claims, tracebacksByClaimId, graph, evidence
   );
 
   const evidenceById = useMemo(() => new Map(evidence.map((e) => [e.evidence_id, e])), [evidence]);
+  const nodeById = useMemo(() => new Map(graph.nodes.map((n) => [n.node_id, n])), [graph.nodes]);
   const alertRefSet = useMemo(() => new Set(alertEvidenceRefs), [alertEvidenceRefs]);
 
   if (sorted.length === 0) {
@@ -52,7 +53,6 @@ export default function ClaimList({ claims, tracebacksByClaimId, graph, evidence
         const expanded = expandedId === claim.claim_id;
         const sharedCount = claim.evidence_refs.filter((ref) => alertRefSet.has(ref)).length;
         const tb = tracebacksByClaimId.get(claim.claim_id) ?? null;
-        const nodeById = new Map(graph.nodes.map((n) => [n.node_id, n]));
         // 链节点去重（实测 4/22 链含重复 UUID）
         const chainNodes = tb
           ? Array.from(new Set(tb.chain_node_ids))

@@ -135,6 +135,27 @@ describe('store — SQLite db data source', () => {
     expect(s.evidence).toEqual([]);
   });
 
+  test('switching from a db import to demo clears db-only fields', async () => {
+    // 1. Import a db — this populates claims/tracebacks/intents/actions/overview
+    const dbImport = await loadDatabaseFromBytes(new Uint8Array(fixtureBytes()), 'run-42.db');
+    useAppStore.getState().loadDatabase(dbImport);
+    expect(useAppStore.getState().claims).toHaveLength(2);
+    expect(useAppStore.getState().overview).not.toBeNull();
+
+    // 2. Switch to demo data — should clear the db-only fields
+    useAppStore.getState().loadDemo();
+
+    const s = useAppStore.getState();
+    expect(s.claims).toEqual([]);
+    expect(s.tracebacks).toEqual([]);
+    expect(s.intents).toEqual([]);
+    expect(s.actions).toEqual([]);
+    expect(s.overview).toBeNull();
+    // Non-db fields are still populated from demo
+    expect(s.graph.nodes.length).toBeGreaterThan(0);
+    expect(s.alerts.length).toBeGreaterThan(0);
+  });
+
   test('loadRun reports an error when both the db and API paths fail', async () => {
     vi.mocked(api.getRunDb).mockRejectedValueOnce(new Error('HTTP 404'));
     vi.mocked(api.getGraph).mockRejectedValueOnce(new Error('HTTP 404'));

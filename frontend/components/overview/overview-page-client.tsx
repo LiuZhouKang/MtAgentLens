@@ -108,7 +108,7 @@ export default function OverviewPageClient() {
     0,
   );
   const totalEvidence = clusterModels.reduce((sum, model) => sum + model.linkedEvidence.length, 0);
-  const totalDelegations = graph.edges.filter(
+  const _totalDelegations = graph.edges.filter(
     (edge) => edge.edge_type === 'AgentDelegatesTo',
   ).length;
   const totalCriticalAlerts = alerts.filter((alert) => alert.severity === 'Critical').length;

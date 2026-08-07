@@ -17,6 +17,9 @@ function fmtDuration(ms: number | null): string {
   return `${Math.round(ms / 60_000)}m`;
 }
 
+/** Formats ns as HH:MM:SS assuming epoch-based nanoseconds. The collector's
+ *  event timestamps are boot-relative (bpf_ktime_get_ns); the real db's
+ *  runs.started_at_ns / ended_at_ns are currently NULL so this is latent. */
 function fmtClock(ns: number | null): string {
   if (ns == null) return '—';
   return new Date(ns / 1_000_000).toISOString().slice(11, 19);

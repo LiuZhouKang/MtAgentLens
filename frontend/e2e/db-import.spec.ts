@@ -119,7 +119,10 @@ test.describe('真实 db 导入（collector.responsibility.db）', () => {
 
     // 证据就绪：证据 dock 徽标 = selectedModel.evidenceRefs.length，真实 db 应 > 0
     const evDock = page.getByRole('button', { name: '打开证据工作台' });
-    await expect(evDock).toBeVisible({ timeout: 20000 });
+    // rail 的 InvestigationModel 由 useAlertModels 在 rIC 分块中延迟计算（12ms/块，
+    // 最坏 1000ms/块 × 13 告警）。fullyParallel 多浏览器并行 + 59MB db 解析会饿死
+    // idle callback，最坏 ~20s+ 才渲染 dock。60s 是 rIC 保证上界（13s）的数倍余量。
+    await expect(evDock).toBeVisible({ timeout: 60000 });
     const evBadgeCount = parseInt(
       (await evDock.textContent())?.replace(/\D/g, '') ?? '0',
       10,
@@ -212,7 +215,10 @@ test.describe('真实 db 导入（collector.responsibility.db）', () => {
     });
 
     const evDock = page.getByRole('button', { name: '打开证据工作台' });
-    await expect(evDock).toBeVisible({ timeout: 20000 });
+    // rail 的 InvestigationModel 由 useAlertModels 在 rIC 分块中延迟计算（12ms/块，
+    // 最坏 1000ms/块 × 13 告警）。fullyParallel 多浏览器并行 + 59MB db 解析会饿死
+    // idle callback，最坏 ~20s+ 才渲染 dock。60s 是 rIC 保证上界（13s）的数倍余量。
+    await expect(evDock).toBeVisible({ timeout: 60000 });
     const evBadgeCount = parseInt(
       (await evDock.textContent())?.replace(/\D/g, '') ?? '0',
       10,

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { demoAlerts, demoGraph } from '@/lib/demo-data';
 import { deriveTracebackEdgeIds } from '@/lib/traceback';
-import { getSeverityPalette } from '@/lib/severity-palette';
 
 describe('deriveTracebackEdgeIds', () => {
   it('prefers edges linked by evidence references', () => {
@@ -42,13 +41,5 @@ describe('deriveTracebackEdgeIds', () => {
 
     const edgeIds = deriveTracebackEdgeIds(alert, edges);
     expect(edgeIds).toEqual(expect.arrayContaining(['e-delegate', 'e-taint']));
-  });
-});
-
-describe('getSeverityPalette', () => {
-  it('returns stable palette tokens for each severity', () => {
-    expect(getSeverityPalette('Critical').color).toBe('#fb7185');
-    expect(getSeverityPalette('Warning').color).toBe('#fbbf24');
-    expect(getSeverityPalette('Info').color).toBe('#7dd3fc');
   });
 });

@@ -25,41 +25,15 @@ const config = [
   },
   {
     ignores: [
-      'code.jquery.com/**',
-      'public/globe/**',
       // Vendored sql.js UMD build (copied from node_modules/sql.js) — its CJS
       // glue trips no-require-imports and minified names trip unused-vars.
       'public/sql-wasm.js',
       'scripts/**',
-      'fonts.googleapis.com/**',
-      'index.html',
-      'style.css',
-      'select2.css',
-      '.lighthouseci/**',
-      '.trae/reports/eslint-report.json',
       'coverage/**',
       'test-results/**',
       'storybook-static/**',
       'out/**',
-      '**/*.cjs', // legacy OSS capture/debug scripts (CommonJS)
     ],
-  },
-  {
-    files: [
-      'lib/*contract.ts',
-      'components/ui/agent-*-dashboard.tsx',
-      'components/ui/analyzer-dashboard.tsx',
-      'components/ui/data-exfiltration-dashboard.tsx',
-      'components/ui/dedup-diagnostics-panel.tsx',
-      'components/ui/intent-verifier-dashboard.tsx',
-      'components/ui/llm-api-*-dashboard.tsx',
-      'components/ui/session-health-dashboard.tsx',
-      'components/ui/sse-content-scanner-dashboard.tsx',
-      'engine/**',
-    ],
-    rules: {
-      '@typescript-eslint/no-unused-vars': 'off',
-    },
   },
   eslintConfigPrettier,
 ];

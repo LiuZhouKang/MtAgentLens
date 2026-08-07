@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { demoAlerts, demoEvidence, demoGraph } from '@/lib/demo-data';
 import { buildClusterModel, compareClusterModels } from '@/lib/cluster-model';
-import { buildAgentModel } from '@/lib/agent-model';
 
 describe('stellar model builders', () => {
   it('builds a cluster model from graph, alerts and evidence', () => {
@@ -39,36 +38,6 @@ describe('stellar model builders', () => {
     expect(model.pressureScore).toBeGreaterThan(0);
   });
 
-  it('builds an agent model with touched resources, related agents and linked evidence', () => {
-    const model = buildAgentModel('agent-frontend', demoGraph, demoAlerts, demoEvidence);
-
-    expect(model.agentId).toBe('agent-frontend');
-    expect(model.alertIds).toEqual(expect.arrayContaining(['demo-alert-1', 'demo-alert-2']));
-    expect(model.relatedAgentIds).toEqual(
-      expect.arrayContaining(['agent-security', 'agent-builder']),
-    );
-    expect(model.touchedResources).toEqual(
-      expect.arrayContaining([
-        '/src/components/Button.tsx',
-        '/package.json',
-        'api.anthropic.com:443',
-      ]),
-    );
-    expect(model.surfacedResources).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ label: '/src/components/Button.tsx' }),
-        expect.objectContaining({ label: '/package.json' }),
-        expect.objectContaining({ label: 'api.anthropic.com:443' }),
-      ]),
-    );
-    expect(model.surfacedResources.length).toBeLessThanOrEqual(8);
-    expect(model.resourceCounts.files).toBeGreaterThan(0);
-    expect(model.resourceCounts.networks).toBeGreaterThan(0);
-    expect(model.linkedEvidence.map((item) => item.evidence_id)).toEqual(
-      expect.arrayContaining(['ev-1', 'ev-2', 'ev-4']),
-    );
-  });
-
   it('returns a stable empty cluster model when no matching data is found', () => {
     const model = buildClusterModel('cluster-missing', demoGraph, demoAlerts, demoEvidence);
 
@@ -101,25 +70,5 @@ describe('stellar model builders', () => {
       'agent-frontend',
       'agent-builder',
     ]);
-  });
-
-  it('returns a stable empty agent model when no matching data is found', () => {
-    const model = buildAgentModel('agent-missing', demoGraph, demoAlerts, demoEvidence);
-
-    expect(model.agentId).toBe('agent-missing');
-    expect(model.alertIds).toEqual([]);
-    expect(model.relatedAgentIds).toEqual([]);
-    expect(model.touchedResources).toEqual([]);
-    expect(model.surfacedResources).toEqual([]);
-    expect(model.resourceCounts).toEqual({
-      files: 0,
-      networks: 0,
-      tools: 0,
-      processes: 0,
-      contexts: 0,
-      boundaries: 0,
-      other: 0,
-    });
-    expect(model.linkedEvidence).toEqual([]);
   });
 });

@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll } from 'vitest';
+import { cleanup } from '@testing-library/react';
 import initSqlJs from 'sql.js';
 import { server } from '@/mocks/server';
 
@@ -52,6 +53,7 @@ beforeAll(() => {
 });
 
 afterEach(() => {
+  cleanup();
   server.resetHandlers();
 });
 

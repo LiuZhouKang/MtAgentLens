@@ -60,7 +60,7 @@ const EXPECTED = {
   nodes: 1461,
   alerts: 13,
   evidence: 1823,
-  meta: '1461 节点 · 13 告警 · 1823 证据',
+  meta: '1461 节点 · 13 告警 · 1823 证据 · 22 声明 · 22 回溯 · 23 意图 · 474 动作',
 };
 
 // 有完整图但 responsibility_alerts 为空的 run —— 曾导致态势页永远 LoadingScreen

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
@@ -9,8 +9,12 @@ import { SectionPanel } from '@/components/ui/linear/section-panel';
 import { StatusBadge, type StatusTone } from '@/components/ui/linear/status-badge';
 import LoadingIndicator from '@/components/ui/loading-indicator';
 import VirtualList from '@/components/ui/virtual-list';
+import ClaimList from '@/components/investigation/claim-list';
 import type { ResponsibilityAlert } from '@/lib/types';
 import type { InvestigationModel } from '@/lib/investigation';
+import { collectAlertEvidenceRefs } from '@/lib/investigation';
+import { useAppStore } from '@/lib/store';
+import { buildTracebacksByClaimId } from '@/lib/traceback-index';
 
 const T = { xs: 9.5, sm: 10.5, md: 12, lg: 14, xl: 16 };
 const S = { xs: 2, sm: 4, md: 8, lg: 12, xl: 16 };
@@ -29,6 +33,15 @@ const evKindIcons: Record<string, typeof FileSearch> = {
 interface Props { alert: ResponsibilityAlert; model: InvestigationModel; activeRunId: string | null; availableAlerts: ResponsibilityAlert[]; onSelectAlert: (id: string) => void; evidenceLoading: boolean; evidenceError: string | null; }
 
 export default function InvestigationWorkbench({ alert, model, availableAlerts, onSelectAlert, evidenceLoading, evidenceError }: Props) {
+  const claims = useAppStore((s) => s.claims);
+  const tracebacks = useAppStore((s) => s.tracebacks);
+  const graph = useAppStore((s) => s.graph);
+  const tracebacksByClaimId = useMemo(() => buildTracebacksByClaimId(tracebacks), [tracebacks]);
+  const alertEvidenceRefs = useMemo(
+    () => collectAlertEvidenceRefs(alert, graph),
+    [alert, graph],
+  );
+
   const timelineRef = useRef<HTMLDivElement>(null);
   const evidenceRef = useRef<HTMLDivElement>(null);
 
@@ -254,6 +267,16 @@ export default function InvestigationWorkbench({ alert, model, availableAlerts, 
                 </div>
               )}
             </div>
+          </SectionPanel>
+
+          <SectionPanel eyebrow="责任声明" title={`${claims.length} 条`} bodyClassName="ln-panel-body">
+            <ClaimList
+              claims={claims}
+              tracebacksByClaimId={tracebacksByClaimId}
+              graph={graph}
+              evidence={model.linkedEvidence}
+              alertEvidenceRefs={alertEvidenceRefs}
+            />
           </SectionPanel>
         </div>
 

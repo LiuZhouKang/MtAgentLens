@@ -1,6 +1,6 @@
 'use client';
 
-import type { CorrelationEvidence } from '@/lib/types';
+import type { Action, CorrelationEvidence, Intent } from '@/lib/types';
 
 const matchColors: Record<string, string> = {
   L1Exact: '#34d399',
@@ -10,7 +10,15 @@ const matchColors: Record<string, string> = {
   L5Substring: '#f43f5e',
 };
 
-export default function IntentActionMatch({ evidence }: { evidence: CorrelationEvidence }) {
+export default function IntentActionMatch({
+  evidence,
+  intent,
+  action,
+}: {
+  evidence: CorrelationEvidence;
+  intent?: Intent;
+  action?: Action;
+}) {
   return (
     <div className="mb-2 rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)' }}>
       <div className="mb-1 flex items-center gap-2">
@@ -26,7 +34,8 @@ export default function IntentActionMatch({ evidence }: { evidence: CorrelationE
         <span className="text-[12px] text-[#68687a]">置信度 {evidence.confidence.toFixed(2)}</span>
       </div>
       <div className="font-mono text-[12px] text-white/60">
-        intent:{evidence.intent_id.slice(0, 8)} → action:{evidence.action_id.slice(0, 8)}
+        {intent ? intent.tool_name : evidence.intent_id.slice(0, 8)} →{' '}
+        {action ? action.action_type : evidence.action_id.slice(0, 8)}
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { MetricCard } from '@/components/ui/linear/metric-card';
 import { SectionPanel } from '@/components/ui/linear/section-panel';
 import { StatusBadge, type StatusTone } from '@/components/ui/linear/status-badge';
+import OverviewDatasetPanel from '@/components/overview/dataset-overview-panel';
 import { TrendChart } from '@/components/ui/linear/trend-chart';
 import LoadingScreen from '@/components/ui/loading-screen';
 import NetworkLoading from '@/components/ui/network-loading';
@@ -84,6 +85,7 @@ export default function OverviewPageClient() {
   const alerts = useAppStore((state) => state.alerts);
   const graph = useAppStore((state) => state.graph);
   const setInvestigationContext = useAppStore((state) => state.setInvestigationContext);
+  const overview = useAppStore((state) => state.overview);
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [selectedSigmaNodeId, setSelectedSigmaNodeId] = useState<string | null>(null);
 
@@ -152,16 +154,30 @@ export default function OverviewPageClient() {
       spark: [2, 3, 2, 4, 3, 5, 4, 6],
     },
     {
-      label: 'Live Events / s',
-      value: formatCompactNumber(graph.edges.length * 72),
-      delta: `↑ ${Math.max(8, totalDelegations * 3)}%`,
+      label: 'Graph Nodes',
+      value: overview ? overview.graph.nodes : graph.nodes.length,
+      delta: overview ? `${overview.graph.edges} edges` : `+${graph.edges.length}`,
       tone: 'info' as StatusTone,
       spark: [18, 22, 20, 26, 24, 30, 28, 34],
     },
     {
-      label: 'Responsibility Edges',
-      value: formatCompactNumber(graph.edges.length * 41),
-      delta: `↑ ${Math.max(12, totalBoundaryCrossings * 8)}%`,
+      label: 'Critical Claims',
+      value: overview ? (overview.claims.by_severity.Critical ?? 0) : 0,
+      delta: overview ? `of ${overview.claims.count} claims` : '—',
+      tone: (overview && (overview.claims.by_severity.Critical ?? 0) > 0 ? 'danger' : 'info') as StatusTone,
+      spark: [4, 3, 5, 2, 4, 3, 2, 1],
+    },
+    {
+      label: 'Evidence',
+      value: overview ? overview.evidence.count : totalEvidence,
+      delta: overview ? `L5 ${overview.evidence.by_match_level.L5Substring ?? 0}` : `${totalEvidence} linked`,
+      tone: 'success' as StatusTone,
+      spark: [30, 38, 44, 50, 55, 62, 68, 74],
+    },
+    {
+      label: 'Intents',
+      value: overview ? overview.intents.count : 0,
+      delta: overview ? `actions ${overview.actions.count}` : '—',
       tone: 'info' as StatusTone,
       spark: [10, 14, 12, 18, 16, 22, 20, 26],
     },
@@ -171,13 +187,6 @@ export default function OverviewPageClient() {
       delta: `↓ ${Math.max(1, alerts.length - totalCriticalAlerts)}`,
       tone: 'danger' as StatusTone,
       spark: [4, 3, 5, 2, 4, 3, 2, 1],
-    },
-    {
-      label: 'Evidence Coverage',
-      value: `${Math.min(99.6, 72 + totalEvidence * 4.3).toFixed(1)}%`,
-      delta: `↑ ${(1 + totalEvidence * 0.2).toFixed(1)}%`,
-      tone: 'success' as StatusTone,
-      spark: [30, 38, 44, 50, 55, 62, 68, 74],
     },
   ];
 
@@ -536,6 +545,11 @@ export default function OverviewPageClient() {
                 <TrendChart type="donut" data={clusterDonut} xKey="name" seriesKey="value" colors={CHART_COLORS} height={160} />
               </SectionPanel>
             </div>
+            {overview && (
+              <div style={{ marginTop: 12 }}>
+                <OverviewDatasetPanel overview={overview} />
+              </div>
+            )}
           </main>
 
           <aside className="ln-rail">

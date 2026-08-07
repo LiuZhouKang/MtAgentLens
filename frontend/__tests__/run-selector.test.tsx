@@ -156,8 +156,8 @@ describe('RunSelector — data source browser', () => {
     );
 
     fireEvent.click(screen.getByTestId('data-source-trigger'));
-    expect((await screen.findByText(/3 节点 · 2 告警 · 3 证据/)).textContent).toMatch(
-      /3 节点 · 2 告警 · 3 证据/,
+    expect((await screen.findByText(/3 节点 · 2 告警 · 3 证据 · 2 声明 · 1 回溯 · 3 意图 · 3 动作/)).textContent).toMatch(
+      /3 节点 · 2 告警 · 3 证据 · 2 声明 · 1 回溯 · 3 意图 · 3 动作/,
     );
   });
 

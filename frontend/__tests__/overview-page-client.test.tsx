@@ -62,4 +62,36 @@ describe('OverviewPageClient', () => {
 
     expect(screen.getAllByText('MtAgentLens').length).toBeGreaterThan(0);
   });
+
+  it('renders the dataset overview panel when a db overview is present', () => {
+    useAppStore.setState({
+      alerts: demoAlerts,
+      graph: demoGraph,
+      overview: {
+        run: null,
+        snapshots: { count: 1 },
+        graph: { nodes: demoGraph.nodes.length, edges: demoGraph.edges.length },
+        alerts: { count: demoAlerts.length },
+        evidence: { count: 0, by_match_level: {} },
+        claims: { count: 0, by_type: {}, by_severity: {} },
+        tracebacks: { count: 0 },
+        intents: { count: 0, by_tool_name: {}, by_authority_source: {} },
+        actions: { count: 0, by_action_type: {}, by_signal_class: {} },
+        pollution: { count: 0 },
+        policy_evaluations: { count: 0 },
+        processes: { count: 0 },
+        tls_sessions: { count: 0 },
+        identity_process_map: { count: 0 },
+        provisional_identities: { count: 0 },
+        agent_identities: { count: 0 },
+        message_bindings: { count: 0 },
+        delegation_records: { count: 0 },
+        subagent_boundaries: { count: 0 },
+        refinements: { claim: 0, classification: 0, evidence: 0, graph: 0, identity: 0 },
+        non_link_diagnostics: { count: 0 },
+      },
+    });
+    render(<OverviewPageClient />, { wrapper: createWrapper() });
+    expect(screen.getByText('数据源详情')).toBeDefined();
+  });
 });

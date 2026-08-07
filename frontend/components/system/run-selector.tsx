@@ -96,9 +96,10 @@ function entryMeta(entry: SourceEntry): string | null {
     case 'demo':
       return '演示';
     case 'file':
-      // Db imports carry real correlation evidence; JSON snapshots do not.
+      // Db imports carry real correlation evidence + full-table counts; JSON
+      // snapshots only expose graph + alerts.
       return isDbImport(entry.snapshot)
-        ? `${entry.snapshot.nodeCount} 节点 · ${entry.snapshot.alertCount} 告警 · ${entry.snapshot.evidenceCount} 证据`
+        ? `${entry.snapshot.nodeCount} 节点 · ${entry.snapshot.alertCount} 告警 · ${entry.snapshot.evidenceCount} 证据 · ${entry.snapshot.claimCount} 声明 · ${entry.snapshot.tracebackCount} 回溯 · ${entry.snapshot.intentCount} 意图 · ${entry.snapshot.actionCount} 动作`
         : `${entry.snapshot.nodeCount} 节点 · ${entry.snapshot.alertCount} 告警`;
     case 'import':
       return null;

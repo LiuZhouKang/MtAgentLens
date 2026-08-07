@@ -14,6 +14,7 @@ import { SectionPanel } from '@/components/ui/linear/section-panel';
 import { StatusBadge, type StatusTone } from '@/components/ui/linear/status-badge';
 import AgentAvatar from '@/components/ui/agent-avatar';
 import VirtualList from '@/components/ui/virtual-list';
+import IntentActionChain from '@/components/traces/intent-action-chain';
 import { agentColor, shortAgentId } from '@/lib/agent-identity';
 import { demoAlerts } from '@/lib/demo-data';
 import { useAppStore } from '@/lib/store';
@@ -156,6 +157,8 @@ export default function TracesPageClient() {
   const alerts = deferredAlerts.length ? deferredAlerts : demoAlerts;
   const currentRunId = useAppStore(s => s.activeRunId);
   const { evidenceItems } = useRunEvidence(currentRunId);
+  const storeIntents = useAppStore((s) => s.intents);
+  const storeActions = useAppStore((s) => s.actions);
   const runs = useMemo(() => alerts.map(a => buildTraceRunModel(a, evidenceItems)), [alerts, evidenceItems]);
   const [tid, setTid] = useState(routeAlertId ?? runs[0]?.id ?? '');
   const [filter, setFilter] = useState<TraceEventKind | 'all'>('all');
@@ -313,6 +316,9 @@ export default function TracesPageClient() {
               />
             )}
           </div>
+        </SectionPanel>
+        <SectionPanel eyebrow="意图动作链" title={`${storeIntents.length} 意图 · ${storeActions.length} 动作`} bodyClassName="ln-panel-body">
+          <IntentActionChain intents={storeIntents} actions={storeActions} evidence={evidenceItems} />
         </SectionPanel>
         <div className="trace-detail-panel" style={{ display: 'flex', flexDirection: 'column', gap: S.lg, position: 'sticky', top: 44 }}>
           {sel ? (<SectionPanel eyebrow={kindLabel[sel.kind]} title={sel.title} meta={sel.operation ?? undefined} bodyClassName="ln-panel-body"><div style={{ display: 'flex', flexDirection: 'column', gap: S.sm, maxHeight: 420, overflowY: 'auto' }}><div style={{ display: 'flex', alignItems: 'center', gap: S.sm, paddingBottom: S.sm, borderBottom: '1px solid var(--ln-border)' }}>

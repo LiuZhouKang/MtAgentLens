@@ -263,7 +263,8 @@ export interface DatasetOverview {
   intents: { count: number; by_tool_name: Record<string, number>; by_authority_source: Record<string, number> };
   actions: { count: number; by_action_type: Record<string, number>; by_signal_class: Record<string, number> };
   pollution: { count: number };
-  policy_evaluations: { count: number };
+  /** count=评估总数，violations=judgment_json.result === 'Violation' 的真实违规数 */
+  policy_evaluations: { count: number; violations: number };
   processes: { count: number };
   tls_sessions: { count: number };
   identity_process_map: { count: number };

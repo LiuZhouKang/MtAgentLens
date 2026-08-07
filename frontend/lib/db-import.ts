@@ -18,6 +18,14 @@ import type {
   ResponsibilityClaim,
   ResponsibilityTraceback,
 } from './types';
+import type {
+  MismatchExtract,
+  PollutionExtract,
+  PolicyExtract,
+  SnapshotMetricsExtract,
+  SnapshotMetricFrame,
+  TlsExtract,
+} from './monitoring/monitoring-types';
 import { deriveGraphMetrics } from './graph-metrics';
 
 /**
@@ -439,7 +447,10 @@ export function extractDatasetOverviewFromDb(db: Database): DatasetOverview {
       by_signal_class: groupCount('actions', 'signal_class'),
     },
     pollution: { count: count('context_pollution_events') },
-    policy_evaluations: { count: count('policy_evaluations') },
+    policy_evaluations: (() => {
+      const c = extractPolicyComplianceFromDb(db);
+      return { count: c.total, violations: c.violations };
+    })(),
     processes: { count: count('process_events') },
     tls_sessions: { count: count('tls_sessions') },
     identity_process_map: { count: count('identity_process_map') },
@@ -617,6 +628,153 @@ export function extractEvidenceFromDb(db: Database): CorrelationEvidence[] {
     phase: parsePhaseIndicator(r.phase) ?? { Provisional: { timestamp_ns: Number(r.timestamp_ns ?? 0) } },
     timestamp_ns: Number(r.timestamp_ns ?? 0),
   }));
+}
+
+const sumValues = (record: Record<string, number>): number =>
+  Object.values(record).reduce((sum, n) => sum + n, 0);
+
+/** 快照帧：仅读 metrics_json（绝不解析 nodes/edges_json）。null metrics 行跳过。 */
+export function extractSnapshotMetricsFromDb(
+  db: Database,
+): SnapshotMetricsExtract {
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(
+      db,
+      'SELECT snapshot_id, timestamp_ns, metrics_json FROM graph_snapshots ORDER BY timestamp_ns ASC',
+    );
+  } catch {
+    return { available: false, frames: [] }; // Table absent.
+  }
+  const frames: SnapshotMetricFrame[] = [];
+  for (const r of rows) {
+    const m = parseJsonObject<{
+      node_counts?: Record<string, number>;
+      edge_counts?: Record<string, number>;
+      agent_count?: number;
+      cross_agent_edges?: number;
+      delegation_depth?: number;
+      taint_chains?: number;
+      avg_confidence?: number;
+    }>(r.metrics_json);
+    if (!m) continue; // null/坏 JSON 帧跳过（如 fixture snap-old）
+    frames.push({
+      snapshot_id: String(r.snapshot_id ?? ''),
+      timestamp_ns: Number(r.timestamp_ns ?? 0),
+      nodeCount: sumValues(m.node_counts ?? {}),
+      edgeCount: sumValues(m.edge_counts ?? {}),
+      agentCount: Number(m.agent_count ?? 0),
+      crossAgentEdges: Number(m.cross_agent_edges ?? 0),
+      delegationDepth: Number(m.delegation_depth ?? 0),
+      taintChains: Number(m.taint_chains ?? 0),
+      avgConfidence: Number(m.avg_confidence ?? 0),
+    });
+  }
+  return { available: true, frames };
+}
+
+/** 意图-动作失配：nld 按 reason + 证据按 match_level（L5Substring 弱 / 其余强）。 */
+export function extractMismatchAggregateFromDb(db: Database): MismatchExtract {
+  const byReason: Record<string, number> = {};
+  let count = 0;
+  try {
+    const rows = queryRows(
+      db,
+      'SELECT reason AS k, COUNT(*) AS n FROM non_link_diagnostics GROUP BY reason',
+    );
+    for (const r of rows) {
+      const n = Number(r.n ?? 0);
+      byReason[String(r.k ?? '')] = n;
+      count += n;
+    }
+  } catch {
+    return { available: false, count: 0, byReason: {}, weak: 0, strong: 0 };
+  }
+  let weak = 0;
+  let strong = 0;
+  try {
+    const rows = queryRows(
+      db,
+      'SELECT match_level AS k, COUNT(*) AS n FROM correlation_evidence GROUP BY match_level',
+    );
+    for (const r of rows) {
+      const n = Number(r.n ?? 0);
+      if (String(r.k) === 'L5Substring') weak += n;
+      else strong += n;
+    }
+  } catch {
+    // correlation_evidence 缺表 → weak/strong 归零（证据不是本视角的主信号）
+  }
+  return { available: true, count, byReason, weak, strong };
+}
+
+/** 上下文污染：按 source_agent_id 聚合。 */
+export function extractPollutionAggregateFromDb(db: Database): PollutionExtract {
+  const bySource: Record<string, number> = {};
+  let count = 0;
+  try {
+    const rows = queryRows(
+      db,
+      'SELECT source_agent_id AS k, COUNT(*) AS n FROM context_pollution_events GROUP BY source_agent_id',
+    );
+    for (const r of rows) {
+      const n = Number(r.n ?? 0);
+      bySource[String(r.k ?? '')] = n;
+      count += n;
+    }
+  } catch {
+    return { available: false, count: 0, bySource: {} };
+  }
+  return { available: true, count, bySource };
+}
+
+/** 策略合规：逐行解析 judgment_json.result === 'Violation'。无时间戳，不做时间趋势。 */
+export function extractPolicyComplianceFromDb(db: Database): PolicyExtract {
+  const byBoundary: Record<string, number> = {};
+  let total = 0;
+  let violations = 0;
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(db, 'SELECT boundary, judgment_json FROM policy_evaluations');
+  } catch {
+    return { available: false, total: 0, violations: 0, byBoundary: {} };
+  }
+  for (const r of rows) {
+    total++;
+    const b = r.boundary == null || r.boundary === '' ? 'null' : String(r.boundary);
+    byBoundary[b] = (byBoundary[b] ?? 0) + 1;
+    const judgment = parseJsonObject<{ result?: string }>(r.judgment_json);
+    if (judgment?.result === 'Violation') violations++;
+  }
+  return { available: true, total, violations, byBoundary };
+}
+
+/** 网络会话：total + byPid + 60s 时间桶趋势（timestamp_ns）。 */
+export function extractTlsSessionAggregateFromDb(db: Database): TlsExtract {
+  const byPid: Record<string, number> = {};
+  let total = 0;
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(db, 'SELECT pid, timestamp_ns FROM tls_sessions ORDER BY timestamp_ns ASC');
+  } catch {
+    return { available: false, total: 0, byPid: {}, trend: [] };
+  }
+  const BUCKET_NS = 60_000_000_000;
+  const buckets = new Map<number, number>();
+  for (const r of rows) {
+    total++;
+    const pid = String(r.pid ?? '');
+    byPid[pid] = (byPid[pid] ?? 0) + 1;
+    const ts = Number(r.timestamp_ns ?? 0);
+    if (ts > 0) {
+      const t = Math.floor(ts / BUCKET_NS) * BUCKET_NS;
+      buckets.set(t, (buckets.get(t) ?? 0) + 1);
+    }
+  }
+  const trend = [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([t, count]) => ({ t, count }));
+  return { available: true, total, byPid, trend };
 }
 
 export function extractCountsFromDb(

@@ -15,7 +15,7 @@ const overview: DatasetOverview = {
   intents: { count: 23, by_tool_name: { Bash: 9 }, by_authority_source: { SseResponseToolUse: 20 } },
   actions: { count: 474, by_action_type: { FileRead: 424 }, by_signal_class: { HighSignal: 100 } },
   pollution: { count: 219 },
-  policy_evaluations: { count: 755 },
+  policy_evaluations: { count: 755, violations: 12 },
   processes: { count: 160 },
   tls_sessions: { count: 1067 },
   identity_process_map: { count: 196 },

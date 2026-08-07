@@ -15,7 +15,7 @@ function sampleOverview(over: Partial<DatasetOverview> = {}): DatasetOverview {
     intents: { count: 0, by_tool_name: {}, by_authority_source: {} },
     actions: { count: 0, by_action_type: {}, by_signal_class: {} },
     pollution: { count: 0 },
-    policy_evaluations: { count: 0 },
+    policy_evaluations: { count: 0, violations: 0 },
     processes: { count: 0 },
     tls_sessions: { count: 0 },
     identity_process_map: { count: 0 },
@@ -80,7 +80,7 @@ describe('deriveDatasetSummary — 纯函数派生（Nothing is invented）', ()
         pollution: { count: 219 },
         claims: { count: 3, by_type: {}, by_severity: { Critical: 3 } },
         evidence: { count: 1823, by_match_level: { L5Substring: 830, L1Exact: 38 } },
-        policy_evaluations: { count: 755 },
+        policy_evaluations: { count: 755, violations: 12 },
       }),
     )
     expect(s.signals).toHaveLength(4)

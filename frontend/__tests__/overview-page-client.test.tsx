@@ -78,7 +78,7 @@ describe('OverviewPageClient', () => {
         intents: { count: 0, by_tool_name: {}, by_authority_source: {} },
         actions: { count: 0, by_action_type: {}, by_signal_class: {} },
         pollution: { count: 0 },
-        policy_evaluations: { count: 0 },
+        policy_evaluations: { count: 0, violations: 0 },
         processes: { count: 0 },
         tls_sessions: { count: 0 },
         identity_process_map: { count: 0 },

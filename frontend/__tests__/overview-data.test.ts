@@ -117,4 +117,24 @@ describe('deriveDatasetSummary — 纯函数派生（Nothing is invented）', ()
     expect(byCategory['意图动作'].items).toContainEqual({ label: '意图', value: 23 })
     expect(byCategory['意图动作'].items).toContainEqual({ label: '动作', value: 474 })
   })
+
+  it('策略违规信号使用 judgment_json 真实违规数而非全量评估数（M1 修复）', () => {
+    const s = deriveDatasetSummary(
+      sampleOverview({
+        policy_evaluations: { count: 755, violations: 12 },
+        claims: { count: 0, by_type: {}, by_severity: {} },
+      }),
+    )
+    const policy = s.signals.find((x) => x.category === 'policy-violations')
+    expect(policy).toBeTruthy()
+    expect(policy!.count).toBe(12)
+    expect(policy!.detail).toContain('Violation')
+  })
+
+  it('无违规时不产生策略信号（nothing is invented）', () => {
+    const s = deriveDatasetSummary(
+      sampleOverview({ policy_evaluations: { count: 755, violations: 0 } }),
+    )
+    expect(s.signals.find((x) => x.category === 'policy-violations')).toBeUndefined()
+  })
 })

@@ -132,13 +132,14 @@ export function deriveDatasetSummary(overview: DatasetOverview): DatasetSummary 
       count: weakCount,
     })
   }
-  if (overview.policy_evaluations.count > 0) {
+  const policyViolations = overview.policy_evaluations.violations ?? 0
+  if (policyViolations > 0) {
     signals.push({
       severity: 'Warning',
       category: 'policy-violations',
-      title: '策略评估',
+      title: '策略违规',
       detail: 'judgment_json.result = Violation',
-      count: overview.policy_evaluations.count,
+      count: policyViolations,
     })
   }
 

@@ -680,7 +680,6 @@ git commit -m "监控数据层类型与聚合提取器：新增 6 视角类型�
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import initSqlJs from 'sql.js';
-import { loadDatabase } from '@/lib/db-import';
 import { deriveMonitoringState, type MonitoringDeriveInput } from '@/lib/monitoring/derive-monitoring';
 import {
   extractSnapshotMetricsFromDb,
@@ -1012,12 +1011,13 @@ export function deriveMonitoringState(input: MonitoringDeriveInput): MonitoringS
         signals: tls.available ? [`会话 ${tls.total}`, `进程 ${Object.keys(tls.byPid).length}`] : ['无 TLS 会话表'],
       },
     },
-    topologyDrift,
-    topologyHealth,
-    intentMismatch,
-    policyCompliance,
+    // 详情 state 与 available 一致：缺表视角 = null（类型契约 `| null`，测试断言）
+    topologyDrift: snapshots.available ? topologyDrift : null,
+    topologyHealth: healthAvailable ? topologyHealth : null,
+    intentMismatch: mismatch.available ? intentMismatch : null,
+    policyCompliance: policy.available ? policyCompliance : null,
     toolFootprint,
-    networkSessions,
+    networkSessions: tls.available ? networkSessions : null,
   }
 }
 ```
@@ -1263,7 +1263,7 @@ git commit -m "修复概览策略违规假阳性：违规信号改为消费 judg
 ```tsx
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import MonitoringSection from '@/components/overview/monitoring/monitoring-section';
 import { useAppStore } from '@/lib/store';
 import type { MonitoringState, PerspectiveHealth, PerspectiveKey } from '@/lib/monitoring/monitoring-types';
@@ -1317,25 +1317,28 @@ describe('MonitoringSection', () => {
       monitoring: makeMonitoring({ health: health({ topologyDrift: { available: false } }) }),
     });
     render(<MonitoringSection />);
-    // 缺表格显示无此表（文字而非颜色）
-    expect(screen.getByText('无此表')).toBeTruthy();
+    // 缺表格显示无此表（文字而非颜色）——健康格 + 卡片各一处，故 getAllByText
+    expect(screen.getAllByText('无此表').length).toBeGreaterThan(0);
   });
 
-  it('点击 tab 就地切换到详情外壳，返回全部恢复卡片网格', () => {
+  it('点击健康格就地切换到详情外壳，返回全部恢复卡片网格', () => {
     useAppStore.setState({ monitoring: makeMonitoring() });
     render(<MonitoringSection />);
-    // 默认全部 → 卡片网格可见
-    expect(screen.getByText('返回全部')).toBeTruthy(); // 全部态渲染返回锚（禁用态由实现决定）
-    // 点击「拓扑漂移」健康格（name 为按钮完整可访问名，用正则子串匹配）
+    // 默认全部 → 卡片网格可见（无详情外壳，描述文案不存在）
+    expect(screen.queryByText(/逐帧演进/)).toBeNull();
+    // 点击「拓扑漂移」健康格（name 为按钮完整可访问名，用正则子串匹配；[0]=健康格，先于 tab/卡片在 DOM 中）
     const driftCell = screen.getAllByRole('button', { name: /拓扑漂移/ })[0];
-    driftCell.click();
+    act(() => { driftCell.click(); });
     // 详情外壳出现唯一描述文案（card grid 已替换为外壳）
     expect(screen.getByText(/逐帧演进/)).toBeTruthy();
+    // 返回全部恢复网格（返回按钮 aria-label="返回全部"，与「← 返回全部」正文不同）
+    act(() => { screen.getByRole('button', { name: '返回全部' }).click(); });
+    expect(screen.queryByText(/逐帧演进/)).toBeNull();
   });
 });
 ```
 
-> 注：第 3 条断言锚点 = 详情外壳的**唯一描述文案**（`graph_snapshots.metrics_json 逐帧演进…`，仅外壳渲染，健康格/tab 不重复该文案），避免 `getByText(/拓扑漂移/)` 因健康格/tab/面包屑多处匹配抛错。测试以「能验证意图」为纲，不强绑实现细节。
+> 注：断言锚点 = 详情外壳的**唯一描述文案**（`graph_snapshots.metrics_json 逐帧演进…`，仅外壳渲染，健康格/tab 不重复该文案），避免 `getByText(/拓扑漂移/)` 因健康格/tab/面包屑多处匹配抛错。测试以「能验证意图」为纲，不强绑实现细节。React 19 + testing-library 16 下点击驱动状态变更须用 `act()` 包裹（Step 8 已授权此调整，断言语义不变）。
 
 - [ ] **Step 2: 运行确认失败**
 
@@ -1630,10 +1633,9 @@ type Props = {
 }
 
 /** 详情工作台统一外壳：面包屑 + 标题/描述 + 摘要统计行 + 视图内容。 */
-export function PerspectiveDetailShell({ perspectiveKey, monitoring, onBack, onFocusAgent, children }: Props) {
+export function PerspectiveDetailShell({ perspectiveKey, monitoring, onBack, children }: Props) {
   const meta = PERSPECTIVE_META[perspectiveKey]
   const h = monitoring.health[perspectiveKey]
-  const summary = children == null ? null : (null as never) // 摘要行由 Task 7 视图经 stats 提供
 
   return (
     <div aria-label={`${meta.label}详情`}>
@@ -1663,7 +1665,7 @@ export function PerspectiveDetailShell({ perspectiveKey, monitoring, onBack, onF
 }
 ```
 
-> 注：`summary` 变量与 `onFocusAgent` prop 当前未在骨架内使用——Task 7 视图通过 children 接收 `onFocusAgent` 渲染 agent 行时用到；`summary` 为占位说明，实现时直接删除该行（避免 eslint 未用变量错误）。
+> 注：`onFocusAgent` 留在 Props 类型但 Task 6 **不解构**（ESLint 实证：未用解构 prop 必报 no-unused-vars 警告）——Task 7 外壳重写时再解构并透传给 `renderPerspectiveView`。`children` 槽由 Task 7 视图填充。
 
 - [ ] **Step 7: 接入 overview-page-client.tsx**
 
@@ -2083,7 +2085,7 @@ git commit -m "六个监控视角详情视图：漂移帧演进线图与首末�
 
 **Files:**
 - Modify: `components/overview/monitoring/monitoring-section.tsx`（agent 聚焦可解析性校验已有——见 Task 6 Step 5 `focusAgent`）
-- Modify: `components/ui/` 下 10 个孤儿 dashboard 组件（顶部加 `@deprecated` JSDoc）
+- Modify: `components/ui/` 下 11 个孤儿 dashboard 组件（顶部加 `@deprecated` JSDoc）
 - Modify（回归验证）: 无代码改动，仅跑通全部门禁
 
 **Interfaces:**
@@ -2147,7 +2149,7 @@ Run 以下命令，全部必须通过：
 
 ```bash
 git add components/ui/agent-drift-dashboard.tsx components/ui/agent-loop-dashboard.tsx components/ui/analyzer-dashboard.tsx components/ui/data-exfiltration-dashboard.tsx components/ui/dedup-diagnostics-panel.tsx components/ui/intent-verifier-dashboard.tsx components/ui/llm-api-anomaly-dashboard.tsx components/ui/llm-api-tracker-dashboard.tsx components/ui/session-health-dashboard.tsx components/ui/sse-content-scanner-dashboard.tsx components/ui/tool-execution-dashboard.tsx __tests__/monitoring-section.test.tsx
-git commit -m "运行监控交叉导航与收尾：污染源 agent 聚焦前做告警可解析校验、无告警降级提示防死链接，10 个旧 analyzer dashboard 标记 deprecated 存档，全量回归通过"
+git commit -m "运行监控交叉导航与收尾：污染源 agent 聚焦前做告警可解析校验、无告警降级提示防死链接，11 个旧 analyzer dashboard 标记 deprecated 存档，全量回归通过"
 ```
 
 ---

@@ -1,14 +1,17 @@
 import type { Database, SqlJsStatic } from 'sql.js';
 import type {
+  Action,
   AlertSeverity,
   BehaviorTimeline,
   ClaimState,
   ClaimType,
   CorrelationEvidence,
+  DatasetOverview,
   EngineSection,
   GraphData,
   GraphMetrics,
   GraphSnapshot,
+  Intent,
   NormalizedArgs,
   PhaseIndicator,
   ResponsibilityAlert,
@@ -43,6 +46,11 @@ export type DbImport = {
   graph: GraphData;
   alerts: ResponsibilityAlert[];
   evidence: CorrelationEvidence[];
+  claims: ResponsibilityClaim[];
+  tracebacks: ResponsibilityTraceback[];
+  intents: Intent[];
+  actions: Action[];
+  overview: DatasetOverview;
   metrics: GraphMetrics;
   nodeCount: number;
   edgeCount: number;
@@ -53,7 +61,7 @@ export type DbImport = {
   intentCount: number;
   actionCount: number;
   runId: string | null;
-  /** True when any of the three consumable tables yielded rows. */
+  /** True when any of the six consumable tables yielded rows. */
   hasConsumableData: boolean;
 };
 
@@ -299,6 +307,158 @@ export function extractTracebacksFromDb(db: Database): ResponsibilityTraceback[]
   }));
 }
 
+/** Load intents — pid/start_time_ns nested into process_id; args stay as raw JSON arrays. */
+export function extractIntentsFromDb(db: Database): Intent[] {
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(
+      db,
+      `SELECT intent_id, pid, process_start_time_ns, message_id, tool_name,
+              tool_args_json, intent_class, parse_state, primary_matching_eligible,
+              authority_source, timestamp_ns
+       FROM intents`,
+    );
+  } catch {
+    return []; // Table absent.
+  }
+  return rows.map((r) => ({
+    intent_id: String(r.intent_id ?? ''),
+    process_id: {
+      pid: Number(r.pid ?? 0),
+      start_time_ns: Number(r.process_start_time_ns ?? 0),
+    },
+    message_id: String(r.message_id ?? ''),
+    tool_name: String(r.tool_name ?? ''),
+    tool_args: parseJsonArray(r.tool_args_json),
+    intent_class: String(r.intent_class ?? ''),
+    parse_state: String(r.parse_state ?? ''),
+    primary_matching_eligible: Number(r.primary_matching_eligible ?? 0) !== 0,
+    authority_source: String(r.authority_source ?? ''),
+    timestamp_ns: Number(r.timestamp_ns ?? 0),
+  }));
+}
+
+/** Load actions — args stay as raw JSON arrays (Array<{Path|Command}> in real dbs). */
+export function extractActionsFromDb(db: Database): Action[] {
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(
+      db,
+      `SELECT action_id, pid, process_start_time_ns, action_type,
+              normalized_args_json, derivation_mode, signal_class, timestamp_ns
+       FROM actions`,
+    );
+  } catch {
+    return []; // Table absent.
+  }
+  return rows.map((r) => ({
+    action_id: String(r.action_id ?? ''),
+    process_id: {
+      pid: Number(r.pid ?? 0),
+      start_time_ns: Number(r.process_start_time_ns ?? 0),
+    },
+    action_type: String(r.action_type ?? ''),
+    normalized_args: parseJsonArray(r.normalized_args_json),
+    derivation_mode: String(r.derivation_mode ?? ''),
+    signal_class: String(r.signal_class ?? ''),
+    timestamp_ns: Number(r.timestamp_ns ?? 0),
+  }));
+}
+
+/** Load a per-table DatasetOverview — counts + GROUP BY distributions. Every
+ *  table query is defensive: a missing table counts as zero (small/older dbs). */
+export function extractDatasetOverviewFromDb(db: Database): DatasetOverview {
+  const count = (table: string): number => {
+    try {
+      const rows = queryRows(db, `SELECT COUNT(*) AS n FROM ${table}`);
+      return Number(rows[0]?.n ?? 0);
+    } catch {
+      return 0; // Table absent.
+    }
+  };
+  const groupCount = (table: string, column: string): Record<string, number> => {
+    const result: Record<string, number> = {};
+    try {
+      const rows = queryRows(
+        db,
+        `SELECT ${column} AS k, COUNT(*) AS n FROM ${table} GROUP BY ${column}`,
+      );
+      for (const r of rows) {
+        const key = r.k === null || r.k === undefined ? 'null' : String(r.k);
+        result[key] = Number(r.n ?? 0);
+      }
+    } catch {
+      // Table or column absent.
+    }
+    return result;
+  };
+  const runRow = (() => {
+    try {
+      return queryRows(
+        db,
+        `SELECT run_id, started_at_ns, ended_at_ns, scenario_id, mode, collector_version
+         FROM runs LIMIT 1`,
+      )[0];
+    } catch {
+      return undefined;
+    }
+  })();
+
+  return {
+    run: runRow
+      ? {
+          run_id: runRow.run_id ? String(runRow.run_id) : null,
+          started_at_ns: runRow.started_at_ns != null ? Number(runRow.started_at_ns) : null,
+          ended_at_ns: runRow.ended_at_ns != null ? Number(runRow.ended_at_ns) : null,
+          scenario_id: runRow.scenario_id ? String(runRow.scenario_id) : null,
+          mode: runRow.mode ? String(runRow.mode) : null,
+          collector_version: runRow.collector_version ? String(runRow.collector_version) : null,
+        }
+      : null,
+    snapshots: { count: count('graph_snapshots') },
+    graph: { nodes: count('graph_nodes'), edges: count('graph_edges') },
+    alerts: { count: count('responsibility_alerts') },
+    evidence: {
+      count: count('correlation_evidence'),
+      by_match_level: groupCount('correlation_evidence', 'match_level'),
+    },
+    claims: {
+      count: count('responsibility_claims'),
+      by_type: groupCount('responsibility_claims', 'claim_type'),
+      by_severity: groupCount('responsibility_claims', 'severity'),
+    },
+    tracebacks: { count: count('responsibility_tracebacks') },
+    intents: {
+      count: count('intents'),
+      by_tool_name: groupCount('intents', 'tool_name'),
+      by_authority_source: groupCount('intents', 'authority_source'),
+    },
+    actions: {
+      count: count('actions'),
+      by_action_type: groupCount('actions', 'action_type'),
+      by_signal_class: groupCount('actions', 'signal_class'),
+    },
+    pollution: { count: count('context_pollution_events') },
+    policy_evaluations: { count: count('policy_evaluations') },
+    processes: { count: count('process_events') },
+    tls_sessions: { count: count('tls_sessions') },
+    identity_process_map: { count: count('identity_process_map') },
+    provisional_identities: { count: count('provisional_identities') },
+    agent_identities: { count: count('agent_identities') },
+    message_bindings: { count: count('message_bindings') },
+    delegation_records: { count: count('delegation_records') },
+    subagent_boundaries: { count: count('subagent_boundaries') },
+    refinements: {
+      claim: count('claim_refinements'),
+      classification: count('classification_refinements'),
+      evidence: count('evidence_refinements'),
+      graph: count('graph_refinements'),
+      identity: count('identity_refinements'),
+    },
+    non_link_diagnostics: { count: count('non_link_diagnostics') },
+  };
+}
+
 const EMPTY_GRAPH: { graph: GraphData; metrics: null; runId: null } = {
   graph: { nodes: [], edges: [] },
   metrics: null,
@@ -498,6 +658,11 @@ export async function loadDatabase(bytes: Uint8Array, fileName: string): Promise
     const { graph, metrics, runId } = extractGraphFromDb(db);
     const alerts = extractAlertsFromDb(db);
     const evidence = extractEvidenceFromDb(db);
+    const claims = extractClaimsFromDb(db);
+    const tracebacks = extractTracebacksFromDb(db);
+    const intents = extractIntentsFromDb(db);
+    const actions = extractActionsFromDb(db);
+    const overview = extractDatasetOverviewFromDb(db);
     const counts = extractCountsFromDb(db);
     const resolvedMetrics = metrics ?? deriveGraphMetrics(graph);
 
@@ -507,6 +672,11 @@ export async function loadDatabase(bytes: Uint8Array, fileName: string): Promise
       graph,
       alerts,
       evidence,
+      claims,
+      tracebacks,
+      intents,
+      actions,
+      overview,
       metrics: resolvedMetrics,
       nodeCount: graph.nodes.length,
       edgeCount: graph.edges.length,
@@ -514,7 +684,13 @@ export async function loadDatabase(bytes: Uint8Array, fileName: string): Promise
       evidenceCount: evidence.length,
       ...counts,
       runId,
-      hasConsumableData: graph.nodes.length > 0 || alerts.length > 0 || evidence.length > 0,
+      hasConsumableData:
+        graph.nodes.length > 0 ||
+        alerts.length > 0 ||
+        evidence.length > 0 ||
+        claims.length > 0 ||
+        intents.length > 0 ||
+        actions.length > 0,
     };
   } finally {
     db.close();

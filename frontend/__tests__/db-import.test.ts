@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   DatabaseImportError,
+  extractActionsFromDb,
   extractAlertsFromDb,
   extractClaimsFromDb,
   extractCountsFromDb,
+  extractDatasetOverviewFromDb,
   extractEvidenceFromDb,
   extractGraphFromDb,
+  extractIntentsFromDb,
   extractTracebacksFromDb,
   loadDatabase,
   openDatabase,
@@ -188,7 +191,11 @@ describe('db-import — SQLite query layer', () => {
 
   it('handles a database with no consumable tables gracefully', async () => {
     const db = await openDatabase(fixtureBytes());
-    db.run('DROP TABLE graph_snapshots; DROP TABLE responsibility_alerts; DROP TABLE correlation_evidence;');
+    // hasConsumableData now spans six tables (graph/alerts/evidence/claims/intents/actions).
+    db.run(
+      'DROP TABLE graph_snapshots; DROP TABLE responsibility_alerts; DROP TABLE correlation_evidence;' +
+        ' DROP TABLE responsibility_claims; DROP TABLE intents; DROP TABLE actions;',
+    );
     const bytes = db.export();
     db.close();
 
@@ -197,6 +204,83 @@ describe('db-import — SQLite query layer', () => {
     expect(result.alerts).toEqual([]);
     expect(result.evidence).toEqual([]);
     expect(result.hasConsumableData).toBe(false);
+  });
+
+  it('maps intents with process_id nesting and Array tool_args (not parseMatchedFields)', async () => {
+    const db = await openDatabase(fixtureBytes());
+    const intents = extractIntentsFromDb(db);
+    db.close();
+
+    expect(intents).toHaveLength(3);
+    const bash = intents.find((i) => i.intent_id === 'int-1')!;
+    expect(bash).toMatchObject({
+      process_id: { pid: 42, start_time_ns: 1000 },
+      message_id: 'msg-1',
+      tool_name: 'Bash',
+      intent_class: 'FileSystem',
+      parse_state: 'Eligible',
+      primary_matching_eligible: true,
+      authority_source: 'SseResponseToolUse',
+      timestamp_ns: 1000,
+    });
+    // 真实数组形态 —— 断言保留了 {Command} 键（parseMatchedFields 会把它清空）
+    expect(bash.tool_args).toEqual([{ Command: 'ls -la /tmp' }]);
+    expect(intents.find((i) => i.intent_id === 'int-3')!.primary_matching_eligible).toBe(false);
+  });
+
+  it('maps actions with process_id nesting and Array normalized_args', async () => {
+    const db = await openDatabase(fixtureBytes());
+    const actions = extractActionsFromDb(db);
+    db.close();
+
+    expect(actions).toHaveLength(3);
+    const write = actions.find((a) => a.action_id === 'act-1')!;
+    expect(write).toMatchObject({
+      process_id: { pid: 42, start_time_ns: 1000 },
+      action_type: 'FileWrite',
+      derivation_mode: 'Direct',
+      signal_class: 'HighSignal',
+      timestamp_ns: 1000,
+    });
+    // 数组形态断言（{Path} 键必须保留）
+    expect(write.normalized_args).toEqual([{ Path: '/tmp/x.sh' }]);
+    expect(actions.find((a) => a.action_id === 'act-3')!.signal_class).toBe('HighSignal');
+  });
+
+  it('extracts DatasetOverview counts and distributions from every table', async () => {
+    const db = await openDatabase(fixtureBytes());
+    const overview = extractDatasetOverviewFromDb(db);
+    db.close();
+
+    expect(overview.run).toEqual({
+      run_id: 'run-1',
+      started_at_ns: null,
+      ended_at_ns: null,
+      scenario_id: null,
+      mode: null,
+      collector_version: null,
+    });
+    expect(overview.snapshots.count).toBe(2);
+    expect(overview.graph).toEqual({ nodes: 0, edges: 0 }); // fixture 无 graph_nodes 表 → 0
+    expect(overview.alerts.count).toBe(2);
+    expect(overview.evidence.count).toBe(3);
+    expect(overview.evidence.by_match_level).toEqual({ L1Exact: 1, L3Containment: 1, L5Substring: 1 });
+    expect(overview.claims.count).toBe(2);
+    expect(overview.claims.by_type).toEqual({ TaintedContextUse: 1, PolicyViolation: 1 });
+    expect(overview.claims.by_severity).toEqual({ Critical: 1, Warning: 1 });
+    expect(overview.tracebacks.count).toBe(1);
+    expect(overview.intents.count).toBe(3);
+    expect(overview.intents.by_tool_name).toEqual({ Bash: 1, Read: 1, Glob: 1 });
+    expect(overview.actions.count).toBe(3);
+    expect(overview.actions.by_action_type).toEqual({ FileWrite: 1, FileRead: 1, ProcessExec: 1 });
+    expect(overview.pollution.count).toBe(0);
+    expect(overview.policy_evaluations.count).toBe(0);
+    expect(overview.processes.count).toBe(0);
+    expect(overview.tls_sessions.count).toBe(0);
+    expect(overview.identity_process_map.count).toBe(0);
+    expect(overview.provisional_identities.count).toBe(0);
+    expect(overview.refinements).toEqual({ claim: 0, classification: 0, evidence: 0, graph: 0, identity: 0 });
+    expect(overview.non_link_diagnostics.count).toBe(0);
   });
 });
 

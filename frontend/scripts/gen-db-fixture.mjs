@@ -150,7 +150,16 @@ async function main() {
       normalized_args_json TEXT, derivation_mode TEXT, signal_class TEXT,
       timestamp_ns INTEGER, run_id TEXT
     );
+    CREATE TABLE runs (
+      run_id TEXT, started_at_ns INTEGER, ended_at_ns INTEGER,
+      scenario_id TEXT, mode TEXT, collector_version TEXT
+    );
   `);
+
+  // Run metadata — a single row with run_id populated, rest NULL.
+  db.run('INSERT INTO runs VALUES (?,?,?,?,?,?)', [
+    'run-1', null, null, null, null, null,
+  ]);
 
   // Two snapshots; the loader must pick the latest.
   db.run('INSERT INTO graph_snapshots VALUES (?,?,?,?,?,?)', [

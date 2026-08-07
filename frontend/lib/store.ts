@@ -1,6 +1,18 @@
 import { create } from 'zustand';
 import { api } from './api';
-import type { CorrelationEvidence, ResponsibilityAlert, GraphData, GraphMetrics, AppState, ZoomLevel } from './types';
+import type {
+  Action,
+  AppState,
+  CorrelationEvidence,
+  DatasetOverview,
+  GraphData,
+  GraphMetrics,
+  Intent,
+  ResponsibilityAlert,
+  ResponsibilityClaim,
+  ResponsibilityTraceback,
+  ZoomLevel,
+} from './types';
 import { demoAlerts, demoGraph } from './demo-data';
 import { loadSampleData } from './load-sample-data';
 import { deriveGraphMetrics } from './graph-metrics';
@@ -56,6 +68,12 @@ interface AppStore {
   graphMetrics: GraphMetrics | null;
   /** Correlation evidence from the active db (import or backend download). */
   evidence: CorrelationEvidence[];
+  /** Claims / tracebacks / intents / actions from the active db (import or backend download). */
+  claims: ResponsibilityClaim[];
+  tracebacks: ResponsibilityTraceback[];
+  intents: Intent[];
+  actions: Action[];
+  overview: DatasetOverview | null;
   timelinePosition: number;
   investigationContext: InvestigationContext;
   errorMessage: string | null;
@@ -150,6 +168,11 @@ function applyDbImport(
     alerts: leanAlerts,
     graphMetrics: dbImport.metrics,
     evidence: dbImport.evidence,
+    claims: dbImport.claims,
+    tracebacks: dbImport.tracebacks,
+    intents: dbImport.intents,
+    actions: dbImport.actions,
+    overview: dbImport.overview,
     dataSource: source,
     activeRunId: source.runId ?? null,
     selectedNodeId: null,
@@ -178,6 +201,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
   graph: { nodes: [], edges: [] },
   graphMetrics: null,
   evidence: [],
+  claims: [],
+  tracebacks: [],
+  intents: [],
+  actions: [],
+  overview: null,
   timelinePosition: 0,
   investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
   errorMessage: null,

@@ -70,6 +70,11 @@ beforeEach(() => {
     graph: { nodes: [], edges: [] },
     alerts: [],
     evidence: [],
+    claims: [],
+    tracebacks: [],
+    intents: [],
+    actions: [],
+    overview: null,
     errorMessage: null,
   });
 });
@@ -88,6 +93,15 @@ describe('store — SQLite db data source', () => {
     expect(s.appState).toBe('replay');
     // graph_snapshot is stripped from stored alerts (memory).
     expect(s.alerts[0]).not.toHaveProperty('graph_snapshot');
+
+    // 全表消费：新表数据随 db import 一并写入 store
+    expect(s.claims).toHaveLength(2);
+    expect(s.tracebacks).toHaveLength(1);
+    expect(s.intents).toHaveLength(3);
+    expect(s.actions).toHaveLength(3);
+    expect(s.overview).not.toBeNull();
+    expect(s.overview?.claims.count).toBe(2);
+    expect(s.overview?.intents.count).toBe(3);
   });
 
   test('loadRun downloads the db and applies it when the endpoint exists', async () => {

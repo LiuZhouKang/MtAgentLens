@@ -331,6 +331,7 @@ const LoopRateBar: React.FC<{ rate: number }> = ({ rate }) => {
 // 主组件: IntegratedAnalyzerDashboard
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/** @deprecated 阶段二实时视角（SSE 接入后迁移至运行监控区块），现无生产者，仅存档。 */
 export const IntegratedAnalyzerDashboard: React.FC<IntegratedAnalyzerDashboardProps> = ({
   state,
   onViewModeChange,

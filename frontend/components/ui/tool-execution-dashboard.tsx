@@ -49,6 +49,7 @@ const VIEW_LABELS: { mode: DashboardViewMode; label: string }[] = [
 // 子组件: ToolCallCard — 单次工具调用卡片
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @deprecated 阶段二实时视角（SSE 接入后迁移至运行监控区块），现无生产者，仅存档。 */
 export const ToolCallCard: React.FC<ToolCallCardProps> = ({ call, selected = false, onSelect }) => {
   const latency = calcLatencyUs(call);
   const severity = toolStatusToSeverity(call.status);

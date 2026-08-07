@@ -272,6 +272,7 @@ const SignalCard: React.FC<{
 // 子组件: SignalDetailPanel — 信号详情面板
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @deprecated 阶段二实时视角（SSE 接入后迁移至运行监控区块），现无生产者，仅存档。 */
 export const SseSignalDetailPanel: React.FC<SseSignalDetailPanelProps> = ({
   signal,
   onClose,

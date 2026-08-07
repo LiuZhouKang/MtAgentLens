@@ -58,6 +58,31 @@ describe('MonitoringSection', () => {
     expect(screen.getAllByText('无此表').length).toBeGreaterThan(0);
   });
 
+  it('聚焦无告警 agent 时降级提示而非死链接', () => {
+    useAppStore.setState({
+      monitoring: makeMonitoring({
+        health: health({ topologyHealth: { available: true } }),
+        topologyHealth: {
+          latest: null,
+          alertSeverity: { critical: 0, warning: 0, info: 0 },
+          pollutionCount: 1,
+          pollutionBySource: { 'ghost-agent': 1 },
+        },
+      }),
+      alerts: [], // ghost-agent 无告警 → 降级
+    });
+    render(<MonitoringSection />);
+    // 打开拓扑健康详情（点击健康格）
+    act(() => {
+      screen.getAllByRole('button', { name: /拓扑健康/ })[0].click();
+    });
+    // 点击污染源 chip → focusAgent('ghost-agent') 因无告警而降级
+    act(() => {
+      screen.getByRole('button', { name: /ghost-ag/ }).click();
+    });
+    expect(screen.getByText(/无告警，已跳过聚焦/)).toBeTruthy();
+  });
+
   it('点击健康格就地切换到详情外壳，返回全部恢复卡片网格', () => {
     useAppStore.setState({ monitoring: makeMonitoring() });
     render(<MonitoringSection />);

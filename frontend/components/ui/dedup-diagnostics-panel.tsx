@@ -126,6 +126,7 @@ const DroppedEventsList: React.FC<{
 // 主组件: DedupDiagnosticsPanel
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @deprecated 阶段二实时视角（SSE 接入后迁移至运行监控区块），现无生产者，仅存档。 */
 export const DedupDiagnosticsPanel: React.FC<DedupDiagnosticsProps> = ({
   state,
   compact = false,

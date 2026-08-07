@@ -74,6 +74,7 @@ const DIMENSION_COLORS: Record<HealthDimension, { bar: string; text: string; bg:
 // 子组件: HealthScoreGauge — 健康分数仪表盘
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @deprecated 阶段二实时视角（SSE 接入后迁移至运行监控区块），现无生产者，仅存档。 */
 export const HealthScoreGauge: React.FC<HealthScoreGaugeProps> = ({
   score,
   previous_score,

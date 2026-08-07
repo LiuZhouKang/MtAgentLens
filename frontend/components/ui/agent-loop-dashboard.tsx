@@ -75,6 +75,7 @@ const LOOP_TYPE_COLOR: Record<LoopType, string> = {
 // 子组件: LoopSeverityBadge — 严重度徽章
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @deprecated 阶段二实时视角（SSE 接入后迁移至运行监控区块），现无生产者，仅存档。 */
 export const LoopSeverityBadge: React.FC<LoopSeverityBadgeProps> = ({
   severity,
   showLabel = true,

@@ -99,6 +99,7 @@ const VIEW_LABELS: { mode: ExfilDashboardViewMode; label: string }[] = [
 // 子组件: ExfilSeverityBadge — 严重度徽章
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @deprecated 阶段二实时视角（SSE 接入后迁移至运行监控区块），现无生产者，仅存档。 */
 export const ExfilSeverityBadge: React.FC<ExfilSeverityBadgeProps> = ({
   severity,
   showLabel = true,

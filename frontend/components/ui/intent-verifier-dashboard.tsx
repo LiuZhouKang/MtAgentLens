@@ -77,6 +77,7 @@ const MISMATCH_TYPE_COLOR: Record<MismatchType, string> = {
 // 子组件: MismatchSeverityBadge — 严重度徽章
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @deprecated 阶段二实时视角（SSE 接入后迁移至运行监控区块），现无生产者，仅存档。 */
 export const MismatchSeverityBadge: React.FC<MismatchSeverityBadgeProps> = ({
   severity,
   showLabel = true,

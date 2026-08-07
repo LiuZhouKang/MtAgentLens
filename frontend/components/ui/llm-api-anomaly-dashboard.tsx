@@ -80,6 +80,7 @@ const ANOMALY_TYPE_COLOR: Record<AnomalyType, string> = {
 // 子组件: AnomalyTypeIcon — 异常类型图标
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** @deprecated 阶段二实时视角（SSE 接入后迁移至运行监控区块），现无生产者，仅存档。 */
 export const AnomalyTypeIcon: React.FC<AnomalyTypeIconProps> = ({ anomaly_type, size = 'md' }) => {
   const sizeClass = size === 'sm' ? 'text-sm' : size === 'lg' ? 'text-xl' : 'text-base';
   return (

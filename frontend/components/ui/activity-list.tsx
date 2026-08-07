@@ -18,7 +18,7 @@ interface ActivityItemProps {
 /** A single activity row. Memoized for virtualized list performance. */
 const ActivityItem = memo(function ActivityItem({ activity }: ActivityItemProps) {
   return (
-    <div className="p-3 border-b border-gray-200">
+    <div className="border-b border-gray-200 p-3">
       <h3 className="font-medium text-gray-900">{activity.title}</h3>
       <p className="text-sm text-gray-500">{activity.description}</p>
       <span className="text-xs text-gray-400">{activity.timestamp}</span>
@@ -103,7 +103,7 @@ export function ActivityList({ activities }: ActivityListProps) {
       aria-activedescendant={activeId}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      className="activity-list max-h-96 overflow-y-auto border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+      className="activity-list max-h-96 overflow-y-auto rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:outline-none"
     >
       <div
         style={{

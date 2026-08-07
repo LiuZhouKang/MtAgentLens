@@ -6,7 +6,7 @@
 // 三级严重度:   Info → Warning → Critical
 // 两种 token 来源: Header | BodyEstimate
 
-import type { AnomalySeverity } from "./data-contract";
+import type { AnomalySeverity } from './data-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 异常类型（与 Rust anomaly_type 对齐）
@@ -14,30 +14,30 @@ import type { AnomalySeverity } from "./data-contract";
 
 /** Token 用量异常类型 */
 export type TokenAnomalyType =
-  | "LargeRequest"       // 单次请求输入 token 超过阈值
-  | "OutputBloat"        // 输出/输入 token 比例异常
-  | "CumulativeOverrun"  // 滑动窗口内累计 token 消耗超过阈值
-  | "GlobalRateSpike";   // 全局 token 消耗速率超过阈值
+  | 'LargeRequest' // 单次请求输入 token 超过阈值
+  | 'OutputBloat' // 输出/输入 token 比例异常
+  | 'CumulativeOverrun' // 滑动窗口内累计 token 消耗超过阈值
+  | 'GlobalRateSpike'; // 全局 token 消耗速率超过阈值
 
 export const TOKEN_ANOMALY_TYPE_LABEL: Record<TokenAnomalyType, string> = {
-  LargeRequest: "超大请求",
-  OutputBloat: "输出膨胀",
-  CumulativeOverrun: "累计超限",
-  GlobalRateSpike: "全局速率激增",
+  LargeRequest: '超大请求',
+  OutputBloat: '输出膨胀',
+  CumulativeOverrun: '累计超限',
+  GlobalRateSpike: '全局速率激增',
 };
 
 export const TOKEN_ANOMALY_TYPE_DESC: Record<TokenAnomalyType, string> = {
-  LargeRequest: "单次 LLM API 请求的输入 token 数超过阈值，可能为上下文污染或 prompt 注入",
-  OutputBloat: "输出 token 数远超输入 token 数，Agent 可能在输出中泄露大量内部状态",
-  CumulativeOverrun: "在观测窗口内累计 token 消耗超过阈值，Agent 可能陷入推理循环",
-  GlobalRateSpike: "全局 token 消耗速率异常飙升，可能为多 Agent 并行失控",
+  LargeRequest: '单次 LLM API 请求的输入 token 数超过阈值，可能为上下文污染或 prompt 注入',
+  OutputBloat: '输出 token 数远超输入 token 数，Agent 可能在输出中泄露大量内部状态',
+  CumulativeOverrun: '在观测窗口内累计 token 消耗超过阈值，Agent 可能陷入推理循环',
+  GlobalRateSpike: '全局 token 消耗速率异常飙升，可能为多 Agent 并行失控',
 };
 
 export const TOKEN_ANOMALY_TYPE_ICON: Record<TokenAnomalyType, string> = {
-  LargeRequest: "🐘",
-  OutputBloat: "💥",
-  CumulativeOverrun: "📈",
-  GlobalRateSpike: "🚨",
+  LargeRequest: '🐘',
+  OutputBloat: '💥',
+  CumulativeOverrun: '📈',
+  GlobalRateSpike: '🚨',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -45,25 +45,25 @@ export const TOKEN_ANOMALY_TYPE_ICON: Record<TokenAnomalyType, string> = {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Token 告警严重程度（与 Rust severity 对齐） */
-export type TokenAnomalySeverity = "info" | "warning" | "critical";
+export type TokenAnomalySeverity = 'info' | 'warning' | 'critical';
 
 export const TOKEN_SEVERITY_LABEL: Record<TokenAnomalySeverity, string> = {
-  info: "信息",
-  warning: "警告",
-  critical: "严重",
+  info: '信息',
+  warning: '警告',
+  critical: '严重',
 };
 
 /** Token 计数来源（与 Rust TokenCountSource 对齐） */
-export type TokenCountSource = "Header" | "BodyEstimate";
+export type TokenCountSource = 'Header' | 'BodyEstimate';
 
 export const TOKEN_SOURCE_LABEL: Record<TokenCountSource, string> = {
-  Header: "Header 精确提取",
-  BodyEstimate: "Body 估算",
+  Header: 'Header 精确提取',
+  BodyEstimate: 'Body 估算',
 };
 
 /** TokenCountSource → 置信度 (0-1) */
 export function tokenSourceConfidence(source: TokenCountSource): number {
-  return source === "Header" ? 1.0 : 0.8;
+  return source === 'Header' ? 1.0 : 0.8;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -196,7 +196,7 @@ export interface TokenTrendDataPoint {
 // 仪表板状态
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type TokenCostViewMode = "overview" | "alerts" | "by_agent" | "by_provider" | "trends";
+export type TokenCostViewMode = 'overview' | 'alerts' | 'by_agent' | 'by_provider' | 'trends';
 
 export interface TokenCostDashboardState {
   /** 告警列表 */
@@ -231,7 +231,7 @@ export function createDefaultTokenCostState(): TokenCostDashboardState {
     alerts: [],
     global_snapshot: null,
     trend_data: [],
-    view_mode: "overview",
+    view_mode: 'overview',
     selected_alert_id: null,
     selected_agent_pid: null,
     type_filter: null,
@@ -239,9 +239,24 @@ export function createDefaultTokenCostState(): TokenCostDashboardState {
     agent_filter: null,
     provider_filter: null,
     pricing_table: [
-      { provider: "openai", input_price_per_1k: 0.0025, output_price_per_1k: 0.01, cache_input_price_per_1k: 0.00125 },
-      { provider: "anthropic", input_price_per_1k: 0.003, output_price_per_1k: 0.015, cache_input_price_per_1k: 0.0003 },
-      { provider: "google", input_price_per_1k: 0.00125, output_price_per_1k: 0.005, cache_input_price_per_1k: null },
+      {
+        provider: 'openai',
+        input_price_per_1k: 0.0025,
+        output_price_per_1k: 0.01,
+        cache_input_price_per_1k: 0.00125,
+      },
+      {
+        provider: 'anthropic',
+        input_price_per_1k: 0.003,
+        output_price_per_1k: 0.015,
+        cache_input_price_per_1k: 0.0003,
+      },
+      {
+        provider: 'google',
+        input_price_per_1k: 0.00125,
+        output_price_per_1k: 0.005,
+        cache_input_price_per_1k: null,
+      },
     ],
     last_update_ms: Date.now(),
   };

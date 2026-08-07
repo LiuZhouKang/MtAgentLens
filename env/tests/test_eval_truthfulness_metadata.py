@@ -20,9 +20,9 @@ class EvaluationTruthfulnessMetadataTests(unittest.TestCase):
                 'reasoning-loop': {'status': 'pass', 'evidence': [], 'details': 'ok'}
             }), encoding='utf-8')
             (run_dir / 'resolved_config.json').write_text(json.dumps({
-                'collector': {'log_file': 'trace.log'}
+                'collector': {'log_file': 'collector.log'}
             }), encoding='utf-8')
-            (run_dir / 'trace.log.alerts.db').write_bytes(b'')
+            (run_dir / 'collector.alerts.db').write_bytes(b'')
             (run_dir / 'replay.report.json').write_text(json.dumps({
                 'warnings': [
                     {

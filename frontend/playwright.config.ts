@@ -5,7 +5,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // 重型页面（3D 引擎 / Sigma / 延迟模型计算）并发过多会拖垮 CPU 与 dev server，
+  // 导致数据加载与 100ms 交互预算抖动。本地限制为 2 worker，CI 串行。
+  workers: process.env.CI ? 1 : 2,
   reporter: 'list',
   webServer: {
     command: 'npm run dev',

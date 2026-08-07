@@ -1,6 +1,6 @@
 interface LayoutNode {
   id: string;
-  type: 'Agent' | 'Resource' | 'PolicyBoundary';
+  type: 'Agent' | 'Resource' | 'PolicyBoundary' | 'Process' | 'ToolCall' | 'Credential' | 'Context';
   x: number;
   y: number;
   z: number;
@@ -17,10 +17,16 @@ interface LayoutEdge {
 
 const STIFFNESS: Record<string, number> = {
   PolicyBoundaryCrossing: 2.0,
+  ViolationProvenance: 2.0,
   TaintPropagatesTo: 1.5,
+  TaintPropagation: 1.5,
   IntentCausesAction: 1.0,
   AgentDelegatesTo: 0.8,
+  Delegation: 0.8,
+  AuthorityTransfer: 0.9,
+  CapabilityUse: 1.0,
   ContextFlowsFrom: 0.6,
+  ContextInheritance: 0.6,
   CompetingExplanation: 0.3,
 };
 
@@ -31,6 +37,10 @@ const MAX_COORDINATE = 220;
 const LAYER_Z: Record<string, number> = {
   Agent: -30,
   Resource: 0,
+  Process: 0,
+  ToolCall: 0,
+  Credential: 0,
+  Context: 0,
   PolicyBoundary: 30,
 };
 
@@ -45,7 +55,7 @@ function finite(value: number, fallback = 0): number {
 export function forceLayout3D(
   nodes: LayoutNode[],
   edges: LayoutEdge[],
-  iterations: number
+  iterations: number,
 ): LayoutNode[] {
   if (nodes.length === 0) return [];
 
@@ -80,8 +90,12 @@ export function forceLayout3D(
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
         const fz = (dz / dist) * force;
-        result[i].vx! += fx; result[i].vy! += fy; result[i].vz! += fz;
-        result[j].vx! -= fx; result[j].vy! -= fy; result[j].vz! -= fz;
+        result[i].vx! += fx;
+        result[i].vy! += fy;
+        result[i].vz! += fz;
+        result[j].vx! -= fx;
+        result[j].vy! -= fy;
+        result[j].vz! -= fz;
       }
     }
 
@@ -99,8 +113,12 @@ export function forceLayout3D(
       const fx = (dx / dist) * force;
       const fy = (dy / dist) * force;
       const fz = (dz / dist) * force;
-      s.vx! += fx; s.vy! += fy; s.vz! += fz;
-      t.vx! -= fx; t.vy! -= fy; t.vz! -= fz;
+      s.vx! += fx;
+      s.vy! += fy;
+      s.vz! += fz;
+      t.vx! -= fx;
+      t.vy! -= fy;
+      t.vz! -= fz;
     }
 
     // Center + layer forces
@@ -119,7 +137,9 @@ export function forceLayout3D(
       n.x = clamp(n.x + n.vx * temp, -MAX_COORDINATE, MAX_COORDINATE);
       n.y = clamp(n.y + n.vy * temp, -MAX_COORDINATE, MAX_COORDINATE);
       n.z = clamp(n.z + n.vz * temp, -MAX_COORDINATE, MAX_COORDINATE);
-      n.vx = 0; n.vy = 0; n.vz = 0;
+      n.vx = 0;
+      n.vy = 0;
+      n.vz = 0;
     }
 
     temp *= 0.995;

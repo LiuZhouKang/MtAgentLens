@@ -63,7 +63,7 @@ class NetworkDnsTunnelVerifier(BaseVerifier):
             evidence.append("High-entropy DNS query payloads detected (indicative of tunneling)")
 
         # Check DB for alerts
-        db_path = run_dir / "trace.log.responsibility.db"
+        db_path = run_dir / "collector.responsibility.db"
         if db_path.exists():
             conn = sqlite3.connect(str(db_path))
             alert_count = conn.execute(

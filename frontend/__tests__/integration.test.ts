@@ -22,8 +22,28 @@ describe('Store — unique integration tests', () => {
   // Tests NOT already covered in store.test.ts
 
   it('setGraph updates graph state with nodes and edges', () => {
-    const nodes = [{ node_id: 'n1', node_type: 'Agent' as const, agent_id: 'a1', resource: null, evidence_refs: [], timestamp_ns: 100, phase: { Provisional: { timestamp_ns: 100 } } }];
-    const edges = [{ edge_id: 'e1', edge_type: 'IntentCausesAction' as const, source: 'n1', target: 'n2', evidence_refs: [], confidence: 0.9, phase: { Provisional: { timestamp_ns: 100 } } }];
+    const nodes = [
+      {
+        node_id: 'n1',
+        node_type: 'Agent' as const,
+        agent_id: 'a1',
+        resource: null,
+        evidence_refs: [],
+        timestamp_ns: 100,
+        phase: { Provisional: { timestamp_ns: 100 } },
+      },
+    ];
+    const edges = [
+      {
+        edge_id: 'e1',
+        edge_type: 'IntentCausesAction' as const,
+        source: 'n1',
+        target: 'n2',
+        evidence_refs: [],
+        confidence: 0.9,
+        phase: { Provisional: { timestamp_ns: 100 } },
+      },
+    ];
     useAppStore.getState().setGraph(nodes, edges);
     expect(useAppStore.getState().graph.nodes).toHaveLength(1);
     expect(useAppStore.getState().graph.edges).toHaveLength(1);

@@ -3,7 +3,6 @@
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '@/lib/store';
-import { buildInvestigationModel } from '@/lib/investigation';
 import { useAlertModels } from '@/lib/use-alert-models';
 import type { ResponsibilityNode } from '@/lib/types';
 import LoadingScreen from '@/components/ui/loading-screen';
@@ -79,14 +78,12 @@ export default function CommandCenterPage() {
     focusAlert(selectedItem.alert);
   }, [focusAlert, selectedItem]);
 
-  const selectedAlert = selectedItem?.alert ?? null;
-  // Selected alert's model is computed synchronously so the theater renders
-  // immediately; the rest of the list populates lazily in idle time.
-  const selectedModel =
-    selectedItem?.model ??
-    (selectedAlert ? buildInvestigationModel(selectedAlert, graph, []) : null);
+  // A real collector run often has a full graph but zero alerts (a monitoring
+  // session that triggered no rule). "No alerts" must not read as "still
+  // loading" — the theater renders as soon as there is any consumable data.
+  const hasData = graph.nodes.length > 0 || alerts.length > 0;
 
-  if (!selectedAlert || !selectedModel) {
+  if (!hasData) {
     return (
       <section className="command-center" aria-busy="true" style={{ height: '100%', minHeight: 0, position: 'relative' }}>
         <LoadingScreen show />

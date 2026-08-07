@@ -9,37 +9,37 @@
 //   tool_name — 关联到具体的工具调用
 //   affected_pids — 关联到 Agent
 
-import type { AnomalySeverity } from "./data-contract";
+import type { AnomalySeverity } from './data-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 循环类型（与 Rust LoopType 对齐）
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type LoopType =
-  | "ExactRepeat"   // 完全相同参数的重复调用
-  | "FuzzyRepeat"   // 参数仅微小变化（编辑距离 < 阈值）
-  | "PingPong"      // A→B→A→B 交替模式
-  | "RetryStorm";   // 快速连续重试（间隔 < 500ms 且无中间修改）
+  | 'ExactRepeat' // 完全相同参数的重复调用
+  | 'FuzzyRepeat' // 参数仅微小变化（编辑距离 < 阈值）
+  | 'PingPong' // A→B→A→B 交替模式
+  | 'RetryStorm'; // 快速连续重试（间隔 < 500ms 且无中间修改）
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 循环严重度（与 Rust LoopSeverity 对齐）
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type LoopSeverity =
-  | "Warning"    // 重复 3-5 次：需要关注但可能自愈
-  | "Critical"   // 重复 6-10 次：明确循环，建议干预
-  | "Emergency"; // 重复 > 10 次：紧急，agent 已失控
+  | 'Warning' // 重复 3-5 次：需要关注但可能自愈
+  | 'Critical' // 重复 6-10 次：明确循环，建议干预
+  | 'Emergency'; // 重复 > 10 次：紧急，agent 已失控
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 循环解决方式
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type LoopResolution =
-  | "self_recovery"       // agent 自行打破循环
-  | "user_intervention"   // 用户干预
-  | "timeout"             // 超时终止
-  | "new_tool_invoked"    // 调用了新工具打破循环
-  | "unknown";
+  | 'self_recovery' // agent 自行打破循环
+  | 'user_intervention' // 用户干预
+  | 'timeout' // 超时终止
+  | 'new_tool_invoked' // 调用了新工具打破循环
+  | 'unknown';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 样本载荷
@@ -106,7 +106,7 @@ export interface AgentLoopResolvedEvent {
   /** 循环持续时长 (ms) */
   duration_ms: number;
   /** 最终结果 */
-  final_outcome: "task_completed" | "abandoned" | "error";
+  final_outcome: 'task_completed' | 'abandoned' | 'error';
   /** 解决时间戳 (epoch ns) */
   resolved_at_ns: number;
 }
@@ -127,7 +127,7 @@ export interface LoopSummary {
   resolved: boolean;
   /** 解决信息（仅 resolved = true 时有效） */
   resolution?: LoopResolution;
-  final_outcome?: "task_completed" | "abandoned" | "error";
+  final_outcome?: 'task_completed' | 'abandoned' | 'error';
   first_occurrence_ns: number;
   last_occurrence_ns: number;
   resolved_at_ns?: number;
@@ -141,21 +141,18 @@ export interface LoopSummary {
 // SSE 流集成 — 扩展 StreamEnvelope 的 stream_type
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type AgentLoopStreamType =
-  | "agent_loop"
-  | "agent_loop_resolved";
+export type AgentLoopStreamType = 'agent_loop' | 'agent_loop_resolved';
 
 /** 扩展后的完整 stream_type 集合 */
 export type ExtendedLoopStreamType =
-  | import("./data-contract").UnifiedStreamEvent["stream_type"]
-  | AgentLoopStreamType;
+  import('./data-contract').UnifiedStreamEvent['stream_type'] | AgentLoopStreamType;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 仪表板 UI 状态
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** 仪表板视图模式 */
-export type LoopDashboardViewMode = "overview" | "timeline" | "tools";
+export type LoopDashboardViewMode = 'overview' | 'timeline' | 'tools';
 
 /** 仪表板全局状态 */
 export interface AgentLoopDashboardState {
@@ -226,7 +223,7 @@ export interface LoopSeverityBadgeProps {
 
 export interface LoopTypeIconProps {
   loop_type: LoopType;
-  size?: "sm" | "md" | "lg";
+  size?: 'sm' | 'md' | 'lg';
 }
 
 export interface LoopToolFrequencyChartProps {
@@ -242,66 +239,66 @@ export interface LoopToolFrequencyChartProps {
 
 /** 循环类型 → 人类可读标签 */
 export const LOOP_TYPE_LABEL: Record<LoopType, string> = {
-  ExactRepeat: "精确重复",
-  FuzzyRepeat: "模糊重复",
-  PingPong: "乒乓切换",
-  RetryStorm: "重试风暴",
+  ExactRepeat: '精确重复',
+  FuzzyRepeat: '模糊重复',
+  PingPong: '乒乓切换',
+  RetryStorm: '重试风暴',
 };
 
 /** 循环类型 → 图标（emoji） */
 export const LOOP_TYPE_ICON: Record<LoopType, string> = {
-  ExactRepeat: "🔄",
-  FuzzyRepeat: "🔀",
-  PingPong: "🏓",
-  RetryStorm: "⛈️",
+  ExactRepeat: '🔄',
+  FuzzyRepeat: '🔀',
+  PingPong: '🏓',
+  RetryStorm: '⛈️',
 };
 
 /** 严重度 → 人类可读标签 */
 export const SEVERITY_LABEL: Record<LoopSeverity, string> = {
-  Warning: "警告",
-  Critical: "严重",
-  Emergency: "紧急",
+  Warning: '警告',
+  Critical: '严重',
+  Emergency: '紧急',
 };
 
 /** 解决方式 → 人类可读标签 */
 export const RESOLUTION_LABEL: Record<LoopResolution, string> = {
-  self_recovery: "自行恢复",
-  user_intervention: "用户干预",
-  timeout: "超时终止",
-  new_tool_invoked: "新工具调用",
-  unknown: "未知",
+  self_recovery: '自行恢复',
+  user_intervention: '用户干预',
+  timeout: '超时终止',
+  new_tool_invoked: '新工具调用',
+  unknown: '未知',
 };
 
 /** 最终结果 → 人类可读标签 */
 export const OUTCOME_LABEL: Record<string, string> = {
-  task_completed: "任务完成",
-  abandoned: "已放弃",
-  error: "错误终止",
+  task_completed: '任务完成',
+  abandoned: '已放弃',
+  error: '错误终止',
 };
 
 /** 循环严重度 → AnomalySeverity 映射（用于着色系统） */
 export function loopSeverityToAnomalySeverity(severity: LoopSeverity): AnomalySeverity {
   switch (severity) {
-    case "Warning":
-      return "warning";
-    case "Critical":
-      return "critical";
-    case "Emergency":
-      return "critical";
+    case 'Warning':
+      return 'warning';
+    case 'Critical':
+      return 'critical';
+    case 'Emergency':
+      return 'critical';
   }
 }
 
 /** 循环类型 → 简要描述 */
 export function describeLoopType(type: LoopType): string {
   switch (type) {
-    case "ExactRepeat":
-      return "相同参数反复调用同一工具";
-    case "FuzzyRepeat":
-      return "参数微小变化的重复调用";
-    case "PingPong":
-      return "在两个工具/文件之间反复切换";
-    case "RetryStorm":
-      return "短时间内密集重试失败操作";
+    case 'ExactRepeat':
+      return '相同参数反复调用同一工具';
+    case 'FuzzyRepeat':
+      return '参数微小变化的重复调用';
+    case 'PingPong':
+      return '在两个工具/文件之间反复切换';
+    case 'RetryStorm':
+      return '短时间内密集重试失败操作';
   }
 }
 
@@ -397,9 +394,9 @@ export function countByLoopType(loops: LoopSummary[]): Record<LoopType, number> 
 
 /** 获取最高的严重度级别 */
 export function maxSeverity(loops: LoopSummary[]): LoopSeverity | null {
-  if (loops.some((l) => l.severity === "Emergency")) return "Emergency";
-  if (loops.some((l) => l.severity === "Critical")) return "Critical";
-  if (loops.some((l) => l.severity === "Warning")) return "Warning";
+  if (loops.some((l) => l.severity === 'Emergency')) return 'Emergency';
+  if (loops.some((l) => l.severity === 'Critical')) return 'Critical';
+  if (loops.some((l) => l.severity === 'Warning')) return 'Warning';
   return null;
 }
 
@@ -428,11 +425,11 @@ export function mergeLoopEvents(
     if (!loopEvents.some((l) => l.loop_id === r.loop_id)) {
       summaries.push({
         loop_id: r.loop_id,
-        loop_type: "ExactRepeat", // 未知类型，保守默认
-        tool_name: "unknown",
+        loop_type: 'ExactRepeat', // 未知类型，保守默认
+        tool_name: 'unknown',
         repeat_count: r.total_repeats,
         duration_ms: r.duration_ms,
-        severity: "Warning",
+        severity: 'Warning',
         affected_pids: [],
         resolved: true,
         resolution: r.resolution,

@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 
 # ── Configuration ──────────────────────────────────────────────────────
-DB_PATH = Path(__file__).parent / "../../../../runs/20260608-124747-73eb63ec9dad/collector/trace.responsibility.db"
+DB_PATH = Path(__file__).parent / "../../../../runs/20260608-124747-73eb63ec9dad/collector/collector.responsibility.db"
 OUTPUT_PATH = Path(__file__).parent / "phase1_output.json"
 AGENT_COMMS = {"claude", "claude-code", "claude.exe"}
 

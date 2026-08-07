@@ -22,7 +22,8 @@ export type NormalizedResource =
 
 export interface ResponsibilityNode {
   node_id: string;
-  node_type: 'Agent' | 'Resource' | 'PolicyBoundary';
+  node_type:
+    'Agent' | 'Resource' | 'PolicyBoundary' | 'Process' | 'ToolCall' | 'Credential' | 'Context';
   agent_id: string | null;
   resource: NormalizedResource | null;
   evidence_refs: string[];
@@ -36,7 +37,13 @@ export type ResponsibilityEdgeType =
   | 'ContextFlowsFrom'
   | 'TaintPropagatesTo'
   | 'PolicyBoundaryCrossing'
-  | 'CompetingExplanation';
+  | 'CompetingExplanation'
+  | 'Delegation'
+  | 'AuthorityTransfer'
+  | 'CapabilityUse'
+  | 'ContextInheritance'
+  | 'TaintPropagation'
+  | 'ViolationProvenance';
 
 export interface ResponsibilityEdge {
   edge_id: string;
@@ -46,9 +53,11 @@ export interface ResponsibilityEdge {
   evidence_refs: string[];
   confidence: number;
   phase: PhaseIndicator;
+  signal?: unknown | null;
 }
 
-export type MatchLevel = 'L1Exact' | 'L2Normalized' | 'L3Containment' | 'L4Basename' | 'L5Substring';
+export type MatchLevel =
+  'L1Exact' | 'L2Normalized' | 'L3Containment' | 'L4Basename' | 'L5Substring';
 
 export type DisplayProfile = 'SafeBaseline' | 'UnsafeByEngine' | 'ObserverJudged';
 export type AlertSeverity = 'Info' | 'Warning' | 'Critical';

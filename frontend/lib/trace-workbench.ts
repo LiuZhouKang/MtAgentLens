@@ -9,6 +9,7 @@ export interface TraceEventModel {
   kind: TraceEventKind;
   title: string;
   actor: string;
+  actorRole: string | null; // claimed_role of the acting agent, if known
   material: string;
   evidenceRef: string | null;
   evidenceLevel: string | null;
@@ -40,6 +41,7 @@ export interface TraceRunModel {
   durationMs: number;
   confidence: number;
   primaryAgent: string;
+  actorRoles: Record<string, string>; // agent_id → claimed_role
   evidenceCount: number;
   boundaryEvents: number;
   timeline: TraceEventModel[];
@@ -51,7 +53,52 @@ export interface TraceRunModel {
   kindCounts: Record<TraceEventKind, number>;
 }
 
-function classifyEventKind(eventType: string): TraceEventKind {
+/**
+ * Canonical mapping for real backend event types (UPPER_SNAKE, emitted by
+ * eBPF runners/analyzers) to responsibility-chain kinds. The older
+ * substring fallback below only matched demo snake_case types (file_read,
+ * boundary_cross), which silently collapsed almost every real event into
+ * `verdict` — this table is the primary path.
+ */
+const REAL_EVENT_TYPE_KIND: Record<string, TraceEventKind> = {
+  // agent / process lifecycle
+  EXEC: 'agent',
+  PROCESS_EXEC: 'agent',
+  EXIT: 'agent',
+  HANDOFF_SPAWN: 'agent',
+  BASH_READLINE: 'agent',
+  // resource access
+  FILE_OPEN: 'file',
+  FILE_WRITE: 'file',
+  FILE_DELETE: 'file',
+  FILE_RENAME: 'file',
+  FILE_TRUNCATE: 'file',
+  NETWORK_CONNECT: 'network',
+  NETWORK_SEND: 'network',
+  NETWORK_RECV: 'network',
+  // SSL connection signals — network activity, not a verdict
+  SIGNAL: 'network',
+  // security / anomaly → policy boundary
+  INJECTION_DETECTED: 'boundary',
+  IDENTITY_CONFUSION: 'boundary',
+  CONTEXT_POLLUTION_DETECTED: 'boundary',
+  CREDENTIAL_LEAK_DETECTED: 'boundary',
+  ANOMALY: 'boundary',
+  ALERT: 'boundary',
+  SUBPROCESS_ALERT: 'boundary',
+  SIGNOFF_TRANSITION: 'boundary',
+  // PascalCase contract types (data_contract.rs) — uppercased before lookup
+  CREDENTIALACCESS: 'boundary',
+  CONTEXTINJECTION: 'boundary',
+  // system / control → verdict
+  SUMMARY: 'verdict',
+  CONTROL: 'verdict',
+  CLOCK_SYNC: 'verdict',
+};
+
+export function classifyEventKind(eventType: string): TraceEventKind {
+  const exact = REAL_EVENT_TYPE_KIND[eventType.toUpperCase()];
+  if (exact) return exact;
   const normalized = eventType.toLowerCase();
   if (normalized.includes('boundary')) return 'boundary';
   if (normalized.includes('file')) return 'file';
@@ -61,10 +108,40 @@ function classifyEventKind(eventType: string): TraceEventKind {
   if (
     normalized.includes('role') ||
     normalized.includes('agent') ||
-    normalized.includes('delegation')
+    normalized.includes('delegation') ||
+    normalized.includes('exec') ||
+    normalized.includes('spawn')
   )
     return 'agent';
   return 'verdict';
+}
+
+interface CollapsibleStep {
+  timestamp_ns: number;
+  event_type: string;
+  description: string;
+}
+
+/**
+ * Collapse repetitive `signal` (SSL connection) timeline steps into a single
+ * aggregate event. Real runs emit hundreds of identical "signal: ssl (pid=N)"
+ * lines; surfacing every one floods the network rows with noise and drowns the
+ * responsibility chain. The aggregate keeps the first signal's timestamp so it
+ * stays in chronological position.
+ */
+function collapseSignalSteps<T extends CollapsibleStep>(steps: T[]): T[] {
+  const signals = steps.filter((s) => s.event_type === 'signal');
+  if (signals.length === 0) return steps;
+  const kept = steps.filter((s) => s.event_type !== 'signal');
+  const first = signals[0];
+  const aggregate = {
+    ...first,
+    description: `SSL/TLS 连接 × ${signals.length}`,
+  } as T;
+  const insertAt = kept.findIndex((s) => s.timestamp_ns >= first.timestamp_ns);
+  if (insertAt === -1) return [...kept, aggregate];
+  kept.splice(insertAt, 0, aggregate);
+  return kept;
 }
 
 function evidenceMaterial(evidence: CorrelationEvidence | undefined) {
@@ -79,25 +156,92 @@ function evidenceMaterial(evidence: CorrelationEvidence | undefined) {
   return evidence.matched_fields.raw_args.join(' ') || evidence.evidence_id;
 }
 
+/**
+ * Surface the LLM observer's judgments (engine.rule_verdicts/pattern_verdicts
+ * where llm_agreed is set) as `llm`-kind timeline events. The observer is a
+ * phase-2 semantic judge: it confirms or refutes each rule/pattern verdict, so
+ * these rows sit at the end of the trace. Verdicts where the observer failed
+ * (llm_agreed === null) carry no judgment and stay invisible.
+ */
+function buildObserverEvents(alert: ResponsibilityAlert): TraceEventModel[] {
+  const events: TraceEventModel[] = [];
+  const judge = alert.primary_agent.agent_id;
+  const baseOffset = alert.timeline.total_duration_ms;
+
+  const push = (
+    id: string,
+    label: string,
+    description: string,
+    material: string | null,
+    comment: string | null,
+    agreed: boolean,
+    confidence: number,
+  ) => {
+    events.push({
+      id: `observer-${id}`,
+      offsetMs: baseOffset + events.length * 10,
+      durationMs: 10,
+      kind: 'llm',
+      title: `LLM 观察者 · ${agreed ? '同意' : '驳回'} ${label}`,
+      actor: judge,
+      actorRole: null,
+      material: material ?? description,
+      evidenceRef: null,
+      evidenceLevel: 'observer',
+      operation: 'observer',
+      ruleIds: [],
+      patternId: null,
+      confidence,
+      severity: agreed ? 'Info' : 'Warning',
+      input: description,
+      output: comment ?? (agreed ? '同意引擎判定' : '不同意引擎判定'),
+      prompt: `${label}：${description}`,
+      response: comment,
+      toolCall: null,
+      toolResult: null,
+      processTree: null,
+      rawEvidence: null,
+      parentEventId: null,
+      depth: 0,
+    });
+  };
+
+  for (const rule of alert.engine.rule_verdicts) {
+    if (rule.llm_agreed === null) continue;
+    push(rule.rule_id, rule.rule_id, rule.description, rule.matched_resource, rule.llm_comment, rule.llm_agreed, alert.confidence);
+  }
+  for (const pattern of alert.engine.pattern_verdicts) {
+    if (pattern.llm_agreed === null) continue;
+    push(pattern.template_id, pattern.template_id, `模式匹配 ${pattern.template_id}`, pattern.template_id, pattern.llm_comment, pattern.llm_agreed, pattern.match_confidence);
+  }
+  return events;
+}
+
 export function buildTraceRunModel(
   alert: ResponsibilityAlert,
   evidenceItems: CorrelationEvidence[],
 ): TraceRunModel {
   const evidenceById = new Map(evidenceItems.map((item) => [item.evidence_id, item]));
+  const actorRoles: Record<string, string> = {};
+  for (const entry of [alert.primary_agent, ...alert.involved_agents]) {
+    if (entry.claimed_role) actorRoles[entry.agent_id] = entry.claimed_role;
+  }
   const sortedSteps = [...alert.timeline.steps].sort(
     (left, right) => left.timestamp_ns - right.timestamp_ns,
   );
-  const startNs = sortedSteps[0]?.timestamp_ns ?? alert.timestamp_ns;
+  // fold hundreds of identical SSL signals into one aggregate network event
+  const collapsedSteps = collapseSignalSteps(sortedSteps);
+  const startNs = collapsedSteps[0]?.timestamp_ns ?? alert.timestamp_ns;
 
-  const timeline = sortedSteps.map((step, index): TraceEventModel => {
+  const stepEvents = collapsedSteps.map((step, index): TraceEventModel => {
     const evidence = step.evidence_ref ? evidenceById.get(step.evidence_ref) : undefined;
     const kind = classifyEventKind(step.event_type);
     const isBoundary = kind === 'boundary';
     const hasRules = step.triggering_rule_ids.length > 0 || !!step.triggering_pattern_id;
 
     // derive parent/child for flame graph nesting
-    const prevStep = index > 0 ? sortedSteps[index - 1] : null;
-    const nextStep = index < sortedSteps.length - 1 ? sortedSteps[index + 1] : null;
+    const prevStep = index > 0 ? collapsedSteps[index - 1] : null;
+    const nextStep = index < collapsedSteps.length - 1 ? collapsedSteps[index + 1] : null;
     const stepDuration = nextStep
       ? Math.max(1, Math.round((nextStep.timestamp_ns - step.timestamp_ns) / 1_000_000))
       : Math.max(10, Math.round((alert.timeline.total_duration_ms || 1000) * 0.1));
@@ -134,6 +278,7 @@ export function buildTraceRunModel(
       kind,
       title: step.description,
       actor: step.agent_id ?? alert.primary_agent.agent_id,
+      actorRole: step.agent_id ? (actorRoles[step.agent_id] ?? null) : null,
       material: evidenceMaterialStr,
       evidenceRef: step.evidence_ref,
       evidenceLevel: step.evidence_level,
@@ -154,6 +299,9 @@ export function buildTraceRunModel(
       depth: parentId ? 1 : 0,
     };
   });
+
+  // phase-2 LLM observer judgments sit at the tail of the trace
+  const timeline = [...stepEvents, ...buildObserverEvents(alert)];
 
   const kindCounts = timeline.reduce<Record<TraceEventKind, number>>(
     (counts, event) => {
@@ -191,6 +339,7 @@ export function buildTraceRunModel(
     durationMs: alert.timeline.total_duration_ms,
     confidence: alert.confidence,
     primaryAgent: alert.primary_agent.agent_id,
+    actorRoles,
     evidenceCount: evidenceItems.length,
     boundaryEvents,
     timeline,
@@ -201,4 +350,30 @@ export function buildTraceRunModel(
     },
     kindCounts,
   };
+}
+
+export type ActorSummary = {
+  spans: number;
+  evidenceCount: number;
+  highestSeverity: AlertSeverity | 'Normal';
+};
+
+const ACTOR_SEVERITY_WEIGHT: Record<AlertSeverity | 'Normal', number> = {
+  Normal: 0,
+  Info: 1,
+  Warning: 2,
+  Critical: 3,
+};
+
+/** Aggregate a list of events for one actor into a compact identity summary. */
+export function summarizeActorEvents(events: TraceEventModel[]): ActorSummary {
+  let evidenceCount = 0;
+  let highestSeverity: AlertSeverity | 'Normal' = 'Normal';
+  for (const event of events) {
+    if (event.evidenceRef) evidenceCount += 1;
+    if (ACTOR_SEVERITY_WEIGHT[event.severity] > ACTOR_SEVERITY_WEIGHT[highestSeverity]) {
+      highestSeverity = event.severity;
+    }
+  }
+  return { spans: events.length, evidenceCount, highestSeverity };
 }

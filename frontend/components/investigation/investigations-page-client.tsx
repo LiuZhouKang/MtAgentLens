@@ -5,8 +5,9 @@ import { useSearchParams } from 'next/navigation';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import InvestigationWorkbench from './investigation-workbench';
+import AlertEmptyState from './alert-empty-state';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 import { useAppStore } from '@/lib/store';
-import { buildInvestigationModel } from '@/lib/investigation';
 import { useAlertModels } from '@/lib/use-alert-models';
 import { buildInvestigationHref, parseInvestigationAlertId } from '@/lib/investigation-route';
 import { useRunEvidence } from '@/lib/use-run-evidence';
@@ -17,6 +18,7 @@ export default function InvestigationsPageClient() {
   const activeRunId = useAppStore(s => s.activeRunId);
   const alerts = useAppStore(s => s.alerts);
   const graph = useAppStore(s => s.graph);
+  const dataSource = useAppStore(s => s.dataSource);
   const { selectedValue: hashAlertId, setRouteValue: setHashAlertId } = useHashRouteState({ searchParams: sp, parseValue: parseInvestigationAlertId, buildHref: buildInvestigationHref });
   const { evidenceItems, evidenceLoading, evidenceError } = useRunEvidence(activeRunId);
 
@@ -37,13 +39,19 @@ export default function InvestigationsPageClient() {
   return (
     <div className="ln-page__inner" ref={pageRef} style={{ maxWidth: 1300, margin: '0 auto', padding: '12px 14px' }}>
       {selected ? (
-        <InvestigationWorkbench alert={selected.alert} model={selected.model ?? buildInvestigationModel(selected.alert, graph, evidenceItems)} activeRunId={activeRunId} availableAlerts={alerts} onSelectAlert={handleSelectAlert} evidenceLoading={evidenceLoading} evidenceError={evidenceError} />
+        selected.model ? (
+          <InvestigationWorkbench alert={selected.alert} model={selected.model} activeRunId={activeRunId} availableAlerts={alerts} onSelectAlert={handleSelectAlert} evidenceLoading={evidenceLoading} evidenceError={evidenceError} />
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+            <LoadingIndicator size={44} label="正在构建调查模型…" />
+          </div>
+        )
       ) : (
-        <div className="ln-panel" style={{ maxWidth: 480, margin: '10vh auto 0', padding: 28, textAlign: 'center' }}>
-          <span className="ln-eyebrow">告警</span>
-          <h1 className="ln-h1" style={{ marginTop: 12 }}>暂无告警数据</h1>
-          <p className="ln-desc" style={{ marginTop: 12 }}>等待实时观测会话接入</p>
-        </div>
+        <AlertEmptyState
+          dataSource={dataSource}
+          graphNodeCount={graph.nodes.length}
+          evidenceCount={evidenceItems.length}
+        />
       )}
     </div>
   );

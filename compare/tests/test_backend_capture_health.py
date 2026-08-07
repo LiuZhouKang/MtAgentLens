@@ -87,10 +87,9 @@ def _make_run_dir(tmp_path: Path, *, trace_err: str) -> Path:
     run_dir = tmp_path / "run-1"
     collector_dir = run_dir / "collector"
     collector_dir.mkdir(parents=True)
-    db_path = collector_dir / "trace.responsibility.db"
+    db_path = collector_dir / "collector.responsibility.db"
     _write_minimal_responsibility_db(db_path)
-    (collector_dir / "trace.err.log").write_text(trace_err, encoding="utf-8")
-    (collector_dir / "trace.log").write_text('{"event":"sample"}\n', encoding="utf-8")
+    (collector_dir / "collector.log").write_text(trace_err, encoding="utf-8")
     (collector_dir / "trace.pcap").write_bytes(b"pcap")
     (run_dir / ".scenario_id").write_text("demo", encoding="utf-8")
     (run_dir / "summary.json").write_text(

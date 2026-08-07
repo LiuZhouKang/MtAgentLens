@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAppStore } from '@/lib/store';
+import { demoAlerts } from '@/lib/demo-data';
+import { DEFAULT_INVESTIGATION_CONTEXT } from '@/lib/investigation-context';
 
 const initState = {
   appState: 'init' as const,
@@ -11,6 +13,7 @@ const initState = {
   graph: { nodes: [], edges: [] },
   graphMetrics: null,
   timelinePosition: 0,
+  investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
   errorMessage: null as string | null,
 };
 
@@ -79,5 +82,18 @@ describe('AppStore', () => {
     expect(useAppStore.getState().selectedNodeId).toBe('n1');
     useAppStore.getState().deselectNode();
     expect(useAppStore.getState().selectedNodeId).toBeNull();
+  });
+
+  it('focuses an alert into the shared investigation context', () => {
+    const alert = demoAlerts[0];
+
+    useAppStore.getState().focusAlert(alert);
+
+    const context = useAppStore.getState().investigationContext;
+    expect(context.activeIncidentId).toBe(alert.alert_id);
+    expect(context.activeAgentId).toBe(alert.primary_agent.agent_id);
+    expect(context.highlightedPathEdgeIds).toEqual(
+      alert.graph_snapshot.edges.map((edge) => edge.edge_id),
+    );
   });
 });

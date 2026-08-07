@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React, { useMemo } from "react";
+import React, { useMemo } from 'react';
 import type {
   DataExfilDashboardProps,
   ExfilAlertCardProps,
@@ -14,7 +14,7 @@ import type {
   ExfilType,
   ExfilSeverity,
   ExfilDashboardViewMode,
-} from "@/lib/data-exfiltration-contract";
+} from '@/lib/data-exfiltration-contract';
 import {
   EXFIL_TYPE_LABEL,
   EXFIL_TYPE_DESC,
@@ -27,69 +27,72 @@ import {
   extractAgentPids,
   extractDestinations,
   findSelectedAlert,
-} from "@/lib/data-exfiltration-contract";
+} from '@/lib/data-exfiltration-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 常量
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** 严重程度 → 颜色映射（Tailwind CSS 类） */
-const SEVERITY_COLORS: Record<ExfilSeverity, {
-  ring: string;
-  border: string;
-  bg: string;
-  text: string;
-  dot: string;
-  bar: string;
-}> = {
+const SEVERITY_COLORS: Record<
+  ExfilSeverity,
+  {
+    ring: string;
+    border: string;
+    bg: string;
+    text: string;
+    dot: string;
+    bar: string;
+  }
+> = {
   Low: {
-    ring: "ring-emerald-400",
-    border: "border-emerald-300",
-    bg: "bg-emerald-50",
-    text: "text-emerald-700",
-    dot: "bg-emerald-400",
-    bar: "bg-emerald-400",
+    ring: 'ring-emerald-400',
+    border: 'border-emerald-300',
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-700',
+    dot: 'bg-emerald-400',
+    bar: 'bg-emerald-400',
   },
   Medium: {
-    ring: "ring-amber-400",
-    border: "border-amber-300",
-    bg: "bg-amber-50",
-    text: "text-amber-700",
-    dot: "bg-amber-400",
-    bar: "bg-amber-400",
+    ring: 'ring-amber-400',
+    border: 'border-amber-300',
+    bg: 'bg-amber-50',
+    text: 'text-amber-700',
+    dot: 'bg-amber-400',
+    bar: 'bg-amber-400',
   },
   High: {
-    ring: "ring-orange-400",
-    border: "border-orange-300",
-    bg: "bg-orange-50",
-    text: "text-orange-700",
-    dot: "bg-orange-500 animate-pulse",
-    bar: "bg-orange-500",
+    ring: 'ring-orange-400',
+    border: 'border-orange-300',
+    bg: 'bg-orange-50',
+    text: 'text-orange-700',
+    dot: 'bg-orange-500 animate-pulse',
+    bar: 'bg-orange-500',
   },
   Critical: {
-    ring: "ring-red-400",
-    border: "border-red-300",
-    bg: "bg-red-50",
-    text: "text-red-700",
-    dot: "bg-red-500 animate-pulse",
-    bar: "bg-red-500",
+    ring: 'ring-red-400',
+    border: 'border-red-300',
+    bg: 'bg-red-50',
+    text: 'text-red-700',
+    dot: 'bg-red-500 animate-pulse',
+    bar: 'bg-red-500',
   },
 };
 
 /** 外泄类型 → 图标 */
 const EXFIL_TYPE_ICON: Record<ExfilType, string> = {
-  ReadThenSend: "🔗",
-  LargeUpload: "📤",
-  BatchExport: "📦",
-  CovertChannel: "🕵️",
+  ReadThenSend: '🔗',
+  LargeUpload: '📤',
+  BatchExport: '📦',
+  CovertChannel: '🕵️',
 };
 
 /** 视图模式标签 */
 const VIEW_LABELS: { mode: ExfilDashboardViewMode; label: string }[] = [
-  { mode: "overview", label: "概览" },
-  { mode: "alerts", label: "告警" },
-  { mode: "destinations", label: "目标" },
-  { mode: "timeline", label: "时间线" },
+  { mode: 'overview', label: '概览' },
+  { mode: 'alerts', label: '告警' },
+  { mode: 'destinations', label: '目标' },
+  { mode: 'timeline', label: '时间线' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -103,9 +106,9 @@ export const ExfilSeverityBadge: React.FC<ExfilSeverityBadgeProps> = ({
   const c = SEVERITY_COLORS[severity];
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${c.bg} ${c.text}`}
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${c.bg} ${c.text}`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+      <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
       {showLabel && EXFIL_SEVERITY_LABEL[severity]}
     </span>
   );
@@ -115,14 +118,9 @@ export const ExfilSeverityBadge: React.FC<ExfilSeverityBadgeProps> = ({
 // 子组件: ExfilTypeIcon — 外泄类型图标
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const ExfilTypeIcon: React.FC<ExfilTypeIconProps> = ({
-  exfil_type,
-  size = "md",
-}) => (
+export const ExfilTypeIcon: React.FC<ExfilTypeIconProps> = ({ exfil_type, size = 'md' }) => (
   <span
-    className={`inline-flex items-center justify-center ${
-      size === "sm" ? "text-sm" : "text-lg"
-    }`}
+    className={`inline-flex items-center justify-center ${size === 'sm' ? 'text-sm' : 'text-lg'}`}
     title={EXFIL_TYPE_DESC[exfil_type]}
   >
     {EXFIL_TYPE_ICON[exfil_type]}
@@ -143,26 +141,24 @@ export const ExfilAlertCard: React.FC<ExfilAlertCardProps> = ({
   return (
     <button
       onClick={onSelect}
-      className={`w-full text-left p-3 rounded border-l-4 transition-all cursor-pointer
-        ${c.border}
-        ${selected ? `ring-2 ${c.ring} ${c.bg}` : "bg-white hover:bg-slate-50"}
-      `}
+      className={`w-full cursor-pointer rounded border-l-4 p-3 text-left transition-all ${c.border} ${selected ? `ring-2 ${c.ring} ${c.bg}` : 'bg-white hover:bg-slate-50'} `}
     >
       {/* 头部：类型图标 + 类型标签 + 严重度 */}
-      <div className="flex items-center gap-2 mb-2">
+      <div className="mb-2 flex items-center gap-2">
         <ExfilTypeIcon exfil_type={alert.exfil_type} size="sm" />
         <span className="text-xs font-medium text-gray-600">
           {EXFIL_TYPE_LABEL[alert.exfil_type]}
         </span>
         <ExfilSeverityBadge severity={alert.severity} />
         {alert.is_active && (
-          <span className="text-xs text-blue-500 animate-pulse ml-auto">● 活跃</span>
+          <span className="ml-auto animate-pulse text-xs text-blue-500">● 活跃</span>
         )}
       </div>
 
       {/* 目标信息 */}
-      <div className="font-mono text-xs text-gray-500 truncate mb-1">
-        → {alert.destination.host}:{alert.destination.port}{alert.destination.path}
+      <div className="mb-1 truncate font-mono text-xs text-gray-500">
+        → {alert.destination.host}:{alert.destination.port}
+        {alert.destination.path}
       </div>
 
       {/* 数据量 + 源文件 */}
@@ -170,19 +166,17 @@ export const ExfilAlertCard: React.FC<ExfilAlertCardProps> = ({
         <span className="font-mono">{formatBytes(alert.payload_size_bytes)}</span>
         {alert.source_file && (
           <span className="truncate" title={alert.source_file}>
-            📄 {alert.source_file.split("/").pop()}
+            📄 {alert.source_file.split('/').pop()}
           </span>
         )}
         {alert.correlation_score > 0 && (
-          <span className="ml-auto">
-            置信度: {(alert.correlation_score * 100).toFixed(0)}%
-          </span>
+          <span className="ml-auto">置信度: {(alert.correlation_score * 100).toFixed(0)}%</span>
         )}
       </div>
 
       {/* 关联置信度进度条 */}
       {alert.correlation_score > 0 && (
-        <div className="mt-1.5 h-1 bg-slate-100 rounded-full overflow-hidden">
+        <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-100">
           <div
             className={`h-full rounded-full transition-all ${c.bar}`}
             style={{ width: `${alert.correlation_score * 100}%` }}
@@ -197,27 +191,24 @@ export const ExfilAlertCard: React.FC<ExfilAlertCardProps> = ({
 // 子组件: ExfilAlertDetail — 告警详情面板
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const ExfilAlertDetail: React.FC<ExfilAlertDetailProps> = ({
-  alert,
-  onAgentClick,
-}) => {
+export const ExfilAlertDetail: React.FC<ExfilAlertDetailProps> = ({ alert, onAgentClick }) => {
   const c = SEVERITY_COLORS[alert.severity];
 
   return (
-    <div className={`p-4 rounded-lg border-2 ${c.border} ${c.bg}`}>
+    <div className={`rounded-lg border-2 p-4 ${c.border} ${c.bg}`}>
       {/* 标题 */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex items-center gap-2">
         <ExfilTypeIcon exfil_type={alert.exfil_type} />
-        <h3 className="font-semibold text-sm">{EXFIL_TYPE_LABEL[alert.exfil_type]}</h3>
+        <h3 className="text-sm font-semibold">{EXFIL_TYPE_LABEL[alert.exfil_type]}</h3>
         <ExfilSeverityBadge severity={alert.severity} />
       </div>
 
       {/* 目标端点详情 */}
-      <div className="mb-3 p-3 bg-white/60 rounded text-xs font-mono">
-        <div className="text-gray-500 mb-1">外泄目标</div>
+      <div className="mb-3 rounded bg-white/60 p-3 font-mono text-xs">
+        <div className="mb-1 text-gray-500">外泄目标</div>
         <div>
           <span className="text-gray-400">host: </span>
-          <span className="text-gray-800 font-semibold">{alert.destination.host}</span>
+          <span className="font-semibold text-gray-800">{alert.destination.host}</span>
         </div>
         <div>
           <span className="text-gray-400">path: </span>
@@ -230,20 +221,20 @@ export const ExfilAlertDetail: React.FC<ExfilAlertDetailProps> = ({
       </div>
 
       {/* 关键指标网格 */}
-      <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
-        <div className="p-2 bg-white/60 rounded">
+      <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded bg-white/60 p-2">
           <div className="text-gray-500">载荷大小</div>
           <div className="font-mono font-semibold">{formatBytes(alert.payload_size_bytes)}</div>
         </div>
-        <div className="p-2 bg-white/60 rounded">
+        <div className="rounded bg-white/60 p-2">
           <div className="text-gray-500">累计外传</div>
           <div className="font-mono font-semibold">{formatBytes(alert.total_exported_bytes)}</div>
         </div>
-        <div className="p-2 bg-white/60 rounded">
+        <div className="rounded bg-white/60 p-2">
           <div className="text-gray-500">时间窗口</div>
           <div className="font-mono font-semibold">{formatTimeWindow(alert.time_window_ms)}</div>
         </div>
-        <div className="p-2 bg-white/60 rounded">
+        <div className="rounded bg-white/60 p-2">
           <div className="text-gray-500">关联置信度</div>
           <div className="font-mono font-semibold">
             {(alert.correlation_score * 100).toFixed(0)}%
@@ -252,8 +243,8 @@ export const ExfilAlertDetail: React.FC<ExfilAlertDetailProps> = ({
       </div>
 
       {/* 证据摘要 */}
-      <div className="mb-3 p-3 bg-white/60 rounded text-xs">
-        <div className="text-gray-500 mb-2 font-medium">证据摘要</div>
+      <div className="mb-3 rounded bg-white/60 p-3 text-xs">
+        <div className="mb-2 font-medium text-gray-500">证据摘要</div>
         <div className="grid grid-cols-2 gap-1.5">
           <div className="flex justify-between">
             <span className="text-gray-400">文件读取次数</span>
@@ -270,7 +261,7 @@ export const ExfilAlertDetail: React.FC<ExfilAlertDetailProps> = ({
           <div className="flex justify-between">
             <span className="text-gray-400">LLM API 已排除</span>
             <span className="font-mono font-semibold">
-              {alert.evidence.llm_api_excluded ? "✅" : "❌"}
+              {alert.evidence.llm_api_excluded ? '✅' : '❌'}
             </span>
           </div>
         </div>
@@ -278,19 +269,19 @@ export const ExfilAlertDetail: React.FC<ExfilAlertDetailProps> = ({
 
       {/* 源文件（ReadThenSend 模式） */}
       {alert.source_file && (
-        <div className="mb-3 p-3 bg-white/60 rounded text-xs">
-          <div className="text-gray-500 mb-1">源文件</div>
-          <div className="font-mono text-gray-800 break-all">{alert.source_file}</div>
+        <div className="mb-3 rounded bg-white/60 p-3 text-xs">
+          <div className="mb-1 text-gray-500">源文件</div>
+          <div className="font-mono break-all text-gray-800">{alert.source_file}</div>
         </div>
       )}
 
       {/* 内容匹配摘要 */}
       {alert.matched_content_excerpt && (
-        <div className="mb-3 p-3 bg-white/60 rounded text-xs">
-          <div className="text-gray-500 mb-1">
+        <div className="mb-3 rounded bg-white/60 p-3 text-xs">
+          <div className="mb-1 text-gray-500">
             内容匹配 ({formatBytes(alert.matched_content_length)})
           </div>
-          <pre className="font-mono text-gray-700 whitespace-pre-wrap break-all max-h-24 overflow-y-auto">
+          <pre className="max-h-24 overflow-y-auto font-mono break-all whitespace-pre-wrap text-gray-700">
             {alert.matched_content_excerpt}
           </pre>
         </div>
@@ -300,7 +291,7 @@ export const ExfilAlertDetail: React.FC<ExfilAlertDetailProps> = ({
       <div className="mb-3">
         <button
           onClick={() => onAgentClick(alert.agent_root_pid)}
-          className="text-xs text-blue-600 hover:text-blue-800 underline font-mono"
+          className="font-mono text-xs text-blue-600 underline hover:text-blue-800"
         >
           Agent PID: {alert.agent_root_pid} →
         </button>
@@ -309,19 +300,17 @@ export const ExfilAlertDetail: React.FC<ExfilAlertDetailProps> = ({
       {/* 关联事件列表 */}
       {alert.related_events.length > 0 && (
         <div className="text-xs">
-          <div className="text-gray-500 mb-1.5 font-medium">
+          <div className="mb-1.5 font-medium text-gray-500">
             关联事件 ({alert.related_events.length})
           </div>
-          <div className="space-y-1 max-h-32 overflow-y-auto">
+          <div className="max-h-32 space-y-1 overflow-y-auto">
             {alert.related_events.map((ev, idx) => (
               <div
                 key={idx}
-                className="flex items-center gap-2 p-1.5 bg-white/40 rounded font-mono"
+                className="flex items-center gap-2 rounded bg-white/40 p-1.5 font-mono"
               >
-                <span className="text-gray-400 w-20 flex-shrink-0 truncate">
-                  {ev.source}
-                </span>
-                <span className="text-gray-600 flex-1 truncate">
+                <span className="w-20 flex-shrink-0 truncate text-gray-400">{ev.source}</span>
+                <span className="flex-1 truncate text-gray-600">
                   {new Date(Math.floor(ev.timestamp_ns / 1_000_000)).toISOString()}
                 </span>
               </div>
@@ -343,33 +332,31 @@ export const ExfilTypeDistribution: React.FC<ExfilTypeDistributionProps> = ({
   onTypeSelect,
 }) => {
   const total = Object.values(distribution).reduce((a, b) => a + b, 0);
-  const types: ExfilType[] = ["ReadThenSend", "LargeUpload", "BatchExport", "CovertChannel"];
+  const types: ExfilType[] = ['ReadThenSend', 'LargeUpload', 'BatchExport', 'CovertChannel'];
   const typeBarColors: Record<ExfilType, string> = {
-    ReadThenSend: "bg-violet-500",
-    LargeUpload: "bg-cyan-500",
-    BatchExport: "bg-amber-500",
-    CovertChannel: "bg-rose-500",
+    ReadThenSend: 'bg-violet-500',
+    LargeUpload: 'bg-cyan-500',
+    BatchExport: 'bg-amber-500',
+    CovertChannel: 'bg-rose-500',
   };
 
   if (total === 0) {
-    return <div className="text-sm text-gray-400 p-4">暂无外泄告警数据</div>;
+    return <div className="p-4 text-sm text-gray-400">暂无外泄告警数据</div>;
   }
 
   return (
     <div className="space-y-2">
-      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-        外泄类型分布
-      </h4>
+      <h4 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">外泄类型分布</h4>
 
       {/* 分段进度条 */}
-      <div className="h-2.5 rounded-full overflow-hidden flex">
+      <div className="flex h-2.5 overflow-hidden rounded-full">
         {types.map((type) => {
           const pct = (distribution[type] || 0) / total;
           return pct > 0 ? (
             <div
               key={type}
               className={`h-full transition-all ${typeBarColors[type]} ${
-                selected_type === type ? "ring-2 ring-offset-1 ring-blue-400" : ""
+                selected_type === type ? 'ring-2 ring-blue-400 ring-offset-1' : ''
               }`}
               style={{ width: `${pct * 100}%` }}
             />
@@ -385,15 +372,13 @@ export const ExfilTypeDistribution: React.FC<ExfilTypeDistributionProps> = ({
             <button
               key={type}
               onClick={() => onTypeSelect(selected_type === type ? null : type)}
-              className={`flex items-center gap-1.5 text-xs p-1.5 rounded transition-colors ${
-                selected_type === type
-                  ? "bg-slate-100 ring-1 ring-blue-300"
-                  : "hover:bg-slate-50"
+              className={`flex items-center gap-1.5 rounded p-1.5 text-xs transition-colors ${
+                selected_type === type ? 'bg-slate-100 ring-1 ring-blue-300' : 'hover:bg-slate-50'
               }`}
             >
-              <span className={`w-2.5 h-2.5 rounded-sm ${typeBarColors[type]} flex-shrink-0`} />
+              <span className={`h-2.5 w-2.5 rounded-sm ${typeBarColors[type]} flex-shrink-0`} />
               <ExfilTypeIcon exfil_type={type} size="sm" />
-              <span className="text-gray-600 truncate">{EXFIL_TYPE_LABEL[type]}</span>
+              <span className="truncate text-gray-600">{EXFIL_TYPE_LABEL[type]}</span>
               <span className="ml-auto font-mono text-gray-400">{count}</span>
             </button>
           );
@@ -413,14 +398,14 @@ export const DestinationChart: React.FC<DestinationChartProps> = ({
   onHostSelect,
 }) => {
   if (destinations.length === 0) {
-    return <div className="text-sm text-gray-400 p-4">暂无目标端点数据</div>;
+    return <div className="p-4 text-sm text-gray-400">暂无目标端点数据</div>;
   }
 
   const maxBytes = destinations[0]?.total_bytes ?? 1;
 
   return (
     <div className="space-y-2">
-      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+      <h4 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
         目标端点 Top {destinations.length}
       </h4>
       {destinations.slice(0, 10).map((dest) => {
@@ -431,35 +416,35 @@ export const DestinationChart: React.FC<DestinationChartProps> = ({
           <button
             key={dest.host}
             onClick={() => onHostSelect(isSelected ? null : dest.host)}
-            className={`w-full text-left group`}
+            className={`group w-full text-left`}
           >
-            <div className="flex items-center justify-between text-xs mb-1">
+            <div className="mb-1 flex items-center justify-between text-xs">
               <span
-                className={`font-mono truncate ${
-                  isSelected ? "text-blue-600 font-semibold" : "text-gray-700"
+                className={`truncate font-mono ${
+                  isSelected ? 'font-semibold text-blue-600' : 'text-gray-700'
                 }`}
                 title={dest.host}
               >
                 {dest.host}
               </span>
-              <span className="text-gray-400 ml-2 flex-shrink-0">
+              <span className="ml-2 flex-shrink-0 text-gray-400">
                 {dest.alert_count} 告警 · {formatBytes(dest.total_bytes)}
               </span>
             </div>
-            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
               <div
                 className={`h-full rounded-full transition-all ${
-                  isSelected ? "bg-blue-500" : sevColors.bar
+                  isSelected ? 'bg-blue-500' : sevColors.bar
                 }`}
                 style={{ width: `${Math.min((dest.total_bytes / maxBytes) * 100, 100)}%` }}
               />
             </div>
             {/* Agent 标签 */}
-            <div className="flex gap-1 mt-0.5 flex-wrap">
+            <div className="mt-0.5 flex flex-wrap gap-1">
               {dest.affected_agents.slice(0, 3).map((pid) => (
                 <span
                   key={pid}
-                  className="text-[10px] text-gray-400 font-mono bg-slate-100 px-1 rounded"
+                  className="rounded bg-slate-100 px-1 font-mono text-[10px] text-gray-400"
                 >
                   PID:{pid}
                 </span>
@@ -488,42 +473,36 @@ export const AgentExfilSummary: React.FC<AgentExfilSummaryProps> = ({
 }) => {
   const maxSevColors = stats.max_severity
     ? SEVERITY_COLORS[stats.max_severity]
-    : SEVERITY_COLORS["Low"];
+    : SEVERITY_COLORS['Low'];
 
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
-        highlighted
-          ? `border-blue-400 bg-blue-50`
-          : `border-slate-200 bg-white hover:bg-slate-50`
+      className={`w-full rounded-lg border-2 p-4 text-left transition-colors ${
+        highlighted ? `border-blue-400 bg-blue-50` : `border-slate-200 bg-white hover:bg-slate-50`
       }`}
     >
       {/* Agent 标识 + 最高严重度 */}
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-sm font-mono">
-          Agent PID: {stats.agent_root_pid}
-        </h3>
-        {stats.max_severity && (
-          <ExfilSeverityBadge severity={stats.max_severity} />
-        )}
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-mono text-sm font-semibold">Agent PID: {stats.agent_root_pid}</h3>
+        {stats.max_severity && <ExfilSeverityBadge severity={stats.max_severity} />}
       </div>
 
       {/* 核心指标网格 */}
-      <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-        <div className="p-2 bg-slate-50 rounded">
+      <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded bg-slate-50 p-2">
           <div className="text-gray-500">总告警</div>
           <div className="font-mono font-semibold">{stats.total_alerts}</div>
         </div>
-        <div className="p-2 bg-slate-50 rounded">
+        <div className="rounded bg-slate-50 p-2">
           <div className="text-gray-500">累计外传</div>
           <div className="font-mono font-semibold">{formatBytes(stats.total_exported_bytes)}</div>
         </div>
-        <div className="p-2 bg-slate-50 rounded">
+        <div className="rounded bg-slate-50 p-2">
           <div className="text-gray-500">涉及目标</div>
           <div className="font-mono font-semibold">{stats.unique_destinations.length}</div>
         </div>
-        <div className="p-2 bg-slate-50 rounded">
+        <div className="rounded bg-slate-50 p-2">
           <div className="text-gray-500">平均置信度</div>
           <div className="font-mono font-semibold">
             {(stats.avg_correlation_score * 100).toFixed(0)}%
@@ -532,13 +511,13 @@ export const AgentExfilSummary: React.FC<AgentExfilSummaryProps> = ({
       </div>
 
       {/* 类型分布迷你条 */}
-      <div className="h-1.5 rounded-full overflow-hidden flex">
+      <div className="flex h-1.5 overflow-hidden rounded-full">
         {(
           [
-            ["ReadThenSend", "bg-violet-400"],
-            ["LargeUpload", "bg-cyan-400"],
-            ["BatchExport", "bg-amber-400"],
-            ["CovertChannel", "bg-rose-400"],
+            ['ReadThenSend', 'bg-violet-400'],
+            ['LargeUpload', 'bg-cyan-400'],
+            ['BatchExport', 'bg-amber-400'],
+            ['CovertChannel', 'bg-rose-400'],
           ] as [ExfilType, string][]
         ).map(([type, barColor]) => {
           const count = stats.alerts_by_type[type] || 0;
@@ -566,13 +545,11 @@ const SeverityGrid: React.FC<{
   selected_severity: ExfilSeverity | null;
   onSelect: (s: ExfilSeverity | null) => void;
 }> = ({ dist, selected_severity, onSelect }) => {
-  const sevs: ExfilSeverity[] = ["Critical", "High", "Medium", "Low"];
+  const sevs: ExfilSeverity[] = ['Critical', 'High', 'Medium', 'Low'];
 
   return (
     <div className="space-y-2">
-      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-        严重度分布
-      </h4>
+      <h4 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">严重度分布</h4>
       <div className="grid grid-cols-2 gap-2">
         {sevs.map((sev) => {
           const c = SEVERITY_COLORS[sev];
@@ -581,18 +558,14 @@ const SeverityGrid: React.FC<{
             <button
               key={sev}
               onClick={() => onSelect(isSelected ? null : sev)}
-              className={`p-3 rounded-lg border-2 transition-all text-center ${
+              className={`rounded-lg border-2 p-3 text-center transition-all ${
                 isSelected
                   ? `ring-2 ring-blue-400 ${c.bg} ${c.border}`
                   : `border-slate-200 bg-white hover:bg-slate-50`
               }`}
             >
-              <div className={`text-2xl font-bold font-mono ${c.text}`}>
-                {dist[sev].count}
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5">
-                {EXFIL_SEVERITY_LABEL[sev]}
-              </div>
+              <div className={`font-mono text-2xl font-bold ${c.text}`}>{dist[sev].count}</div>
+              <div className="mt-0.5 text-xs text-gray-500">{EXFIL_SEVERITY_LABEL[sev]}</div>
               <div className={`text-[10px] ${c.text} mt-0.5`}>
                 {(dist[sev].pct * 100).toFixed(0)}%
               </div>
@@ -619,19 +592,19 @@ const ExfilTimeline: React.FC<{
   );
 
   if (sorted.length === 0) {
-    return <div className="text-sm text-gray-400 p-4">暂无外泄告警记录</div>;
+    return <div className="p-4 text-sm text-gray-400">暂无外泄告警记录</div>;
   }
 
   return (
-    <div className="space-y-2 max-h-[600px] overflow-y-auto">
+    <div className="max-h-[600px] space-y-2 overflow-y-auto">
       {sorted.map((alert) => (
         <div key={alert.alert_id}>
           {/* 时间戳 */}
-          <div className="text-[10px] text-gray-400 font-mono ml-1 mb-1">
-            {new Date(alert.timestamp_epoch_ms).toLocaleTimeString("zh-CN", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
+          <div className="mb-1 ml-1 font-mono text-[10px] text-gray-400">
+            {new Date(alert.timestamp_epoch_ms).toLocaleTimeString('zh-CN', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
             })}
           </div>
           <ExfilAlertCard
@@ -710,9 +683,9 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
   if (alerts.length === 0) {
     return (
       <div className="p-6 text-center text-gray-400">
-        <div className="text-2xl mb-2">🛡️</div>
+        <div className="mb-2 text-2xl">🛡️</div>
         <div className="text-sm">暂无数据外泄告警</div>
-        <div className="text-xs mt-1">DataExfiltrationDetector 尚未检测到异常</div>
+        <div className="mt-1 text-xs">DataExfiltrationDetector 尚未检测到异常</div>
       </div>
     );
   }
@@ -720,17 +693,17 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
   return (
     <div className="space-y-4">
       {/* ═══ 顶部工具栏 ═══ */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex flex-wrap items-center gap-3">
         {/* 视图切换 */}
         <div className="flex rounded-lg bg-slate-100 p-0.5">
           {VIEW_LABELS.map(({ mode, label }) => (
             <button
               key={mode}
               onClick={() => onViewModeChange(mode)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 view_mode === mode
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               {label}
@@ -740,8 +713,8 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
 
         {/* 严重度过滤器 */}
         <select
-          className="text-xs border border-slate-300 rounded px-2 py-1.5 bg-white"
-          value={severity_filter ?? ""}
+          className="rounded border border-slate-300 bg-white px-2 py-1.5 text-xs"
+          value={severity_filter ?? ''}
           onChange={(e) => {
             const v = e.target.value;
             onSeverityFilterChange(v ? (v as ExfilSeverity) : null);
@@ -757,8 +730,8 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
 
         {/* 类型过滤器 */}
         <select
-          className="text-xs border border-slate-300 rounded px-2 py-1.5 bg-white"
-          value={type_filter ?? ""}
+          className="rounded border border-slate-300 bg-white px-2 py-1.5 text-xs"
+          value={type_filter ?? ''}
           onChange={(e) => {
             const v = e.target.value;
             onTypeFilterChange(v ? (v as ExfilType) : null);
@@ -775,8 +748,8 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
         {/* Agent PID 过滤器 */}
         {agentPids.length > 1 && (
           <select
-            className="text-xs border border-slate-300 rounded px-2 py-1.5 bg-white"
-            value={agent_filter ?? ""}
+            className="rounded border border-slate-300 bg-white px-2 py-1.5 text-xs"
+            value={agent_filter ?? ''}
             onChange={(e) => {
               const v = e.target.value;
               onAgentFilterChange(v ? Number(v) : null);
@@ -794,8 +767,8 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
         {/* 目标主机过滤器 */}
         {destHosts.length > 1 && (
           <select
-            className="text-xs border border-slate-300 rounded px-2 py-1.5 bg-white max-w-[200px]"
-            value={destination_filter ?? ""}
+            className="max-w-[200px] rounded border border-slate-300 bg-white px-2 py-1.5 text-xs"
+            value={destination_filter ?? ''}
             onChange={(e) => {
               const v = e.target.value;
               onDestinationFilterChange(v || null);
@@ -812,12 +785,8 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
       </div>
 
       {/* ═══ 概览视图 ═══ */}
-      {view_mode === "overview" && (
-        <div
-          className={`grid gap-4 ${
-            compact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
-          }`}
-        >
+      {view_mode === 'overview' && (
+        <div className={`grid gap-4 ${compact ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
           {/* 严重度分布 */}
           <SeverityGrid
             dist={sevDist}
@@ -833,7 +802,7 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
           />
 
           {/* 目标端点 Top */}
-          <div className={compact ? "" : "md:col-span-2"}>
+          <div className={compact ? '' : 'md:col-span-2'}>
             <DestinationChart
               destinations={destStats}
               selected_host={destination_filter}
@@ -843,11 +812,11 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
 
           {/* Agent 摘要卡片 */}
           {agentStats.length > 0 && (
-            <div className={compact ? "" : "md:col-span-2"}>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            <div className={compact ? '' : 'md:col-span-2'}>
+              <h4 className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                 Agent 外泄摘要
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {agentStats.slice(0, compact ? 3 : 6).map((stats) => (
                   <AgentExfilSummary
                     key={stats.agent_root_pid}
@@ -855,9 +824,7 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
                     highlighted={stats.agent_root_pid === agent_filter}
                     onClick={() =>
                       onAgentFilterChange(
-                        agent_filter === stats.agent_root_pid
-                          ? null
-                          : stats.agent_root_pid,
+                        agent_filter === stats.agent_root_pid ? null : stats.agent_root_pid,
                       )
                     }
                   />
@@ -869,18 +836,14 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
       )}
 
       {/* ═══ 告警列表视图 ═══ */}
-      {view_mode === "alerts" && (
-        <div className={`grid gap-4 ${compact ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-3"}`}>
+      {view_mode === 'alerts' && (
+        <div className={`grid gap-4 ${compact ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-3'}`}>
           {/* 告警卡片列表 */}
           <div
-            className={`space-y-2 max-h-[600px] overflow-y-auto ${
-              compact ? "" : "lg:col-span-2"
-            }`}
+            className={`max-h-[600px] space-y-2 overflow-y-auto ${compact ? '' : 'lg:col-span-2'}`}
           >
             {filteredAlerts.length === 0 ? (
-              <div className="text-sm text-gray-400 p-4">
-                当前过滤条件下无匹配告警
-              </div>
+              <div className="p-4 text-sm text-gray-400">当前过滤条件下无匹配告警</div>
             ) : (
               filteredAlerts.map((alert) => (
                 <ExfilAlertCard
@@ -896,14 +859,11 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
           {/* 详情面板 */}
           {!compact && selectedAlert && (
             <div className="max-h-[600px] overflow-y-auto">
-              <ExfilAlertDetail
-                alert={selectedAlert}
-                onAgentClick={onNavigateToAgent}
-              />
+              <ExfilAlertDetail alert={selectedAlert} onAgentClick={onNavigateToAgent} />
             </div>
           )}
           {!compact && !selectedAlert && filteredAlerts.length > 0 && (
-            <div className="text-sm text-gray-400 p-4 text-center self-center">
+            <div className="self-center p-4 text-center text-sm text-gray-400">
               点击左侧告警卡片查看详情
             </div>
           )}
@@ -911,7 +871,7 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
       )}
 
       {/* ═══ 目标分析视图 ═══ */}
-      {view_mode === "destinations" && (
+      {view_mode === 'destinations' && (
         <div className="space-y-4">
           <DestinationChart
             destinations={
@@ -926,10 +886,10 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
           {/* 选中目标下的告警列表 */}
           {destination_filter && (
             <div>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              <h4 className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                 目标 {destination_filter} 的告警详情
               </h4>
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              <div className="max-h-[400px] space-y-2 overflow-y-auto">
                 {alerts
                   .filter((a) => a.destination.host === destination_filter)
                   .map((alert) => (
@@ -947,7 +907,7 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
       )}
 
       {/* ═══ 时间线视图 ═══ */}
-      {view_mode === "timeline" && (
+      {view_mode === 'timeline' && (
         <ExfilTimeline
           alerts={filteredAlerts}
           selected_id={selected_alert_id}
@@ -956,17 +916,13 @@ export const DataExfilDashboard: React.FC<DataExfilDashboardProps> = ({
       )}
 
       {/* ═══ 底部状态栏 ═══ */}
-      <div className="text-xs text-gray-400 flex items-center justify-between pt-2 border-t border-slate-100">
+      <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-xs text-gray-400">
         <span>
-          共 {alerts.length} 条告警 · {agentPids.length} 个 Agent ·{" "}
-          {destHosts.length} 个目标
+          共 {alerts.length} 条告警 · {agentPids.length} 个 Agent · {destHosts.length} 个目标
         </span>
         <span>
-          {filteredAlerts.length !== alerts.length &&
-            `过滤后 ${filteredAlerts.length} 条 · `}
-          总计 {formatBytes(
-            alerts.reduce((sum, a) => sum + a.total_exported_bytes, 0),
-          )}
+          {filteredAlerts.length !== alerts.length && `过滤后 ${filteredAlerts.length} 条 · `}
+          总计 {formatBytes(alerts.reduce((sum, a) => sum + a.total_exported_bytes, 0))}
         </span>
       </div>
     </div>

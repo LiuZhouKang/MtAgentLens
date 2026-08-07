@@ -362,7 +362,7 @@ def run_probe_latency(
             command_log.append(baseline_record)
             baseline_values.append(baseline_s)
 
-            log_path = RAW_DIR / f"probe_{config['id']}_{index + 1}.trace.log"
+            log_path = RAW_DIR / f"probe_{config['id']}_{index + 1}.collector.log"
             stdout_path = RAW_DIR / f"probe_{config['id']}_{index + 1}.collector.stdout.log"
             stderr_path = RAW_DIR / f"probe_{config['id']}_{index + 1}.collector.stderr.log"
             collector_cmd = list(config["collector_args"]) + ["-o", str(log_path)]
@@ -495,7 +495,7 @@ def run_memory(
     sudo_password: str,
     command_log: list[CommandRecord],
 ) -> dict[str, Any]:
-    log_path = RAW_DIR / "memory_process_trace.trace.log"
+    log_path = RAW_DIR / "memory_process_trace.collector.log"
     stdout_path = RAW_DIR / "memory_process_trace.collector.stdout.log"
     stderr_path = RAW_DIR / "memory_process_trace.collector.stderr.log"
     collector_cmd = [
@@ -591,7 +591,7 @@ def run_time_to_detect(
     sudo_password: str,
     command_log: list[CommandRecord],
 ) -> dict[str, Any]:
-    log_path = RAW_DIR / "ttd_process_runner.trace.log"
+    log_path = RAW_DIR / "ttd_process_runner.collector.log"
     stdout_path = RAW_DIR / "ttd_process_runner.collector.stdout.log"
     stderr_path = RAW_DIR / "ttd_process_runner.collector.stderr.log"
     collector_cmd = [

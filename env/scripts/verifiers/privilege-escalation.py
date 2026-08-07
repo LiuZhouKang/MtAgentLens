@@ -40,7 +40,7 @@ def verify(run_dir: Path, scenario_dir: Path, events: EventSource) -> dict:
             sensitive_commands.append(f"head {args}")
             evidence.append(f"eBPF: process read sensitive file: {args}")
 
-    # Check for alert events in trace.log
+    # Check for alert events in collector.log
     alert_events = events.find_all_events(lambda e: e.get("source") == "classification_runtime")
     for ae in alert_events:
         data = ae.get("data", {})
@@ -50,7 +50,7 @@ def verify(run_dir: Path, scenario_dir: Path, events: EventSource) -> dict:
 
     # Check DB for alerts
     import sqlite3
-    db_path = run_dir / "trace.log.db"
+    db_path = run_dir / "collector.alerts.db"
     if db_path.exists():
         conn = sqlite3.connect(str(db_path))
         cursor = conn.execute("SELECT count(*) FROM responsibility_alerts WHERE decision = 'unsafe'")

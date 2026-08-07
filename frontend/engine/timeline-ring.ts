@@ -26,7 +26,11 @@ export class TimelineRing {
       const radius = startRadius + (endRadius - startRadius) * t;
       const angle = t * Math.PI * 2 * turns;
       const geom = new THREE.SphereGeometry(2, 8, 8);
-      const mat = new THREE.MeshBasicMaterial({ color: t < 0.3 ? 0xffffff : 0x68687a, transparent: true, opacity: t < 0.3 ? 0.9 : 0.3 });
+      const mat = new THREE.MeshBasicMaterial({
+        color: t < 0.3 ? 0xffffff : 0x68687a,
+        transparent: true,
+        opacity: t < 0.3 ? 0.9 : 0.3,
+      });
       const mesh = new THREE.Mesh(geom, mat);
       mesh.position.set(radius * Math.cos(angle), (t - 0.5) * 40, radius * Math.sin(angle));
       this.points.push({ mesh });

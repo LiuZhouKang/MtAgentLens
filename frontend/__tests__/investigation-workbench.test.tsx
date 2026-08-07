@@ -5,12 +5,6 @@ import InvestigationWorkbench from '@/components/investigation/investigation-wor
 import { buildInvestigationModel } from '@/lib/investigation';
 import { demoAlerts, demoEvidence, demoGraph } from '@/lib/demo-data';
 
-vi.mock('@/components/ui/theme-toggle', () => ({
-  default: function MockThemeToggle() {
-    return <button type="button">主题切换</button>;
-  },
-}));
-
 afterEach(() => {
   cleanup();
 });

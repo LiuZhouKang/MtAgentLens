@@ -26,10 +26,10 @@ AnalyzerDashboard Component
 
 ## 文件清单
 
-| 文件 | 用途 |
-|------|------|
-| `lib/analyzer-dashboard-contract.ts` | TypeScript 接口定义 |
-| `components/ui/analyzer-dashboard.tsx` | React 组件实现 |
+| 文件                                   | 用途                |
+| -------------------------------------- | ------------------- |
+| `lib/analyzer-dashboard-contract.ts`   | TypeScript 接口定义 |
+| `components/ui/analyzer-dashboard.tsx` | React 组件实现      |
 
 ## 核心接口
 
@@ -39,7 +39,7 @@ interface AnalyzerMetric {
   id: string;
   analyzer_name: string;
   timestamp_ns: number;
-  metric_type: "counter" | "gauge" | "histogram" | "event";
+  metric_type: 'counter' | 'gauge' | 'histogram' | 'event';
   value: number | string | Record<string, unknown>;
   severity: AnomalySeverity;
   tags?: Record<string, string>;
@@ -66,8 +66,8 @@ interface AnalyzerDashboardProps {
 ## 使用示例
 
 ```tsx
-import { AnalyzerDashboard } from "@/components/ui/analyzer-dashboard";
-import type { AnalyzerAggregation } from "@/lib/analyzer-dashboard-contract";
+import { AnalyzerDashboard } from '@/components/ui/analyzer-dashboard';
+import type { AnalyzerAggregation } from '@/lib/analyzer-dashboard-contract';
 
 export function MyDashboard() {
   const metrics: AnalyzerAggregation[] = [
@@ -76,12 +76,12 @@ export function MyDashboard() {
       events_by_severity: { critical: 2, warning: 5, info: 35, ok: 0 },
       recent_metrics: [
         {
-          id: "m1",
-          analyzer_name: "ObservabilityMetrics",
+          id: 'm1',
+          analyzer_name: 'ObservabilityMetrics',
           timestamp_ns: Date.now() * 1_000_000,
-          metric_type: "gauge",
+          metric_type: 'gauge',
           value: 0.75,
-          severity: "warning",
+          severity: 'warning',
         },
       ],
       aggregate_value: 0.75,
@@ -102,8 +102,9 @@ export function MyDashboard() {
 ## 集成步骤
 
 1. **导入组件**
+
    ```tsx
-   import { AnalyzerDashboard } from "@/components/ui/analyzer-dashboard";
+   import { AnalyzerDashboard } from '@/components/ui/analyzer-dashboard';
    ```
 
 2. **准备数据**

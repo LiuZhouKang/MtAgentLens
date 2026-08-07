@@ -59,9 +59,11 @@ function stableId(prefix: string, key: string): string {
 function formatResource(node: ResponsibilityNode): string | null {
   if (!node.resource) return null;
   if ('File' in node.resource) return node.resource.File.canonical_path;
-  if ('Network' in node.resource) return `${node.resource.Network.scheme}://${node.resource.Network.host}:${node.resource.Network.port}`;
+  if ('Network' in node.resource)
+    return `${node.resource.Network.scheme}://${node.resource.Network.host}:${node.resource.Network.port}`;
   if ('Process' in node.resource) return `pid=${node.resource.Process.process_id.pid}`;
-  if ('LlmConversation' in node.resource) return `${node.resource.LlmConversation.provider}/${node.resource.LlmConversation.model}`;
+  if ('LlmConversation' in node.resource)
+    return `${node.resource.LlmConversation.provider}/${node.resource.LlmConversation.model}`;
   if ('ToolCall' in node.resource) return node.resource.ToolCall.tool_name;
   if ('Credential' in node.resource) return `credential:${node.resource.Credential.credential_id}`;
   if ('Context' in node.resource) return `context:${node.resource.Context.context_id}`;
@@ -72,16 +74,21 @@ export function getPolicyBoundaryKey(node: ResponsibilityNode): string {
   if (node.node_type !== 'PolicyBoundary') return 'PolicyBoundary';
   if (!node.resource) return 'PolicyBoundary:unknown';
   if ('File' in node.resource) return `File:${node.resource.File.canonical_path}`;
-  if ('Network' in node.resource) return `Network:${node.resource.Network.scheme}://${node.resource.Network.host}:${node.resource.Network.port}`;
+  if ('Network' in node.resource)
+    return `Network:${node.resource.Network.scheme}://${node.resource.Network.host}:${node.resource.Network.port}`;
   if ('Process' in node.resource) return `Process:pid:${node.resource.Process.process_id.pid}`;
-  if ('LlmConversation' in node.resource) return `LlmConversation:${node.resource.LlmConversation.provider}/${node.resource.LlmConversation.model}`;
+  if ('LlmConversation' in node.resource)
+    return `LlmConversation:${node.resource.LlmConversation.provider}/${node.resource.LlmConversation.model}`;
   if ('ToolCall' in node.resource) return `ToolCall:${node.resource.ToolCall.tool_name}`;
   if ('Credential' in node.resource) return `Credential:${node.resource.Credential.credential_id}`;
   if ('Context' in node.resource) return `Context:${node.resource.Context.context_id}`;
   return 'PolicyBoundary:unknown';
 }
 
-function computeComponentClusters(nodeIds: string[], links: Array<{ source: string; target: string }>): Map<string, string> {
+function computeComponentClusters(
+  nodeIds: string[],
+  links: Array<{ source: string; target: string }>,
+): Map<string, string> {
   const parent = new Map<string, string>();
   const rank = new Map<string, number>();
 
@@ -176,7 +183,9 @@ export function adaptGraphToLargeGraph(
       node_type: node.node_type,
       agent_id: agentId,
       cluster_id: 'cluster-0',
-      description: [node.node_type, agentId !== 'unassigned' ? agentId : null, resource].filter(Boolean).join(' • '),
+      description: [node.node_type, agentId !== 'unassigned' ? agentId : null, resource]
+        .filter(Boolean)
+        .join(' • '),
       ...(pinnedPos
         ? {
             fx: pinnedPos.x,
@@ -191,7 +200,9 @@ export function adaptGraphToLargeGraph(
     adaptedNodeMap.set(entry.id, {
       id: entry.id,
       raw_node_ids: rawNodes
-        .filter((node) => node.node_type === 'PolicyBoundary' && getPolicyBoundaryKey(node) === entry.key)
+        .filter(
+          (node) => node.node_type === 'PolicyBoundary' && getPolicyBoundaryKey(node) === entry.key,
+        )
         .map((node) => node.node_id),
       node_type: 'PolicyBoundary',
       agent_id: 'unassigned',
@@ -202,7 +213,17 @@ export function adaptGraphToLargeGraph(
     });
   });
 
-  const linkAgg = new Map<string, { source: string; target: string; edge_type: ResponsibilityEdge['edge_type']; count: number; maxConfidence: number; rawEdgeIds: string[] }>();
+  const linkAgg = new Map<
+    string,
+    {
+      source: string;
+      target: string;
+      edge_type: ResponsibilityEdge['edge_type'];
+      count: number;
+      maxConfidence: number;
+      rawEdgeIds: string[];
+    }
+  >();
   rawEdges.forEach((edge) => {
     if (!rawNodeById.has(edge.source) || !rawNodeById.has(edge.target)) return;
     const source = idRemap.get(edge.source) ?? edge.source;
@@ -217,7 +238,14 @@ export function adaptGraphToLargeGraph(
       existing.rawEdgeIds.push(edge.edge_id);
       return;
     }
-    linkAgg.set(key, { source, target, edge_type: edge.edge_type, count: 1, maxConfidence: edge.confidence, rawEdgeIds: [edge.edge_id] });
+    linkAgg.set(key, {
+      source,
+      target,
+      edge_type: edge.edge_type,
+      count: 1,
+      maxConfidence: edge.confidence,
+      rawEdgeIds: [edge.edge_id],
+    });
   });
 
   const adaptedLinks: LargeGraphLink[] = Array.from(linkAgg.values()).map((entry) => {
@@ -230,16 +258,18 @@ export function adaptGraphToLargeGraph(
       target: entry.target,
       source_id: entry.source,
       target_id: entry.target,
-      source_label: sourceNode?.agent_id && sourceNode.agent_id !== 'unassigned'
-        ? sourceNode.agent_id
-        : sourceNode?.node_type === 'PolicyBoundary'
-          ? 'Policy Boundary'
-          : sourceNode?.id ?? entry.source,
-      target_label: targetNode?.agent_id && targetNode.agent_id !== 'unassigned'
-        ? targetNode.agent_id
-        : targetNode?.node_type === 'PolicyBoundary'
-          ? 'Policy Boundary'
-          : targetNode?.id ?? entry.target,
+      source_label:
+        sourceNode?.agent_id && sourceNode.agent_id !== 'unassigned'
+          ? sourceNode.agent_id
+          : sourceNode?.node_type === 'PolicyBoundary'
+            ? 'Policy Boundary'
+            : (sourceNode?.id ?? entry.source),
+      target_label:
+        targetNode?.agent_id && targetNode.agent_id !== 'unassigned'
+          ? targetNode.agent_id
+          : targetNode?.node_type === 'PolicyBoundary'
+            ? 'Policy Boundary'
+            : (targetNode?.id ?? entry.target),
       source_type: sourceNode?.node_type ?? 'Resource',
       target_type: targetNode?.node_type ?? 'Resource',
       edge_type: entry.edge_type,

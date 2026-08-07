@@ -18,6 +18,15 @@ export default function nextConfig(phase: string): NextConfig {
         },
       ],
     },
+    // Proxy /api/* to Python data server in development
+    ...(isDev && {
+      rewrites: async () => [
+        {
+          source: '/api/:path*',
+          destination: 'http://localhost:7397/api/:path*',
+        },
+      ],
+    }),
     experimental: {
       optimizePackageImports: ['lucide-react'],
     },

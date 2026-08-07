@@ -80,7 +80,14 @@ export default function AgentResponsibilityAtlas({ model }: AgentResponsibilityA
             }}
           />
           <div style={{ position: 'relative', display: 'grid', gap: 14, minHeight: 154 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
               <div className="prism-atlas-mini-copy">responsibility signature</div>
               <div
                 style={{
@@ -95,23 +102,25 @@ export default function AgentResponsibilityAtlas({ model }: AgentResponsibilityA
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {(model.claimedRoles.length ? model.claimedRoles : ['Pending role claim']).slice(0, 3).map((role) => (
-                <span
-                  key={role}
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: 999,
-                    border: '1px solid var(--border-soft)',
-                    background: 'color-mix(in srgb, var(--surface-soft) 84%, transparent)',
-                    fontSize: 10,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    color: 'var(--text-secondary)',
-                  }}
-                >
-                  {role}
-                </span>
-              ))}
+              {(model.claimedRoles.length ? model.claimedRoles : ['Pending role claim'])
+                .slice(0, 3)
+                .map((role) => (
+                  <span
+                    key={role}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 999,
+                      border: '1px solid var(--border-soft)',
+                      background: 'color-mix(in srgb, var(--surface-soft) 84%, transparent)',
+                      fontSize: 10,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    {role}
+                  </span>
+                ))}
             </div>
             <div className="prism-atlas-mini-copy">
               当前这个 agent 最值得优先确认的是身份声明是否与真正执行路径一致。
@@ -189,9 +198,12 @@ export default function AgentResponsibilityAtlas({ model }: AgentResponsibilityA
 
       <section className="prism-atlas-panel">
         <div className="prism-atlas-label">Evidence Hold</div>
-        <div className="prism-atlas-value">把这个 agent 能否被定责，读成证据抓握力而不是补充说明</div>
+        <div className="prism-atlas-value">
+          把这个 agent 能否被定责，读成证据抓握力而不是补充说明
+        </div>
         <div className="prism-atlas-caption">
-          每一格代表一个已物化的 trace；亮起越多，说明这条 agent 画像越接近可以直接进入 investigation。
+          每一格代表一个已物化的 trace；亮起越多，说明这条 agent 画像越接近可以直接进入
+          investigation。
         </div>
         <div className="prism-atlas-cell-grid" style={{ marginTop: 18 }}>
           {Array.from({ length: 12 }).map((_, index) => {

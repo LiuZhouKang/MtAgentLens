@@ -83,8 +83,8 @@ class VerificationArtifactSplitTests(unittest.TestCase):
                 json.dumps({"run_id": "run-1", "scenario_ids": ["network-anomaly"], "tasks": []}),
                 encoding="utf-8",
             )
-            replayed_db = run_dir / "trace.log.replayed.causal.db"
-            replayed_jsonl = run_dir / "trace.log.replayed.causal.jsonl"
+            replayed_db = run_dir / "collector.replayed.causal.db"
+            replayed_jsonl = run_dir / "collector.replayed.causal.jsonl"
             replayed_db.write_text("stale", encoding="utf-8")
             replayed_jsonl.write_text("stale", encoding="utf-8")
 

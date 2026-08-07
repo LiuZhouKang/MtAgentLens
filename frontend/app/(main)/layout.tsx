@@ -7,9 +7,9 @@ import gsap from 'gsap';
 import IncidentRail from '@/components/command-center/incident-rail';
 import { CommandPalette } from '@/components/system/command-palette';
 import RunSelector from '@/components/system/run-selector';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { MtlLogo } from '@/components/ui/mtl-logo';
-import { buildInvestigationModel } from '@/lib/investigation';
 import { useAlertModels } from '@/lib/use-alert-models';
 import { useAppStore } from '@/lib/store';
 import type { ResponsibilityAlert } from '@/lib/types';
@@ -34,7 +34,7 @@ function decisionLabel(d: ResponsibilityAlert['decision']) {
 }
 
 const TABS = [
-  { href: '/', label: '总览' },
+  { href: '/', label: '态势' },
   { href: '/overview', label: '仪表盘' },
   { href: '/investigations', label: '告警' },
   { href: '/traces', label: '追踪' },
@@ -207,17 +207,17 @@ function MainShell({ children }: { children: React.ReactNode }) {
 
   const sel = selectedItem;
   const selectedAlert = sel?.alert ?? null;
-  // The selected alert's model is computed synchronously so its detail is
-  // immediately available; the rest of the list populates lazily.
-  const selectedModel =
-    sel?.model ?? (selectedAlert ? buildInvestigationModel(selectedAlert, graph, []) : null);
+  // The selected alert's model is computed lazily by useAlertModels (idle-time
+  // chunks). Until it lands the rail renders a skeleton instead of blocking
+  // the main thread with a synchronous build — large graphs stay fluid.
+  const selectedModel = sel?.model ?? null;
 
   const anchorNs = useMemo(
     () => Math.max(...alerts.map((a) => a.timestamp_ns), Date.now() * 1_000_000),
     [alerts],
   );
 
-  const hasData = selectedAlert != null && selectedModel != null;
+  const hasData = selectedAlert != null;
 
   // persisted sidebar width
   const [customRailWidth, setCustomRailWidth] = useState<number | undefined>(() => {
@@ -271,35 +271,48 @@ return (
                 : { flexShrink: 0 }
             }
           >
-            <IncidentRail
-              selectedAlert={selectedAlert!}
-              selectedModel={selectedModel!}
-              selectionSummary={{
-                eyebrow: '当前事件',
-                title: selectedAlert!.title,
-                description: selectedAlert!.summary,
-              }}
-              alertModels={alertModels}
-              selectedAlertId={selectedAlert!.alert_id}
-              anchorNs={anchorNs}
-              openCount={alertModels.filter((m) => m.alert.decision !== 'Safe').length}
-              criticalCount={alertModels.filter((m) => m.alert.severity === 'Critical').length}
-              onSelect={(id) => {
-                const url = new URL(window.location.href);
-                url.searchParams.set('alert', id);
-                router.replace(url.pathname + url.search, { scroll: false });
-              }}
-              formatPercent={formatPercent}
-              formatRuntimeAge={formatRuntimeAge}
-              severityTone={severityTone}
-              decisionLabel={decisionLabel}
-              layoutMode="theater"
-              customWidth={customRailWidth}
-              onWidthChange={onRailWidthChange}
-            />
+            {selectedModel ? (
+              <IncidentRail
+                selectedAlert={selectedAlert!}
+                selectedModel={selectedModel}
+                selectionSummary={{
+                  eyebrow: '当前事件',
+                  title: selectedAlert!.title,
+                  description: selectedAlert!.summary,
+                }}
+                alertModels={alertModels}
+                selectedAlertId={selectedAlert!.alert_id}
+                anchorNs={anchorNs}
+                openCount={alertModels.filter((m) => m.alert.decision !== 'Safe').length}
+                criticalCount={alertModels.filter((m) => m.alert.severity === 'Critical').length}
+                onSelect={(id) => {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('alert', id);
+                  router.replace(url.pathname + url.search, { scroll: false });
+                }}
+                formatPercent={formatPercent}
+                formatRuntimeAge={formatRuntimeAge}
+                severityTone={severityTone}
+                decisionLabel={decisionLabel}
+                layoutMode="theater"
+                customWidth={customRailWidth}
+                onWidthChange={onRailWidthChange}
+              />
+            ) : (
+              <aside
+                className="incident-rail"
+                data-theme="apple-pro"
+                aria-label="事件调查控制轨"
+                style={{ position: 'relative', top: 'auto', left: 'auto', width: 58, height: '100%' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                  <LoadingIndicator size={32} label="构建中" />
+                </div>
+              </aside>
+            )}
           </div>
         )}
-        <main
+        <div
           ref={(el) => { contentRef.current = el as HTMLDivElement; }}
           style={
             isHome
@@ -308,7 +321,7 @@ return (
           }
         >
           {children}
-        </main>
+        </div>
       </div>
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
       <LoadingScreen show={showLoader} />

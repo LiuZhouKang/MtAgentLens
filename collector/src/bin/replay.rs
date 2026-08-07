@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
 // SPDX-License-Identifier: MIT
 // Ablation replay tool: re-run Correlator on existing SQLite DB with signals disabled.
 // Usage: cargo run --bin replay -- --sqlite <path> [--disable-signal argument_matching|process_lineage|temporal_proximity]

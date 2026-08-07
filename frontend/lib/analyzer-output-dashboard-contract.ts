@@ -11,7 +11,7 @@
 //
 // 对应 Rust 侧：collector/src/framework/analyzers/ 中任意 Analyzer 实现
 
-import type { AnomalySeverity } from "./data-contract";
+import type { AnomalySeverity } from './data-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 分析器输出事件（通用信封）
@@ -45,19 +45,17 @@ export interface AnalyzerOutputEvent {
 }
 
 /** 分析器事件的 UI 严重程度 */
-export type AnalyzerEventSeverity = "info" | "warning" | "critical";
+export type AnalyzerEventSeverity = 'info' | 'warning' | 'critical';
 
 /** 严重程度到 AnomalySeverity 的映射（统一着色） */
-export function analyzerSeverityToAnomalySeverity(
-  s: AnalyzerEventSeverity,
-): AnomalySeverity {
+export function analyzerSeverityToAnomalySeverity(s: AnalyzerEventSeverity): AnomalySeverity {
   switch (s) {
-    case "info":
-      return "info";
-    case "warning":
-      return "warning";
-    case "critical":
-      return "critical";
+    case 'info':
+      return 'info';
+    case 'warning':
+      return 'warning';
+    case 'critical':
+      return 'critical';
   }
 }
 
@@ -83,21 +81,21 @@ export interface AnalyzerRegistration {
 
 /** 流水线阶段标识（与 PipelineStage 对齐） */
 export type PipelineStageId =
-  | "preprocessing"
-  | "parsing"
-  | "causal_linking"
-  | "injection_detection"
-  | "anomaly_detection"
-  | "alert_enrichment";
+  | 'preprocessing'
+  | 'parsing'
+  | 'causal_linking'
+  | 'injection_detection'
+  | 'anomaly_detection'
+  | 'alert_enrichment';
 
 /** 阶段中文标签 */
 export const PIPELINE_STAGE_LABEL_CN: Record<PipelineStageId, string> = {
-  preprocessing: "预处理",
-  parsing: "解析",
-  causal_linking: "因果关联",
-  injection_detection: "注入检测",
-  anomaly_detection: "异常检测",
-  alert_enrichment: "告警丰富",
+  preprocessing: '预处理',
+  parsing: '解析',
+  causal_linking: '因果关联',
+  injection_detection: '注入检测',
+  anomaly_detection: '异常检测',
+  alert_enrichment: '告警丰富',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -185,10 +183,10 @@ export function createDefaultEventFilter(): AnalyzerEventFilter {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type AnalyzerOutputViewMode =
-  | "pipeline_overview" // 流水线总览：各分析器吞吐量 + 健康状态
-  | "event_feed"        // 实时事件流：滚动列表
-  | "analyzer_detail"   // 单分析器详情：统计 + 产出分布
-  | "statistics";       // 聚合统计图表
+  | 'pipeline_overview' // 流水线总览：各分析器吞吐量 + 健康状态
+  | 'event_feed' // 实时事件流：滚动列表
+  | 'analyzer_detail' // 单分析器详情：统计 + 产出分布
+  | 'statistics'; // 聚合统计图表
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 仪表板全局状态
@@ -367,7 +365,7 @@ export function calcErrorRate(stats: AnalyzerRuntimeStats): number {
 
 /** 格式化吞吐量为人类可读字符串 */
 export function formatThroughput(eps: number): string {
-  if (eps < 1) return "< 1/s";
+  if (eps < 1) return '< 1/s';
   if (eps < 1000) return `${Math.round(eps)}/s`;
   return `${(eps / 1000).toFixed(1)}K/s`;
 }
@@ -382,11 +380,11 @@ export function formatLatency(us: number): string {
 /** 按严重程度排序权重（critical > warning > info） */
 export function severitySortWeight(s: AnalyzerEventSeverity): number {
   switch (s) {
-    case "critical":
+    case 'critical':
       return 0;
-    case "warning":
+    case 'warning':
       return 1;
-    case "info":
+    case 'info':
       return 2;
   }
 }
@@ -396,21 +394,10 @@ export function eventMatchesFilter(
   event: AnalyzerOutputEvent,
   filter: AnalyzerEventFilter,
 ): boolean {
-  if (
-    filter.analyzer_ids !== null &&
-    !filter.analyzer_ids.includes(event.analyzer_id)
-  )
+  if (filter.analyzer_ids !== null && !filter.analyzer_ids.includes(event.analyzer_id))
     return false;
-  if (
-    filter.source_tags !== null &&
-    !filter.source_tags.includes(event.source_tag)
-  )
-    return false;
-  if (
-    filter.severities !== null &&
-    !filter.severities.includes(event.severity)
-  )
-    return false;
+  if (filter.source_tags !== null && !filter.source_tags.includes(event.source_tag)) return false;
+  if (filter.severities !== null && !filter.severities.includes(event.severity)) return false;
   if (
     filter.agent_pids !== null &&
     (event.agent_pid === null || !filter.agent_pids.includes(event.agent_pid))
@@ -421,10 +408,8 @@ export function eventMatchesFilter(
     (event.category === null || !filter.categories.includes(event.category))
   )
     return false;
-  if (filter.time_from_ms !== null && event.timestamp_ms < filter.time_from_ms)
-    return false;
-  if (filter.time_to_ms !== null && event.timestamp_ms > filter.time_to_ms)
-    return false;
+  if (filter.time_from_ms !== null && event.timestamp_ms < filter.time_from_ms) return false;
+  if (filter.time_to_ms !== null && event.timestamp_ms > filter.time_to_ms) return false;
   if (filter.text_search !== null) {
     const q = filter.text_search.toLowerCase();
     if (
@@ -454,16 +439,16 @@ export function groupEventsBySeverity(
   events: AnalyzerOutputEvent[],
 ): Record<AnalyzerEventSeverity, AnalyzerOutputEvent[]> {
   return {
-    info: events.filter((e) => e.severity === "info"),
-    warning: events.filter((e) => e.severity === "warning"),
-    critical: events.filter((e) => e.severity === "critical"),
+    info: events.filter((e) => e.severity === 'info'),
+    warning: events.filter((e) => e.severity === 'warning'),
+    critical: events.filter((e) => e.severity === 'critical'),
   };
 }
 
 /** 创建空的仪表板状态 */
 export function createDefaultAnalyzerOutputDashboardState(): AnalyzerOutputDashboardState {
   return {
-    view_mode: "pipeline_overview",
+    view_mode: 'pipeline_overview',
     registered_analyzers: [],
     runtime_stats: {},
     pipeline_snapshot: null,

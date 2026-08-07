@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 eunomia-bpf org.
 
@@ -203,6 +205,7 @@ async fn handle_request(
                     RunResource::Diff => serve_run_diff_api(&run_dir).await,
                     RunResource::GraphAnalysis => serve_run_graph_analysis_api(&run_dir).await,
                     RunResource::Snapshots => serve_run_snapshots_api(&run_dir).await,
+                    RunResource::Db => serve_run_db_api(&run_dir).await,
                     RunResource::AgentSnapshots => {
                         serve_run_agent_snapshots_api(&run_dir, run_route.extra.unwrap_or("")).await
                     }
@@ -485,6 +488,9 @@ enum RunResource {
     SnapshotChain,
     AgentSnapshotChain,
     SnapshotCrossDiff,
+    /// Raw SQLite artifact (collector.responsibility.db) — the frontend loads
+    /// it directly with sql.js, so the backend just streams the file.
+    Db,
 }
 
 struct RunRoute<'a> {
@@ -531,6 +537,11 @@ fn match_run_route(path: &str) -> Option<RunRoute<'_>> {
         ["api", "runs", run_id, "graph-analysis"] if !run_id.is_empty() => Some(RunRoute {
             run_id,
             resource: RunResource::GraphAnalysis,
+            extra: None,
+        }),
+        ["api", "runs", run_id, "db"] if !run_id.is_empty() => Some(RunRoute {
+            run_id,
+            resource: RunResource::Db,
             extra: None,
         }),
         ["api", "runs", run_id, "snapshots"] if !run_id.is_empty() => Some(RunRoute {
@@ -737,6 +748,7 @@ fn run_summary_value(run_dir: &Path, run_id: &str, summary: &Value) -> Value {
     let persisted_causal_path = run_dir.join("trace.log.causal.db");
     let persisted_causal_exists = persisted_causal_path.exists();
     let alerts_db_path = resolve_alerts_db_path(run_dir);
+    let responsibility_db_path = resolve_responsibility_db_path(run_dir);
     let correlation_evidence_db_path = resolve_correlation_evidence_db_path(run_dir);
     let correlation_evidence_available = correlation_evidence_db_path.as_ref().is_some_and(|p| {
         rusqlite::Connection::open(p)
@@ -772,6 +784,7 @@ fn run_summary_value(run_dir: &Path, run_id: &str, summary: &Value) -> Value {
             "alerts": alerts_db_path.is_some(),
             "correlation_evidence": correlation_evidence_available,
             "events": resolve_events_artifact_path(run_dir).is_some(),
+            "database": responsibility_db_path.is_some(),
         },
         "artifact_sources": {
             "correlation_evidence": if !correlation_evidence_available {
@@ -2097,6 +2110,66 @@ async fn serve_alerts_api(
         .unwrap_or_default();
 
     Ok(json_response(serde_json::json!(rows)))
+}
+
+/// Locate the run's authoritative SQLite artifact (`collector.responsibility.db`),
+/// which holds the `graph_snapshots` / `responsibility_alerts` /
+/// `correlation_evidence` tables the frontend's sql.js consumption layer reads
+/// directly. The collector writes it at `<run>/collector/collector.responsibility.db`.
+fn resolve_responsibility_db_path(run_dir: &Path) -> Option<PathBuf> {
+    if let Some(path) = resolve_artifact_from_summary(run_dir, "responsibility_db") {
+        return Some(path);
+    }
+    let nested = run_dir.join("collector").join("collector.responsibility.db");
+    if nested.is_file() {
+        return Some(nested);
+    }
+    let flat = run_dir.join("collector.responsibility.db");
+    if flat.is_file() {
+        return Some(flat);
+    }
+    // Shallow search for collector.responsibility.db under any subdirectory.
+    let mut candidates = std::fs::read_dir(run_dir)
+        .ok()?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .filter_map(|dir| {
+            let db = dir.join("collector.responsibility.db");
+            db.is_file().then_some(db)
+        })
+        .collect::<Vec<_>>();
+    candidates.sort();
+    candidates.into_iter().next()
+}
+
+/// Stream the raw run SQLite artifact. The frontend consumes it in-browser
+/// with sql.js, so no schema knowledge lives on this endpoint.
+async fn serve_run_db_api(
+    run_dir: &Path,
+) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
+    let run_id = run_dir.file_name().and_then(|s| s.to_str()).unwrap_or("unknown");
+    let Some(db_path) = resolve_responsibility_db_path(run_dir) else {
+        return Ok(not_found_json(json_error(
+            "db_unavailable",
+            run_id,
+            "responsibility_db",
+        )));
+    };
+
+    match tokio::fs::read(&db_path).await {
+        Ok(bytes) => Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/x-sqlite3")
+            .header("Content-Length", bytes.len().to_string())
+            .header("Access-Control-Allow-Origin", "*")
+            .header("X-MtAgentLens-Artifact", "collector.responsibility.db")
+            .body(Full::new(Bytes::from(bytes)))
+            .unwrap()),
+        Err(err) => Ok(internal_error_json(format!(
+            "failed to read responsibility db: {err}"
+        ))),
+    }
 }
 
 fn resolve_db_for_alerts(run_dir: &Path) -> Option<PathBuf> {
@@ -3488,12 +3561,13 @@ fn json_error(error: &str, run_id: &str, artifact: &str) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::{
-        handle_request, match_run_route, resolve_run_dir, serve_alerts_api,
-        serve_correlation_evidence_api, serve_events_api, serve_run_agent_snapshot_chain_api,
-        serve_run_agent_snapshots_api, serve_run_evaluation_api, serve_run_events_api,
-        serve_run_graph_analysis_api, serve_run_snapshot_by_id_api, serve_run_snapshot_chain_api,
-        serve_run_snapshot_cross_diff_api, serve_run_snapshot_diff_api, serve_run_snapshots_api,
-        serve_run_summary_api,
+        handle_request, match_run_route, resolve_responsibility_db_path, resolve_run_dir,
+        serve_alerts_api, serve_correlation_evidence_api, serve_events_api,
+        serve_run_agent_snapshot_chain_api, serve_run_agent_snapshots_api, serve_run_db_api,
+        serve_run_evaluation_api, serve_run_events_api, serve_run_graph_analysis_api,
+        serve_run_snapshot_by_id_api, serve_run_snapshot_chain_api, serve_run_snapshot_cross_diff_api,
+        serve_run_snapshot_diff_api, serve_run_snapshots_api, serve_run_summary_api,
+        serve_runs_index_api,
     };
     use crate::server::assets::FrontendAssets;
     use http_body_util::{BodyExt, Empty};
@@ -3693,8 +3767,10 @@ mod tests {
                         "evaluation": true,
                         "alerts": true,
                         "correlation_evidence": true,
-                        "events": false
+                        "events": false,
+                        "database": false,
                     },
+
                     "artifact_sources": {
                         "correlation_evidence": "persisted"
                     },
@@ -3774,8 +3850,10 @@ mod tests {
                         "evaluation": false,
                         "alerts": false,
                         "correlation_evidence": false,
-                        "events": false
+                        "events": false,
+                        "database": false,
                     },
+
                     "artifact_sources": {
                         "correlation_evidence": "missing"
                     },
@@ -3832,6 +3910,100 @@ mod tests {
         assert!(match_run_route("/api/runs/test-run/events").is_some());
     }
 
+    #[test]
+    fn db_route_is_distinct_from_collection_routes() {
+        assert!(match_run_route("/api/runs").is_none());
+        assert!(match_run_route("/api/runs/test-run/db").is_some());
+        assert!(match_run_route("/api/runs/test-run/db/extra").is_none());
+    }
+
+    #[test]
+    fn resolve_responsibility_db_path_finds_nested_collector_layout() {
+        let fixture = RunFixture::new("run-db-layout");
+        let collector_dir = fixture.run_dir().join("collector");
+        std::fs::create_dir_all(&collector_dir).unwrap();
+        std::fs::write(
+            collector_dir.join("collector.responsibility.db"),
+            b"SQLite format 3\x00fixture-bytes",
+        )
+        .unwrap();
+
+        let resolved = resolve_responsibility_db_path(fixture.run_dir());
+        assert_eq!(
+            resolved,
+            Some(collector_dir.join("collector.responsibility.db"))
+        );
+    }
+
+    #[test]
+    fn resolve_responsibility_db_path_returns_none_when_absent() {
+        let fixture = RunFixture::new("run-no-db");
+        assert!(resolve_responsibility_db_path(fixture.run_dir()).is_none());
+    }
+
+    #[tokio::test]
+    async fn serve_run_db_api_streams_the_raw_responsibility_db() {
+        let fixture = RunFixture::new("run-db-api");
+        let collector_dir = fixture.run_dir().join("collector");
+        std::fs::create_dir_all(&collector_dir).unwrap();
+        let db_bytes = b"SQLite format 3\x00fake-db-content-abc123";
+        std::fs::write(
+            collector_dir.join("collector.responsibility.db"),
+            db_bytes,
+        )
+        .unwrap();
+
+        let response = serve_run_db_api(fixture.run_dir()).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "application/x-sqlite3"
+        );
+        assert_eq!(
+            response.headers().get("x-mtagentlens-artifact").unwrap(),
+            "collector.responsibility.db"
+        );
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(&body[..], db_bytes);
+    }
+
+    #[tokio::test]
+    async fn serve_run_db_api_404s_when_no_db_is_present() {
+        let fixture = RunFixture::new("run-db-missing");
+        let response = serve_run_db_api(fixture.run_dir()).await.unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn runs_index_reports_database_availability_for_real_layout() {
+        let fixture = RunFixture::new("run-with-responsibility-db");
+        fixture.write_summary(json!({
+            "run_id": "run-with-responsibility-db",
+            "scenario_ids": [],
+            "status": "completed",
+        }));
+        let collector_dir = fixture.run_dir().join("collector");
+        std::fs::create_dir_all(&collector_dir).unwrap();
+        std::fs::write(
+            collector_dir.join("collector.responsibility.db"),
+            b"SQLite format 3\x00x",
+        )
+        .unwrap();
+
+        let _guard = fixture.enter_repo_root();
+        let response = serve_runs_index_api().await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let value: Value = serde_json::from_slice(&body).unwrap();
+        let run = value
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["run_id"] == "run-with-responsibility-db")
+            .expect("run must appear in the index");
+        assert_eq!(run["artifact_availability"]["database"], true);
+    }
+
     #[tokio::test]
     async fn handle_request_routes_run_summary_through_get_path() {
         let fixture = RunFixture::new("test-run");
@@ -3862,8 +4034,10 @@ mod tests {
                     "evaluation": true,
                     "alerts": true,
                     "correlation_evidence": false,
-                    "events": false
+                    "events": false,
+                    "database": false,
                 },
+
                 "artifact_sources": {
                     "correlation_evidence": "missing"
                 },
@@ -3914,8 +4088,10 @@ mod tests {
                     "evaluation": true,
                     "alerts": true,
                     "correlation_evidence": false,
-                    "events": false
+                    "events": false,
+                    "database": false,
                 },
+
                 "artifact_sources": {
                     "correlation_evidence": "missing"
                 },
@@ -3977,8 +4153,10 @@ mod tests {
                     "evaluation": false,
                     "alerts": false,
                     "correlation_evidence": false,
-                    "events": false
+                    "events": false,
+                    "database": false,
                 },
+
                 "artifact_sources": {
                     "correlation_evidence": "missing"
                 },
@@ -4706,8 +4884,10 @@ mod tests {
                     "evaluation": false,
                     "alerts": false,
                     "correlation_evidence": true,
-                    "events": false
+                    "events": false,
+                    "database": false,
                 },
+
                 "artifact_sources": {
                     "correlation_evidence": "replayed"
                 },
@@ -4746,8 +4926,10 @@ mod tests {
                     "evaluation": false,
                     "alerts": true,
                     "correlation_evidence": false,
-                    "events": false
+                    "events": false,
+                    "database": false,
                 },
+
                 "artifact_sources": {
                     "correlation_evidence": "missing"
                 },
@@ -4795,8 +4977,10 @@ mod tests {
                     "evaluation": false,
                     "alerts": true,
                     "correlation_evidence": false,
-                    "events": false
+                    "events": false,
+                    "database": false,
                 },
+
                 "artifact_sources": {
                     "correlation_evidence": "missing"
                 },
@@ -4948,8 +5132,10 @@ mod tests {
                     "evaluation": false,
                     "alerts": false,
                     "correlation_evidence": true,
-                    "events": false
+                    "events": false,
+                    "database": false,
                 },
+
                 "artifact_sources": {
                     "correlation_evidence": "replayed"
                 },
@@ -5016,8 +5202,10 @@ mod tests {
                     "evaluation": false,
                     "alerts": false,
                     "correlation_evidence": true,
-                    "events": false
+                    "events": false,
+                    "database": false,
                 },
+
                 "artifact_sources": {
                     "correlation_evidence": "replayed"
                 },
@@ -7194,8 +7382,10 @@ mod tests {
                     "evaluation": false,
                     "alerts": false,
                     "correlation_evidence": false,
-                    "events": true
+                    "events": true,
+                    "database": false,
                 },
+
                 "artifact_sources": {
                     "correlation_evidence": "missing"
                 },
@@ -7264,8 +7454,10 @@ mod tests {
                     "evaluation": false,
                     "alerts": true,
                     "correlation_evidence": false,
-                    "events": false
+                    "events": false,
+                    "database": false,
                 },
+
                 "artifact_sources": {
                     "correlation_evidence": "missing"
                 },
@@ -7343,8 +7535,10 @@ mod tests {
                     "evaluation": false,
                     "alerts": false,
                     "correlation_evidence": true,
-                    "events": false
+                    "events": false,
+                    "database": false,
                 },
+
                 "artifact_sources": {
                     "correlation_evidence": "persisted"
                 },
@@ -7517,8 +7711,10 @@ mod tests {
                     "evaluation": true,
                     "alerts": true,
                     "correlation_evidence": false,
-                    "events": false
+                    "events": false,
+                    "database": false,
                 },
+
                 "artifact_sources": {
                     "correlation_evidence": "missing"
                 },

@@ -8,12 +8,17 @@ export function isThemePreference(value: string | null): value is ThemePreferenc
   return value != null && VALID_THEMES.includes(value as ThemePreference);
 }
 
-export function readStoredTheme(storage: Pick<Storage, 'getItem'> | null | undefined): ThemePreference {
+export function readStoredTheme(
+  storage: Pick<Storage, 'getItem'> | null | undefined,
+): ThemePreference {
   const raw = storage?.getItem(THEME_STORAGE_KEY) ?? null;
   return isThemePreference(raw) ? raw : 'dark';
 }
 
-export function resolveEffectiveTheme(theme: ThemePreference, prefersDark: boolean): EffectiveTheme {
+export function resolveEffectiveTheme(
+  theme: ThemePreference,
+  prefersDark: boolean,
+): EffectiveTheme {
   if (theme === 'system') {
     return prefersDark ? 'dark' : 'light';
   }

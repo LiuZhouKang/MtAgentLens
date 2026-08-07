@@ -1,5 +1,13 @@
 import { afterAll, afterEach, beforeAll } from 'vitest';
+import initSqlJs from 'sql.js';
 import { server } from '@/mocks/server';
+
+// Provide the SQLite engine for db-import tests. The app loads it in the
+// browser via <script src="/sql-wasm.js"> (a public asset, see lib/db-import.ts);
+// vitest runs in Node where there is no script tag, so the real module is
+// injected here. This file only ever runs under vitest — never part of the
+// Next.js browser bundle — so the CJS glue's Node-only requires are safe.
+(globalThis as unknown as { initSqlJs?: typeof initSqlJs }).initSqlJs = initSqlJs;
 
 // Mock ResizeObserver for ReactFlow (@xyflow/react)
 globalThis.ResizeObserver = class ResizeObserver {

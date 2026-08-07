@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { GraphData, ResponsibilityEdge, ResponsibilityNode } from '@/lib/types';
-import { buildForceLink, buildForceNode, buildStageGraph, createBackgroundGraph } from '@/components/ui/home-engine-stage-config';
+import {
+  buildForceLink,
+  buildForceNode,
+  buildStageGraph,
+  createBackgroundGraph,
+} from '@/components/ui/home-engine-stage-config';
 
 function makeNode(node_id: string, node_type: ResponsibilityNode['node_type']): ResponsibilityNode {
   return {
@@ -14,7 +19,12 @@ function makeNode(node_id: string, node_type: ResponsibilityNode['node_type']): 
   };
 }
 
-function makeEdge(edge_id: string, edge_type: ResponsibilityEdge['edge_type'], source: string, target: string): ResponsibilityEdge {
+function makeEdge(
+  edge_id: string,
+  edge_type: ResponsibilityEdge['edge_type'],
+  source: string,
+  target: string,
+): ResponsibilityEdge {
   return {
     edge_id,
     edge_type,

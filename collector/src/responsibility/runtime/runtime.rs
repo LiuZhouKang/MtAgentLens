@@ -835,9 +835,23 @@ impl ResponsibilityRuntime {
         let cache_key = {
             let edge_types: Vec<String> = graph.all_edges().map(|e| format!("{:?}", e.edge_type)).collect();
             let node_types: Vec<String> = graph.all_nodes().map(|n| format!("{:?}", n.node_type)).collect();
-            CacheKey::compute(&edge_types, &node_types, "", "")
+            let subject = graph.all_nodes()
+                .find(|n| n.node_type == NewNodeType::Agent)
+                .and_then(|n| n.agent_id.as_ref().map(|a| a.as_str()))
+                .unwrap_or("");
+            let resource_path = graph.all_edges()
+                .filter(|e| e.edge_type == NewEdgeType::PolicyBoundaryCrossing)
+                .filter_map(|e| graph.get_node(&e.target))
+                .find_map(|n| n.resource.as_ref().map(|r| match r {
+                    crate::responsibility::types::NormalizedResource::File { canonical_path } => canonical_path.as_str(),
+                    crate::responsibility::types::NormalizedResource::Network { host, .. } => host.as_str(),
+                    _ => "",
+                }))
+                .unwrap_or("");
+            CacheKey::compute(&edge_types, &node_types, subject, resource_path)
         };
         let cached = self.observer_cache.lookup(cache_key);
+        let cache_prior = self.observer_cache.build_prior(cache_key);
 
         // ── Four-condition Observer trigger (§16.2) ─────────────
         // Triggers LLM arbitration when ANY of these pre-classification
@@ -852,35 +866,46 @@ impl ResponsibilityRuntime {
             || progressive_fused.map_or(false, |s| s > 0.4)
             || pbc_count > 50;
 
+        // Intent-triggered suspicious patterns → bypass L1 cache.
+        // When intents contain attack keywords, the Observer must re-evaluate
+        // even if a structurally similar graph was previously seen as safe.
+        let has_suspicious_intents_now = standalone_intents.iter().any(|intent| {
+            let text = format!("{} {:?}", intent.tool_name, intent.tool_args);
+            text.contains("docker") || text.contains("sudo") || text.contains("/etc/shadow") || text.contains("/etc/passwd") || text.contains("/proc/") || text.contains(".ssh/") || text.contains("credential") || text.contains("escape") || text.contains("inject") || text.contains("exploit") || text.contains("backdoor") || text.contains("typosquat") || text.contains("pyjwt") || text.contains("cryptograph") || text.contains("pip install")
+        });
+
+        // CUSUM/conflict/boost triggers AND suspicious intents signal genuine
+        // anomalies that should bypass quota limits. Regular grey-zone calls
+        // are still capped by max_observer_calls.
+        let quota_bypass = (needs_observer_extra || has_suspicious_intents_now)
+            && !self.config.disable_observer
+            && cached.is_none();
+
         let observer_for_call: Option<&dyn ObserverProvider> =
             if self.config.disable_observer {
-                None // Ablation A4: Observer disabled → heuristic fallback
-            } else if cached.is_some() {
-                None // Cache hit — skip observer call
-            } else if self.observer_calls < self.config.max_observer_calls {
-                // Pre-classification override: if CUSUM/conflict/boost triggers,
-                // pass observer even if the engine scoring might have fallen
-                // into DirectSafe/DirectUnsafe territory.
-                if needs_observer_extra {
-                    eprintln!("[runtime:trigger] observer forced by extra conditions: cusum={} conflict={} pfuse={:?}",
+                None
+            } else if cached.is_some() && !has_suspicious_intents_now {
+                None // Cache hit — skip (unless intents are suspicious)
+            } else if self.observer_calls < self.config.max_observer_calls || quota_bypass {
+                if needs_observer_extra && self.observer_calls >= self.config.max_observer_calls {
+                    eprintln!("[runtime:trigger] observer forced (quota bypass): cusum={} conflict={} pfuse={:?}",
                         cusum_triggered, evidence_conflict_flag, progressive_fused);
                 }
                 Some(self.observer.as_ref())
             } else {
-                None // Fall back to heuristic when quota exhausted
+                None
             };
 
+        let intent_descriptions: Vec<String> = standalone_intents.iter().filter_map(|intent| {
+                let tool: &str = &intent.tool_name;
+                intent.tool_args.iter().find_map(|arg| match arg { crate::responsibility::types::NormalizedArg::Content(c) if !c.is_empty() => Some(format!("{}: {}", tool, c.chars().take(120).collect::<String>())), _ => None }).or_else(|| Some(tool.to_string()))
+            }).take(10).collect();
+        if has_suspicious_intents_now { eprintln!("[runtime:intent-trigger] forcing Observer due to suspicious intents"); }
+        let intent_count = standalone_intents.len() as u32;
         let (mut classification_result, route) = self
             .classification_engine
-            .classify_provisional(
-                graph,
-                &patterns,
-                &evidence_snapshot,
-                observer_for_call,
-                repetition_count,
-                needs_observer_extra, // force observer when CUSUM/conflict/boost
-            )
-            .await;
+            .classify_provisional(graph, &patterns, &evidence_snapshot, observer_for_call, repetition_count,
+                needs_observer_extra || has_suspicious_intents_now, cache_prior, &intent_descriptions, intent_count).await;
 
         // ── Feed calibration monitor ──────────────────────────────
         // Record predictions for ECE tracking. When observer was called,
@@ -890,9 +915,22 @@ impl ResponsibilityRuntime {
             classification_result.score as f64,
             is_observer_unsafe,
         );
+        // v14: Feed pseudo-labels back into the calibrator for online SGD.
+        // Observer decisions serve as pseudo-labels — the Observer's semantic
+        // judgment is the best available ground truth in a streaming setting.
+        // This closes the calibration feedback loop: monitor → recalibrate.
+        let dim_scores_for_cal: [f64; 6] = [
+            classification_result.score_breakdown.boundary_score as f64,
+            classification_result.score_breakdown.pattern_score as f64,
+            classification_result.score_breakdown.role_score as f64,
+            classification_result.score_breakdown.repetition_score as f64,
+            classification_result.score_breakdown.evidence_score as f64,
+            classification_result.score_breakdown.behavioral_score as f64,
+        ];
+        self.calibration_monitor.feed_calibrator(&dim_scores_for_cal);
         if self.calibration_monitor.needs_recalibration() {
             eprintln!(
-                "[runtime:trigger] calibration ECE={:.4} exceeds threshold — recalibration recommended",
+                "[runtime:trigger] calibration ECE={:.4} exceeds threshold — recalibrating",
                 self.calibration_monitor.ece()
             );
         }
@@ -938,6 +976,7 @@ impl ResponsibilityRuntime {
                     authority: output.authority.clone(),
                     reasoning: output.reasoning.clone(),
                     attacked_flag: output.attacked_flag,
+                    evidence_cited: output.evidence_cited.clone(),
                     rule_verdicts: output.rule_verdicts.clone(),
                     pattern_verdicts: output.pattern_verdicts.clone(),
                 }, CacheTTL::Task);
@@ -1012,7 +1051,12 @@ impl ResponsibilityRuntime {
             .cloned()
             .collect();
 
-        if can_identify_agent && !new_claims.is_empty() {
+        // v14: Allow alert creation when Observer detected Unsafe, even without
+        // PBC claims. The Observer's evidence_cited provides justification.
+        let observer_detected = classification_result.route == "observer_unsafe"
+            && observer_output.as_ref().map_or(false, |o| !o.evidence_cited.is_empty());
+
+        if (can_identify_agent && !new_claims.is_empty()) || observer_detected {
             // ── Emit claim signals to cross-layer bus ──────────────
             for claim in &new_claims {
                 self.bus.emit_claim(ClaimSignal {
@@ -1239,6 +1283,7 @@ impl ResponsibilityRuntime {
         let matcher = GraphPatternMatcher::new(default_templates());
         let patterns = matcher.match_graph(graph);
         let repetition_count = all_intents.len() as u32;
+        let intent_count = all_intents.len() as u32;
 
         let (classification_result, _route) = self
             .classification_engine
@@ -1247,6 +1292,7 @@ impl ResponsibilityRuntime {
                 &patterns,
                 &batch_evidence.evidence,
                 repetition_count,
+                intent_count,
             );
 
         // ── 6. Build authoritative claims/alerts/tracebacks ────────
@@ -1381,7 +1427,7 @@ impl ResponsibilityRuntime {
 fn route_is_unsafe(route: &ClassRoute) -> bool {
     match route {
         ClassRoute::DirectUnsafe(output) => output.decision.as_str() == "unsafe",
-        ClassRoute::DirectSafe(output) => output.decision.as_str() == "unsafe",
+        ClassRoute::DirectSafe(_) => false,
         ClassRoute::ToObserver(_) => false,
     }
 }

@@ -46,15 +46,22 @@ function getActiveGraph(alert: ResponsibilityAlert, fallbackGraph: GraphData): G
   return fallbackGraph;
 }
 
-export function collectAlertEvidenceRefs(alert: ResponsibilityAlert): string[] {
+export function collectAlertEvidenceRefs(
+  alert: ResponsibilityAlert,
+  fallbackGraph: GraphData = { nodes: [], edges: [] },
+): string[] {
+  // Store alerts (db import / sample / demo) carry no graph_snapshot — the full
+  // graph lives in the store. Derive evidence refs from the same effective graph
+  // used for rendering (getActiveGraph), so evidence still links to alerts.
+  const graph = getActiveGraph(alert, fallbackGraph);
   const refs = new Set<string>();
-  const relevantEdgeIds = new Set(deriveTracebackEdgeIds(alert, alert.graph_snapshot?.edges ?? []));
+  const relevantEdgeIds = new Set(deriveTracebackEdgeIds(alert, graph.edges));
 
   for (const step of alert.timeline?.steps ?? []) {
     if (step.evidence_ref) refs.add(step.evidence_ref);
   }
 
-  for (const edge of alert.graph_snapshot?.edges ?? []) {
+  for (const edge of graph.edges ?? []) {
     if (relevantEdgeIds.size > 0 && !relevantEdgeIds.has(edge.edge_id)) continue;
     for (const ref of edge.evidence_refs ?? []) {
       refs.add(ref);
@@ -99,7 +106,7 @@ export function buildInvestigationModel(
   evidence: CorrelationEvidence[] = [],
 ): InvestigationModel {
   const graph = getActiveGraph(alert, fallbackGraph);
-  const evidenceRefs = collectAlertEvidenceRefs(alert);
+  const evidenceRefs = collectAlertEvidenceRefs(alert, fallbackGraph);
   const pathEdgeIds = deriveTracebackEdgeIds(alert, graph.edges);
   const pathEdges = graph.edges.filter((edge) => pathEdgeIds.includes(edge.edge_id));
   const pathNodeIds = new Set<string>();
@@ -137,9 +144,10 @@ export function buildInvestigationModel(
     primaryAgentId: alert.primary_agent?.agent_id ?? null,
     involvedAgentIds: Array.from(
       new Set(
-        [alert.primary_agent?.agent_id, ...alert.involved_agents.map((agent) => agent.agent_id)].filter(
-          (value): value is string => !!value,
-        ),
+        [
+          alert.primary_agent?.agent_id,
+          ...alert.involved_agents.map((agent) => agent.agent_id),
+        ].filter((value): value is string => !!value),
       ),
     ),
     timelineSteps: alert.timeline.steps,
@@ -148,7 +156,8 @@ export function buildInvestigationModel(
     linkedEvidence,
     pathEdges,
     pathNodes,
-    boundaryCrossingCount: pathEdges.filter((edge) => edge.edge_type === 'PolicyBoundaryCrossing').length,
+    boundaryCrossingCount: pathEdges.filter((edge) => edge.edge_type === 'PolicyBoundaryCrossing')
+      .length,
     ruleCount: alert.engine.rule_verdicts.length,
     patternCount: alert.engine.pattern_verdicts.length,
     parentClusterId: alert.primary_agent?.agent_id ?? null,

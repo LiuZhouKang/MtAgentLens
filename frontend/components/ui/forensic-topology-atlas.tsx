@@ -84,7 +84,13 @@ export default function ForensicTopologyAtlas({
                 'linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--brand-primary) 30%, transparent) 18%, color-mix(in srgb, var(--brand-primary) 30%, transparent) 82%, transparent 100%)',
             }}
           />
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, Math.min(5, model.pathNodes.length))}, minmax(0, 1fr))`, gap: 10 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${Math.max(1, Math.min(5, model.pathNodes.length))}, minmax(0, 1fr))`,
+              gap: 10,
+            }}
+          >
             {model.pathNodes.slice(0, 5).map((node, index) => (
               <div key={node.nodeId} style={{ display: 'grid', justifyItems: 'center', gap: 10 }}>
                 <div
@@ -121,7 +127,8 @@ export default function ForensicTopologyAtlas({
             marginTop: 18,
             borderRadius: 20,
             border: '1px solid var(--border-soft)',
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)',
+            background:
+              'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)',
             overflow: 'hidden',
           }}
         >
@@ -155,7 +162,9 @@ export default function ForensicTopologyAtlas({
 
       <section className="prism-atlas-panel">
         <div className="prism-atlas-label">Evidence Voltage</div>
-        <div className="prism-atlas-value">证据强度决定这场调查是否足够站得住，而不是视觉上看起来有多复杂</div>
+        <div className="prism-atlas-value">
+          证据强度决定这场调查是否足够站得住，而不是视觉上看起来有多复杂
+        </div>
         <div className="prism-atlas-caption">首个物化对象是 {leadEvidenceMaterial}。</div>
         <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
           {confidenceBands.map((band) => (

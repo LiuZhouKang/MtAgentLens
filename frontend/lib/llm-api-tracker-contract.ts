@@ -12,7 +12,7 @@
 //   timestamp_ns     — 连接 TimelinePanel（时间定位）
 //   provider         — 连接 LlmApiAnomalyDashboard（按 provider 过滤异常）
 
-import type { AnomalySeverity } from "./data-contract";
+import type { AnomalySeverity } from './data-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Provider 与状态枚举
@@ -20,63 +20,58 @@ import type { AnomalySeverity } from "./data-contract";
 
 /** LLM API Provider 标识 */
 export type LlmProvider =
-  | "openai"
-  | "anthropic"
-  | "google"
-  | "openrouter"
-  | "openai-legacy"
-  | "unknown";
+  'openai' | 'anthropic' | 'google' | 'openrouter' | 'openai-legacy' | 'unknown';
 
 /** 已知 provider 的 Logo/颜色映射 */
 export const LLM_PROVIDER_LABEL: Record<LlmProvider, string> = {
-  openai: "OpenAI",
-  anthropic: "Anthropic",
-  google: "Google",
-  openrouter: "OpenRouter",
-  "openai-legacy": "OpenAI (Legacy)",
-  unknown: "未知",
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+  google: 'Google',
+  openrouter: 'OpenRouter',
+  'openai-legacy': 'OpenAI (Legacy)',
+  unknown: '未知',
 };
 
 export const LLM_PROVIDER_COLOR: Record<LlmProvider, string> = {
-  openai: "text-emerald-600 bg-emerald-50 border-emerald-200",
-  anthropic: "text-amber-600 bg-amber-50 border-amber-200",
-  google: "text-blue-600 bg-blue-50 border-blue-200",
-  openrouter: "text-purple-600 bg-purple-50 border-purple-200",
-  "openai-legacy": "text-emerald-700 bg-emerald-100/50 border-emerald-300",
-  unknown: "text-slate-500 bg-slate-50 border-slate-200",
+  openai: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+  anthropic: 'text-amber-600 bg-amber-50 border-amber-200',
+  google: 'text-blue-600 bg-blue-50 border-blue-200',
+  openrouter: 'text-purple-600 bg-purple-50 border-purple-200',
+  'openai-legacy': 'text-emerald-700 bg-emerald-100/50 border-emerald-300',
+  unknown: 'text-slate-500 bg-slate-50 border-slate-200',
 };
 
 export const LLM_PROVIDER_DOT: Record<LlmProvider, string> = {
-  openai: "bg-emerald-400",
-  anthropic: "bg-amber-400",
-  google: "bg-blue-400",
-  openrouter: "bg-purple-400",
-  "openai-legacy": "bg-emerald-500",
-  unknown: "bg-slate-400",
+  openai: 'bg-emerald-400',
+  anthropic: 'bg-amber-400',
+  google: 'bg-blue-400',
+  openrouter: 'bg-purple-400',
+  'openai-legacy': 'bg-emerald-500',
+  unknown: 'bg-slate-400',
 };
 
 /** API 调用状态 — 对应 Rust LLMCallEvent.status */
 export type LlmCallStatus =
-  | "complete"   // 请求-响应成功配对
-  | "orphaned"   // 超时未收到响应的请求
-  | "error";     // 非 2xx 响应的调用
+  | 'complete' // 请求-响应成功配对
+  | 'orphaned' // 超时未收到响应的请求
+  | 'error'; // 非 2xx 响应的调用
 
 export const LLM_CALL_STATUS_LABEL: Record<LlmCallStatus, string> = {
-  complete: "完成",
-  orphaned: "孤立请求",
-  error: "错误",
+  complete: '完成',
+  orphaned: '孤立请求',
+  error: '错误',
 };
 
 export const LLM_CALL_STATUS_ICON: Record<LlmCallStatus, string> = {
-  complete: "✅",
-  orphaned: "👻",
-  error: "❌",
+  complete: '✅',
+  orphaned: '👻',
+  error: '❌',
 };
 
 export const LLM_CALL_STATUS_COLOR: Record<LlmCallStatus, string> = {
-  complete: "text-emerald-600 bg-emerald-50 border-emerald-200",
-  orphaned: "text-amber-600 bg-amber-50 border-amber-200",
-  error: "text-red-600 bg-red-50 border-red-200",
+  complete: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+  orphaned: 'text-amber-600 bg-amber-50 border-amber-200',
+  error: 'text-red-600 bg-red-50 border-red-200',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -231,9 +226,9 @@ export interface LlmApiTrackerSnapshot {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export type LlmTrackerDashboardViewMode =
-  | "overview"        // 概览：统计卡片 + provider 分布 + 最近调用
-  | "calls"           // 调用列表：可筛选、可排序的调用记录
-  | "by_provider";    // Provider 分析：按 provider 聚合的延迟/错误/token 图表
+  | 'overview' // 概览：统计卡片 + provider 分布 + 最近调用
+  | 'calls' // 调用列表：可筛选、可排序的调用记录
+  | 'by_provider'; // Provider 分析：按 provider 聚合的延迟/错误/token 图表
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 仪表板全局状态
@@ -376,12 +371,12 @@ export interface LlmTrackerFilterBarProps {
 /** 将 provider 字符串规范化为 LlmProvider */
 export function normalizeProvider(raw: string): LlmProvider {
   const lower = raw.toLowerCase();
-  if (lower.includes("openai") && lower.includes("legacy")) return "openai-legacy";
-  if (lower.includes("openai") || lower.includes("chat/completions")) return "openai";
-  if (lower.includes("anthropic") || lower.includes("messages")) return "anthropic";
-  if (lower.includes("google") || lower.includes("gemini")) return "google";
-  if (lower.includes("openrouter")) return "openrouter";
-  return "unknown";
+  if (lower.includes('openai') && lower.includes('legacy')) return 'openai-legacy';
+  if (lower.includes('openai') || lower.includes('chat/completions')) return 'openai';
+  if (lower.includes('anthropic') || lower.includes('messages')) return 'anthropic';
+  if (lower.includes('google') || lower.includes('gemini')) return 'google';
+  if (lower.includes('openrouter')) return 'openrouter';
+  return 'unknown';
 }
 
 /** 格式化延迟 (ms) 为人类可读字符串 */
@@ -447,38 +442,47 @@ export function buildLlmCallRecord(
     error_message: raw.error_message ?? null,
     record_id: `llm-call-${raw.pid}-${raw.tid}-${raw.request_timestamp_ns}-${index}`,
     request_timestamp_ms: requestTsMs,
-    latency_formatted: latency !== null ? formatLatency(latency) : "—",
+    latency_formatted: latency !== null ? formatLatency(latency) : '—',
   };
 }
 
 /** 按 provider 聚合调用记录 */
 export function aggregateByProvider(records: LlmCallRecord[]): Record<string, ProviderCallStats> {
-  const map = new Map<string, {
-    total: number;
-    complete: number;
-    orphaned: number;
-    errors: number;
-    streaming: number;
-    models: Set<string>;
-    latencies: number[];
-    inputTokens: number;
-    outputTokens: number;
-  }>();
+  const map = new Map<
+    string,
+    {
+      total: number;
+      complete: number;
+      orphaned: number;
+      errors: number;
+      streaming: number;
+      models: Set<string>;
+      latencies: number[];
+      inputTokens: number;
+      outputTokens: number;
+    }
+  >();
 
   for (const r of records) {
     const key = r.provider;
     if (!map.has(key)) {
       map.set(key, {
-        total: 0, complete: 0, orphaned: 0, errors: 0,
-        streaming: 0, models: new Set(),
-        latencies: [], inputTokens: 0, outputTokens: 0,
+        total: 0,
+        complete: 0,
+        orphaned: 0,
+        errors: 0,
+        streaming: 0,
+        models: new Set(),
+        latencies: [],
+        inputTokens: 0,
+        outputTokens: 0,
       });
     }
     const agg = map.get(key)!;
     agg.total++;
-    if (r.status === "complete") agg.complete++;
-    if (r.status === "orphaned") agg.orphaned++;
-    if (r.status === "error") agg.errors++;
+    if (r.status === 'complete') agg.complete++;
+    if (r.status === 'orphaned') agg.orphaned++;
+    if (r.status === 'error') agg.errors++;
     if (r.is_streaming) agg.streaming++;
     if (r.model) agg.models.add(r.model);
     if (r.latency_ms !== null) agg.latencies.push(r.latency_ms);
@@ -492,9 +496,7 @@ export function aggregateByProvider(records: LlmCallRecord[]): Record<string, Pr
     const p50 = sortedLat[Math.floor(sortedLat.length * 0.5)] ?? 0;
     const p95 = sortedLat[Math.floor(sortedLat.length * 0.95)] ?? 0;
     const p99 = sortedLat[Math.floor(sortedLat.length * 0.99)] ?? 0;
-    const avg = sortedLat.length > 0
-      ? sortedLat.reduce((a, b) => a + b, 0) / sortedLat.length
-      : 0;
+    const avg = sortedLat.length > 0 ? sortedLat.reduce((a, b) => a + b, 0) / sortedLat.length : 0;
 
     result[provider] = {
       provider: normalizeProvider(provider),
@@ -517,31 +519,39 @@ export function aggregateByProvider(records: LlmCallRecord[]): Record<string, Pr
 
 /** 按模型聚合调用记录 */
 export function aggregateByModel(records: LlmCallRecord[]): Record<string, ModelCallStats> {
-  const map = new Map<string, {
-    provider: LlmProvider;
-    total: number;
-    complete: number;
-    orphaned: number;
-    errors: number;
-    latencies: number[];
-    inputTokens: number;
-    outputTokens: number;
-  }>();
+  const map = new Map<
+    string,
+    {
+      provider: LlmProvider;
+      total: number;
+      complete: number;
+      orphaned: number;
+      errors: number;
+      latencies: number[];
+      inputTokens: number;
+      outputTokens: number;
+    }
+  >();
 
   for (const r of records) {
-    const key = r.model ?? "(unknown)";
+    const key = r.model ?? '(unknown)';
     if (!map.has(key)) {
       map.set(key, {
         provider: r.provider,
-        total: 0, complete: 0, orphaned: 0, errors: 0,
-        latencies: [], inputTokens: 0, outputTokens: 0,
+        total: 0,
+        complete: 0,
+        orphaned: 0,
+        errors: 0,
+        latencies: [],
+        inputTokens: 0,
+        outputTokens: 0,
       });
     }
     const agg = map.get(key)!;
     agg.total++;
-    if (r.status === "complete") agg.complete++;
-    if (r.status === "orphaned") agg.orphaned++;
-    if (r.status === "error") agg.errors++;
+    if (r.status === 'complete') agg.complete++;
+    if (r.status === 'orphaned') agg.orphaned++;
+    if (r.status === 'error') agg.errors++;
     if (r.latency_ms !== null) agg.latencies.push(r.latency_ms);
     if (r.prompt_tokens !== null) agg.inputTokens += r.prompt_tokens;
     if (r.completion_tokens !== null) agg.outputTokens += r.completion_tokens;
@@ -549,9 +559,10 @@ export function aggregateByModel(records: LlmCallRecord[]): Record<string, Model
 
   const result: Record<string, ModelCallStats> = {};
   for (const [model, agg] of map.entries()) {
-    const avg = agg.latencies.length > 0
-      ? agg.latencies.reduce((a, b) => a + b, 0) / agg.latencies.length
-      : 0;
+    const avg =
+      agg.latencies.length > 0
+        ? agg.latencies.reduce((a, b) => a + b, 0) / agg.latencies.length
+        : 0;
 
     result[model] = {
       model,
@@ -570,23 +581,32 @@ export function aggregateByModel(records: LlmCallRecord[]): Record<string, Model
 
 /** 按 agent pid 聚合调用记录 */
 export function aggregateByAgent(records: LlmCallRecord[]): AgentApiCallSummary[] {
-  const map = new Map<number, {
-    total: number;
-    providerCounts: Map<string, number>;
-    models: Set<string>;
-    latencies: number[];
-    errors: number;
-    orphaned: number;
-    totalTokens: number;
-    lastMs: number;
-  }>();
+  const map = new Map<
+    number,
+    {
+      total: number;
+      providerCounts: Map<string, number>;
+      models: Set<string>;
+      latencies: number[];
+      errors: number;
+      orphaned: number;
+      totalTokens: number;
+      lastMs: number;
+    }
+  >();
 
   for (const r of records) {
     const pid = r.pid;
     if (!map.has(pid)) {
       map.set(pid, {
-        total: 0, providerCounts: new Map(), models: new Set(),
-        latencies: [], errors: 0, orphaned: 0, totalTokens: 0, lastMs: 0,
+        total: 0,
+        providerCounts: new Map(),
+        models: new Set(),
+        latencies: [],
+        errors: 0,
+        orphaned: 0,
+        totalTokens: 0,
+        lastMs: 0,
       });
     }
     const agg = map.get(pid)!;
@@ -594,26 +614,29 @@ export function aggregateByAgent(records: LlmCallRecord[]): AgentApiCallSummary[
     agg.providerCounts.set(r.provider, (agg.providerCounts.get(r.provider) ?? 0) + 1);
     if (r.model) agg.models.add(r.model);
     if (r.latency_ms !== null) agg.latencies.push(r.latency_ms);
-    if (r.status === "error") agg.errors++;
-    if (r.status === "orphaned") agg.orphaned++;
+    if (r.status === 'error') agg.errors++;
+    if (r.status === 'orphaned') agg.orphaned++;
     agg.totalTokens += (r.prompt_tokens ?? 0) + (r.completion_tokens ?? 0);
     if (r.request_timestamp_ms > agg.lastMs) agg.lastMs = r.request_timestamp_ms;
   }
 
-  return Array.from(map.entries()).map(([pid, agg]) => ({
-    agent_root_pid: pid,
-    comm: `pid:${pid}`, // 可由调用方通过 process 事件补充实际 comm
-    total_calls: agg.total,
-    by_provider: Object.fromEntries(agg.providerCounts),
-    models: Array.from(agg.models).sort(),
-    avg_latency_ms: agg.latencies.length > 0
-      ? agg.latencies.reduce((a, b) => a + b, 0) / agg.latencies.length
-      : 0,
-    error_rate: agg.total > 0 ? agg.errors / agg.total : 0,
-    orphan_rate: agg.total > 0 ? agg.orphaned / agg.total : 0,
-    total_tokens: agg.totalTokens,
-    last_call_ms: agg.lastMs,
-  })).sort((a, b) => b.total_calls - a.total_calls);
+  return Array.from(map.entries())
+    .map(([pid, agg]) => ({
+      agent_root_pid: pid,
+      comm: `pid:${pid}`, // 可由调用方通过 process 事件补充实际 comm
+      total_calls: agg.total,
+      by_provider: Object.fromEntries(agg.providerCounts),
+      models: Array.from(agg.models).sort(),
+      avg_latency_ms:
+        agg.latencies.length > 0
+          ? agg.latencies.reduce((a, b) => a + b, 0) / agg.latencies.length
+          : 0,
+      error_rate: agg.total > 0 ? agg.errors / agg.total : 0,
+      orphan_rate: agg.total > 0 ? agg.orphaned / agg.total : 0,
+      total_tokens: agg.totalTokens,
+      last_call_ms: agg.lastMs,
+    }))
+    .sort((a, b) => b.total_calls - a.total_calls);
 }
 
 /** 构建全局快照 */
@@ -623,14 +646,12 @@ export function buildTrackerSnapshot(records: LlmCallRecord[]): LlmApiTrackerSna
   const byAgent = aggregateByAgent(records);
 
   const total = records.length;
-  const complete = records.filter((r) => r.status === "complete").length;
-  const errors = records.filter((r) => r.status === "error").length;
-  const orphaned = records.filter((r) => r.status === "orphaned").length;
+  const complete = records.filter((r) => r.status === 'complete').length;
+  const errors = records.filter((r) => r.status === 'error').length;
+  const orphaned = records.filter((r) => r.status === 'orphaned').length;
   const streaming = records.filter((r) => r.is_streaming).length;
 
-  const allLatencies = records
-    .filter((r) => r.latency_ms !== null)
-    .map((r) => r.latency_ms!);
+  const allLatencies = records.filter((r) => r.latency_ms !== null).map((r) => r.latency_ms!);
 
   return {
     total_records: total,
@@ -640,11 +661,11 @@ export function buildTrackerSnapshot(records: LlmCallRecord[]): LlmApiTrackerSna
     global_completion_rate: total > 0 ? complete / total : 1,
     global_error_rate: total > 0 ? errors / total : 0,
     global_orphan_rate: total > 0 ? orphaned / total : 0,
-    global_avg_latency_ms: allLatencies.length > 0
-      ? allLatencies.reduce((a, b) => a + b, 0) / allLatencies.length
-      : 0,
+    global_avg_latency_ms:
+      allLatencies.length > 0 ? allLatencies.reduce((a, b) => a + b, 0) / allLatencies.length : 0,
     global_total_tokens: records.reduce(
-      (sum, r) => sum + (r.prompt_tokens ?? 0) + (r.completion_tokens ?? 0), 0,
+      (sum, r) => sum + (r.prompt_tokens ?? 0) + (r.completion_tokens ?? 0),
+      0,
     ),
     global_streaming_ratio: total > 0 ? streaming / total : 0,
   };
@@ -672,7 +693,7 @@ export function findSelectedRecord(
 /** 创建默认仪表板状态 */
 export function createDefaultLlmApiTrackerState(): LlmApiTrackerDashboardState {
   return {
-    view_mode: "overview",
+    view_mode: 'overview',
     snapshot: null,
     recent_calls: [],
     total_record_count: 0,

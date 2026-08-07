@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React, { useMemo } from "react";
+import React, { useMemo } from 'react';
 import type {
   SseContentScannerDashboardProps,
   SseContentScannerDashboardState,
@@ -11,7 +11,7 @@ import type {
   ScannedEventType,
   SseSignalDetailPanelProps,
   ToolSignalRowProps,
-} from "@/lib/sse-content-scanner-contract";
+} from '@/lib/sse-content-scanner-contract';
 import {
   DETECTION_LAYER_LABEL,
   DETECTION_LAYER_COLOR,
@@ -19,39 +19,39 @@ import {
   signalConfidenceToSeverity,
   signalConfidenceColor,
   signalConfidenceBg,
-} from "@/lib/sse-content-scanner-contract";
+} from '@/lib/sse-content-scanner-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 常量
 // ═══════════════════════════════════════════════════════════════════════════
 
 const VIEW_LABELS: { mode: ScannerViewMode; label: string; icon: string }[] = [
-  { mode: "overview", label: "概览", icon: "📊" },
-  { mode: "signals", label: "信号列表", icon: "🚨" },
-  { mode: "tools", label: "工具分布", icon: "🔧" },
+  { mode: 'overview', label: '概览', icon: '📊' },
+  { mode: 'signals', label: '信号列表', icon: '🚨' },
+  { mode: 'tools', label: '工具分布', icon: '🔧' },
 ];
 
 const LAYER_DOT: Record<DetectionLayer, string> = {
-  pattern: "bg-indigo-400",
-  ood: "bg-amber-400",
+  pattern: 'bg-indigo-400',
+  ood: 'bg-amber-400',
 };
 
 const LAYER_BORDER: Record<DetectionLayer, string> = {
-  pattern: "border-l-indigo-400",
-  ood: "border-l-amber-400",
+  pattern: 'border-l-indigo-400',
+  ood: 'border-l-amber-400',
 };
 
 const SEVERITY_BADGE: Record<string, string> = {
-  critical: "bg-red-100 text-red-700 border-red-200",
-  high: "bg-orange-100 text-orange-700 border-orange-200",
-  medium: "bg-amber-100 text-amber-700 border-amber-200",
-  low: "bg-slate-100 text-slate-600 border-slate-200",
+  critical: 'bg-red-100 text-red-700 border-red-200',
+  high: 'bg-orange-100 text-orange-700 border-orange-200',
+  medium: 'bg-amber-100 text-amber-700 border-amber-200',
+  low: 'bg-slate-100 text-slate-600 border-slate-200',
 };
 
 const EVENT_TYPE_ICON: Record<ScannedEventType, string> = {
-  tool_result: "📋",
-  content_block_delta: "📝",
-  text_delta: "💬",
+  tool_result: '📋',
+  content_block_delta: '📝',
+  text_delta: '💬',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -64,24 +64,22 @@ const SummaryCard: React.FC<{
   unit?: string;
   highlight?: boolean;
   raw?: boolean;
-}> = ({ label, value, unit = "", highlight = false, raw = false }) => (
+}> = ({ label, value, unit = '', highlight = false, raw = false }) => (
   <div
-    className={`p-3 rounded-lg border ${
-      highlight
-        ? "border-red-300 bg-red-50"
-        : "border-slate-200 bg-white"
+    className={`rounded-lg border p-3 ${
+      highlight ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'
     }`}
   >
-    <div className="text-xs text-gray-500 mb-1">{label}</div>
+    <div className="mb-1 text-xs text-gray-500">{label}</div>
     <div className="font-mono text-lg font-semibold">
       {raw
         ? value
-        : typeof value === "number"
+        : typeof value === 'number'
           ? value >= 1000
             ? `${(value / 1000).toFixed(1)}k`
             : value
-          : value}{" "}
-      {unit && <span className="text-xs text-gray-400 font-normal">{unit}</span>}
+          : value}{' '}
+      {unit && <span className="text-xs font-normal text-gray-400">{unit}</span>}
     </div>
   </div>
 );
@@ -99,7 +97,7 @@ const DistributionBar: React.FC<{
   return (
     <div className="space-y-2">
       {/* 彩色条 */}
-      <div className="flex h-2 rounded-full overflow-hidden bg-slate-100">
+      <div className="flex h-2 overflow-hidden rounded-full bg-slate-100">
         {segments.map((seg) => {
           const pct = (seg.count / total) * 100;
           return pct > 0 ? (
@@ -113,10 +111,10 @@ const DistributionBar: React.FC<{
         })}
       </div>
       {/* 图例 */}
-      <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
         {segments.map((seg) => (
           <span key={seg.label} className="flex items-center gap-1">
-            <span className={`inline-block w-2 h-2 rounded-full ${seg.color}`} />
+            <span className={`inline-block h-2 w-2 rounded-full ${seg.color}`} />
             {seg.label}: {seg.count}
           </span>
         ))}
@@ -135,7 +133,7 @@ const ConfidenceBadge: React.FC<{ confidence: number }> = ({ confidence }) => {
 
   return (
     <span
-      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${colorClass}`}
+      className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${colorClass}`}
     >
       {(confidence * 100).toFixed(0)}%
     </span>
@@ -153,22 +151,22 @@ const ConfidenceBar: React.FC<{ confidence: number; compact?: boolean }> = ({
   const pct = (confidence * 100).toFixed(0);
   const color =
     confidence >= 0.9
-      ? "bg-red-500"
+      ? 'bg-red-500'
       : confidence >= 0.7
-        ? "bg-orange-500"
+        ? 'bg-orange-500'
         : confidence >= 0.5
-          ? "bg-amber-500"
-          : "bg-slate-300";
+          ? 'bg-amber-500'
+          : 'bg-slate-300';
 
   return (
-    <div className={`flex items-center gap-2 ${compact ? "w-16" : "w-20"}`}>
-      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+    <div className={`flex items-center gap-2 ${compact ? 'w-16' : 'w-20'}`}>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
         <div
           className={`h-full rounded-full ${color} transition-all`}
           style={{ width: `${Math.min(confidence * 100, 100)}%` }}
         />
       </div>
-      <span className={`font-mono ${signalConfidenceColor(confidence)} text-xs w-8 text-right`}>
+      <span className={`font-mono ${signalConfidenceColor(confidence)} w-8 text-right text-xs`}>
         {pct}%
       </span>
     </div>
@@ -200,30 +198,25 @@ const SignalCard: React.FC<{
   return (
     <div
       onClick={onSelect}
-      className={`p-3 rounded-lg border border-l-4 cursor-pointer transition-all ${
+      className={`cursor-pointer rounded-lg border border-l-4 p-3 transition-all ${
         LAYER_BORDER[signal.detection_layer]
-      } ${bgClass} ${
-        isSelected
-          ? "ring-2 ring-blue-400 shadow-sm"
-          : "hover:shadow-sm"
-      }`}
+      } ${bgClass} ${isSelected ? 'shadow-sm ring-2 ring-blue-400' : 'hover:shadow-sm'}`}
     >
       {/* ── 头部: 检测层 + 置信度 + 时间 ── */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span
-            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+            className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${
               DETECTION_LAYER_COLOR[signal.detection_layer]
             }`}
           >
             {DETECTION_LAYER_LABEL[signal.detection_layer]}
           </span>
           <span className="text-xs text-gray-400">
-            {EVENT_TYPE_ICON[signal.event_type]}{" "}
-            {EVENT_TYPE_LABEL[signal.event_type]}
+            {EVENT_TYPE_ICON[signal.event_type]} {EVENT_TYPE_LABEL[signal.event_type]}
           </span>
-          {signal.detection_layer === "ood" && signal.detail.layer === "ood" && (
-            <span className="text-[10px] font-mono text-amber-600">
+          {signal.detection_layer === 'ood' && signal.detail.layer === 'ood' && (
+            <span className="font-mono text-[10px] text-amber-600">
               分数: {signal.detail.anomaly_score.toFixed(3)}
             </span>
           )}
@@ -232,31 +225,31 @@ const SignalCard: React.FC<{
       </div>
 
       {/* ── 工具名 ── */}
-      <div className="text-xs font-mono text-blue-600 mb-1.5">
-        {signal.tool_name}
-      </div>
+      <div className="mb-1.5 font-mono text-xs text-blue-600">{signal.tool_name}</div>
 
       {/* ── 检测理由 ── */}
-      <div className={`text-xs text-gray-600 leading-relaxed ${compact ? "line-clamp-1" : "line-clamp-2"}`}>
+      <div
+        className={`text-xs leading-relaxed text-gray-600 ${compact ? 'line-clamp-1' : 'line-clamp-2'}`}
+      >
         {signal.reason}
       </div>
 
       {/* ── 文本片段预览 ── */}
       {signal.snippet_preview && (
-        <div className="mt-2 p-2 rounded bg-white/60 border border-slate-200 text-[11px] font-mono text-gray-500 line-clamp-2 whitespace-pre-wrap break-all">
+        <div className="mt-2 line-clamp-2 rounded border border-slate-200 bg-white/60 p-2 font-mono text-[11px] break-all whitespace-pre-wrap text-gray-500">
           {signal.snippet_preview}
         </div>
       )}
 
       {/* ── 操作按钮 ── */}
       {isSelected && (
-        <div className="mt-2 flex items-center gap-2 pt-2 border-t border-slate-200/50">
+        <div className="mt-2 flex items-center gap-2 border-t border-slate-200/50 pt-2">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onNavigateToTimeline(signal.timestamp_ns);
             }}
-            className="text-[10px] px-2 py-1 rounded bg-white border border-slate-200 text-gray-600 hover:bg-slate-50 transition-colors"
+            className="rounded border border-slate-200 bg-white px-2 py-1 text-[10px] text-gray-600 transition-colors hover:bg-slate-50"
           >
             ⏱ 定位时间线
           </button>
@@ -265,7 +258,7 @@ const SignalCard: React.FC<{
               e.stopPropagation();
               onNavigateToToolExecution(signal.tool_name);
             }}
-            className="text-[10px] px-2 py-1 rounded bg-white border border-slate-200 text-gray-600 hover:bg-slate-50 transition-colors"
+            className="rounded border border-slate-200 bg-white px-2 py-1 text-[10px] text-gray-600 transition-colors hover:bg-slate-50"
           >
             🔧 查看工具调用
           </button>
@@ -286,22 +279,17 @@ export const SseSignalDetailPanel: React.FC<SseSignalDetailPanelProps> = ({
   onNavigateToToolExecution,
 }) => {
   return (
-    <div className="p-4 rounded-lg border border-slate-300 bg-white shadow-sm space-y-3">
+    <div className="space-y-3 rounded-lg border border-slate-300 bg-white p-4 shadow-sm">
       {/* 头部 */}
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold text-gray-800">信号详情</h4>
-        <button
-          onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 text-xs"
-        >
+        <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-600">
           ✕ 关闭
         </button>
       </div>
 
       {/* 信号 ID */}
-      <div className="text-[10px] font-mono text-gray-400 truncate">
-        ID: {signal.signal_id}
-      </div>
+      <div className="truncate font-mono text-[10px] text-gray-400">ID: {signal.signal_id}</div>
 
       {/* 属性网格 */}
       <div className="grid grid-cols-2 gap-2 text-xs">
@@ -314,8 +302,8 @@ export const SseSignalDetailPanel: React.FC<SseSignalDetailPanelProps> = ({
 
       {/* 理由 */}
       <div>
-        <div className="text-[10px] text-gray-400 font-medium mb-1">检测理由</div>
-        <div className="text-xs text-gray-700 bg-slate-50 p-2 rounded border border-slate-100">
+        <div className="mb-1 text-[10px] font-medium text-gray-400">检测理由</div>
+        <div className="rounded border border-slate-100 bg-slate-50 p-2 text-xs text-gray-700">
           {signal.reason}
         </div>
       </div>
@@ -323,24 +311,24 @@ export const SseSignalDetailPanel: React.FC<SseSignalDetailPanelProps> = ({
       {/* 片段 */}
       {signal.snippet_preview && (
         <div>
-          <div className="text-[10px] text-gray-400 font-medium mb-1">文本片段</div>
-          <div className="text-[11px] font-mono text-gray-600 bg-slate-50 p-2 rounded border border-slate-100 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">
+          <div className="mb-1 text-[10px] font-medium text-gray-400">文本片段</div>
+          <div className="max-h-32 overflow-y-auto rounded border border-slate-100 bg-slate-50 p-2 font-mono text-[11px] break-all whitespace-pre-wrap text-gray-600">
             {signal.snippet_preview}
           </div>
         </div>
       )}
 
       {/* 操作按钮 */}
-      <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+      <div className="flex items-center gap-2 border-t border-slate-100 pt-2">
         <button
           onClick={() => onNavigateToTimeline(signal.timestamp_ns)}
-          className="text-xs px-3 py-1.5 rounded bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors"
+          className="rounded border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs text-blue-700 transition-colors hover:bg-blue-100"
         >
           ⏱ 定位时间线
         </button>
         <button
           onClick={() => onNavigateToToolExecution(signal.tool_name)}
-          className="text-xs px-3 py-1.5 rounded bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition-colors"
+          className="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 transition-colors hover:bg-slate-100"
         >
           🔧 查看工具调用
         </button>
@@ -356,9 +344,9 @@ const DetailRow: React.FC<{
   mono?: boolean;
   fullWidth?: boolean;
 }> = ({ label, value, mono = false, fullWidth = false }) => (
-  <div className={fullWidth ? "col-span-2" : ""}>
+  <div className={fullWidth ? 'col-span-2' : ''}>
     <div className="text-[10px] text-gray-400">{label}</div>
-    <div className={`text-gray-700 ${mono ? "font-mono" : ""}`}>{value}</div>
+    <div className={`text-gray-700 ${mono ? 'font-mono' : ''}`}>{value}</div>
   </div>
 );
 
@@ -381,34 +369,26 @@ export const ToolSignalRow: React.FC<ToolSignalRowProps> = ({
   return (
     <div
       onClick={onSelect}
-      className={`p-3 rounded-lg border cursor-pointer transition-all ${
+      className={`cursor-pointer rounded-lg border p-3 transition-all ${
         isSelected
-          ? "border-blue-300 bg-blue-50 ring-1 ring-blue-400"
-          : "border-slate-200 bg-white hover:bg-slate-50"
+          ? 'border-blue-300 bg-blue-50 ring-1 ring-blue-400'
+          : 'border-slate-200 bg-white hover:bg-slate-50'
       }`}
     >
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-mono text-blue-600 font-semibold truncate flex-1">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="flex-1 truncate font-mono text-xs font-semibold text-blue-600">
           {tool_name}
         </span>
-        <span className="text-xs font-mono text-gray-600 ml-2">
-          {signal_count} 信号
-        </span>
+        <span className="ml-2 font-mono text-xs text-gray-600">{signal_count} 信号</span>
       </div>
 
       {/* 层分布条 */}
-      <div className="flex h-1.5 rounded-full overflow-hidden bg-slate-100 mb-2">
+      <div className="mb-2 flex h-1.5 overflow-hidden rounded-full bg-slate-100">
         {pattern_count > 0 && (
-          <div
-            className="bg-indigo-400 h-full"
-            style={{ width: `${patternPct}%` }}
-          />
+          <div className="h-full bg-indigo-400" style={{ width: `${patternPct}%` }} />
         )}
         {ood_count > 0 && (
-          <div
-            className="bg-amber-400 h-full"
-            style={{ width: `${100 - patternPct}%` }}
-          />
+          <div className="h-full bg-amber-400" style={{ width: `${100 - patternPct}%` }} />
         )}
       </div>
 
@@ -416,9 +396,7 @@ export const ToolSignalRow: React.FC<ToolSignalRowProps> = ({
         <span>
           模式: {pattern_count} · 离群: {ood_count}
         </span>
-        <span className="font-mono">
-          均置信度: {(avg_confidence * 100).toFixed(0)}%
-        </span>
+        <span className="font-mono">均置信度: {(avg_confidence * 100).toFixed(0)}%</span>
       </div>
     </div>
   );
@@ -453,12 +431,8 @@ const OverviewTab: React.FC<{
   return (
     <div className="space-y-4">
       {/* ── 摘要卡片 ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <SummaryCard
-          label="已扫描事件"
-          value={stats.events_scanned}
-          unit="个"
-        />
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <SummaryCard label="已扫描事件" value={stats.events_scanned} unit="个" />
         <SummaryCard
           label="产生信号"
           value={stats.signals_produced}
@@ -476,7 +450,7 @@ const OverviewTab: React.FC<{
           value={
             stats.last_signal_ns
               ? new Date(stats.last_signal_ns / 1_000_000).toLocaleTimeString()
-              : "—"
+              : '—'
           }
           raw
         />
@@ -484,9 +458,9 @@ const OverviewTab: React.FC<{
 
       {!hasData && (
         <div className="p-6 text-center text-gray-400">
-          <div className="text-lg mb-1">🔍</div>
+          <div className="mb-1 text-lg">🔍</div>
           <div className="text-xs">扫描器已就绪，等待 SSE 事件...</div>
-          <div className="text-xs mt-1 text-gray-300">
+          <div className="mt-1 text-xs text-gray-300">
             SseContentScanner 正在监测工具结果、内容块和文本增量
           </div>
         </div>
@@ -494,32 +468,32 @@ const OverviewTab: React.FC<{
 
       {hasData && !hasSignals && (
         <div className="p-6 text-center text-gray-400">
-          <div className="text-lg mb-1">✅</div>
+          <div className="mb-1 text-lg">✅</div>
           <div className="text-xs">
             已扫描 {stats.events_scanned.toLocaleString()} 个事件，未检测到注入信号
           </div>
-          <div className="text-xs mt-1 text-gray-300">SSE 内容流安全</div>
+          <div className="mt-1 text-xs text-gray-300">SSE 内容流安全</div>
         </div>
       )}
 
       {hasSignals && (
         <>
           {/* ── 检测层分布 ── */}
-          <div className="p-4 rounded-lg border border-slate-200 bg-white">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
               检测层分布
             </h4>
             <DistributionBar
               segments={[
                 {
-                  label: "模式匹配",
+                  label: '模式匹配',
                   count: stats.by_layer.pattern,
-                  color: "bg-indigo-400",
+                  color: 'bg-indigo-400',
                 },
                 {
-                  label: "离群检测",
+                  label: '离群检测',
                   count: stats.by_layer.ood,
-                  color: "bg-amber-400",
+                  color: 'bg-amber-400',
                 },
               ]}
               total={stats.by_layer.pattern + stats.by_layer.ood}
@@ -527,15 +501,27 @@ const OverviewTab: React.FC<{
           </div>
 
           {/* ── 事件类型分布 ── */}
-          <div className="p-4 rounded-lg border border-slate-200 bg-white">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
               事件类型命中分布
             </h4>
             <DistributionBar
               segments={[
-                { label: "工具结果", count: stats.by_event_type.tool_result, color: "bg-emerald-400" },
-                { label: "内容块", count: stats.by_event_type.content_block_delta, color: "bg-blue-400" },
-                { label: "文本增量", count: stats.by_event_type.text_delta, color: "bg-purple-400" },
+                {
+                  label: '工具结果',
+                  count: stats.by_event_type.tool_result,
+                  color: 'bg-emerald-400',
+                },
+                {
+                  label: '内容块',
+                  count: stats.by_event_type.content_block_delta,
+                  color: 'bg-blue-400',
+                },
+                {
+                  label: '文本增量',
+                  count: stats.by_event_type.text_delta,
+                  color: 'bg-purple-400',
+                },
               ]}
               total={
                 stats.by_event_type.tool_result +
@@ -547,8 +533,8 @@ const OverviewTab: React.FC<{
 
           {/* ── 高风险工具 Top-N ── */}
           {stats.top_tools.length > 0 && (
-            <div className="p-4 rounded-lg border border-slate-200 bg-white">
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                 信号最多的工具
               </h4>
               <div className="space-y-1">
@@ -556,10 +542,10 @@ const OverviewTab: React.FC<{
                   <button
                     key={t.tool_name}
                     onClick={() => onToolClick(t.tool_name)}
-                    className="w-full text-left flex items-center justify-between p-2 rounded hover:bg-slate-50 transition-colors text-xs"
+                    className="flex w-full items-center justify-between rounded p-2 text-left text-xs transition-colors hover:bg-slate-50"
                   >
                     <span className="flex items-center gap-2">
-                      <span className="text-gray-400 font-mono w-4">{i + 1}.</span>
+                      <span className="w-4 font-mono text-gray-400">{i + 1}.</span>
                       <span className="font-mono text-blue-600">{t.tool_name}</span>
                     </span>
                     <span className="font-mono text-gray-600">{t.signal_count}</span>
@@ -571,8 +557,8 @@ const OverviewTab: React.FC<{
 
           {/* ── 最近信号预览 ── */}
           {recent_signals.length > 0 && (
-            <div className="p-4 rounded-lg border border-slate-200 bg-white">
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                 最近信号
               </h4>
               <div className="space-y-2">
@@ -582,9 +568,7 @@ const OverviewTab: React.FC<{
                     signal={signal}
                     isSelected={selected_signal_id === signal.signal_id}
                     onSelect={() =>
-                      onSignalSelect(
-                        selected_signal_id === signal.signal_id ? null : signal,
-                      )
+                      onSignalSelect(selected_signal_id === signal.signal_id ? null : signal)
                     }
                     onNavigateToTimeline={onNavigateToTimeline}
                     onNavigateToToolExecution={onNavigateToToolExecution}
@@ -627,9 +611,9 @@ const SignalsTab: React.FC<{
   if (signals.length === 0) {
     return (
       <div className="p-6 text-center text-gray-400">
-        <div className="text-lg mb-1">🔍</div>
+        <div className="mb-1 text-lg">🔍</div>
         <div className="text-xs">无匹配信号</div>
-        <div className="text-xs mt-1 text-gray-300">尝试调整筛选条件</div>
+        <div className="mt-1 text-xs text-gray-300">尝试调整筛选条件</div>
       </div>
     );
   }
@@ -653,11 +637,7 @@ const SignalsTab: React.FC<{
             key={signal.signal_id}
             signal={signal}
             isSelected={selected_signal_id === signal.signal_id}
-            onSelect={() =>
-              onSelect(
-                selected_signal_id === signal.signal_id ? null : signal,
-              )
-            }
+            onSelect={() => onSelect(selected_signal_id === signal.signal_id ? null : signal)}
             onNavigateToTimeline={onNavigateToTimeline}
             onNavigateToToolExecution={onNavigateToToolExecution}
             compact={compact}
@@ -666,9 +646,7 @@ const SignalsTab: React.FC<{
       </div>
 
       {/* 列表总数 */}
-      <div className="text-xs text-gray-400 text-right">
-        共 {signals.length} 条信号
-      </div>
+      <div className="text-right text-xs text-gray-400">共 {signals.length} 条信号</div>
     </div>
   );
 };
@@ -678,7 +656,7 @@ const SignalsTab: React.FC<{
 // ═══════════════════════════════════════════════════════════════════════════
 
 const ToolsTab: React.FC<{
-  top_tools: SseScannerStats["top_tools"];
+  top_tools: SseScannerStats['top_tools'];
   stats: SseScannerStats;
   selected_tool: string | null;
   onSelectTool: (tool: string | null) => void;
@@ -705,11 +683,9 @@ const ToolsTab: React.FC<{
   if (top_tools.length === 0) {
     return (
       <div className="p-6 text-center text-gray-400">
-        <div className="text-lg mb-1">🔧</div>
+        <div className="mb-1 text-lg">🔧</div>
         <div className="text-xs">暂无工具级分布数据</div>
-        <div className="text-xs mt-1 text-gray-300">
-          产生信号后将按工具名聚合展示
-        </div>
+        <div className="mt-1 text-xs text-gray-300">产生信号后将按工具名聚合展示</div>
       </div>
     );
   }
@@ -721,11 +697,7 @@ const ToolsTab: React.FC<{
           key={tool.tool_name}
           {...tool}
           isSelected={selected_tool === tool.tool_name}
-          onSelect={() =>
-            onSelectTool(
-              selected_tool === tool.tool_name ? null : tool.tool_name,
-            )
-          }
+          onSelect={() => onSelectTool(selected_tool === tool.tool_name ? null : tool.tool_name)}
         />
       ))}
     </div>
@@ -764,9 +736,9 @@ const FilterBar: React.FC<{
     min_confidence_filter > 0;
 
   return (
-    <div className="p-3 rounded-lg border border-slate-200 bg-white space-y-2">
+    <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-500 font-medium">筛选</span>
+        <span className="text-xs font-medium text-gray-500">筛选</span>
         {hasActiveFilters && (
           <button
             onClick={() => {
@@ -783,18 +755,16 @@ const FilterBar: React.FC<{
       </div>
 
       {/* ── 检测层筛选 ── */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-[10px] text-gray-400">检测层:</span>
-        {(["pattern", "ood"] as DetectionLayer[]).map((layer) => (
+        {(['pattern', 'ood'] as DetectionLayer[]).map((layer) => (
           <button
             key={layer}
-            onClick={() =>
-              onLayerFilterChange(layer === layer_filter ? null : layer)
-            }
-            className={`px-2 py-0.5 rounded text-[10px] border transition-colors ${
+            onClick={() => onLayerFilterChange(layer === layer_filter ? null : layer)}
+            className={`rounded border px-2 py-0.5 text-[10px] transition-colors ${
               layer_filter === layer
-                ? "bg-blue-600 text-white border-blue-600"
-                : "border-slate-200 text-gray-500 hover:border-slate-300"
+                ? 'border-blue-600 bg-blue-600 text-white'
+                : 'border-slate-200 text-gray-500 hover:border-slate-300'
             }`}
           >
             {DETECTION_LAYER_LABEL[layer]}
@@ -803,30 +773,28 @@ const FilterBar: React.FC<{
       </div>
 
       {/* ── 事件类型筛选 ── */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-[10px] text-gray-400">事件类型:</span>
-        {(
-          ["tool_result", "content_block_delta", "text_delta"] as ScannedEventType[]
-        ).map((type) => (
-          <button
-            key={type}
-            onClick={() =>
-              onEventTypeFilterChange(type === event_type_filter ? null : type)
-            }
-            className={`px-2 py-0.5 rounded text-[10px] border transition-colors ${
-              event_type_filter === type
-                ? "bg-blue-600 text-white border-blue-600"
-                : "border-slate-200 text-gray-500 hover:border-slate-300"
-            }`}
-          >
-            {EVENT_TYPE_LABEL[type]}
-          </button>
-        ))}
+        {(['tool_result', 'content_block_delta', 'text_delta'] as ScannedEventType[]).map(
+          (type) => (
+            <button
+              key={type}
+              onClick={() => onEventTypeFilterChange(type === event_type_filter ? null : type)}
+              className={`rounded border px-2 py-0.5 text-[10px] transition-colors ${
+                event_type_filter === type
+                  ? 'border-blue-600 bg-blue-600 text-white'
+                  : 'border-slate-200 text-gray-500 hover:border-slate-300'
+              }`}
+            >
+              {EVENT_TYPE_LABEL[type]}
+            </button>
+          ),
+        )}
       </div>
 
       {/* ── 置信度阈值 ── */}
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-gray-400 whitespace-nowrap">
+        <span className="text-[10px] whitespace-nowrap text-gray-400">
           最低置信度: {(min_confidence_filter * 100).toFixed(0)}%
         </span>
         <input
@@ -836,20 +804,18 @@ const FilterBar: React.FC<{
           step={5}
           value={Math.round(min_confidence_filter * 100)}
           onChange={(e) => onMinConfidenceChange(Number(e.target.value) / 100)}
-          className="flex-1 h-1 accent-blue-500"
+          className="h-1 flex-1 accent-blue-500"
         />
       </div>
 
       {/* ── 工具筛选 ── */}
       {availableTools.length > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[10px] text-gray-400">工具:</span>
           <select
-            value={tool_filter ?? ""}
-            onChange={(e) =>
-              onToolFilterChange(e.target.value || null)
-            }
-            className="text-[10px] px-1.5 py-0.5 rounded border border-slate-200 text-gray-600"
+            value={tool_filter ?? ''}
+            onChange={(e) => onToolFilterChange(e.target.value || null)}
+            className="rounded border border-slate-200 px-1.5 py-0.5 text-[10px] text-gray-600"
           >
             <option value="">全部</option>
             {availableTools.map((tool) => (
@@ -868,9 +834,7 @@ const FilterBar: React.FC<{
 // 主组件: SseContentScannerDashboard
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const SseContentScannerDashboard: React.FC<
-  SseContentScannerDashboardProps
-> = ({
+export const SseContentScannerDashboard: React.FC<SseContentScannerDashboardProps> = ({
   state,
   onViewModeChange,
   onSignalSelect,
@@ -913,14 +877,14 @@ export const SseContentScannerDashboard: React.FC<
   // ── 从概览点击工具名 → 切换到 signals 视图 + 设置工具过滤 ──
   const handleOverviewToolClick = (tool: string) => {
     onToolFilterChange(tool);
-    onViewModeChange("signals");
+    onViewModeChange('signals');
   };
 
   // ── 从工具视图选择工具 ──
   const handleToolSelect = (tool: string | null) => {
     if (tool) {
       onToolFilterChange(tool);
-      onViewModeChange("signals");
+      onViewModeChange('signals');
     } else {
       onToolFilterChange(null);
     }
@@ -929,12 +893,12 @@ export const SseContentScannerDashboard: React.FC<
   return (
     <div className="space-y-4">
       {/* ═══ 顶部 Tab 导航 ═══ */}
-      <div className="flex items-center gap-1 flex-wrap border-b border-slate-200 pb-2">
+      <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 pb-2">
         {VIEW_LABELS.map(({ mode, label, icon }) => {
           const hasData =
-            mode === "overview"
+            mode === 'overview'
               ? stats.events_scanned > 0
-              : mode === "signals"
+              : mode === 'signals'
                 ? recent_signals.length > 0
                 : stats.top_tools.length > 0;
 
@@ -942,34 +906,30 @@ export const SseContentScannerDashboard: React.FC<
             <button
               key={mode}
               onClick={() => onViewModeChange(mode)}
-              className={`px-3 py-2 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-all ${
                 view_mode === mode
-                  ? "bg-blue-600 text-white shadow-sm"
+                  ? 'bg-blue-600 text-white shadow-sm'
                   : hasData
-                    ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                    : "text-slate-400"
+                    ? 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    : 'text-slate-400'
               }`}
             >
               <span>{icon}</span>
-              <span className={compact ? "hidden md:inline" : ""}>{label}</span>
+              <span className={compact ? 'hidden md:inline' : ''}>{label}</span>
               {/* 数据徽章 */}
-              {mode === "signals" && filteredSignals.length > 0 && (
+              {mode === 'signals' && filteredSignals.length > 0 && (
                 <span
-                  className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${
-                    view_mode === mode
-                      ? "bg-white/20 text-white"
-                      : "bg-red-100 text-red-700"
+                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                    view_mode === mode ? 'bg-white/20 text-white' : 'bg-red-100 text-red-700'
                   }`}
                 >
                   {filteredSignals.length}
                 </span>
               )}
-              {mode === "tools" && stats.top_tools.length > 0 && (
+              {mode === 'tools' && stats.top_tools.length > 0 && (
                 <span
-                  className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${
-                    view_mode === mode
-                      ? "bg-white/20 text-white"
-                      : "bg-indigo-100 text-indigo-700"
+                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                    view_mode === mode ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'
                   }`}
                 >
                   {stats.top_tools.length}
@@ -981,7 +941,7 @@ export const SseContentScannerDashboard: React.FC<
       </div>
 
       {/* ═══ 筛选栏（仅 signals 视图） ═══ */}
-      {view_mode === "signals" && (
+      {view_mode === 'signals' && (
         <FilterBar
           layer_filter={layer_filter}
           event_type_filter={event_type_filter}
@@ -996,9 +956,9 @@ export const SseContentScannerDashboard: React.FC<
       )}
 
       {/* ═══ 视图内容 ═══ */}
-      <div className={compact ? "max-h-[60vh] overflow-y-auto" : ""}>
+      <div className={compact ? 'max-h-[60vh] overflow-y-auto' : ''}>
         {/* ── 概览视图 ── */}
-        {view_mode === "overview" && (
+        {view_mode === 'overview' && (
           <OverviewTab
             stats={stats}
             recent_signals={recent_signals}
@@ -1012,7 +972,7 @@ export const SseContentScannerDashboard: React.FC<
         )}
 
         {/* ── 信号列表视图 ── */}
-        {view_mode === "signals" && (
+        {view_mode === 'signals' && (
           <SignalsTab
             signals={filteredSignals}
             selected_signal_id={selected_signal_id}
@@ -1024,7 +984,7 @@ export const SseContentScannerDashboard: React.FC<
         )}
 
         {/* ── 工具分布视图 ── */}
-        {view_mode === "tools" && (
+        {view_mode === 'tools' && (
           <ToolsTab
             top_tools={stats.top_tools}
             stats={stats}
@@ -1035,13 +995,13 @@ export const SseContentScannerDashboard: React.FC<
       </div>
 
       {/* ═══ 底部状态栏 ═══ */}
-      <div className="text-xs text-gray-400 flex items-center justify-between pt-2 border-t border-slate-100">
+      <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-xs text-gray-400">
         <span>
-          {view_mode === "overview" &&
+          {view_mode === 'overview' &&
             `已扫描 ${stats.events_scanned.toLocaleString()} · 信号 ${stats.signals_produced.toLocaleString()}`}
-          {view_mode === "signals" &&
-            `${filteredSignals.length} 条信号${recent_signals.length !== filteredSignals.length ? ` (共 ${recent_signals.length} 条)` : ""}`}
-          {view_mode === "tools" &&
+          {view_mode === 'signals' &&
+            `${filteredSignals.length} 条信号${recent_signals.length !== filteredSignals.length ? ` (共 ${recent_signals.length} 条)` : ''}`}
+          {view_mode === 'tools' &&
             `${stats.top_tools.length} 个工具 · ${stats.signals_produced} 条信号`}
         </span>
         <span>{new Date(state.last_update_ms).toLocaleTimeString()}</span>

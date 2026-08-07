@@ -1,16 +1,11 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import OverviewPageClient from '@/components/overview/overview-page-client';
 import { useAppStore } from '@/lib/store';
 import { demoAlerts, demoGraph } from '@/lib/demo-data';
 
-vi.mock('@/components/ui/theme-toggle', () => ({
-  default: function MockThemeToggle() {
-    return <button type="button">主题切换</button>;
-  },
-}));
 
 function createWrapper() {
   const queryClient = new QueryClient({

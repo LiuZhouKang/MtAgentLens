@@ -96,7 +96,9 @@ export default function FrontendObserver() {
     });
 
     const clsObserver = new PerformanceObserver((list) => {
-      for (const entry of list.getEntries() as Array<PerformanceEntry & { hadRecentInput?: boolean; value?: number }>) {
+      for (const entry of list.getEntries() as Array<
+        PerformanceEntry & { hadRecentInput?: boolean; value?: number }
+      >) {
         if (entry.hadRecentInput) continue;
         clsValue += entry.value ?? 0;
       }
@@ -125,7 +127,9 @@ export default function FrontendObserver() {
     });
 
     const eventObserver = new PerformanceObserver((list) => {
-      for (const entry of list.getEntries() as Array<PerformanceEntry & { duration?: number; name?: string }>) {
+      for (const entry of list.getEntries() as Array<
+        PerformanceEntry & { duration?: number; name?: string }
+      >) {
         const duration = entry.duration ?? 0;
         if (duration < 40) continue;
         emitMonitoring({

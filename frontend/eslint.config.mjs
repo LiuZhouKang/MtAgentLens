@@ -27,6 +27,9 @@ const config = [
     ignores: [
       'code.jquery.com/**',
       'public/globe/**',
+      // Vendored sql.js UMD build (copied from node_modules/sql.js) — its CJS
+      // glue trips no-require-imports and minified names trip unused-vars.
+      'public/sql-wasm.js',
       'scripts/**',
       'fonts.googleapis.com/**',
       'index.html',

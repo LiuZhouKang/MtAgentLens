@@ -1,9 +1,13 @@
+// The standalone /agents page was consolidated into the 4-page structure
+// (态势 / 仪表盘 / 告警 / 追踪). Agent deep links now land on the overview
+// dashboard, which already renders agent risk context and graph focus.
+
 export function buildAgentHref(agentId?: string | null) {
   if (!agentId) {
-    return '/agents';
+    return '/overview';
   }
 
-  return `/agents#agentId=${encodeURIComponent(agentId)}`;
+  return `/overview#agentId=${encodeURIComponent(agentId)}`;
 }
 
 export function parseAgentId(searchParams: URLSearchParams, hash?: string | null) {

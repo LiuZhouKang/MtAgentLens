@@ -85,6 +85,8 @@ pub struct CalibrationMonitor {
     n_bins: usize,
     /// ECE threshold for re-calibration trigger.
     ece_threshold: f64,
+    /// Multi-feature calibrator for online SGD updates.
+    calibrator: MultiFeatureCalibrator,
 }
 
 impl Default for CalibrationMonitor {
@@ -94,6 +96,7 @@ impl Default for CalibrationMonitor {
             max_window: 1000,
             n_bins: 15,
             ece_threshold: 0.05,
+            calibrator: MultiFeatureCalibrator::new(),
         }
     }
 }
@@ -102,9 +105,20 @@ impl CalibrationMonitor {
     pub fn new(max_window: usize, n_bins: usize, ece_threshold: f64) -> Self {
         Self {
             predictions: VecDeque::new(),
-            max_window,
-            n_bins,
-            ece_threshold,
+            max_window, n_bins, ece_threshold,
+            calibrator: MultiFeatureCalibrator::new(),
+        }
+    }
+
+    /// Access the calibrator for prediction.
+    pub fn calibrator(&self) -> &MultiFeatureCalibrator { &self.calibrator }
+
+    /// Feed the most recent prediction's dimension scores into the calibrator
+    /// for online SGD update. The pseudo-label comes from the last record() call.
+    /// Call this AFTER record() so the label is available.
+    pub fn feed_calibrator(&mut self, dim_scores: &[f64; 6]) {
+        if let Some((_prob, label)) = self.predictions.back() {
+            self.calibrator.online_update(dim_scores, *label, 0.01);
         }
     }
 

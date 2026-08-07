@@ -42,7 +42,15 @@ def run_one(scenario_id: str):
     # Map mode to ScenarioMode and RunMode
     mode_map = {'single_agent': ScenarioMode.SINGLE_AGENT, 'agent_teams': ScenarioMode.AGENT_TEAMS, 'subagents': ScenarioMode.SUBAGENTS}
     scenario_mode = mode_map.get(mode_str, ScenarioMode.SINGLE_AGENT)
-    exec_mode = 'process' if scenario_mode == ScenarioMode.SINGLE_AGENT else 'tmux-live'
+    # Use process mode for single-agent scenarios OR multi-agent scenarios
+    # with only 1 JSON agent (the single agent spawns sub-agents dynamically).
+    # Tmux-live is only needed when multiple agents are defined in JSON
+    # and each needs its own pane.
+    agent_count = len(config_data.get('agents', []))
+    if scenario_mode == ScenarioMode.SINGLE_AGENT or agent_count <= 1:
+        exec_mode = 'process'
+    else:
+        exec_mode = 'tmux-live'
 
     # Build AgentSpec list
     agents = []
@@ -105,6 +113,11 @@ def run_one(scenario_id: str):
 
         # Quick quality check
         db = sqlite3.connect(str(db_path))
+        integrity = db.execute("PRAGMA integrity_check").fetchone()
+        if str(integrity[0]).lower() != "ok":
+            print(f"ERROR: DB integrity check FAILED: {integrity[0]}")
+            db.close()
+            return False
         pbc = db.execute("SELECT COUNT(*) FROM graph_edges WHERE edge_type='PolicyBoundaryCrossing'").fetchone()[0]
         edges = db.execute("SELECT COUNT(*) FROM graph_edges").fetchone()[0]
         alerts = db.execute("SELECT COUNT(*) FROM responsibility_alerts").fetchone()[0]
@@ -126,9 +139,15 @@ def run_one(scenario_id: str):
         print(f"Saved: {dest_db}")
 
         # Copy log
-        err_log = run_dir / 'collector' / 'trace.err.log'
-        if err_log.exists():
-            shutil.copy2(str(err_log), str(dest_dir / 'trace.err.log'))
+        log_file = run_dir / 'collector' / 'collector.log'
+        if log_file.exists():
+            shutil.copy2(str(log_file), str(dest_dir / 'collector.log'))
+
+        # Clean up any leftover WAL/SHM files from the copy
+        for suffix in ['-wal', '-shm']:
+            leftover = dest_dir / f'responsibility.db{suffix}'
+            if leftover.exists():
+                leftover.unlink()
 
         return True
     else:

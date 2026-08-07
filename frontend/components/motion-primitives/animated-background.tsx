@@ -1,19 +1,10 @@
 'use client';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, Transition, motion } from 'motion/react';
-import {
-  Children,
-  cloneElement,
-  ReactElement,
-  useEffect,
-  useState,
-  useId,
-} from 'react';
+import { Children, cloneElement, ReactElement, useEffect, useState, useId } from 'react';
 
 export type AnimatedBackgroundProps = {
-  children:
-    | ReactElement<{ 'data-id': string }>[]
-    | ReactElement<{ 'data-id': string }>;
+  children: ReactElement<{ 'data-id': string }>[] | ReactElement<{ 'data-id': string }>;
   value?: string | null;
   defaultValue?: string;
   onValueChange?: (newActiveId: string | null) => void;
@@ -31,7 +22,9 @@ export function AnimatedBackground({
   transition,
   enableHover = false,
 }: AnimatedBackgroundProps) {
-  const [uncontrolledActiveId, setUncontrolledActiveId] = useState<string | null>(defaultValue ?? null);
+  const [uncontrolledActiveId, setUncontrolledActiveId] = useState<string | null>(
+    defaultValue ?? null,
+  );
   const uniqueId = useId();
   const isControlled = value !== undefined;
   const activeId = isControlled ? value : uncontrolledActiveId;
@@ -92,8 +85,8 @@ export function AnimatedBackground({
             />
           )}
         </AnimatePresence>
-        <div className='z-10'>{child.props.children}</div>
-      </>
+        <div className="z-10">{child.props.children}</div>
+      </>,
     );
   });
 }

@@ -37,17 +37,57 @@ def sub_score_boundary(pbc_count: int, total_edges: int, anomaly_count: int | No
 
 
 def sub_score_evidence(evidence_records: list[dict]) -> float:
-    """evidence_score = avg confidence of records with conf >= 0.45"""
+    """evidence_score = match-level-weighted avg of records with conf >= 0.45.
+
+    L5 (weak substring) matches dominate benign scenarios (73-82% of evidence).
+    Attacks concentrate on L1 (exact) and L3 (containment). L5 gets near-zero
+    weight to prevent project file I/O from inflating the evidence score.
+    """
     MIN_CONF = 0.45
-    quality = [e for e in evidence_records if e.get("confidence", 0.0) >= MIN_CONF]
-    if not quality:
+    MATCH_WEIGHTS = {"L1": 1.0, "L2": 0.85, "L3": 0.7, "L4": 0.15, "L5": 0.02}
+    weighted_conf = 0.0
+    total_weight = 0.0
+    for e in evidence_records:
+        conf = e.get("confidence", 0.0)
+        if conf < MIN_CONF:
+            continue
+        ml = str(e.get("match_level", "L5"))
+        w = MATCH_WEIGHTS.get(ml[:2] if len(ml) >= 2 else ml, 0.02)
+        weighted_conf += conf * w
+        total_weight += w
+    if total_weight < 1e-9:
         return 0.0
-    return sum(e["confidence"] for e in quality) / len(quality)
+    return weighted_conf / total_weight
 
 
-def sub_score_role(pbc_count: int, agent_count: int) -> float:
-    """role_score = role_mismatch_edges / max(agent_count, 1)"""
-    return min(pbc_count / max(agent_count, 1), 1.0)
+def sub_score_role(pbc_count: int, agent_count: int, intent_count: int = 0,
+                   evidence_quality: float = 0.0) -> float:
+    """role_score = sigmoid(PBC/intent) × evidence_quality (v12).
+
+    v9-v11: normalized PBC by agent_count — failed to discriminate because
+    benign file I/O and multi-agent attacks produce comparable agent-level
+    PBC counts.
+
+    v12: normalize by INTENT count (tool calls). Attacks concentrate PBC
+    into fewer intents (ratio=10-25), benign tasks spread PBC across many
+    tool calls (ratio=1-3). Multiplied by evidence quality (L1+L3 ratio)
+    for corroboration — benign tasks produce mostly low-quality L5 evidence.
+
+    Falls back to v11 (PBC/agent sigmoid) when intent_count is unavailable."""
+    import math
+    if pbc_count <= 0:
+        return 0.0
+
+    # Prefer PBC/intent normalization when intent data is available
+    if intent_count > 0 and evidence_quality > 0:
+        ratio = float(pbc_count) / float(intent_count)
+        sig = 1.0 / (1.0 + math.exp(-(ratio - 4.0) / 1.5))
+        return sig * evidence_quality
+
+    # Fallback: PBC/agent sigmoid
+    center = 100.0 * agent_count
+    scale = 20.0 * agent_count
+    return 1.0 / (1.0 + math.exp(-(float(pbc_count) - center) / scale))
 
 
 def sub_score_repetition(repetition_count: int) -> float:
@@ -93,18 +133,38 @@ def compute_weighted_geometric_mean(scores: list[float], weights: list[float]) -
 
 
 def fuse_dimensions(dims: list[float], dim_weights: list[float]) -> float:
-    """OWA(0.70) + GeoMean(0.30) fusion (exact replica of fusion.rs)."""
-    owa = compute_owa(dims, 0.70)
-    geo = compute_weighted_geometric_mean(dims, dim_weights)
-    # GeoMean over active dimensions only (v3: dims > 0.01)
-    active = [(d, w) for d, w in zip(dims, dim_weights) if d > 0.01]
-    if not active:
+    """OWA(0.50) + GeoMean(0.50) with dimension activation (v13).
+
+    Each dimension's effective weight is scaled by its signal activation:
+        eff_weight[i] = base_weight[i] × min(dim[i] / 0.15, 1.0)
+
+    A dimension with score 0.0 contributes zero weight — no signal, no
+    influence. This prevents the 52% of weight assigned to D2-D6 from
+    diluting the composite when those dimensions carry no signal.
+    Active-dim GeoMean is still computed (only dims > 0.01 participate).
+    """
+    owa = compute_owa(dims, 0.50)
+
+    # Dimension activation: scale each weight by signal strength
+    activation_threshold = 0.15
+    active_weights = [
+        w * min(d / activation_threshold, 1.0)
+        for d, w in zip(dims, dim_weights)
+    ]
+    weight_sum = sum(active_weights)
+    if weight_sum < 1e-9:
+        return owa  # No active dimensions → pure OWA
+
+    # Normalize active weights to sum to 1.0
+    norm_weights = [w / weight_sum for w in active_weights]
+
+    # GeoMean over active dimensions (dims > 0.01)
+    active_dims = [d for d in dims if d > 0.01]
+    if not active_dims:
         return owa
 
-    active_dims = [a[0] for a in active]
-    active_weights = [a[1] for a in active]
-    geo = compute_weighted_geometric_mean(active_dims, active_weights)
-    return owa * 0.80 + geo * 0.20
+    geo = compute_weighted_geometric_mean(active_dims, norm_weights)
+    return owa * 0.50 + geo * 0.50
 
 
 def platt_sigmoid(score: float, a: float = 7.0, b: float = -3.0) -> float:
@@ -165,16 +225,18 @@ def compute_score(
     calibrated = platt_sigmoid(raw)
     score = min(calibrated, 1.0)
 
-    # Soft PBC gate: gate_pbc controls the gate (separate from fusion PBC).
-    # In lesion studies, all layers share the real gate_pbc so the gate
-    # is NOT a confound when comparing layers.
+    # Soft PBC gate: matches Rust scoring.rs exactly.
+    # k=10.0 sigmoid. Unsafe rules → floor 0.3.
     gate_pbc_val = gate_pbc if gate_pbc is not None else pbc_count
     has_unsafe_rules = any(h.get("decision") == "Unsafe" for h in rule_hits)
     pbc_gate_k = 10.0
     pbc_gate_steepness = 0.5
     actual_pbc = float(gate_pbc_val)
     gate_factor = 1.0 / (1.0 + math.exp(-(actual_pbc - pbc_gate_k) / pbc_gate_steepness))
-    effective_gate = max(gate_factor, 0.3) if has_unsafe_rules else gate_factor
+    if has_unsafe_rules:
+        effective_gate = max(gate_factor, 0.3)
+    else:
+        effective_gate = gate_factor
     return min(score * effective_gate, 1.0)
 
 

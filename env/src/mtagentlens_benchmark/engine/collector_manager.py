@@ -542,7 +542,7 @@ class CollectorManager(CollectorInterface):
         subcommand: str = "trace",
         comm: str = "claude",
         trace_args: list[str] | None = None,
-        log_file: str = "trace",
+        log_file: str = "collector",
         sudo: bool = True,
         startup_check_seconds: float = 0.5,
         verify_uprobes: bool = True,
@@ -577,7 +577,7 @@ class CollectorManager(CollectorInterface):
         self._output_dir = output_dir
 
         sudo_pass = os.environ.get("MTAGENTLENS_SUDO_PASSWORD", "")
-        err_log = open(str(output_dir / "trace.err.log"), "w")
+        err_log = open(str(output_dir / f"{self.log_file}.log"), "w")
         self._err_log = err_log
 
         # ── 0. Resolve claude binary with diagnostics ──
@@ -664,7 +664,7 @@ class CollectorManager(CollectorInterface):
                     collector_cmd, stdout=err_log, stderr=subprocess.STDOUT,
                     start_new_session=True,
                 )
-            self._check_collector_startup(output_dir / "trace.err.log")
+            self._check_collector_startup(output_dir / f"{self.log_file}.log")
         except Exception:
             self._stop_tcpdump()
             self._process = None
@@ -691,11 +691,13 @@ class CollectorManager(CollectorInterface):
             encoding="utf-8",
         )
 
-    def stop(self, wait_seconds: int = 5) -> None:
+    def stop(self, wait_seconds: int = 30) -> None:
         # Stop tcpdump first
         self._stop_tcpdump()
 
-        # Stop collector
+        # Stop collector with generous timeout for graceful shutdown.
+        # The Rust collector's Phase 2 finalization (traceback, claims, alerts)
+        # and WAL checkpoint can take 10-20 seconds for large traces.
         if self._process is None:
             if self._output_dir:
                 self._collect_runtime_metrics()
@@ -704,6 +706,8 @@ class CollectorManager(CollectorInterface):
         try:
             self._process.wait(timeout=wait_seconds)
         except subprocess.TimeoutExpired:
+            # Graceful shutdown timed out — force kill but log a warning
+            print(f"[WARNING] collector did not exit within {wait_seconds}s, sending SIGKILL")
             self._signal_process_group(self._process, signal.SIGKILL)
             self._process.wait()
         self._process = None
@@ -714,14 +718,19 @@ class CollectorManager(CollectorInterface):
         # Collect post-stop runtime metrics
         if self._output_dir:
             self._collect_runtime_metrics()
+            self._write_health_snapshot()
+
+        # ── Verify database integrity after shutdown ──
+        if self._output_dir:
+            self._verify_database_integrity()
 
     def _collect_runtime_metrics(self) -> None:
         """Collect runtime health metrics from collector output logs."""
         if not self._output_dir:
             return
 
-        err_log = self._output_dir / "trace.err.log"
-        trace_out = self._output_dir / self.log_file
+        err_log = self._output_dir / f"{self.log_file}.log"
+        trace_out = self._output_dir / f"{self.log_file}.log"
         responsibility_db = self._output_dir / f"{self.log_file}.responsibility.db"
 
         if err_log.exists():
@@ -767,6 +776,49 @@ class CollectorManager(CollectorInterface):
             metrics["scoring_healthy"],
         ])
         self._health_snapshot["runtime_metrics"] = metrics
+
+    def _write_health_snapshot(self) -> None:
+        """Persist the accumulated health snapshot to disk (post-stop update)."""
+        if not self._output_dir:
+            return
+        snapshot_path = self._output_dir / "collector_health.json"
+        try:
+            snapshot_path.write_text(
+                json.dumps(self._health_snapshot, indent=2, ensure_ascii=False, default=str),
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
+
+    def _verify_database_integrity(self) -> None:
+        """Verify the SQLite database is intact after collector shutdown.
+
+        Reports errors to stderr so they are visible in the run log.
+        If the database is corrupt, the run should be retried.
+        """
+        db_path = self.database_path
+        if db_path is None or not db_path.exists():
+            print("[ERROR] responsibility database not found after collector stop")
+            return
+        try:
+            con = sqlite3.connect(str(db_path))
+            # integrity_check returns "ok" on success, error details otherwise
+            result = con.execute("PRAGMA integrity_check").fetchone()
+            fk_result = con.execute("PRAGMA foreign_key_check").fetchone()
+            con.close()
+            integrity_ok = result is not None and str(result[0]).lower() == "ok"
+            fk_ok = fk_result is None  # None means no violations
+            if integrity_ok and fk_ok:
+                print(f"[OK] database integrity verified: {db_path}")
+            else:
+                details = []
+                if not integrity_ok:
+                    details.append(f"integrity_check: {result}")
+                if not fk_ok:
+                    details.append(f"foreign_key_check: {fk_result}")
+                print(f"[ERROR] database integrity FAILED: {'; '.join(details)}")
+        except Exception as e:
+            print(f"[ERROR] database integrity check raised: {e}")
 
     def _check_collector_startup(self, err_log_path: Path) -> None:
         """Fail fast if the collector exits before the attach window begins."""

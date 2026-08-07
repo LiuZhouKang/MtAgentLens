@@ -194,6 +194,7 @@ impl ReplayExecutor {
             &patterns,
             &correlation_result.evidence,
             0, // repetition_count — 0 for batch replay
+            0, // intent_count — 0 for batch replay
         );
 
         // ── Step 6: Claims, Alerts, Tracebacks ────────────────────────

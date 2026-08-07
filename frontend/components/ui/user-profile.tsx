@@ -98,16 +98,16 @@ export function UserProfile({ userId }: UserProfileProps) {
       <div className="p-4" role="status" aria-label="Loading user profile">
         <div className="animate-pulse space-y-4">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-gray-200" />
-            <div className="space-y-2 flex-1">
-              <div className="h-6 w-48 bg-gray-200 rounded" />
-              <div className="h-4 w-32 bg-gray-200 rounded" />
-              <div className="h-3 w-64 bg-gray-200 rounded" />
+            <div className="h-16 w-16 rounded-full bg-gray-200" />
+            <div className="flex-1 space-y-2">
+              <div className="h-6 w-48 rounded bg-gray-200" />
+              <div className="h-4 w-32 rounded bg-gray-200" />
+              <div className="h-3 w-64 rounded bg-gray-200" />
             </div>
           </div>
           <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-16 bg-gray-200 rounded" />
+              <div key={i} className="h-16 rounded bg-gray-200" />
             ))}
           </div>
         </div>
@@ -134,15 +134,15 @@ export function UserProfile({ userId }: UserProfileProps) {
   const activities = data.activities;
 
   return (
-    <div className="user-profile max-w-2xl mx-auto p-6">
+    <div className="user-profile mx-auto max-w-2xl p-6">
       {/* User Info Section */}
-      <div className="user-info flex items-center gap-4 mb-6">
+      <div className="user-info mb-6 flex items-center gap-4">
         <Image
           src={processedAvatar}
           alt={`${data.user.name}'s avatar`}
           width={64}
           height={64}
-          className="w-16 h-16 rounded-full"
+          className="h-16 w-16 rounded-full"
           unoptimized
         />
         <div>
@@ -154,9 +154,7 @@ export function UserProfile({ userId }: UserProfileProps) {
 
       {/* Activity List Section */}
       <div className="activities-section">
-        <h2 className="text-xl font-semibold mb-4">
-          Activity History ({activities.length})
-        </h2>
+        <h2 className="mb-4 text-xl font-semibold">Activity History ({activities.length})</h2>
         <ActivityList activities={activities} />
       </div>
     </div>

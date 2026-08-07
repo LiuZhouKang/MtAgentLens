@@ -5,7 +5,7 @@
 // 三种异常类型: CrossUser | ContextMutation | UnauthorizedHandoff
 // 三级严重度:   Info → Warning → Critical
 
-import type { AnomalySeverity } from "./data-contract";
+import type { AnomalySeverity } from './data-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 异常类型（与 Rust anomaly_type 对齐）
@@ -13,26 +13,26 @@ import type { AnomalySeverity } from "./data-contract";
 
 /** 会话边界异常类型 */
 export type SessionBoundaryAnomalyType =
-  | "CrossUser"              // 同一 TLS session 中出现多个不同 user_id
-  | "ContextMutation"        // SSE 流中 conversation_id 发生突变
-  | "UnauthorizedHandoff";   // Agent 接受了不是发给它的 handoff 消息
+  | 'CrossUser' // 同一 TLS session 中出现多个不同 user_id
+  | 'ContextMutation' // SSE 流中 conversation_id 发生突变
+  | 'UnauthorizedHandoff'; // Agent 接受了不是发给它的 handoff 消息
 
 export const SESSION_ANOMALY_TYPE_LABEL: Record<SessionBoundaryAnomalyType, string> = {
-  CrossUser: "跨用户混入",
-  ContextMutation: "上下文突变",
-  UnauthorizedHandoff: "未授权 handoff",
+  CrossUser: '跨用户混入',
+  ContextMutation: '上下文突变',
+  UnauthorizedHandoff: '未授权 handoff',
 };
 
 export const SESSION_ANOMALY_TYPE_DESC: Record<SessionBoundaryAnomalyType, string> = {
-  CrossUser: "同一 TLS 会话中出现了多个不同 user_id 的请求，可能存在攻击者走私恶意请求进入合法会话",
-  ContextMutation: "SSE 流中 conversation_id 在单个连接内发生突变，会话上下文可能被劫持",
-  UnauthorizedHandoff: "Agent 接收了不是发给它的 handoff 消息，子 Agent 信任链可能被污染",
+  CrossUser: '同一 TLS 会话中出现了多个不同 user_id 的请求，可能存在攻击者走私恶意请求进入合法会话',
+  ContextMutation: 'SSE 流中 conversation_id 在单个连接内发生突变，会话上下文可能被劫持',
+  UnauthorizedHandoff: 'Agent 接收了不是发给它的 handoff 消息，子 Agent 信任链可能被污染',
 };
 
 export const SESSION_ANOMALY_TYPE_ICON: Record<SessionBoundaryAnomalyType, string> = {
-  CrossUser: "👥",
-  ContextMutation: "🦠",
-  UnauthorizedHandoff: "🔓",
+  CrossUser: '👥',
+  ContextMutation: '🦠',
+  UnauthorizedHandoff: '🔓',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -40,22 +40,22 @@ export const SESSION_ANOMALY_TYPE_ICON: Record<SessionBoundaryAnomalyType, strin
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** 会话边界告警严重程度 */
-export type SessionBoundarySeverity = "info" | "warning" | "high";
+export type SessionBoundarySeverity = 'info' | 'warning' | 'high';
 
 export const SESSION_SEVERITY_LABEL: Record<SessionBoundarySeverity, string> = {
-  info: "信息",
-  warning: "警告",
-  high: "高危",
+  info: '信息',
+  warning: '警告',
+  high: '高危',
 };
 
 export function sessionSeverityToAnomalySeverity(s: SessionBoundarySeverity): AnomalySeverity {
   switch (s) {
-    case "info":
-      return "info";
-    case "warning":
-      return "warning";
-    case "high":
-      return "critical";
+    case 'info':
+      return 'info';
+    case 'warning':
+      return 'warning';
+    case 'high':
+      return 'critical';
   }
 }
 
@@ -155,7 +155,7 @@ export interface SessionBoundarySnapshot {
 // 仪表板状态
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type SessionBoundaryViewMode = "overview" | "alerts" | "sessions";
+export type SessionBoundaryViewMode = 'overview' | 'alerts' | 'sessions';
 
 export interface SessionBoundaryDashboardState {
   /** 告警列表 */
@@ -185,7 +185,7 @@ export function createDefaultSessionBoundaryState(): SessionBoundaryDashboardSta
   return {
     alerts: [],
     snapshot: null,
-    view_mode: "overview",
+    view_mode: 'overview',
     selected_alert_id: null,
     selected_session_key: null,
     type_filter: null,

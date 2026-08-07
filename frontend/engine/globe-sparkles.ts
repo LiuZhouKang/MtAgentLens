@@ -22,7 +22,7 @@ export interface GlobeSparklesController {
 export function generateGlobeSparkleCloud(
   count = SPARKLE_COUNT,
   radius = SPHERE_RADIUS,
-  random: () => number = Math.random
+  random: () => number = Math.random,
 ): GlobeSparkleCloud {
   const positions = new Float32Array(count * 3);
   const targets = new Float32Array(count * 3);
@@ -69,7 +69,7 @@ function easeOutCubic(value: number): number {
 
 export function createGlobeSparkles(
   scene: THREE.Scene,
-  material: THREE.ShaderMaterial
+  material: THREE.ShaderMaterial,
 ): GlobeSparklesController {
   const cloud = generateGlobeSparkleCloud();
   const runtimePositions = new Float32Array(cloud.positions);
@@ -95,24 +95,28 @@ export function createGlobeSparkles(
 
       for (let i = 0; i < SPARKLE_COUNT; i++) {
         const offset = cloud.introOffsets[i];
-        const introT = THREE.MathUtils.clamp((elapsed - offset) / (INTRO_DURATION - offset * 0.35), 0, 1);
+        const introT = THREE.MathUtils.clamp(
+          (elapsed - offset) / (INTRO_DURATION - offset * 0.35),
+          0,
+          1,
+        );
         const settleT = easeOutCubic(introT);
         const startIndex = i * 3;
 
         runtimePositions[startIndex] = THREE.MathUtils.lerp(
           cloud.positions[startIndex],
           cloud.targets[startIndex],
-          settleT
+          settleT,
         );
         runtimePositions[startIndex + 1] = THREE.MathUtils.lerp(
           cloud.positions[startIndex + 1],
           cloud.targets[startIndex + 1],
-          settleT
+          settleT,
         );
         runtimePositions[startIndex + 2] = THREE.MathUtils.lerp(
           cloud.positions[startIndex + 2],
           cloud.targets[startIndex + 2],
-          settleT
+          settleT,
         );
 
         if (introSettled) {
@@ -125,7 +129,9 @@ export function createGlobeSparkles(
 
       positionAttribute.needsUpdate = true;
       if (material.uniforms.opacity) {
-        material.uniforms.opacity.value = introSettled ? 0.56 : 0.44 + Math.min(elapsed / INTRO_DURATION, 1) * 0.08;
+        material.uniforms.opacity.value = introSettled
+          ? 0.56
+          : 0.44 + Math.min(elapsed / INTRO_DURATION, 1) * 0.08;
       }
     },
     dispose() {

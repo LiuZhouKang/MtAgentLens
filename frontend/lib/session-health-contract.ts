@@ -16,51 +16,46 @@
 //   agent_root_pid — 连接到 ToolExecutionDashboard / AgentLoopDashboard / 所有其他仪表板
 //   session_id     — 连接到 SessionBoundaryDashboard
 
-import type { AnomalySeverity } from "./data-contract";
+import type { AnomalySeverity } from './data-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 维度定义
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** 五个健康维度的标识 */
-export type HealthDimension =
-  | "latency"
-  | "error_rate"
-  | "tool_health"
-  | "api_health"
-  | "resource";
+export type HealthDimension = 'latency' | 'error_rate' | 'tool_health' | 'api_health' | 'resource';
 
 export const HEALTH_DIMENSION_LABEL: Record<HealthDimension, string> = {
-  latency: "延迟",
-  error_rate: "错误率",
-  tool_health: "工具健康",
-  api_health: "API 健康",
-  resource: "资源",
+  latency: '延迟',
+  error_rate: '错误率',
+  tool_health: '工具健康',
+  api_health: 'API 健康',
+  resource: '资源',
 };
 
 export const HEALTH_DIMENSION_ICON: Record<HealthDimension, string> = {
-  latency: "⏱️",
-  error_rate: "❌",
-  tool_health: "🔧",
-  api_health: "🌐",
-  resource: "💻",
+  latency: '⏱️',
+  error_rate: '❌',
+  tool_health: '🔧',
+  api_health: '🌐',
+  resource: '💻',
 };
 
 export const HEALTH_DIMENSION_DESC: Record<HealthDimension, string> = {
-  latency: "LLM API 请求-响应延迟分布，p95 越低越好",
-  error_rate: "工具失败、5xx 错误、进程崩溃的综合错误率",
-  tool_health: "工具调用成功率，活跃循环会显著扣分",
-  api_health: "LLM API 返回 5xx/429 状态码的比例",
-  resource: "Agent 进程崩溃次数，每次崩溃扣 30% 分数",
+  latency: 'LLM API 请求-响应延迟分布，p95 越低越好',
+  error_rate: '工具失败、5xx 错误、进程崩溃的综合错误率',
+  tool_health: '工具调用成功率，活跃循环会显著扣分',
+  api_health: 'LLM API 返回 5xx/429 状态码的比例',
+  resource: 'Agent 进程崩溃次数，每次崩溃扣 30% 分数',
 };
 
 /** 默认维度权重（与 Rust SessionHealthMonitorConfig 默认值对齐） */
 export const DEFAULT_HEALTH_WEIGHTS: Record<HealthDimension, number> = {
   latency: 0.25,
-  error_rate: 0.30,
-  tool_health: 0.20,
+  error_rate: 0.3,
+  tool_health: 0.2,
   api_health: 0.15,
-  resource: 0.10,
+  resource: 0.1,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -69,27 +64,27 @@ export const DEFAULT_HEALTH_WEIGHTS: Record<HealthDimension, number> = {
 
 /** 健康告警类型（与 Rust alert_type 对齐） */
 export type HealthAlertType =
-  | "health_degraded"   // 分数下降超过 degradation_min_drop
-  | "health_warning"    // 分数低于 warning_threshold (60)
-  | "health_critical";  // 分数低于 critical_threshold (30)
+  | 'health_degraded' // 分数下降超过 degradation_min_drop
+  | 'health_warning' // 分数低于 warning_threshold (60)
+  | 'health_critical'; // 分数低于 critical_threshold (30)
 
 export const HEALTH_ALERT_TYPE_LABEL: Record<HealthAlertType, string> = {
-  health_degraded: "健康下降",
-  health_warning: "健康警告",
-  health_critical: "健康严重",
+  health_degraded: '健康下降',
+  health_warning: '健康警告',
+  health_critical: '健康严重',
 };
 
 export const HEALTH_ALERT_TYPE_ICON: Record<HealthAlertType, string> = {
-  health_degraded: "📉",
-  health_warning: "⚠️",
-  health_critical: "🚨",
+  health_degraded: '📉',
+  health_warning: '⚠️',
+  health_critical: '🚨',
 };
 
 /** 健康告警严重程度（与 Rust severity 对齐） */
-export type HealthAlertSeverity = "warning" | "critical";
+export type HealthAlertSeverity = 'warning' | 'critical';
 
 export function healthSeverityToAnomalySeverity(s: HealthAlertSeverity): AnomalySeverity {
-  return s === "critical" ? "critical" : "warning";
+  return s === 'critical' ? 'critical' : 'warning';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -172,11 +167,11 @@ export interface ResourceHealthDimensionData {
 
 /** 所有维度的联合类型 */
 export type DimensionData =
-  | { dimension: "latency"; data: LatencyDimensionData }
-  | { dimension: "error_rate"; data: ErrorRateDimensionData }
-  | { dimension: "tool_health"; data: ToolHealthDimensionData }
-  | { dimension: "api_health"; data: ApiHealthDimensionData }
-  | { dimension: "resource"; data: ResourceHealthDimensionData };
+  | { dimension: 'latency'; data: LatencyDimensionData }
+  | { dimension: 'error_rate'; data: ErrorRateDimensionData }
+  | { dimension: 'tool_health'; data: ToolHealthDimensionData }
+  | { dimension: 'api_health'; data: ApiHealthDimensionData }
+  | { dimension: 'resource'; data: ResourceHealthDimensionData };
 
 /** 五维度评分总览 */
 export interface HealthDimensions {
@@ -342,11 +337,11 @@ export interface SessionHealthProfile {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type SessionHealthViewMode =
-  | "overview"       // Fleet 概况
-  | "fleet"          // Fleet 网格视图
-  | "session_detail" // 单个会话的深入分析
-  | "alerts"         // 告警列表
-  | "trends";        // 趋势图
+  | 'overview' // Fleet 概况
+  | 'fleet' // Fleet 网格视图
+  | 'session_detail' // 单个会话的深入分析
+  | 'alerts' // 告警列表
+  | 'trends'; // 趋势图
 
 export interface SessionHealthDashboardState {
   /** 最近 N 次健康快照（所有会话的最近快照合并） */
@@ -432,7 +427,7 @@ export interface HealthScoreGaugeProps {
   /** 之前的分数（用于显示变化） */
   previous_score?: number;
   /** 显示大小 */
-  size?: "sm" | "md" | "lg";
+  size?: 'sm' | 'md' | 'lg';
   /** 是否显示分数标签 */
   showLabel?: boolean;
 }
@@ -458,7 +453,9 @@ export interface HealthTrendChartProps {
 }
 
 /** 从 SessionHealthSnapshot 提取各维度的标量分数 */
-export function extractDimensionScores(snapshot: SessionHealthSnapshot): Record<HealthDimension, number> {
+export function extractDimensionScores(
+  snapshot: SessionHealthSnapshot,
+): Record<HealthDimension, number> {
   return {
     latency: Math.round(snapshot.dimensions.latency.score * 100),
     error_rate: Math.round(snapshot.dimensions.error_rate.score * 100),
@@ -487,38 +484,50 @@ export interface HealthAlertCardProps {
 // SSE 流集成
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type SessionHealthStreamType = "session_health" | "session_health_alert";
+export type SessionHealthStreamType = 'session_health' | 'session_health_alert';
 
 export type ExtendedHealthStreamType =
-  | import("./data-contract").UnifiedStreamEvent["stream_type"]
-  | SessionHealthStreamType;
+  import('./data-contract').UnifiedStreamEvent['stream_type'] | SessionHealthStreamType;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 工具函数
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** 健康分数 → 颜色等级 */
-export type HealthScoreTier = "excellent" | "good" | "warning" | "critical";
+export type HealthScoreTier = 'excellent' | 'good' | 'warning' | 'critical';
 
 export function healthScoreToTier(score: number): HealthScoreTier {
-  if (score > 80) return "excellent";
-  if (score > 60) return "good";
-  if (score > 30) return "warning";
-  return "critical";
+  if (score > 80) return 'excellent';
+  if (score > 60) return 'good';
+  if (score > 30) return 'warning';
+  return 'critical';
 }
 
-export const HEALTH_TIER_COLORS: Record<HealthScoreTier, { bg: string; text: string; ring: string; dot: string }> = {
-  excellent: { bg: "bg-emerald-50", text: "text-emerald-700", ring: "ring-emerald-400", dot: "bg-emerald-500" },
-  good: { bg: "bg-blue-50", text: "text-blue-700", ring: "ring-blue-400", dot: "bg-blue-500" },
-  warning: { bg: "bg-amber-50", text: "text-amber-700", ring: "ring-amber-400", dot: "bg-amber-500" },
-  critical: { bg: "bg-red-50", text: "text-red-700", ring: "ring-red-600", dot: "bg-red-600" },
+export const HEALTH_TIER_COLORS: Record<
+  HealthScoreTier,
+  { bg: string; text: string; ring: string; dot: string }
+> = {
+  excellent: {
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-700',
+    ring: 'ring-emerald-400',
+    dot: 'bg-emerald-500',
+  },
+  good: { bg: 'bg-blue-50', text: 'text-blue-700', ring: 'ring-blue-400', dot: 'bg-blue-500' },
+  warning: {
+    bg: 'bg-amber-50',
+    text: 'text-amber-700',
+    ring: 'ring-amber-400',
+    dot: 'bg-amber-500',
+  },
+  critical: { bg: 'bg-red-50', text: 'text-red-700', ring: 'ring-red-600', dot: 'bg-red-600' },
 };
 
 export const HEALTH_TIER_LABEL: Record<HealthScoreTier, string> = {
-  excellent: "优秀",
-  good: "良好",
-  warning: "警告",
-  critical: "严重",
+  excellent: '优秀',
+  good: '良好',
+  warning: '警告',
+  critical: '严重',
 };
 
 /** 计算每个维度的加权贡献值 (0–100) */
@@ -528,11 +537,11 @@ export function computeDimensionContribution(
 ): Record<HealthDimension, number> {
   const total = Object.entries(weights).reduce((sum, [, w]) => sum + w, 0) || 1;
   return {
-    latency: (dimensions.latency.score * (weights.latency / total)) * 100,
-    error_rate: (dimensions.error_rate.score * (weights.error_rate / total)) * 100,
-    tool_health: (dimensions.tool_health.score * (weights.tool_health / total)) * 100,
-    api_health: (dimensions.api_health.score * (weights.api_health / total)) * 100,
-    resource: (dimensions.resource.score * (weights.resource / total)) * 100,
+    latency: dimensions.latency.score * (weights.latency / total) * 100,
+    error_rate: dimensions.error_rate.score * (weights.error_rate / total) * 100,
+    tool_health: dimensions.tool_health.score * (weights.tool_health / total) * 100,
+    api_health: dimensions.api_health.score * (weights.api_health / total) * 100,
+    resource: dimensions.resource.score * (weights.resource / total) * 100,
   };
 }
 
@@ -555,8 +564,14 @@ export function computeAgentHealthSummary(
       avg_score: 100,
       score_trend: 0,
       score_stddev: 0,
-      dimension_scores: { latency: 100, error_rate: 100, tool_health: 100, api_health: 100, resource: 100 },
-      weakest_dimension: "latency",
+      dimension_scores: {
+        latency: 100,
+        error_rate: 100,
+        tool_health: 100,
+        api_health: 100,
+        resource: 100,
+      },
+      weakest_dimension: 'latency',
       active_alert_count: 0,
       total_alert_count: 0,
       first_seen_ns: 0,
@@ -591,7 +606,7 @@ export function computeAgentHealthSummary(
   };
 
   // 最弱维度
-  let weakest: HealthDimension = "latency";
+  let weakest: HealthDimension = 'latency';
   let lowest = dimension_scores.latency;
   for (const [dim, score] of Object.entries(dimension_scores)) {
     if (score < lowest) {
@@ -622,7 +637,8 @@ export function computeAgentHealthSummary(
     total_alert_count: session_alerts.length,
     first_seen_ns: snapshots[0].timestamp_ns,
     last_active_ns: current.timestamp_ns,
-    is_active: (current.timestamp_ns - snapshots[snapshots.length - 1].timestamp_ns) / 1_000_000 < 120,
+    is_active:
+      (current.timestamp_ns - snapshots[snapshots.length - 1].timestamp_ns) / 1_000_000 < 120,
     recent_snapshots: snapshots.slice(-10),
   };
 }
@@ -636,9 +652,10 @@ export function computeFleetOverview(
   const active = summaries.filter((s) => s.is_active);
 
   const fleet_scores = active.map((s) => s.current_score);
-  const fleet_avg = fleet_scores.length > 0
-    ? Math.round(fleet_scores.reduce((a, b) => a + b, 0) / fleet_scores.length)
-    : 100;
+  const fleet_avg =
+    fleet_scores.length > 0
+      ? Math.round(fleet_scores.reduce((a, b) => a + b, 0) / fleet_scores.length)
+      : 100;
 
   const distribution = { excellent: 0, good: 0, warning: 0, critical: 0 };
   for (const score of fleet_scores) {
@@ -652,7 +669,11 @@ export function computeFleetOverview(
 
   // 按维度聚合 fleet 平均
   const fleet_dims: Record<HealthDimension, number> = {
-    latency: 0, error_rate: 0, tool_health: 0, api_health: 0, resource: 0,
+    latency: 0,
+    error_rate: 0,
+    tool_health: 0,
+    api_health: 0,
+    resource: 0,
   };
   for (const s of active) {
     for (const dim of Object.keys(fleet_dims) as HealthDimension[]) {
@@ -702,7 +723,7 @@ export function createDefaultSessionHealthState(): SessionHealthDashboardState {
     fleet_overview: null,
     agent_summaries: new Map(),
     alerts: [],
-    view_mode: "overview",
+    view_mode: 'overview',
     selected_alert_id: null,
     selected_session_id: null,
     selected_agent_pid: null,

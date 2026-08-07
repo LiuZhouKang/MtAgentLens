@@ -14,6 +14,21 @@ describe('investigation helpers', () => {
     expect(refs).toEqual(['ev-3', 'ev-4']);
   });
 
+  it('collects evidence refs from the fallback graph when the alert has no graph snapshot', () => {
+    // db 导入 / sample / demo 的 store 告警会剥离 graph_snapshot（省内存），完整图
+    // 在 store.graph。timeline 也置空，refs 只能来自图边 —— 证据联动必须走与渲染
+    // 一致的 fallback graph（getActiveGraph），否则永远链不上。
+    const leanAlert = {
+      ...demoAlerts[0],
+      graph_snapshot: undefined,
+      timeline: { steps: [], total_duration_ms: 0 },
+    } as unknown as typeof demoAlerts[0];
+
+    const refs = collectAlertEvidenceRefs(leanAlert, demoGraph);
+
+    expect(refs).toContain('ev-3');
+  });
+
   it('builds an investigation model with the main path and linked evidence', () => {
     const evidence: CorrelationEvidence[] = [
       {
@@ -68,7 +83,9 @@ describe('investigation helpers', () => {
   it('formats responsibility node labels for different node types', () => {
     const graph = demoGraph;
     const agentNode = graph.nodes.find((node) => node.node_type === 'Agent');
-    const fileNode = graph.nodes.find((node) => 'resource' in node && node.resource && 'File' in node.resource);
+    const fileNode = graph.nodes.find(
+      (node) => 'resource' in node && node.resource && 'File' in node.resource,
+    );
     const boundaryNode = graph.nodes.find((node) => node.node_type === 'PolicyBoundary');
 
     expect(agentNode && formatResponsibilityNodeLabel(agentNode)).toBe('agent-frontend');
@@ -142,7 +159,9 @@ describe('investigation helpers', () => {
         node_id: 'conversation-node',
         node_type: 'Resource',
         agent_id: null,
-        resource: { LlmConversation: { provider: 'openai', model: 'gpt-4.1', message_id: 'msg-1' } },
+        resource: {
+          LlmConversation: { provider: 'openai', model: 'gpt-4.1', message_id: 'msg-1' },
+        },
         evidence_refs: [],
         timestamp_ns: 1,
         phase: { Provisional: { timestamp_ns: 1 } },

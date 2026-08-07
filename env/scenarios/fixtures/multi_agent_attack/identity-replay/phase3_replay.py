@@ -21,7 +21,7 @@ PHASE3_OUTPUT = SCENARIO_DIR / "phase3_replay_result.json"
 
 # Use the latest available database (original path from Phase 1 no longer exists)
 # The Phase 1 database was at a stale path; we use the most recent equivalent
-DB_PATH = Path("/home/lzk/MtAgentLens/env/runs/20260608-115745-d5cee48152e8/collector/trace.responsibility.db")
+DB_PATH = Path("/home/lzk/MtAgentLens/env/runs/20260608-115745-d5cee48152e8/collector/collector.responsibility.db")
 
 # ── Step 1: Create input files from existing Phase 1/2 outputs ───────────
 
@@ -506,7 +506,7 @@ def main():
             "attack_type": "Token Replay Attack via Session Replay Audit Protocol",
             "attack_description": (
                 "An attacker with access to stored trace data (trace.pcap + tls.keys + "
-                "trace.responsibility.db) attempts to replay the audit session using a token "
+                "collector.responsibility.db) attempts to replay the audit session using a token "
                 "that was issued in Phase 1 and subsequently revoked in Phase 2."
             ),
             "was_replay_blocked": replay_result["replay_access"] == "BLOCKED",

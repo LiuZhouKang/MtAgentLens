@@ -64,8 +64,20 @@ export function Reveal({
           ? { opacity: 0 }
           : { opacity: 0, y: distance, filter: blur ? 'blur(12px)' : 'blur(0px)' }
       }
-      animate={mode === 'mount' ? (reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' }) : undefined}
-      whileInView={mode === 'view' ? (reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' }) : undefined}
+      animate={
+        mode === 'mount'
+          ? reduceMotion
+            ? { opacity: 1 }
+            : { opacity: 1, y: 0, filter: 'blur(0px)' }
+          : undefined
+      }
+      whileInView={
+        mode === 'view'
+          ? reduceMotion
+            ? { opacity: 1 }
+            : { opacity: 1, y: 0, filter: 'blur(0px)' }
+          : undefined
+      }
       viewport={mode === 'view' ? { once, margin: '-12% 0px' } : undefined}
       transition={{
         delay,
@@ -156,7 +168,13 @@ export function MagneticButton({
 
   if (motionDisabled) {
     return (
-      <motion.button initial={false} style={style} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} {...props}>
+      <motion.button
+        initial={false}
+        style={style}
+        onPointerMove={onPointerMove}
+        onPointerLeave={onPointerLeave}
+        {...props}
+      >
         {children as ReactNode}
       </motion.button>
     );
@@ -235,7 +253,13 @@ export function TiltPanel({
 
   if (disableMotion) {
     return (
-      <motion.div initial={false} style={style} onPointerMove={onPointerMove} onPointerLeave={onPointerLeave} {...props}>
+      <motion.div
+        initial={false}
+        style={style}
+        onPointerMove={onPointerMove}
+        onPointerLeave={onPointerLeave}
+        {...props}
+      >
         {children as ReactNode}
       </motion.div>
     );

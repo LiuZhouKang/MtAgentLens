@@ -244,7 +244,7 @@ export function createShieldMaterial(): THREE.ShaderMaterial {
       uHitMaxRadius: { value: 0.85 },
       uHitDuration: { value: 1.8 },
       uHitIntensity: { value: 4.1 },
-      uHitImpactRadius: { value: 0.30 },
+      uHitImpactRadius: { value: 0.3 },
       uFadeStart: { value: 0.0 },
     },
     vertexShader,
@@ -255,4 +255,3 @@ export function createShieldMaterial(): THREE.ShaderMaterial {
     blending: THREE.AdditiveBlending,
   });
 }
-

@@ -83,6 +83,16 @@ describe('CommandCenterPage', () => {
     expect(screen.getAllByText('MtAgentLens').length).toBeGreaterThan(0);
   });
 
+  it('renders the theater when the graph has data but alerts are empty (real db run with no violations)', async () => {
+    // Real collector dbs frequently carry a full graph with zero alerts
+    // (a monitoring session that triggered no rule). The theater must render —
+    // "no alerts" is not "loading".
+    useAppStore.setState({ alerts: [], graph: demoGraph });
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('mtl-stage')).toBeDefined());
+    expect(screen.queryByText('MtAgentLens')).toBeNull();
+  });
+
   it('opens a node detail panel when a graph node is clicked and closes on background', () => {
     renderPage();
     expect(stageState.onNodeClick).not.toBeNull();

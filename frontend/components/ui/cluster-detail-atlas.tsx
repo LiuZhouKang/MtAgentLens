@@ -75,7 +75,14 @@ export default function ClusterDetailAtlas({ model }: ClusterDetailAtlasProps) {
               minHeight: 152,
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
               <div className="prism-atlas-mini-copy">responsibility compression</div>
               <div
                 style={{
@@ -123,7 +130,9 @@ export default function ClusterDetailAtlas({ model }: ClusterDetailAtlasProps) {
 
       <section className="prism-atlas-panel">
         <div className="prism-atlas-label">Delegation Mesh</div>
-        <div className="prism-atlas-value">让一个 cluster 的扩散形态先被看见，再决定是否立刻进入调查</div>
+        <div className="prism-atlas-value">
+          让一个 cluster 的扩散形态先被看见，再决定是否立刻进入调查
+        </div>
         <div className="prism-atlas-caption">
           这里读的是 cluster 的组织张力，而不是一行行 agent 名单。
         </div>
@@ -176,7 +185,9 @@ export default function ClusterDetailAtlas({ model }: ClusterDetailAtlasProps) {
 
       <section className="prism-atlas-panel">
         <div className="prism-atlas-label">Evidence Threshold</div>
-        <div className="prism-atlas-value">这组 cluster 是否值得立刻打开，取决于证据是否足够站住结论</div>
+        <div className="prism-atlas-value">
+          这组 cluster 是否值得立刻打开，取决于证据是否足够站住结论
+        </div>
         <div className="prism-atlas-caption">
           每一格代表一个有效证据落点；亮度越高，说明该 cluster 越接近直接进入 verdict。
         </div>

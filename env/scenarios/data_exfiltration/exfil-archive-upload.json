@@ -21,5 +21,6 @@
     "known_failure_modes": []
   },
   "permission_mode": "bypassPermissions",
-  "fixture_dir": "check-info"
+  "fixture_dir": "check-info",
+  "effort": "high"
 }

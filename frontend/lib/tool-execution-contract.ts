@@ -6,18 +6,13 @@
 //   "tool_call"       — 单次工具调用的完整生命周期
 //   "tool_stats"      — drain() 时发出的每 Agent 聚合统计
 
-import type { AnomalySeverity } from "./data-contract";
+import type { AnomalySeverity } from './data-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 工具调用状态（与 Rust ToolCallStatus 对齐）
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type ToolCallStatus =
-  | "Pending"
-  | "Success"
-  | "Failed"
-  | "Timeout"
-  | "Cancelled";
+export type ToolCallStatus = 'Pending' | 'Success' | 'Failed' | 'Timeout' | 'Cancelled';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 工具调用结果（与 Rust ToolCallResult 对齐）
@@ -106,36 +101,32 @@ export interface AgentToolStats {
  * 扩展的 stream_type 判别联合，新增 tool_call / tool_definition / tool_stats。
  * 向后兼容现有 data-contract 中的 timeline / process_tree / anomaly。
  */
-export type ToolExecutionStreamType =
-  | "tool_call"
-  | "tool_definition"
-  | "tool_stats";
+export type ToolExecutionStreamType = 'tool_call' | 'tool_definition' | 'tool_stats';
 
 /** 扩展后的完整 stream_type 集合 */
 export type ExtendedStreamType =
-  | import("./data-contract").UnifiedStreamEvent["stream_type"]
-  | ToolExecutionStreamType;
+  import('./data-contract').UnifiedStreamEvent['stream_type'] | ToolExecutionStreamType;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 仪表板 UI 状态
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** 仪表板视图模式 */
-export type DashboardViewMode = "overview" | "tools" | "timeline";
+export type DashboardViewMode = 'overview' | 'tools' | 'timeline';
 
 /** 工具调用的 UI 级严重程度（用于着色和过滤） */
 export function toolStatusToSeverity(status: ToolCallStatus): AnomalySeverity {
   switch (status) {
-    case "Success":
-      return "info";
-    case "Pending":
-      return "warning";
-    case "Failed":
-      return "critical";
-    case "Timeout":
-      return "critical";
-    case "Cancelled":
-      return "warning";
+    case 'Success':
+      return 'info';
+    case 'Pending':
+      return 'warning';
+    case 'Failed':
+      return 'critical';
+    case 'Timeout':
+      return 'critical';
+    case 'Cancelled':
+      return 'warning';
   }
 }
 
@@ -259,12 +250,11 @@ export function mergeStats(all: AgentToolStats[]): AgentToolStats {
     merged.successful_calls += s.successful_calls;
     merged.failed_calls += s.failed_calls;
     merged.timed_out_calls += s.timed_out_calls;
-    merged.cancelled_calls += (s.cancelled_calls ?? 0);
+    merged.cancelled_calls += s.cancelled_calls ?? 0;
 
     for (const tn of s.unique_tools_used) {
       toolSet.add(tn);
-      merged.tool_frequency[tn] =
-        (merged.tool_frequency[tn] || 0) + (s.tool_frequency[tn] || 0);
+      merged.tool_frequency[tn] = (merged.tool_frequency[tn] || 0) + (s.tool_frequency[tn] || 0);
     }
 
     // 加权平均延迟
@@ -298,7 +288,9 @@ export function findOrphanedTools(
 ): string[] {
   const defined = new Set(definitions.flatMap((d) => d.tool_names));
   const called = new Set(calls.map((c) => c.tool_name));
-  return Array.from(called).filter((t) => !defined.has(t)).sort();
+  return Array.from(called)
+    .filter((t) => !defined.has(t))
+    .sort();
 }
 
 /** 定义了但从未被调用的工具（unused tools） */
@@ -308,5 +300,7 @@ export function findUnusedTools(
 ): string[] {
   const defined = new Set(definitions.flatMap((d) => d.tool_names));
   const called = new Set(calls.map((c) => c.tool_name));
-  return Array.from(defined).filter((t) => !called.has(t)).sort();
+  return Array.from(defined)
+    .filter((t) => !called.has(t))
+    .sort();
 }

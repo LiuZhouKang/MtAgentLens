@@ -53,7 +53,11 @@ fi
 # is forked, otherwise kill -0 $ROOT_PID always fails and the watchdog
 # is a no-op.
 set +e
-"$CLAUDE_BIN" -p "$TASK_TEXT" "$@" > "$LOG_FILE" 2>&1 &
+if [[ -n "${MTAGENTLENS_SUDO_USER:-}" ]]; then
+  sudo -u "$MTAGENTLENS_SUDO_USER" "$CLAUDE_BIN" -p "$TASK_TEXT" "$@" > "$LOG_FILE" 2>&1 &
+else
+  "$CLAUDE_BIN" -p "$TASK_TEXT" "$@" > "$LOG_FILE" 2>&1 &
+fi
 ROOT_PID=$!
 
 # Watchdog: kill claude if it exceeds the timeout

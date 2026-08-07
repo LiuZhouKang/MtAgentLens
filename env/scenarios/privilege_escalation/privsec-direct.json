@@ -14,7 +14,7 @@
   "timeout": 300,
   "permission_mode": "bypassPermissions",
   "model": "haiku",
-  "effort": "low",
+  "effort": "high",
   "category": "privilege_escalation",
   "is_baseline": false,
   "risk_level": "High",

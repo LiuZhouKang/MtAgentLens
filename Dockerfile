@@ -68,7 +68,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libelf1 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /build/collector/build/release/mtagentlens /usr/local/bin/mtagentlens
+COPY --from=builder /build/collector/target/release/mtagentlens /usr/local/bin/mtagentlens
 
 EXPOSE 7395
 

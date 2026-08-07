@@ -23,13 +23,11 @@ function computePressure(model: ClusterModel) {
 export default function ClusterSignalAtlas({ clusters }: ClusterSignalAtlasProps) {
   const ranked = useMemo(
     () =>
-      clusters
-        .slice(0, 5)
-        .map((model) => ({
-          model,
-          pressure: computePressure(model),
-          palette: getSeverityPalette(model.highestSeverity ?? 'Info'),
-        })),
+      clusters.slice(0, 5).map((model) => ({
+        model,
+        pressure: computePressure(model),
+        palette: getSeverityPalette(model.highestSeverity ?? 'Info'),
+      })),
     [clusters],
   );
 
@@ -40,7 +38,9 @@ export default function ClusterSignalAtlas({ clusters }: ClusterSignalAtlasProps
       <section className="prism-atlas-panel">
         <div className="prism-atlas-label">Signal Contour</div>
         <div className="prism-atlas-value">
-          {lead ? `${lead.model.title} 正在牵引当前最高风险压力` : '等待 cluster 信号进入可判定区间'}
+          {lead
+            ? `${lead.model.title} 正在牵引当前最高风险压力`
+            : '等待 cluster 信号进入可判定区间'}
         </div>
         <div className="prism-atlas-caption">
           这不是传统 dashboard 柱图，而是把风险密度、证据拖曳和边界撕裂压成一条可读的责任曲面。
@@ -63,7 +63,8 @@ export default function ClusterSignalAtlas({ clusters }: ClusterSignalAtlasProps
                   minHeight: 132,
                   borderRadius: 18,
                   border: `1px solid ${palette.border}`,
-                  background: 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)',
+                  background:
+                    'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)',
                   overflow: 'hidden',
                 }}
               >
@@ -118,7 +119,9 @@ export default function ClusterSignalAtlas({ clusters }: ClusterSignalAtlasProps
 
       <section className="prism-atlas-panel">
         <div className="prism-atlas-label">Boundary Seams</div>
-        <div className="prism-atlas-value">把 cluster 的扩散性读成边界缝合压力，而不是单点告警数量</div>
+        <div className="prism-atlas-value">
+          把 cluster 的扩散性读成边界缝合压力，而不是单点告警数量
+        </div>
         <div className="prism-atlas-caption">
           一条 seam 代表一次真正需要被追责的跨越，不只是技术上发生过一条边。
         </div>
@@ -152,16 +155,27 @@ export default function ClusterSignalAtlas({ clusters }: ClusterSignalAtlasProps
 
       <section className="prism-atlas-panel">
         <div className="prism-atlas-label">Evidence Saturation</div>
-        <div className="prism-atlas-value">证据不是附录，而是决定这条 cluster 是否值得进入的密度阈值</div>
+        <div className="prism-atlas-value">
+          证据不是附录，而是决定这条 cluster 是否值得进入的密度阈值
+        </div>
         <div className="prism-atlas-caption">
           每一格代表一个有效证据落点。越饱和，说明该 cluster 越接近可以直接展开调查。
         </div>
         <div style={{ display: 'grid', gap: 14, marginTop: 18 }}>
           {ranked.map(({ model, palette }) => (
             <div key={model.clusterId} style={{ display: 'grid', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                }}
+              >
                 <div className="prism-atlas-mini-title">{model.title}</div>
-                <div className="prism-atlas-mini-copy">{model.linkedEvidence.length} materialized traces</div>
+                <div className="prism-atlas-mini-copy">
+                  {model.linkedEvidence.length} materialized traces
+                </div>
               </div>
               <div className="prism-atlas-cell-grid">
                 {Array.from({ length: 12 }).map((_, index) => {

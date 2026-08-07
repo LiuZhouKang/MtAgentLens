@@ -265,6 +265,8 @@ pub struct ObserverOutput {
     pub authority: AlertAuthority,
     pub reasoning: String,
     pub attacked_flag: bool,
+    #[serde(default)]
+    pub evidence_cited: Vec<String>,
     pub rule_verdicts: Vec<RuleVerdict>,
     pub pattern_verdicts: Vec<PatternVerdict>,
 }

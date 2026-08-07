@@ -1,46 +1,17 @@
 import { create } from 'zustand';
 import { api } from './api';
-import type { ResponsibilityAlert, GraphData, GraphMetrics, AppState, ZoomLevel } from './types';
+import type { CorrelationEvidence, ResponsibilityAlert, GraphData, GraphMetrics, AppState, ZoomLevel } from './types';
 import { demoAlerts, demoGraph } from './demo-data';
 import { loadSampleData } from './load-sample-data';
+import { deriveGraphMetrics } from './graph-metrics';
+import type { SnapshotImport } from './snapshot-import';
+import { loadDatabase as loadDatabaseFromBytes, type DbImport } from './db-import';
 import {
   DEFAULT_INVESTIGATION_CONTEXT,
   buildInvestigationContextFromAlert,
   mergeInvestigationContext,
   type InvestigationContext,
 } from './investigation-context';
-
-function deriveGraphMetrics(graph: GraphData): GraphMetrics {
-  const node_counts = graph.nodes.reduce<Record<string, number>>((acc, node) => {
-    acc[node.node_type] = (acc[node.node_type] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  const edge_counts = graph.edges.reduce<Record<string, number>>((acc, edge) => {
-    acc[edge.edge_type] = (acc[edge.edge_type] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  const cross_agent_edges = graph.edges.filter((edge) => {
-    const source = graph.nodes.find((node) => node.node_id === edge.source);
-    const target = graph.nodes.find((node) => node.node_id === edge.target);
-    return source?.agent_id && target?.agent_id && source.agent_id !== target.agent_id;
-  }).length;
-
-  const avg_confidence = graph.edges.length
-    ? graph.edges.reduce((sum, edge) => sum + edge.confidence, 0) / graph.edges.length
-    : 0;
-
-  return {
-    node_counts,
-    edge_counts,
-    agent_count: node_counts.Agent ?? 0,
-    cross_agent_edges,
-    delegation_depth: edge_counts.AgentDelegatesTo ?? 0,
-    taint_chains: edge_counts.TaintPropagatesTo ?? 0,
-    avg_confidence,
-  };
-}
 
 interface EngineAPI {
   setVisualizationMode(mode: 'globe' | 'graph3d' | 'graph2d' | 'map' | 'hero' | 'focus'): void;
@@ -60,15 +31,31 @@ interface EngineAPI {
   dispose(): void;
 }
 
+/**
+ * Which data source is currently shown. Backend runs are consumed from the
+ * run's SQLite db (via /api/runs/:id/db) when available, otherwise via the
+ * API contract — so a run may surface as kind 'run' (API) or kind 'db'
+ * (db-consumed, runId attached so the run selector still highlights it).
+ * Local sources (sample/demo/file/db import) carry no activeRunId unless the
+ * imported db came from a backend run.
+ */
+export type DataSourceMeta =
+  | { kind: 'run'; runId: string }
+  | { kind: 'db'; label: string; runId?: string | null }
+  | { kind: 'sample' | 'demo' | 'file'; label: string };
+
 interface AppStore {
   appState: AppState;
   activeRunId: string | null;
+  dataSource: DataSourceMeta | null;
   zoomLevel: ZoomLevel;
   selectedNodeId: string | null;
   expandedNodeIds: Set<string>;
   alerts: ResponsibilityAlert[];
   graph: GraphData;
   graphMetrics: GraphMetrics | null;
+  /** Correlation evidence from the active db (import or backend download). */
+  evidence: CorrelationEvidence[];
   timelinePosition: number;
   investigationContext: InvestigationContext;
   errorMessage: string | null;
@@ -94,6 +81,11 @@ interface AppStore {
   highlightPath: (edgeIds: string[]) => void;
   clearHighlights: () => void;
   loadRun: (runId: string) => Promise<void>;
+  loadSample: () => Promise<void>;
+  loadDemo: () => void;
+  loadSnapshot: (snapshot: SnapshotImport) => void;
+  /** Apply a SQLite db import (from a local .db file) to the store. */
+  loadDatabase: (dbImport: DbImport) => void;
   onAlertReceived: (alert: ResponsibilityAlert) => void;
   onRunActiveChanged: (active: boolean) => void;
 }
@@ -119,6 +111,53 @@ function flushAlertBuffer(get: () => AppStore, set: (partial: Partial<AppStore>)
   fresh.forEach((a) => state.engineRef.current?.showAlertPulse(a));
 }
 
+/** Apply a local (non-API) data snapshot to the store. */
+function applySnapshot(
+  set: (partial: Partial<AppStore>) => void,
+  opts: {
+    graph: GraphData;
+    alerts: ResponsibilityAlert[];
+    metrics: GraphMetrics;
+    source: Extract<DataSourceMeta, { kind: 'sample' | 'demo' | 'file' }>;
+  },
+): void {
+  const leanAlerts = opts.alerts.map(({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest);
+  set({
+    graph: opts.graph,
+    alerts: leanAlerts,
+    graphMetrics: opts.metrics,
+    evidence: [],
+    dataSource: opts.source,
+    activeRunId: null,
+    selectedNodeId: null,
+    appState: 'replay',
+    errorMessage: null,
+  });
+}
+
+/**
+ * Apply a SQLite db import. The db is the source of truth for evidence too
+ * (correlation_evidence), so it populates `evidence` alongside graph/alerts.
+ */
+function applyDbImport(
+  set: (partial: Partial<AppStore>) => void,
+  dbImport: DbImport,
+  source: Extract<DataSourceMeta, { kind: 'db' }>,
+): void {
+  const leanAlerts = dbImport.alerts.map(({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest);
+  set({
+    graph: dbImport.graph,
+    alerts: leanAlerts,
+    graphMetrics: dbImport.metrics,
+    evidence: dbImport.evidence,
+    dataSource: source,
+    activeRunId: source.runId ?? null,
+    selectedNodeId: null,
+    appState: 'replay',
+    errorMessage: null,
+  });
+}
+
 function scheduleAlertFlush(get: () => AppStore, set: (partial: Partial<AppStore>) => void): void {
   if (typeof requestAnimationFrame === 'function') {
     flushHandle = requestAnimationFrame(() => flushAlertBuffer(get, set)) as unknown as number;
@@ -131,12 +170,14 @@ function scheduleAlertFlush(get: () => AppStore, set: (partial: Partial<AppStore
 export const useAppStore = create<AppStore>((set, get) => ({
   appState: 'replay',
   activeRunId: null,
+  dataSource: null,
   zoomLevel: 0,
   selectedNodeId: null,
   expandedNodeIds: new Set(),
   alerts: [],
   graph: { nodes: [], edges: [] },
   graphMetrics: null,
+  evidence: [],
   timelinePosition: 0,
   investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
   errorMessage: null,
@@ -188,7 +229,22 @@ export const useAppStore = create<AppStore>((set, get) => ({
   clearHighlights: () => get().engineRef.current?.clearHighlights(),
   loadRun: async (runId) => {
     if (!runId) return;
-    set({ activeRunId: runId, appState: 'replay', errorMessage: null });
+    set({ activeRunId: runId, dataSource: { kind: 'run', runId }, appState: 'replay', errorMessage: null });
+
+    // The real run artifacts live in collector/collector.responsibility.db, so
+    // the preferred path downloads the raw db and consumes it with sql.js (the
+    // same code path as a local .db import). Fall back to the API contract when
+    // the backend lacks the db endpoint or the db yields nothing consumable.
+    try {
+      const buffer = await api.getRunDb(runId);
+      const dbImport = await loadDatabaseFromBytes(new Uint8Array(buffer), runId);
+      if (dbImport.hasConsumableData) {
+        applyDbImport(set, dbImport, { kind: 'db', label: runId, runId });
+        return;
+      }
+    } catch (_dbError) {
+      // No db artifact on this backend — fall through to the API path.
+    }
 
     try {
       const [graph, alerts] = await Promise.all([api.getGraph(runId), api.getAlerts(runId)]);
@@ -200,12 +256,43 @@ export const useAppStore = create<AppStore>((set, get) => ({
         graph: { nodes: graph.nodes, edges: graph.edges },
         graphMetrics: deriveGraphMetrics({ nodes: graph.nodes, edges: graph.edges }),
         alerts: leanAlerts,
+        evidence: [],
         selectedNodeId: null,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       set({ errorMessage: message, appState: 'error' });
     }
+  },
+
+  loadSample: async () => {
+    const data = await loadSampleData();
+    if (!data) throw new Error('样例数据不可用（sample-run.json 未找到）');
+    applySnapshot(set, {
+      graph: data.graph,
+      alerts: data.alerts,
+      metrics: data.metrics,
+      source: { kind: 'sample', label: '样例运行' },
+    });
+  },
+  loadDemo: () => {
+    applySnapshot(set, {
+      graph: demoGraph,
+      alerts: demoAlerts,
+      metrics: deriveGraphMetrics(demoGraph),
+      source: { kind: 'demo', label: '演示数据' },
+    });
+  },
+  loadSnapshot: (snapshot) => {
+    applySnapshot(set, {
+      graph: snapshot.graph,
+      alerts: snapshot.alerts,
+      metrics: snapshot.metrics,
+      source: { kind: 'file', label: snapshot.label },
+    });
+  },
+  loadDatabase: (dbImport) => {
+    applyDbImport(set, dbImport, { kind: 'db', label: dbImport.label });
   },
 
   onAlertReceived: (alert) => {
@@ -251,26 +338,27 @@ async function initData() {
     const runs = await api.getRuns();
     const runList = (runs as any)?.runs ?? runs ?? [];
     if (runList.length > 0) {
-      // Find first run with data, preferring the latest
-      const firstWithData = runList.find((r: any) => r.has_data !== false) ?? runList[0];
-      const runId = firstWithData.run_id;
-      const [graphData, alertList] = await Promise.all([
-        api.getGraph(runId),
-        api.getAlerts(runId),
-      ]);
-      if (graphData.nodes?.length > 0) {
-        // Strip graph_snapshot from alerts to save memory (~800KB for 3 alerts)
-        const leanAlerts = alertList.map(({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest);
-        console.log(
-          `[MtAgentLens] API: ${graphData.nodes.length} nodes, ${graphData.edges.length} edges, ${leanAlerts.length} alerts (${runId})`
+      // Find first run with data, preferring the latest. The collector's run
+      // summaries expose artifact_availability (a real SQLite db counts as
+      // usable data); fall back to the legacy has_data field when absent.
+      const runHasData = (r: any) => {
+        const avail = r.artifact_availability;
+        if (!avail) return r.has_data !== false;
+        return (
+          avail.alerts === true ||
+          avail.correlation_evidence === true ||
+          avail.events === true ||
+          avail.database === true
         );
-        useAppStore.setState({
-          graph: graphData,
-          alerts: leanAlerts,
-          graphMetrics: deriveGraphMetrics(graphData),
-          activeRunId: runId,
-          appState: 'replay',
-        });
+      };
+      const firstWithData = runList.find(runHasData) ?? runList[0];
+      await useAppStore.getState().loadRun(firstWithData.run_id);
+      const state = useAppStore.getState();
+      if (state.graph.nodes.length > 0 || state.alerts.length > 0) {
+        console.log(
+          `[MtAgentLens] Loaded run ${firstWithData.run_id}: ${state.graph.nodes.length} nodes, ` +
+            `${state.graph.edges.length} edges, ${state.alerts.length} alerts (${state.dataSource?.kind})`
+        );
         return;
       }
     }
@@ -290,6 +378,7 @@ async function initData() {
         graph: data.graph,
         alerts: leanAlerts,
         graphMetrics: data.metrics,
+        dataSource: { kind: 'sample', label: '样例运行' },
       });
       return;
     }
@@ -303,10 +392,19 @@ async function initData() {
     graph: demoGraph,
     alerts: demoAlerts,
     graphMetrics: deriveGraphMetrics(demoGraph),
+    dataSource: { kind: 'demo', label: '演示数据' },
   });
 }
 
 // Only run on client — SSR would fail and block rendering
 if (typeof window !== 'undefined') {
   initData();
+}
+
+// Dev-only test hook — lets Playwright drive the store for live-update
+// simulation (push alerts → sidebar/reactivity recomputes). Stripped from
+// production builds by NODE_ENV, so it never ships.
+if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+  (window as unknown as { __MTA_LENS_STORE__?: typeof useAppStore }).__MTA_LENS_STORE__ =
+    useAppStore;
 }

@@ -85,7 +85,7 @@ impl ObserverProvider for ObserverLLMProvider {
         &self,
         input: &ObserverInput,
     ) -> Result<ObserverOutput, ObserverProviderError> {
-        let prompt = ObserverLLM::build_compact_prompt(&input.signature, &input.prior);
+        let prompt = ObserverLLM::build_compact_prompt(&input.signature, &input.prior, input.content_signals.as_ref());
 
         // Build request body for Anthropic-compatible API (DeepSeek).
         // Token budget:

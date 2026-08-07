@@ -16,7 +16,7 @@
 //   tool_name      — 连接 ToolExecutionDashboard（查看具体工具调用变化）
 //   window_start_ms / window_end_ms — 连接 TimelinePanel（定位漂移发生时间段）
 
-import type { AnomalySeverity } from "./data-contract";
+import type { AnomalySeverity } from './data-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 漂移维度
@@ -24,50 +24,50 @@ import type { AnomalySeverity } from "./data-contract";
 
 /** AgentDriftAnalyzer 的六个检测维度 */
 export type DriftDimension =
-  | "ToolUsage"               // 工具使用频率分布偏移
-  | "Latency"                 // 请求-响应时延偏移
-  | "ErrorRate"               // HTTP 错误率偏移
-  | "OutputSize"              // 响应体积偏移
-  | "EventFrequency"          // 事件频率偏移
-  | "HttpMethodDistribution"; // HTTP 方法分布偏移
+  | 'ToolUsage' // 工具使用频率分布偏移
+  | 'Latency' // 请求-响应时延偏移
+  | 'ErrorRate' // HTTP 错误率偏移
+  | 'OutputSize' // 响应体积偏移
+  | 'EventFrequency' // 事件频率偏移
+  | 'HttpMethodDistribution'; // HTTP 方法分布偏移
 
 /** 维度人类可读标签 */
 export const DRIFT_DIMENSION_LABEL: Record<DriftDimension, string> = {
-  ToolUsage: "工具偏好",
-  Latency: "响应延迟",
-  ErrorRate: "错误率",
-  OutputSize: "输出体积",
-  EventFrequency: "事件频率",
-  HttpMethodDistribution: "HTTP 方法",
+  ToolUsage: '工具偏好',
+  Latency: '响应延迟',
+  ErrorRate: '错误率',
+  OutputSize: '输出体积',
+  EventFrequency: '事件频率',
+  HttpMethodDistribution: 'HTTP 方法',
 };
 
 /** 维度简短描述（用于 tooltip） */
 export const DRIFT_DIMENSION_DESC: Record<DriftDimension, string> = {
-  ToolUsage: "工具使用频率分布与基线的 KL 散度",
-  Latency: "请求-响应延迟均值相对基线的偏移",
-  ErrorRate: "HTTP 4xx/5xx 错误率相对基线的变化",
-  OutputSize: "响应体积均值相对基线的偏移",
-  EventFrequency: "事件产出速率相对基线的变化",
-  HttpMethodDistribution: "HTTP 方法分布与基线的 KL 散度",
+  ToolUsage: '工具使用频率分布与基线的 KL 散度',
+  Latency: '请求-响应延迟均值相对基线的偏移',
+  ErrorRate: 'HTTP 4xx/5xx 错误率相对基线的变化',
+  OutputSize: '响应体积均值相对基线的偏移',
+  EventFrequency: '事件产出速率相对基线的变化',
+  HttpMethodDistribution: 'HTTP 方法分布与基线的 KL 散度',
 };
 
 /** 维度对应图标 */
 export const DRIFT_DIMENSION_ICON: Record<DriftDimension, string> = {
-  ToolUsage: "🔧",
-  Latency: "⏱️",
-  ErrorRate: "❌",
-  OutputSize: "📦",
-  EventFrequency: "📊",
-  HttpMethodDistribution: "🌐",
+  ToolUsage: '🔧',
+  Latency: '⏱️',
+  ErrorRate: '❌',
+  OutputSize: '📦',
+  EventFrequency: '📊',
+  HttpMethodDistribution: '🌐',
 };
 
 /** 维度在综合评分中的默认权重 */
 export const DRIFT_DIMENSION_WEIGHT: Record<DriftDimension, number> = {
-  ToolUsage: 0.30,
-  Latency: 0.20,
+  ToolUsage: 0.3,
+  Latency: 0.2,
   ErrorRate: 0.25,
-  OutputSize: 0.10,
-  EventFrequency: 0.10,
+  OutputSize: 0.1,
+  EventFrequency: 0.1,
   HttpMethodDistribution: 0.05,
 };
 
@@ -77,31 +77,31 @@ export const DRIFT_DIMENSION_WEIGHT: Record<DriftDimension, number> = {
 
 /** 漂移趋势方向 */
 export type DriftDirection =
-  | "Worsening"   // 持续恶化（连续 ≥3 周期递增）
-  | "Plateaued"   // 漂移后趋于稳定
-  | "Recovering"  // 正在恢复
-  | "Uncertain";  // 方向不明（基线学习期或无足够周期）
+  | 'Worsening' // 持续恶化（连续 ≥3 周期递增）
+  | 'Plateaued' // 漂移后趋于稳定
+  | 'Recovering' // 正在恢复
+  | 'Uncertain'; // 方向不明（基线学习期或无足够周期）
 
 export const DRIFT_DIRECTION_LABEL: Record<DriftDirection, string> = {
-  Worsening: "持续恶化",
-  Plateaued: "趋于稳定",
-  Recovering: "正在恢复",
-  Uncertain: "方向不明",
+  Worsening: '持续恶化',
+  Plateaued: '趋于稳定',
+  Recovering: '正在恢复',
+  Uncertain: '方向不明',
 };
 
 export const DRIFT_DIRECTION_ICON: Record<DriftDirection, string> = {
-  Worsening: "📈",
-  Plateaued: "➡️",
-  Recovering: "📉",
-  Uncertain: "❓",
+  Worsening: '📈',
+  Plateaued: '➡️',
+  Recovering: '📉',
+  Uncertain: '❓',
 };
 
 /** 方向对应的颜色类 */
 export const DRIFT_DIRECTION_COLOR: Record<DriftDirection, string> = {
-  Worsening: "text-red-600 bg-red-50 border-red-200",
-  Plateaued: "text-amber-600 bg-amber-50 border-amber-200",
-  Recovering: "text-emerald-600 bg-emerald-50 border-emerald-200",
-  Uncertain: "text-slate-500 bg-slate-50 border-slate-200",
+  Worsening: 'text-red-600 bg-red-50 border-red-200',
+  Plateaued: 'text-amber-600 bg-amber-50 border-amber-200',
+  Recovering: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+  Uncertain: 'text-slate-500 bg-slate-50 border-slate-200',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -206,7 +206,7 @@ export interface AgentDriftStats {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /** 漂移评分到严重性的映射 */
-export type DriftSeverity = "normal" | "elevated" | "warning" | "critical";
+export type DriftSeverity = 'normal' | 'elevated' | 'warning' | 'critical';
 
 /** 评分阈值 */
 export const DRIFT_SEVERITY_THRESHOLDS: Array<{
@@ -214,24 +214,24 @@ export const DRIFT_SEVERITY_THRESHOLDS: Array<{
   severity: DriftSeverity;
   label: string;
 }> = [
-  { min: 0.0, severity: "normal", label: "正常" },
-  { min: 0.15, severity: "elevated", label: "轻微" },
-  { min: 0.25, severity: "warning", label: "告警" },
-  { min: 0.50, severity: "critical", label: "严重" },
+  { min: 0.0, severity: 'normal', label: '正常' },
+  { min: 0.15, severity: 'elevated', label: '轻微' },
+  { min: 0.25, severity: 'warning', label: '告警' },
+  { min: 0.5, severity: 'critical', label: '严重' },
 ];
 
 export const DRIFT_SEVERITY_COLOR: Record<DriftSeverity, string> = {
-  normal: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  elevated: "bg-amber-100 text-amber-700 border-amber-200",
-  warning: "bg-orange-100 text-orange-700 border-orange-200",
-  critical: "bg-red-100 text-red-700 border-red-200",
+  normal: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  elevated: 'bg-amber-100 text-amber-700 border-amber-200',
+  warning: 'bg-orange-100 text-orange-700 border-orange-200',
+  critical: 'bg-red-100 text-red-700 border-red-200',
 };
 
 export const DRIFT_SEVERITY_DOT: Record<DriftSeverity, string> = {
-  normal: "bg-emerald-400",
-  elevated: "bg-amber-400",
-  warning: "bg-orange-500 animate-pulse",
-  critical: "bg-red-600 animate-pulse",
+  normal: 'bg-emerald-400',
+  elevated: 'bg-amber-400',
+  warning: 'bg-orange-500 animate-pulse',
+  critical: 'bg-red-600 animate-pulse',
 };
 
 /** 根据评分计算严重性 */
@@ -241,7 +241,7 @@ export function driftScoreToSeverity(score: number): DriftSeverity {
       return DRIFT_SEVERITY_THRESHOLDS[i].severity;
     }
   }
-  return "normal";
+  return 'normal';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -249,10 +249,10 @@ export function driftScoreToSeverity(score: number): DriftSeverity {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export type DriftDashboardViewMode =
-  | "overview"       // 概览：全局统计 + agent 列表
-  | "dimensions"     // 维度雷达：6 维对比视图
-  | "agents"         // agent 级：按 agent 查看漂移历史
-  | "trend";         // 趋势：时间线漂移曲线
+  | 'overview' // 概览：全局统计 + agent 列表
+  | 'dimensions' // 维度雷达：6 维对比视图
+  | 'agents' // agent 级：按 agent 查看漂移历史
+  | 'trend'; // 趋势：时间线漂移曲线
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 仪表板完整状态
@@ -376,7 +376,7 @@ export interface DriftSnapshotDetailProps {
 /** 创建默认仪表板状态 */
 export function createDefaultDriftState(): AgentDriftDashboardState {
   return {
-    view_mode: "overview",
+    view_mode: 'overview',
     stats: {
       monitored_agents: 0,
       baselined_agents: 0,

@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React, { useMemo } from "react";
+import React, { useMemo } from 'react';
 import type {
   SessionHealthDashboardProps,
   SessionHealthViewMode,
@@ -16,7 +16,7 @@ import type {
   HealthAlertType,
   HealthAlertSeverity,
   HealthScoreTier,
-} from "@/lib/session-health-contract";
+} from '@/lib/session-health-contract';
 import {
   HEALTH_DIMENSION_LABEL,
   HEALTH_DIMENSION_ICON,
@@ -28,46 +28,46 @@ import {
   computeDimensionContribution,
   formatLatencyUs,
   snapshotsToDataPoints,
-} from "@/lib/session-health-contract";
+} from '@/lib/session-health-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 常量
 // ═══════════════════════════════════════════════════════════════════════════
 
 const VIEW_LABELS: { mode: SessionHealthViewMode; label: string; icon: string }[] = [
-  { mode: "overview", label: "概览", icon: "📊" },
-  { mode: "fleet", label: "Fleet", icon: "🖥️" },
-  { mode: "alerts", label: "告警", icon: "🔔" },
-  { mode: "trends", label: "趋势", icon: "📈" },
+  { mode: 'overview', label: '概览', icon: '📊' },
+  { mode: 'fleet', label: 'Fleet', icon: '🖥️' },
+  { mode: 'alerts', label: '告警', icon: '🔔' },
+  { mode: 'trends', label: '趋势', icon: '📈' },
 ];
 
 const DIMENSION_ORDER: HealthDimension[] = [
-  "latency",
-  "error_rate",
-  "tool_health",
-  "api_health",
-  "resource",
+  'latency',
+  'error_rate',
+  'tool_health',
+  'api_health',
+  'resource',
 ];
 
 const ALERT_TYPE_COLOR: Record<HealthAlertType, string> = {
-  health_degraded: "border-l-amber-400 bg-amber-50",
-  health_warning: "border-l-orange-400 bg-orange-50",
-  health_critical: "border-l-red-500 bg-red-50",
+  health_degraded: 'border-l-amber-400 bg-amber-50',
+  health_warning: 'border-l-orange-400 bg-orange-50',
+  health_critical: 'border-l-red-500 bg-red-50',
 };
 
 const ALERT_TYPE_DOT: Record<HealthAlertType, string> = {
-  health_degraded: "bg-amber-400",
-  health_warning: "bg-orange-500",
-  health_critical: "bg-red-600 animate-pulse",
+  health_degraded: 'bg-amber-400',
+  health_warning: 'bg-orange-500',
+  health_critical: 'bg-red-600 animate-pulse',
 };
 
 // DIMENSION_COLORS 用于柱状图和多维度可视化
 const DIMENSION_COLORS: Record<HealthDimension, { bar: string; text: string; bg: string }> = {
-  latency: { bar: "bg-violet-500", text: "text-violet-700", bg: "bg-violet-50" },
-  error_rate: { bar: "bg-red-500", text: "text-red-700", bg: "bg-red-50" },
-  tool_health: { bar: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50" },
-  api_health: { bar: "bg-blue-500", text: "text-blue-700", bg: "bg-blue-50" },
-  resource: { bar: "bg-slate-500", text: "text-slate-700", bg: "bg-slate-50" },
+  latency: { bar: 'bg-violet-500', text: 'text-violet-700', bg: 'bg-violet-50' },
+  error_rate: { bar: 'bg-red-500', text: 'text-red-700', bg: 'bg-red-50' },
+  tool_health: { bar: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-50' },
+  api_health: { bar: 'bg-blue-500', text: 'text-blue-700', bg: 'bg-blue-50' },
+  resource: { bar: 'bg-slate-500', text: 'text-slate-700', bg: 'bg-slate-50' },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -77,34 +77,34 @@ const DIMENSION_COLORS: Record<HealthDimension, { bar: string; text: string; bg:
 export const HealthScoreGauge: React.FC<HealthScoreGaugeProps> = ({
   score,
   previous_score,
-  size = "md",
+  size = 'md',
   showLabel = true,
 }) => {
   const tier = healthScoreToTier(score);
   const colors = HEALTH_TIER_COLORS[tier];
 
   const sizeClasses = {
-    sm: { ring: "w-12 h-12", text: "text-sm", sub: "text-[10px]" },
-    md: { ring: "w-20 h-20", text: "text-xl", sub: "text-xs" },
-    lg: { ring: "w-28 h-28", text: "text-3xl", sub: "text-sm" },
+    sm: { ring: 'w-12 h-12', text: 'text-sm', sub: 'text-[10px]' },
+    md: { ring: 'w-20 h-20', text: 'text-xl', sub: 'text-xs' },
+    lg: { ring: 'w-28 h-28', text: 'text-3xl', sub: 'text-sm' },
   }[size];
 
   // SVG 环形进度条参数
-  const radius = size === "sm" ? 20 : size === "md" ? 34 : 48;
+  const radius = size === 'sm' ? 20 : size === 'md' ? 34 : 48;
   const circumference = 2 * Math.PI * radius;
   const progress = (score / 100) * circumference;
-  const svgSize = size === "sm" ? 52 : size === "md" ? 84 : 108;
+  const svgSize = size === 'sm' ? 52 : size === 'md' ? 84 : 108;
 
   // 渐变色: 红 → 橙 → 黄 → 绿
   const barColor =
-    score > 80 ? "#10b981" : score > 60 ? "#3b82f6" : score > 30 ? "#f59e0b" : "#ef4444";
+    score > 80 ? '#10b981' : score > 60 ? '#3b82f6' : score > 30 ? '#f59e0b' : '#ef4444';
 
   const delta = previous_score != null ? score - previous_score : null;
 
   return (
     <div className="flex flex-col items-center gap-1">
       <div className={`relative ${sizeClasses.ring}`}>
-        <svg className="w-full h-full -rotate-90" viewBox={`0 0 ${svgSize} ${svgSize}`}>
+        <svg className="h-full w-full -rotate-90" viewBox={`0 0 ${svgSize} ${svgSize}`}>
           {/* 背景环 */}
           <circle
             cx={svgSize / 2}
@@ -112,7 +112,7 @@ export const HealthScoreGauge: React.FC<HealthScoreGaugeProps> = ({
             r={radius}
             fill="none"
             stroke="#e5e7eb"
-            strokeWidth={size === "sm" ? 4 : 6}
+            strokeWidth={size === 'sm' ? 4 : 6}
           />
           {/* 进度环 */}
           <circle
@@ -121,7 +121,7 @@ export const HealthScoreGauge: React.FC<HealthScoreGaugeProps> = ({
             r={radius}
             fill="none"
             stroke={barColor}
-            strokeWidth={size === "sm" ? 4 : 6}
+            strokeWidth={size === 'sm' ? 4 : 6}
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={circumference - progress}
@@ -130,9 +130,7 @@ export const HealthScoreGauge: React.FC<HealthScoreGaugeProps> = ({
         </svg>
         {/* 中心分数 */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className={`font-bold ${sizeClasses.text} ${colors.text}`}>
-            {score}
-          </span>
+          <span className={`font-bold ${sizeClasses.text} ${colors.text}`}>{score}</span>
         </div>
       </div>
 
@@ -144,7 +142,7 @@ export const HealthScoreGauge: React.FC<HealthScoreGaugeProps> = ({
           {delta != null && delta !== 0 && (
             <span
               className={`${sizeClasses.sub} ml-1 ${
-                delta > 0 ? "text-emerald-600" : "text-red-600"
+                delta > 0 ? 'text-emerald-600' : 'text-red-600'
               }`}
             >
               {delta > 0 ? `↑${delta}` : `↓${Math.abs(delta)}`}
@@ -172,7 +170,7 @@ export const DimensionBarChart: React.FC<DimensionBarChartProps> = ({
   );
 
   return (
-    <div className={compact ? "space-y-1" : "space-y-2"}>
+    <div className={compact ? 'space-y-1' : 'space-y-2'}>
       {DIMENSION_ORDER.map((dim) => {
         const data = dimensions[dim];
         const rawScore = Math.round(data.score * 100);
@@ -183,65 +181,63 @@ export const DimensionBarChart: React.FC<DimensionBarChartProps> = ({
         return (
           <div
             key={dim}
-            className={`rounded p-2 ${compact ? "p-1.5" : ""} ${
-              isHighlighted ? "ring-2 ring-blue-400 bg-blue-50/50" : ""
+            className={`rounded p-2 ${compact ? 'p-1.5' : ''} ${
+              isHighlighted ? 'bg-blue-50/50 ring-2 ring-blue-400' : ''
             }`}
           >
             {/* 维度标题行 */}
-            <div className="flex items-center gap-1.5 mb-1">
+            <div className="mb-1 flex items-center gap-1.5">
               <span className="text-xs">{HEALTH_DIMENSION_ICON[dim]}</span>
               <span className={`text-xs font-medium ${colors.text}`}>
                 {HEALTH_DIMENSION_LABEL[dim]}
               </span>
-              <span className="text-xs text-gray-400 ml-auto">
+              <span className="ml-auto text-xs text-gray-400">
                 权重: {(weights[dim] * 100).toFixed(0)}%
               </span>
             </div>
 
             {/* 进度条 */}
             <div className="flex items-center gap-2">
-              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${colors.bar}`}
                   style={{ width: `${rawScore}%` }}
                 />
               </div>
-              <span className="text-xs font-mono font-semibold w-8 text-right">
-                {rawScore}
-              </span>
+              <span className="w-8 text-right font-mono text-xs font-semibold">{rawScore}</span>
             </div>
 
             {/* 贡献值（加权后） */}
             {!compact && (
-              <div className="text-[10px] text-gray-400 mt-0.5">
+              <div className="mt-0.5 text-[10px] text-gray-400">
                 加权贡献: {contrib} 分
-                {dim === "latency" && dimensions.latency.samples > 0 && (
-                  <span className="ml-2">
-                    P95: {formatLatencyUs(dimensions.latency.p95_us)}
-                  </span>
+                {dim === 'latency' && dimensions.latency.samples > 0 && (
+                  <span className="ml-2">P95: {formatLatencyUs(dimensions.latency.p95_us)}</span>
                 )}
-                {dim === "error_rate" && dimensions.error_rate.total_operations > 0 && (
+                {dim === 'error_rate' && dimensions.error_rate.total_operations > 0 && (
                   <span className="ml-2">
                     错误率: {(dimensions.error_rate.error_rate * 100).toFixed(1)}%
                   </span>
                 )}
-                {dim === "tool_health" && dimensions.tool_health.total_calls > 0 && (
+                {dim === 'tool_health' && dimensions.tool_health.total_calls > 0 && (
                   <span className="ml-2">
                     成功 {dimensions.tool_health.successful}/{dimensions.tool_health.total_calls}
                     {dimensions.tool_health.active_loops > 0 && (
-                      <span className="text-red-500"> · {dimensions.tool_health.active_loops} 循环</span>
+                      <span className="text-red-500">
+                        {' '}
+                        · {dimensions.tool_health.active_loops} 循环
+                      </span>
                     )}
                   </span>
                 )}
-                {dim === "api_health" && dimensions.api_health.total_requests > 0 && (
+                {dim === 'api_health' && dimensions.api_health.total_requests > 0 && (
                   <span className="ml-2">
-                    5xx: {dimensions.api_health.status_5xx} · 429: {dimensions.api_health.status_429}
+                    5xx: {dimensions.api_health.status_5xx} · 429:{' '}
+                    {dimensions.api_health.status_429}
                   </span>
                 )}
-                {dim === "resource" && (
-                  <span className="ml-2">
-                    崩溃: {dimensions.resource.process_crashes} 次
-                  </span>
+                {dim === 'resource' && (
+                  <span className="ml-2">崩溃: {dimensions.resource.process_crashes} 次</span>
                 )}
               </div>
             )}
@@ -264,9 +260,7 @@ export const HealthTrendChart: React.FC<HealthTrendChartProps> = ({
 }) => {
   if (data.length < 2) {
     return (
-      <div className="p-4 text-center text-gray-400 text-xs">
-        需要至少 2 个数据点才能显示趋势
-      </div>
+      <div className="p-4 text-center text-xs text-gray-400">需要至少 2 个数据点才能显示趋势</div>
     );
   }
 
@@ -290,26 +284,27 @@ export const HealthTrendChart: React.FC<HealthTrendChartProps> = ({
   const ys = series.map((v) => padding.top + chartH - ((v - minVal) / valRange) * chartH);
 
   // SVG path
-  const pathD = ys.map((y, i) => `${i === 0 ? "M" : "L"}${xs[i]},${y}`).join(" ");
+  const pathD = ys.map((y, i) => `${i === 0 ? 'M' : 'L'}${xs[i]},${y}`).join(' ');
   const areaD = `${pathD} L${xs[xs.length - 1]},${padding.top + chartH} L${xs[0]},${padding.top + chartH} Z`;
 
   const lineColor = highlight_dimension
-    ? DIMENSION_COLORS[highlight_dimension].bar.replace("bg-", "#")
-    : healthScoreToTier(series[series.length - 1]) === "critical"
-      ? "#ef4444"
-      : healthScoreToTier(series[series.length - 1]) === "warning"
-        ? "#f59e0b"
-        : "#3b82f6";
+    ? DIMENSION_COLORS[highlight_dimension].bar.replace('bg-', '#')
+    : healthScoreToTier(series[series.length - 1]) === 'critical'
+      ? '#ef4444'
+      : healthScoreToTier(series[series.length - 1]) === 'warning'
+        ? '#f59e0b'
+        : '#3b82f6';
 
   // 阈值参考线
   const warningY = padding.top + chartH - ((60 - minVal) / valRange) * chartH;
   const criticalY = padding.top + chartH - ((30 - minVal) / valRange) * chartH;
 
   return (
-    <div className={compact ? "" : "p-3 border border-slate-200 rounded-lg bg-white"}>
+    <div className={compact ? '' : 'rounded-lg border border-slate-200 bg-white p-3'}>
       {!compact && (
-        <div className="text-xs text-gray-500 mb-2">
-          Agent PID {agent_pid} · {highlight_dimension ? HEALTH_DIMENSION_LABEL[highlight_dimension] : "综合健康"} 趋势
+        <div className="mb-2 text-xs text-gray-500">
+          Agent PID {agent_pid} ·{' '}
+          {highlight_dimension ? HEALTH_DIMENSION_LABEL[highlight_dimension] : '综合健康'} 趋势
         </div>
       )}
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ maxHeight: height }}>
@@ -368,41 +363,34 @@ export const HealthAlertCard: React.FC<HealthAlertCardProps> = ({
   return (
     <button
       onClick={onSelect}
-      className={`w-full text-left p-3 rounded-lg border border-l-4 transition-all cursor-pointer
-        ${ALERT_TYPE_COLOR[alert.alert_type]}
-        ${selected ? "ring-2 ring-blue-400 shadow-sm" : "hover:shadow-sm"}
-      `}
+      className={`w-full cursor-pointer rounded-lg border border-l-4 p-3 text-left transition-all ${ALERT_TYPE_COLOR[alert.alert_type]} ${selected ? 'shadow-sm ring-2 ring-blue-400' : 'hover:shadow-sm'} `}
     >
-      <div className="flex items-center gap-2 mb-1">
+      <div className="mb-1 flex items-center gap-2">
         <span
-          className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${ALERT_TYPE_DOT[alert.alert_type]}`}
+          className={`inline-block h-2 w-2 flex-shrink-0 rounded-full ${ALERT_TYPE_DOT[alert.alert_type]}`}
         />
         <span className="text-xs font-semibold">
           {HEALTH_ALERT_TYPE_ICON[alert.alert_type]} {HEALTH_ALERT_TYPE_LABEL[alert.alert_type]}
         </span>
-        <span className="text-xs text-gray-500 ml-auto font-mono">
+        <span className="ml-auto font-mono text-xs text-gray-500">
           {new Date(alert.timestamp_ns / 1_000_000).toLocaleTimeString()}
         </span>
       </div>
 
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-xs font-mono text-gray-600">
-          PID: {alert.agent_root_pid}
-        </span>
+      <div className="mb-1 flex items-center gap-2">
+        <span className="font-mono text-xs text-gray-600">PID: {alert.agent_root_pid}</span>
         <span className="text-xs text-gray-400">{alert.comm}</span>
-        <span className="text-xs font-mono font-bold ml-auto">
-          分数: {alert.health_score}
-        </span>
+        <span className="ml-auto font-mono text-xs font-bold">分数: {alert.health_score}</span>
       </div>
 
-      <p className="text-xs text-gray-600 mt-1 line-clamp-2">{alert.message}</p>
+      <p className="mt-1 line-clamp-2 text-xs text-gray-600">{alert.message}</p>
 
       {alert.degraded_dimensions.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1.5">
+        <div className="mt-1.5 flex flex-wrap gap-1">
           {alert.degraded_dimensions.map((dim) => (
             <span
               key={dim}
-              className={`text-[10px] px-1.5 py-0.5 rounded ${DIMENSION_COLORS[dim].bg} ${DIMENSION_COLORS[dim].text}`}
+              className={`rounded px-1.5 py-0.5 text-[10px] ${DIMENSION_COLORS[dim].bg} ${DIMENSION_COLORS[dim].text}`}
             >
               {HEALTH_DIMENSION_ICON[dim]} {HEALTH_DIMENSION_LABEL[dim]}
             </span>
@@ -434,8 +422,8 @@ export const FleetGrid: React.FC<FleetGridProps> = ({
     <div
       className={`grid gap-3 ${
         compact
-          ? "grid-cols-2 md:grid-cols-3"
-          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          ? 'grid-cols-2 md:grid-cols-3'
+          : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
       }`}
     >
       {sorted.map((agent) => {
@@ -448,52 +436,47 @@ export const FleetGrid: React.FC<FleetGridProps> = ({
           <button
             key={agent.agent_root_pid}
             onClick={() => onAgentClick(agent.agent_root_pid)}
-            className={`text-left p-3 rounded-lg border transition-all cursor-pointer
-              ${isSelected ? "ring-2 ring-blue-400 shadow-md" : "hover:shadow-sm"}
-              ${colors.bg} ${colors.ring.replace("ring-", "border-")}
-            `}
+            className={`cursor-pointer rounded-lg border p-3 text-left transition-all ${isSelected ? 'shadow-md ring-2 ring-blue-400' : 'hover:shadow-sm'} ${colors.bg} ${colors.ring.replace('ring-', 'border-')} `}
           >
             {/* Agent 标识行 */}
-            <div className="flex items-center gap-2 mb-2">
-              <span className={`inline-block w-2 h-2 rounded-full ${colors.dot}`} />
-              <span className="text-xs font-mono font-bold truncate">
+            <div className="mb-2 flex items-center gap-2">
+              <span className={`inline-block h-2 w-2 rounded-full ${colors.dot}`} />
+              <span className="truncate font-mono text-xs font-bold">
                 PID {agent.agent_root_pid}
               </span>
               {agent.is_active && (
-                <span className="ml-auto inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="ml-auto inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
               )}
             </div>
-            <div className="text-xs text-gray-500 truncate mb-2">{agent.comm}</div>
+            <div className="mb-2 truncate text-xs text-gray-500">{agent.comm}</div>
 
             {/* 健康分数 + 仪表盘 */}
             <div className="flex items-center gap-3">
               <HealthScoreGauge score={agent.current_score} size="sm" showLabel={false} />
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-1">
-                  <span className={`text-lg font-bold ${colors.text}`}>
-                    {agent.current_score}
-                  </span>
+                  <span className={`text-lg font-bold ${colors.text}`}>{agent.current_score}</span>
                   {agent.score_trend !== 0 && (
                     <span
                       className={`text-xs ${
-                        agent.score_trend > 0 ? "text-emerald-600" : "text-red-600"
+                        agent.score_trend > 0 ? 'text-emerald-600' : 'text-red-600'
                       }`}
                     >
-                      {agent.score_trend > 0 ? "↑" : "↓"}
+                      {agent.score_trend > 0 ? '↑' : '↓'}
                       {Math.abs(agent.score_trend)}
                     </span>
                   )}
                 </div>
                 {/* 最弱维度指示 */}
-                <div className="text-[10px] text-gray-400 mt-0.5">
-                  最弱: {HEALTH_DIMENSION_ICON[agent.weakest_dimension]}{" "}
-                  {HEALTH_DIMENSION_LABEL[agent.weakest_dimension]}{" "}
+                <div className="mt-0.5 text-[10px] text-gray-400">
+                  最弱: {HEALTH_DIMENSION_ICON[agent.weakest_dimension]}{' '}
+                  {HEALTH_DIMENSION_LABEL[agent.weakest_dimension]}{' '}
                   <span className={DIMENSION_COLORS[agent.weakest_dimension].text}>
                     {agent.dimension_scores[agent.weakest_dimension]}
                   </span>
                 </div>
                 {isBelowFleetAvg && (
-                  <div className="text-[10px] text-amber-600 mt-0.5">
+                  <div className="mt-0.5 text-[10px] text-amber-600">
                     ⚠ 低于 Fleet 平均 ({fleet_avg_score})
                   </div>
                 )}
@@ -504,10 +487,10 @@ export const FleetGrid: React.FC<FleetGridProps> = ({
             {agent.active_alert_count > 0 && (
               <div className="mt-2 text-xs">
                 <span
-                  className={`inline-flex items-center px-1.5 py-0.5 rounded-full ${
+                  className={`inline-flex items-center rounded-full px-1.5 py-0.5 ${
                     agent.active_alert_count > 2
-                      ? "bg-red-100 text-red-700"
-                      : "bg-amber-100 text-amber-700"
+                      ? 'bg-red-100 text-red-700'
+                      : 'bg-amber-100 text-amber-700'
                   }`}
                 >
                   {agent.active_alert_count} 活跃告警
@@ -571,7 +554,8 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
     const list = Array.from(agent_summaries.values());
     return list.filter((a) => {
       if (agent_filter && a.agent_root_pid !== agent_filter) return false;
-      if (max_health_score_filter != null && a.current_score > max_health_score_filter) return false;
+      if (max_health_score_filter != null && a.current_score > max_health_score_filter)
+        return false;
       return true;
     });
   }, [agent_summaries, agent_filter, max_health_score_filter]);
@@ -583,14 +567,14 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
   return (
     <div className="space-y-4">
       {/* ═══ 视图导航 ═══ */}
-      <div className="flex items-center gap-1 flex-wrap border-b border-slate-200 pb-2">
+      <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 pb-2">
         {VIEW_LABELS.map(({ mode, label, icon }) => {
           const hasData =
-            mode === "overview"
+            mode === 'overview'
               ? fleet_overview != null
-              : mode === "fleet"
+              : mode === 'fleet'
                 ? agent_summaries.size > 0
-                : mode === "alerts"
+                : mode === 'alerts'
                   ? alerts.length > 0
                   : selected_profile != null;
 
@@ -598,30 +582,30 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
             <button
               key={mode}
               onClick={() => onViewModeChange(mode)}
-              className={`px-3 py-2 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-all ${
                 view_mode === mode
-                  ? "bg-blue-600 text-white shadow-sm"
+                  ? 'bg-blue-600 text-white shadow-sm'
                   : hasData
-                    ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                    : "text-slate-400"
+                    ? 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    : 'text-slate-400'
               }`}
             >
               <span>{icon}</span>
-              <span className={compact ? "hidden md:inline" : ""}>{label}</span>
+              <span className={compact ? 'hidden md:inline' : ''}>{label}</span>
               {/* 徽章 */}
-              {mode === "fleet" && agent_summaries.size > 0 && (
+              {mode === 'fleet' && agent_summaries.size > 0 && (
                 <span
-                  className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${
-                    view_mode === mode ? "bg-white/20 text-white" : "bg-blue-100 text-blue-700"
+                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                    view_mode === mode ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'
                   }`}
                 >
                   {agent_summaries.size}
                 </span>
               )}
-              {mode === "alerts" && alerts.length > 0 && (
+              {mode === 'alerts' && alerts.length > 0 && (
                 <span
-                  className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${
-                    view_mode === mode ? "bg-white/20 text-white" : "bg-red-100 text-red-700"
+                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                    view_mode === mode ? 'bg-white/20 text-white' : 'bg-red-100 text-red-700'
                   }`}
                 >
                   {alerts.length}
@@ -633,17 +617,17 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
       </div>
 
       {/* ═══ 视图内容 ═══ */}
-      <div className={compact ? "max-h-[70vh] overflow-y-auto" : ""}>
+      <div className={compact ? 'max-h-[70vh] overflow-y-auto' : ''}>
         {/* ── Overview: Fleet 总览 ── */}
-        {view_mode === "overview" && fleet_overview && (
+        {view_mode === 'overview' && fleet_overview && (
           <div className="space-y-4">
             {/* 顶部摘要卡片 */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
               <SummaryCard
                 label="Fleet 健康均分"
                 value={fleet_overview.fleet_avg_score}
                 unit="/ 100"
-                highlight={fleetTier !== "excellent"}
+                highlight={fleetTier !== 'excellent'}
               />
               <SummaryCard
                 label="活跃会话"
@@ -666,13 +650,19 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
                 label="Fleet 分布"
                 value={
                   <span className="flex gap-1">
-                    <span className="text-emerald-600">{fleet_overview.score_distribution.excellent}</span>
+                    <span className="text-emerald-600">
+                      {fleet_overview.score_distribution.excellent}
+                    </span>
                     <span className="text-slate-300">/</span>
                     <span className="text-blue-600">{fleet_overview.score_distribution.good}</span>
                     <span className="text-slate-300">/</span>
-                    <span className="text-amber-600">{fleet_overview.score_distribution.warning}</span>
+                    <span className="text-amber-600">
+                      {fleet_overview.score_distribution.warning}
+                    </span>
                     <span className="text-slate-300">/</span>
-                    <span className="text-red-600">{fleet_overview.score_distribution.critical}</span>
+                    <span className="text-red-600">
+                      {fleet_overview.score_distribution.critical}
+                    </span>
                   </span>
                 }
                 unit="优/良/警/危"
@@ -681,22 +671,24 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
             </div>
 
             {/* Fleet 维度雷达 + 需关注列表 */}
-            <div className={`grid gap-4 ${compact ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-2"}`}>
+            <div className={`grid gap-4 ${compact ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
               {/* Fleet 维度概览 */}
-              <div className="p-4 border border-slate-200 rounded-lg bg-white">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                   Fleet 维度平均分
                 </h4>
                 {DIMENSION_ORDER.map((dim) => (
-                  <div key={dim} className="flex items-center gap-2 mb-2">
-                    <span className="text-xs w-16">{HEALTH_DIMENSION_ICON[dim]} {HEALTH_DIMENSION_LABEL[dim]}</span>
-                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div key={dim} className="mb-2 flex items-center gap-2">
+                    <span className="w-16 text-xs">
+                      {HEALTH_DIMENSION_ICON[dim]} {HEALTH_DIMENSION_LABEL[dim]}
+                    </span>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
                       <div
                         className={`h-full rounded-full transition-all ${DIMENSION_COLORS[dim].bar}`}
                         style={{ width: `${fleet_overview.fleet_dimension_scores[dim]}%` }}
                       />
                     </div>
-                    <span className="text-xs font-mono w-8 text-right">
+                    <span className="w-8 text-right font-mono text-xs">
                       {fleet_overview.fleet_dimension_scores[dim]}
                     </span>
                   </div>
@@ -704,12 +696,12 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
               </div>
 
               {/* 需要关注的 Agent */}
-              <div className="p-4 border border-slate-200 rounded-lg bg-white">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                   ⚠ 需要关注
                 </h4>
                 {fleet_overview.attention_needed.length === 0 ? (
-                  <div className="text-center text-gray-400 text-xs py-4">
+                  <div className="py-4 text-center text-xs text-gray-400">
                     所有 Agent 健康状态正常 🎉
                   </div>
                 ) : (
@@ -718,22 +710,23 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
                       <button
                         key={agent.agent_root_pid}
                         onClick={() => onAgentSelect(agent.agent_root_pid)}
-                        className="w-full text-left p-2 rounded border border-slate-200 hover:bg-slate-50 flex items-center gap-3 cursor-pointer"
+                        className="flex w-full cursor-pointer items-center gap-3 rounded border border-slate-200 p-2 text-left hover:bg-slate-50"
                       >
                         <HealthScoreGauge score={agent.current_score} size="sm" showLabel={false} />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-mono font-semibold">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-mono text-xs font-semibold">
                             PID {agent.agent_root_pid}
                           </div>
-                          <div className="text-[10px] text-gray-400 truncate">
-                            {agent.comm} · 最弱: {HEALTH_DIMENSION_LABEL[agent.weakest_dimension]} ({agent.dimension_scores[agent.weakest_dimension]})
+                          <div className="truncate text-[10px] text-gray-400">
+                            {agent.comm} · 最弱: {HEALTH_DIMENSION_LABEL[agent.weakest_dimension]} (
+                            {agent.dimension_scores[agent.weakest_dimension]})
                           </div>
                         </div>
                         <span className="text-xs text-blue-500">详情 →</span>
                       </button>
                     ))}
                     {fleet_overview.attention_needed.length > 5 && (
-                      <div className="text-xs text-gray-400 text-center">
+                      <div className="text-center text-xs text-gray-400">
                         +{fleet_overview.attention_needed.length - 5} 更多...
                       </div>
                     )}
@@ -744,46 +737,46 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
           </div>
         )}
 
-        {view_mode === "overview" && !fleet_overview && (
+        {view_mode === 'overview' && !fleet_overview && (
           <div className="p-6 text-center text-gray-400">
-            <div className="text-lg mb-1">📊</div>
+            <div className="mb-1 text-lg">📊</div>
             <div className="text-xs">等待 Fleet 健康数据...</div>
-            <div className="text-xs mt-1 text-gray-300">
+            <div className="mt-1 text-xs text-gray-300">
               需要 SessionHealthMonitor 输出 session_health 事件
             </div>
           </div>
         )}
 
         {/* ── Fleet: 网格视图 ── */}
-        {view_mode === "fleet" && (
+        {view_mode === 'fleet' && (
           <>
             {/* Filter bar */}
-            <div className="flex items-center gap-2 flex-wrap mb-3">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
               <span className="text-xs text-gray-500">过滤:</span>
               {max_health_score_filter != null && (
                 <button
                   onClick={() => onMaxHealthScoreFilterChange(null)}
-                  className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                  className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700 hover:bg-blue-200"
                 >
                   分数 ≤ {max_health_score_filter} ✕
                 </button>
               )}
               <button
                 onClick={() => onMaxHealthScoreFilterChange(60)}
-                className={`text-xs px-2 py-1 rounded ${
+                className={`rounded px-2 py-1 text-xs ${
                   max_health_score_filter === 60
-                    ? "bg-amber-100 text-amber-700"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
                 &lt; 60 警告
               </button>
               <button
                 onClick={() => onMaxHealthScoreFilterChange(30)}
-                className={`text-xs px-2 py-1 rounded ${
+                className={`rounded px-2 py-1 text-xs ${
                   max_health_score_filter === 30
-                    ? "bg-red-100 text-red-700"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
                 &lt; 30 严重
@@ -796,14 +789,14 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
                 selected_pid={selected_agent_pid}
                 onAgentClick={(pid) => {
                   onAgentSelect(pid);
-                  onSessionSelect(agent_summaries.get(pid)?.session_id ?? "");
+                  onSessionSelect(agent_summaries.get(pid)?.session_id ?? '');
                 }}
                 fleet_avg_score={fleetAvg}
                 compact={compact}
               />
             ) : (
               <div className="p-6 text-center text-gray-400">
-                <div className="text-lg mb-1">🖥️</div>
+                <div className="mb-1 text-lg">🖥️</div>
                 <div className="text-xs">无匹配的 Agent 会话</div>
               </div>
             )}
@@ -811,51 +804,53 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
         )}
 
         {/* ── Session Detail ── */}
-        {view_mode === "session_detail" && selected_profile && (
+        {view_mode === 'session_detail' && selected_profile && (
           <div className="space-y-4">
             {/* 返回按钮 */}
             <button
-              onClick={() => onViewModeChange("fleet")}
+              onClick={() => onViewModeChange('fleet')}
               className="text-xs text-blue-600 hover:text-blue-800"
             >
               ← 返回 Fleet
             </button>
 
             {/* 会话头部 */}
-            <div className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg bg-white">
+            <div className="flex items-center gap-4 rounded-lg border border-slate-200 bg-white p-4">
               <HealthScoreGauge
                 score={selected_profile.summary.current_score}
                 previous_score={
                   selected_profile.snapshot_history.length >= 2
-                    ? selected_profile.snapshot_history[selected_profile.snapshot_history.length - 2].health_score
+                    ? selected_profile.snapshot_history[
+                        selected_profile.snapshot_history.length - 2
+                      ].health_score
                     : undefined
                 }
                 size="lg"
               />
               <div>
-                <h3 className="text-sm font-mono font-bold">
+                <h3 className="font-mono text-sm font-bold">
                   PID {selected_profile.agent_root_pid}
                 </h3>
                 <p className="text-xs text-gray-500">{selected_profile.comm}</p>
-                <p className="text-xs text-gray-400 font-mono mt-1">
+                <p className="mt-1 font-mono text-xs text-gray-400">
                   Session: {selected_profile.session_id.slice(0, 12)}...
                 </p>
-                <div className="flex gap-2 mt-2">
+                <div className="mt-2 flex gap-2">
                   <button
                     onClick={() => onNavigateToToolExecution(selected_profile.agent_root_pid)}
-                    className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100"
+                    className="rounded bg-blue-50 px-2 py-1 text-xs text-blue-600 hover:bg-blue-100"
                   >
                     🔧 工具调用
                   </button>
                   <button
                     onClick={() => onNavigateToAgentLoop(selected_profile.agent_root_pid)}
-                    className="text-xs px-2 py-1 rounded bg-violet-50 text-violet-600 hover:bg-violet-100"
+                    className="rounded bg-violet-50 px-2 py-1 text-xs text-violet-600 hover:bg-violet-100"
                   >
                     🔄 循环检测
                   </button>
                   <button
                     onClick={() => onNavigateToTokenCost(selected_profile.agent_root_pid)}
-                    className="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                    className="rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-600 hover:bg-emerald-100"
                   >
                     💰 Token 消耗
                   </button>
@@ -864,15 +859,19 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
             </div>
 
             {/* 维度详情 + 趋势图 */}
-            <div className={`grid gap-4 ${compact ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-2"}`}>
+            <div className={`grid gap-4 ${compact ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
               {/* 维度柱状图 */}
-              <div className="p-4 border border-slate-200 rounded-lg bg-white">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                   维度评分
                 </h4>
                 {selected_profile.snapshot_history.length > 0 && (
                   <DimensionBarChart
-                    dimensions={selected_profile.snapshot_history[selected_profile.snapshot_history.length - 1].dimensions}
+                    dimensions={
+                      selected_profile.snapshot_history[
+                        selected_profile.snapshot_history.length - 1
+                      ].dimensions
+                    }
                     weights={weights}
                     highlight_dimension={selected_profile.summary.weakest_dimension}
                     compact={compact}
@@ -881,8 +880,8 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
               </div>
 
               {/* 趋势图 */}
-              <div className="p-4 border border-slate-200 rounded-lg bg-white">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                   健康趋势
                 </h4>
                 <HealthTrendChart
@@ -895,70 +894,69 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
 
             {/* 告警历史 */}
             {selected_profile.alert_history.length > 0 && (
-              <div className="p-4 border border-slate-200 rounded-lg bg-white">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                   告警历史 ({selected_profile.alert_history.length})
                 </h4>
                 <div className="space-y-2">
-                  {selected_profile.alert_history.slice(-10).reverse().map((alert) => (
-                    <HealthAlertCard
-                      key={alert.session_id + alert.timestamp_ns}
-                      alert={alert}
-                      selected={false}
-                      onSelect={() => onAlertSelect(alert)}
-                    />
-                  ))}
+                  {selected_profile.alert_history
+                    .slice(-10)
+                    .reverse()
+                    .map((alert) => (
+                      <HealthAlertCard
+                        key={alert.session_id + alert.timestamp_ns}
+                        alert={alert}
+                        selected={false}
+                        onSelect={() => onAlertSelect(alert)}
+                      />
+                    ))}
                 </div>
               </div>
             )}
           </div>
         )}
 
-        {view_mode === "session_detail" && !selected_profile && (
+        {view_mode === 'session_detail' && !selected_profile && (
           <div className="p-6 text-center text-gray-400">
-            <div className="text-lg mb-1">🔍</div>
+            <div className="mb-1 text-lg">🔍</div>
             <div className="text-xs">请从 Fleet 视图选择一个 Agent 查看详情</div>
           </div>
         )}
 
         {/* ── Alerts: 告警列表 ── */}
-        {view_mode === "alerts" && (
+        {view_mode === 'alerts' && (
           <>
             {/* Filter bar */}
-            <div className="flex items-center gap-2 flex-wrap mb-3">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
               <span className="text-xs text-gray-500">过滤:</span>
-              {(["health_degraded", "health_warning", "health_critical"] as HealthAlertType[]).map(
+              {(['health_degraded', 'health_warning', 'health_critical'] as HealthAlertType[]).map(
                 (type) => (
                   <button
                     key={type}
                     onClick={() =>
-                      onAlertTypeFilterChange(
-                        alert_type_filter === type ? null : type,
-                      )
+                      onAlertTypeFilterChange(alert_type_filter === type ? null : type)
                     }
-                    className={`text-xs px-2 py-1 rounded ${
+                    className={`rounded px-2 py-1 text-xs ${
                       alert_type_filter === type
-                        ? `${ALERT_TYPE_COLOR[type].split(" ")[0]} ${ALERT_TYPE_COLOR[type].split(" ")[1]}`
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        ? `${ALERT_TYPE_COLOR[type].split(' ')[0]} ${ALERT_TYPE_COLOR[type].split(' ')[1]}`
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
                     {HEALTH_ALERT_TYPE_ICON[type]} {HEALTH_ALERT_TYPE_LABEL[type]}
                   </button>
                 ),
               )}
-              {(["warning", "critical"] as HealthAlertSeverity[]).map((sev) => (
+              {(['warning', 'critical'] as HealthAlertSeverity[]).map((sev) => (
                 <button
                   key={sev}
-                  onClick={() =>
-                    onSeverityFilterChange(severity_filter === sev ? null : sev)
-                  }
-                  className={`text-xs px-2 py-1 rounded ${
+                  onClick={() => onSeverityFilterChange(severity_filter === sev ? null : sev)}
+                  className={`rounded px-2 py-1 text-xs ${
                     severity_filter === sev
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  {sev === "warning" ? "⚠ 警告" : "🚨 严重"}
+                  {sev === 'warning' ? '⚠ 警告' : '🚨 严重'}
                 </button>
               ))}
             </div>
@@ -980,7 +978,7 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
               </div>
             ) : (
               <div className="p-6 text-center text-gray-400">
-                <div className="text-lg mb-1">🔔</div>
+                <div className="mb-1 text-lg">🔔</div>
                 <div className="text-xs">无匹配的告警</div>
               </div>
             )}
@@ -988,18 +986,18 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
         )}
 
         {/* ── Trends: 趋势视图 ── */}
-        {view_mode === "trends" && selected_profile && (
+        {view_mode === 'trends' && selected_profile && (
           <div className="space-y-4">
             <button
-              onClick={() => onViewModeChange("session_detail")}
+              onClick={() => onViewModeChange('session_detail')}
               className="text-xs text-blue-600 hover:text-blue-800"
             >
               ← 返回详情
             </button>
 
             {/* 综合趋势 */}
-            <div className="p-4 border border-slate-200 rounded-lg bg-white">
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                 综合健康趋势
               </h4>
               <HealthTrendChart
@@ -1010,10 +1008,10 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
             </div>
 
             {/* 各维度独立趋势 */}
-            <div className={`grid gap-3 ${compact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"}`}>
+            <div className={`grid gap-3 ${compact ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
               {DIMENSION_ORDER.map((dim) => (
-                <div key={dim} className="p-3 border border-slate-200 rounded-lg bg-white">
-                  <h5 className="text-xs font-semibold text-gray-500 mb-2">
+                <div key={dim} className="rounded-lg border border-slate-200 bg-white p-3">
+                  <h5 className="mb-2 text-xs font-semibold text-gray-500">
                     {HEALTH_DIMENSION_ICON[dim]} {HEALTH_DIMENSION_LABEL[dim]}
                   </h5>
                   <HealthTrendChart
@@ -1028,24 +1026,26 @@ export const SessionHealthDashboard: React.FC<SessionHealthDashboardProps> = ({
           </div>
         )}
 
-        {view_mode === "trends" && !selected_profile && (
+        {view_mode === 'trends' && !selected_profile && (
           <div className="p-6 text-center text-gray-400">
-            <div className="text-lg mb-1">📈</div>
+            <div className="mb-1 text-lg">📈</div>
             <div className="text-xs">请从 Fleet 视图选择一个 Agent 查看趋势</div>
           </div>
         )}
       </div>
 
       {/* ═══ 底部状态栏 ═══ */}
-      <div className="text-xs text-gray-400 flex items-center justify-between pt-2 border-t border-slate-100">
+      <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-xs text-gray-400">
         <span>
-          {view_mode === "overview" &&
+          {view_mode === 'overview' &&
             `${fleet_overview?.active_session_count ?? 0} Active · ${fleet_overview?.total_active_alerts ?? 0} Alerts`}
-          {view_mode === "fleet" && `${agent_summaries.size} Agent 会话`}
-          {view_mode === "session_detail" && selected_profile &&
+          {view_mode === 'fleet' && `${agent_summaries.size} Agent 会话`}
+          {view_mode === 'session_detail' &&
+            selected_profile &&
             `会话 ${selected_profile.session_id.slice(0, 8)}... · ${selected_profile.snapshot_history.length} 快照`}
-          {view_mode === "alerts" && `${alerts.length} 告警`}
-          {view_mode === "trends" && selected_profile &&
+          {view_mode === 'alerts' && `${alerts.length} 告警`}
+          {view_mode === 'trends' &&
+            selected_profile &&
             `${selected_profile.snapshot_history.length} 数据点`}
         </span>
         <span>{new Date(state.last_update_ms).toLocaleTimeString()}</span>
@@ -1066,20 +1066,20 @@ const SummaryCard: React.FC<{
   raw?: boolean;
 }> = ({ label, value, unit, highlight = false, raw = false }) => (
   <div
-    className={`p-3 rounded-lg border ${
-      highlight ? "border-red-300 bg-red-50" : "border-slate-200 bg-white"
+    className={`rounded-lg border p-3 ${
+      highlight ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'
     }`}
   >
-    <div className="text-xs text-gray-500 mb-1">{label}</div>
+    <div className="mb-1 text-xs text-gray-500">{label}</div>
     <div className="font-mono text-lg font-semibold">
-      {raw ? (
-        value
-      ) : typeof value === "number" ? (
-        value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value
-      ) : (
-        value
-      )}{" "}
-      <span className="text-xs text-gray-400 font-normal">{unit}</span>
+      {raw
+        ? value
+        : typeof value === 'number'
+          ? value >= 1000
+            ? `${(value / 1000).toFixed(1)}k`
+            : value
+          : value}{' '}
+      <span className="text-xs font-normal text-gray-400">{unit}</span>
     </div>
   </div>
 );

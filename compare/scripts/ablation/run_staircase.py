@@ -203,10 +203,11 @@ def _intent_boost(d, s):
 
 
 def _apply_observer(d, s):
-    """Replicate the Observer LLM's directional score adjustment.
+    """Replicate the Observer LLM's score adjustment (matches Rust engine.rs).
 
-    Uses the stored observer route and decision from the production run.
-    Unsafe → pushes score upward; Safe → pulls score downward.
+    Unsafe → blend: score * 0.4 + confidence * 0.6 (floor 0.15, cap 0.99)
+    Safe   → attenuate: score * (1.0 - confidence * 0.7)
+    Matches classify_provisional() in classification/engine.rs exactly.
     """
     rs = d.get("observer_rust_score") or d.get("rust_score")
     if rs is None:
@@ -218,22 +219,33 @@ def _apply_observer(d, s):
     if "failed" in rr.lower() or "uncertain" in rr.lower():
         return s
 
-    # Direction from route string
+    # Unsafe: matches Rust engine.rs variable-weight blend (v14).
     if "unsafe" in rr.lower():
         obs_conf = rs if rs > 0 else 0.5
-        return max(min(s + obs_conf * 0.3, 0.99), 0.15)
+        obs_weight = 0.5 if s < 0.1 else 0.3
+        blended = s * (1.0 - obs_weight) + obs_conf * obs_weight
+        return max(min(blended, 0.99), 0.15)
+
+    # Safe: attenuate per Rust formula.
     if "safe" in rr.lower():
-        conf = rs if rs < s else (1.0 - rs)
-        return s * (1.0 - conf * 0.7)
+        obs_conf = rs if rs < s else (1.0 - rs)
+        if obs_conf <= 0:
+            obs_conf = 0.5
+        return s * (1.0 - obs_conf * 0.7)
 
     # Fallback: display_profile + decision
     dp = d.get("observer_display_profile", "")
     dec = d.get("observer_decision", "")
     if "ObserverJudged" in dp:
         if "Unsafe" in dec:
-            return max(min(s + (rs if rs > 0 else 0.5) * 0.3, 0.99), 0.15)
+            obs_weight = 0.5 if s < 0.1 else 0.3
+            blended = s * (1.0 - obs_weight) + (rs if rs > 0 else 0.5) * obs_weight
+            return max(min(blended, 0.99), 0.15)
         elif "Safe" in dec:
-            return s * (1.0 - ((rs if rs < s else 1.0 - rs)) * 0.7)
+            obs_conf = rs if rs < s else (1.0 - rs)
+            if obs_conf <= 0:
+                obs_conf = 0.5
+            return s * (1.0 - obs_conf * 0.7)
 
     return s
 

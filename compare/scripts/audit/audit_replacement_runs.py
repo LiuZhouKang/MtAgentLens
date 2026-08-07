@@ -133,7 +133,7 @@ def collect_candidates(
             if sid not in target_set:
                 continue
             run_dir = sid_file.parent
-            db_path = run_dir / "collector" / "trace.responsibility.db"
+            db_path = run_dir / "collector" / "collector.responsibility.db"
             if not db_path.exists():
                 continue
             by_id[sid].append(read_candidate(sid, run_dir, db_path, expected_fixtures.get(sid)))

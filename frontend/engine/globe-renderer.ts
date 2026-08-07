@@ -14,7 +14,7 @@ export function createGlobe(scene: THREE.Scene): THREE.Group {
       transparent: true,
       opacity: 0.92,
       depthWrite: false,
-    })
+    }),
   );
   globe.add(body);
 
@@ -27,7 +27,7 @@ export function createGlobe(scene: THREE.Scene): THREE.Group {
       side: THREE.BackSide,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
-    })
+    }),
   );
   globe.add(atmosphere);
 
@@ -40,7 +40,7 @@ export function createGlobe(scene: THREE.Scene): THREE.Group {
       side: THREE.BackSide,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
-    })
+    }),
   );
   globe.add(halo);
 
@@ -48,10 +48,7 @@ export function createGlobe(scene: THREE.Scene): THREE.Group {
   return globe;
 }
 
-export async function addGlobeOutlines(
-  globe: THREE.Group,
-  geoJsonPath: string
-): Promise<void> {
+export async function addGlobeOutlines(globe: THREE.Group, geoJsonPath: string): Promise<void> {
   const resp = await fetch(geoJsonPath);
   const geoJson = await resp.json();
 
@@ -75,7 +72,7 @@ export async function addGlobeOutlines(
     for (const polygon of coordinateSets) {
       for (const ring of polygon) {
         const points = ring.map(([lon, lat]: [number, number]) =>
-          latLonToVec3(lat, lon, GLOBE_OUTLINE_RADIUS)
+          latLonToVec3(lat, lon, GLOBE_OUTLINE_RADIUS),
         );
         const geom = new THREE.BufferGeometry().setFromPoints(points);
         const line = new THREE.Line(geom, lineMaterial);
@@ -94,7 +91,7 @@ function latLonToVec3(lat: number, lon: number, radius: number): THREE.Vector3 {
   return new THREE.Vector3(
     -radius * Math.sin(phi) * Math.cos(theta),
     radius * Math.cos(phi),
-    radius * Math.sin(phi) * Math.sin(theta)
+    radius * Math.sin(phi) * Math.sin(theta),
   );
 }
 

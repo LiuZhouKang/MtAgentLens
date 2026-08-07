@@ -30,6 +30,12 @@ const EDGE_COLORS: Record<string, number> = {
   TaintPropagatesTo: 0xf59e0b,
   PolicyBoundaryCrossing: 0xf43f5e,
   CompetingExplanation: 0x68687a,
+  Delegation: 0x818cf8,
+  AuthorityTransfer: 0x93c5fd,
+  CapabilityUse: 0xc084fc,
+  ContextInheritance: 0xa78bfa,
+  TaintPropagation: 0xf59e0b,
+  ViolationProvenance: 0xf43f5e,
 };
 
 const BIRTH_DURATION = 0.5;
@@ -96,12 +102,18 @@ export class GraphRenderer {
     }
 
     if (this.visualizationMode === 'focus') {
-      return edgeType === 'PolicyBoundaryCrossing' || edgeType === 'TaintPropagatesTo'
+      return edgeType === 'PolicyBoundaryCrossing' ||
+        edgeType === 'ViolationProvenance' ||
+        edgeType === 'TaintPropagatesTo' ||
+        edgeType === 'TaintPropagation'
         ? 0.78
         : 0.6;
     }
 
-    return edgeType === 'PolicyBoundaryCrossing' || edgeType === 'TaintPropagatesTo'
+    return edgeType === 'PolicyBoundaryCrossing' ||
+      edgeType === 'ViolationProvenance' ||
+      edgeType === 'TaintPropagatesTo' ||
+      edgeType === 'TaintPropagation'
       ? 0.36
       : 0.2;
   }
@@ -113,12 +125,29 @@ export class GraphRenderer {
     if (nodeType === 'PolicyBoundary') {
       return new THREE.TorusGeometry(12, 2.8, 12, 32);
     }
+    if (nodeType === 'ToolCall') {
+      return new THREE.BoxGeometry(8, 8, 8);
+    }
+    if (nodeType === 'Credential') {
+      return new THREE.TetrahedronGeometry(8, 0);
+    }
+    if (nodeType === 'Context' || nodeType === 'Process') {
+      return new THREE.OctahedronGeometry(6.4, 0);
+    }
     return new THREE.OctahedronGeometry(6.4, 0);
   }
 
   private createNodeMaterial(nodeType: string): THREE.MeshPhongMaterial {
-    const color = nodeType === 'Agent' ? 0x8bc5ff
-      : nodeType === 'PolicyBoundary' ? 0xfb7185 : 0x7dd3fc;
+    const color =
+      nodeType === 'Agent'
+        ? 0x8bc5ff
+        : nodeType === 'PolicyBoundary'
+          ? 0xfb7185
+          : nodeType === 'Credential'
+            ? 0xfbbf24
+            : nodeType === 'ToolCall'
+              ? 0xc084fc
+              : 0x7dd3fc;
     return new THREE.MeshPhongMaterial({
       color,
       emissive: color,
@@ -132,7 +161,13 @@ export class GraphRenderer {
     });
   }
 
-  private getSemanticPosition(nodeId: string, nodeType: string, x: number, y: number, z: number): THREE.Vector3 {
+  private getSemanticPosition(
+    nodeId: string,
+    nodeType: string,
+    x: number,
+    y: number,
+    z: number,
+  ): THREE.Vector3 {
     const point = new THREE.Vector3(x, y, z);
     const magnitude = point.length();
     const unit = magnitude > 0.001 ? point.clone().normalize() : new THREE.Vector3(1, 0, 0);
@@ -143,7 +178,7 @@ export class GraphRenderer {
       const orbit = new THREE.Vector3(
         Math.cos(angle) * (132 + phase * 28),
         (phase - 0.5) * 64,
-        Math.sin(angle) * (116 + phase * 24)
+        Math.sin(angle) * (116 + phase * 24),
       );
       point.multiplyScalar(0.28);
       point.y *= 0.58;
@@ -151,12 +186,18 @@ export class GraphRenderer {
       return point;
     }
 
-    if (nodeType === 'Resource') {
+    if (
+      nodeType === 'Resource' ||
+      nodeType === 'Process' ||
+      nodeType === 'ToolCall' ||
+      nodeType === 'Credential' ||
+      nodeType === 'Context'
+    ) {
       const radial = Math.max(magnitude * 0.96, 234 + phase * 72);
       const orbit = new THREE.Vector3(
         Math.cos(angle + 0.38) * radial,
         Math.sin(angle * 1.4) * 48,
-        Math.sin(angle + 0.38) * radial
+        Math.sin(angle + 0.38) * radial,
       );
       point.copy(unit.multiplyScalar(28)).add(orbit);
       point.y *= 0.74;
@@ -167,14 +208,18 @@ export class GraphRenderer {
     const orbit = new THREE.Vector3(
       Math.cos(angle - 0.28) * boundaryRadial,
       phase > 0.5 ? 104 : -104,
-      Math.sin(angle - 0.28) * boundaryRadial
+      Math.sin(angle - 0.28) * boundaryRadial,
     );
     point.copy(unit.multiplyScalar(36)).add(orbit);
     point.y *= 0.52;
     return point;
   }
 
-  private updateEdgeGeometry(edge: GraphEdge3D, source: THREE.Vector3, target: THREE.Vector3): void {
+  private updateEdgeGeometry(
+    edge: GraphEdge3D,
+    source: THREE.Vector3,
+    target: THREE.Vector3,
+  ): void {
     const mid = source.clone().lerp(target, 0.5);
     let bend = source.clone().cross(target);
     if (bend.lengthSq() < 0.001) {
@@ -188,7 +233,12 @@ export class GraphRenderer {
     const control = mid
       .clone()
       .add(bend.multiplyScalar(Math.max(distance * 0.18, 18)))
-      .add(mid.clone().normalize().multiplyScalar(Math.max(distance * 0.08, 10)));
+      .add(
+        mid
+          .clone()
+          .normalize()
+          .multiplyScalar(Math.max(distance * 0.08, 10)),
+      );
     const curve = new THREE.QuadraticBezierCurve3(source.clone(), control, target.clone());
     const points = curve.getPoints(26);
     edge.line.geometry.dispose();
@@ -227,7 +277,9 @@ export class GraphRenderer {
     });
 
     const layoutEdges = graph.edges.map((e) => ({
-      source: e.source, target: e.target, edge_type: e.edge_type,
+      source: e.source,
+      target: e.target,
+      edge_type: e.edge_type,
     }));
 
     const laidOut = forceLayout3D(layoutInput, layoutEdges, 100);
@@ -237,7 +289,13 @@ export class GraphRenderer {
       if (!isFinitePosition(pos.x, pos.y, pos.z)) continue;
       const data = graph.nodes.find((n) => n.node_id === pos.id);
       if (!data) continue;
-      const semanticPosition = this.getSemanticPosition(data.node_id, data.node_type, pos.x, pos.y, pos.z);
+      const semanticPosition = this.getSemanticPosition(
+        data.node_id,
+        data.node_type,
+        pos.x,
+        pos.y,
+        pos.z,
+      );
 
       let node3d = this.nodes.get(pos.id);
       if (!node3d) {
@@ -268,15 +326,18 @@ export class GraphRenderer {
       const sourceNode = this.nodes.get(e.source);
       const targetNode = this.nodes.get(e.target);
       if (!sourceNode || !targetNode) continue;
-      if (!isFinitePosition(
-        sourceNode.mesh.position.x,
-        sourceNode.mesh.position.y,
-        sourceNode.mesh.position.z,
-      ) || !isFinitePosition(
-        targetNode.mesh.position.x,
-        targetNode.mesh.position.y,
-        targetNode.mesh.position.z,
-      )) {
+      if (
+        !isFinitePosition(
+          sourceNode.mesh.position.x,
+          sourceNode.mesh.position.y,
+          sourceNode.mesh.position.z,
+        ) ||
+        !isFinitePosition(
+          targetNode.mesh.position.x,
+          targetNode.mesh.position.y,
+          targetNode.mesh.position.z,
+        )
+      ) {
         continue;
       }
 
@@ -318,7 +379,8 @@ export class GraphRenderer {
       node.mesh.position.lerp(node.targetPosition, Math.min(0.12 + delta * 3.4, 0.24));
       node.mesh.rotation.y += delta * (node.data.node_type === 'PolicyBoundary' ? 0.44 : 0.18);
       node.mesh.rotation.x += delta * (node.data.node_type === 'Resource' ? 0.12 : 0.05);
-      const pulse = 1 + Math.sin(now * (node.data.node_type === 'Agent' ? 2.4 : 1.8) + node.phase) * 0.08;
+      const pulse =
+        1 + Math.sin(now * (node.data.node_type === 'Agent' ? 2.4 : 1.8) + node.phase) * 0.08;
       if (node.dissolving) {
         const elapsed = now - node.dissolveStart;
         if (elapsed < DISSOLVE_DURATION) {
@@ -337,10 +399,12 @@ export class GraphRenderer {
         if (age < BIRTH_DURATION) {
           const t = age / BIRTH_DURATION;
           const overshoot = presentation.scale * 1.12;
-          const scale = t < 0.6
-            ? overshoot * (t / 0.6)
-            : overshoot - (overshoot - presentation.scale) * ((t - 0.6) / 0.4);
-          (node.mesh.material as THREE.MeshPhongMaterial).opacity = Math.min(t * 2, 1) * presentation.opacity;
+          const scale =
+            t < 0.6
+              ? overshoot * (t / 0.6)
+              : overshoot - (overshoot - presentation.scale) * ((t - 0.6) / 0.4);
+          (node.mesh.material as THREE.MeshPhongMaterial).opacity =
+            Math.min(t * 2, 1) * presentation.opacity;
           node.mesh.scale.setScalar(Math.max(scale * pulse, 0.01));
         } else {
           (node.mesh.material as THREE.MeshPhongMaterial).opacity = presentation.opacity;
@@ -350,7 +414,10 @@ export class GraphRenderer {
     }
 
     for (const [id, edge] of this.edges) {
-      const targetOpacity = this.getEdgeOpacity(edge.data.edge_type, this.highlightedEdgeIds.has(id));
+      const targetOpacity = this.getEdgeOpacity(
+        edge.data.edge_type,
+        this.highlightedEdgeIds.has(id),
+      );
       const sourceNode = this.nodes.get(edge.data.source);
       const targetNode = this.nodes.get(edge.data.target);
       if (sourceNode && targetNode) {
@@ -359,7 +426,8 @@ export class GraphRenderer {
       if (edge.dissolving) {
         const elapsed = now - edge.dissolveStart;
         if (elapsed < DISSOLVE_DURATION) {
-          (edge.line.material as THREE.LineBasicMaterial).opacity = targetOpacity * (1 - elapsed / DISSOLVE_DURATION);
+          (edge.line.material as THREE.LineBasicMaterial).opacity =
+            targetOpacity * (1 - elapsed / DISSOLVE_DURATION);
         } else {
           this.edgeGroup.remove(edge.line);
           this.edges.delete(edge.data.edge_id);
@@ -369,9 +437,10 @@ export class GraphRenderer {
         const shimmer = this.highlightedEdgeIds.has(id)
           ? 0.08 + Math.sin(now * 4.6 + edge.phase) * 0.1
           : 0.02 + Math.sin(now * 1.4 + edge.phase) * 0.02;
-        (edge.line.material as THREE.LineBasicMaterial).opacity = age < BIRTH_DURATION
-          ? (age / BIRTH_DURATION) * targetOpacity
-          : Math.max(targetOpacity + shimmer, 0.09);
+        (edge.line.material as THREE.LineBasicMaterial).opacity =
+          age < BIRTH_DURATION
+            ? (age / BIRTH_DURATION) * targetOpacity
+            : Math.max(targetOpacity + shimmer, 0.09);
       }
     }
   }
@@ -381,10 +450,11 @@ export class GraphRenderer {
     for (const [id, edge] of this.edges) {
       (edge.line.material as THREE.LineBasicMaterial).color.setHex(
         edgeIds.includes(id)
-          ? edge.data.edge_type === 'PolicyBoundaryCrossing' || edge.data.edge_type === 'TaintPropagatesTo'
+          ? edge.data.edge_type === 'PolicyBoundaryCrossing' ||
+            edge.data.edge_type === 'TaintPropagatesTo'
             ? 0xff6b87
             : 0x9ce9ff
-          : EDGE_COLORS[edge.data.edge_type] ?? 0xffffff
+          : (EDGE_COLORS[edge.data.edge_type] ?? 0xffffff),
       );
     }
   }
@@ -393,7 +463,7 @@ export class GraphRenderer {
     this.highlightedEdgeIds.clear();
     for (const [, edge] of this.edges) {
       (edge.line.material as THREE.LineBasicMaterial).color.setHex(
-        EDGE_COLORS[edge.data.edge_type] ?? 0xffffff
+        EDGE_COLORS[edge.data.edge_type] ?? 0xffffff,
       );
     }
   }

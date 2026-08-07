@@ -21,7 +21,8 @@ export default function RunSelector() {
     },
     retry: false,
     enabled: queryEnabled,
-    refetchInterval: (query) => ((query.state.data as unknown[] | undefined)?.length ? 5000 : false),
+    refetchInterval: (query) =>
+      (query.state.data as unknown[] | undefined)?.length ? 5000 : false,
   });
 
   // When a run is selected, load its data

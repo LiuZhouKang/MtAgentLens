@@ -11,7 +11,11 @@ interface PulseInstance {
 }
 
 const PULSE_DURATION = 3.0;
-const severityColors: Record<string, number> = { Critical: 0xf43f5e, Warning: 0xf59e0b, Info: 0x60a5fa };
+const severityColors: Record<string, number> = {
+  Critical: 0xf43f5e,
+  Warning: 0xf59e0b,
+  Info: 0x60a5fa,
+};
 
 export class AlertPulseOverlay {
   scene: THREE.Scene;
@@ -31,7 +35,7 @@ export class AlertPulseOverlay {
     const anchor = new THREE.Vector3(
       164 * Math.sin(phi) * Math.cos(theta),
       164 * Math.cos(phi),
-      164 * Math.sin(phi) * Math.sin(theta)
+      164 * Math.sin(phi) * Math.sin(theta),
     );
     const normal = anchor.clone().normalize();
     const tangent = new THREE.Vector3(0, 1, 0).cross(normal);
@@ -49,7 +53,7 @@ export class AlertPulseOverlay {
         opacity: 0.92,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-      })
+      }),
     );
 
     const shell = new THREE.Mesh(
@@ -61,7 +65,7 @@ export class AlertPulseOverlay {
         blending: THREE.AdditiveBlending,
         side: THREE.BackSide,
         depthWrite: false,
-      })
+      }),
     );
 
     const segmentCount = 12;
@@ -70,7 +74,9 @@ export class AlertPulseOverlay {
       const angle = (i / segmentCount) * Math.PI * 2;
       const spread = 5 + (i % 3) * 2.4;
       const length = 9 + (i % 4) * 3.2;
-      const radial = tangent.clone().multiplyScalar(Math.cos(angle) * spread)
+      const radial = tangent
+        .clone()
+        .multiplyScalar(Math.cos(angle) * spread)
         .add(bitangent.clone().multiplyScalar(Math.sin(angle) * spread));
       const elevated = radial.clone().add(normal.clone().multiplyScalar(1.6));
       const tip = radial.clone().multiplyScalar(1.55).add(normal.clone().multiplyScalar(length));
@@ -85,7 +91,7 @@ export class AlertPulseOverlay {
         opacity: 0.46,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-      })
+      }),
     );
     shards.geometry.setAttribute('position', new THREE.BufferAttribute(shardPositions, 3));
 

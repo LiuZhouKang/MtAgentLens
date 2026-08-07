@@ -163,7 +163,7 @@ def _candidate(
     policy_ids: list[str] | None = None,
 ):
     run_dir = tmp_path / name
-    db_path = run_dir / "collector" / "trace.responsibility.db"
+    db_path = run_dir / "collector" / "collector.responsibility.db"
     db_path.parent.mkdir(parents=True)
     _write_db(
         db_path,

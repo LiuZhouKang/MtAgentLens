@@ -17,7 +17,9 @@ export default function LiveIndicator() {
           height: 8,
           borderRadius: '50%',
           background: isLive ? 'var(--normal)' : 'var(--warning)',
-          boxShadow: isLive ? '0 0 14px rgba(52, 211, 153, 0.5)' : '0 0 14px rgba(251, 191, 36, 0.4)',
+          boxShadow: isLive
+            ? '0 0 14px rgba(52, 211, 153, 0.5)'
+            : '0 0 14px rgba(251, 191, 36, 0.4)',
           animation: isLive ? 'prismLivePulse 1.6s ease-in-out infinite' : undefined,
         }}
       />

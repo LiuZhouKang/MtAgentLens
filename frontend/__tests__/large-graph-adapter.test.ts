@@ -82,7 +82,11 @@ describe('large-graph-adapter', () => {
     };
 
     const adapted = adaptGraphToLargeGraph(graph);
-    expect(adapted.nodes.some((n) => n.node_type === 'PolicyBoundary' && n.boundary_count === 2)).toBe(true);
-    expect(adapted.links.some((l) => l.edge_type === 'PolicyBoundaryCrossing' && l.count === 2)).toBe(true);
+    expect(
+      adapted.nodes.some((n) => n.node_type === 'PolicyBoundary' && n.boundary_count === 2),
+    ).toBe(true);
+    expect(
+      adapted.links.some((l) => l.edge_type === 'PolicyBoundaryCrossing' && l.count === 2),
+    ).toBe(true);
   });
 });

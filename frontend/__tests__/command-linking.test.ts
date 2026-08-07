@@ -22,8 +22,8 @@ describe('command linking', () => {
     expect(context.alertId).toBe('demo-alert-1');
     expect(context.agentId).toBe('agent-security');
     expect(context.clusterId).toBe('cluster-security-anchor');
-    expect(context.surfaceHref).toBe('/agents#agentId=agent-security');
-    expect(context.surfaceLabel).toBe('打开主体画像');
+    expect(context.surfaceHref).toBe('/overview#agentId=agent-security');
+    expect(context.surfaceLabel).toBe('打开主体');
     expect(context.investigationHref).toBe('/investigations#alertId=demo-alert-1');
     expect(context.traceHref).toBe('/traces#alertId=demo-alert-1');
   });
@@ -64,7 +64,7 @@ describe('command linking', () => {
 
     expect(context.alertId).toBeNull();
     expect(context.surfaceHref).toBe('/overview');
-    expect(context.surfaceLabel).toBe('打开总览');
+    expect(context.surfaceLabel).toBe('打开仪表盘');
     expect(context.traceHref).toBe('/traces');
   });
 });

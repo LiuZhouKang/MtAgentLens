@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React, { useMemo } from "react";
+import React, { useMemo } from 'react';
 import type {
   IntentVerifierDashboardProps,
   IntentVerifierDashboardState,
@@ -13,7 +13,7 @@ import type {
   MismatchType,
   MismatchSeverity,
   IntentVerifierDashboardViewMode,
-} from "@/lib/intent-verifier-contract";
+} from '@/lib/intent-verifier-contract';
 import {
   MISMATCH_TYPE_LABEL,
   MISMATCH_TYPE_ICON,
@@ -28,49 +28,49 @@ import {
   aggregateMismatchByTool,
   maxMismatchSeverity,
   countCritical,
-} from "@/lib/intent-verifier-contract";
+} from '@/lib/intent-verifier-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 常量
 // ═══════════════════════════════════════════════════════════════════════════
 
 const VIEW_LABELS: { mode: IntentVerifierDashboardViewMode; label: string }[] = [
-  { mode: "overview", label: "概览" },
-  { mode: "timeline", label: "时间线" },
-  { mode: "agents", label: "Agent 视图" },
+  { mode: 'overview', label: '概览' },
+  { mode: 'timeline', label: '时间线' },
+  { mode: 'agents', label: 'Agent 视图' },
 ];
 
 const SEVERITY_RING: Record<MismatchSeverity, string> = {
-  Info: "ring-blue-300",
-  Warning: "ring-amber-400",
-  Critical: "ring-red-500",
+  Info: 'ring-blue-300',
+  Warning: 'ring-amber-400',
+  Critical: 'ring-red-500',
 };
 
 const SEVERITY_BG: Record<MismatchSeverity, string> = {
-  Info: "bg-blue-50 border-blue-200",
-  Warning: "bg-amber-50 border-amber-200",
-  Critical: "bg-red-50 border-red-200",
+  Info: 'bg-blue-50 border-blue-200',
+  Warning: 'bg-amber-50 border-amber-200',
+  Critical: 'bg-red-50 border-red-200',
 };
 
 const SEVERITY_DOT: Record<MismatchSeverity, string> = {
-  Info: "bg-blue-400",
-  Warning: "bg-amber-400",
-  Critical: "bg-red-500 animate-pulse",
+  Info: 'bg-blue-400',
+  Warning: 'bg-amber-400',
+  Critical: 'bg-red-500 animate-pulse',
 };
 
 const SEVERITY_BORDER: Record<MismatchSeverity, string> = {
-  Info: "border-l-blue-300",
-  Warning: "border-l-amber-400",
-  Critical: "border-l-red-500",
+  Info: 'border-l-blue-300',
+  Warning: 'border-l-amber-400',
+  Critical: 'border-l-red-500',
 };
 
 const MISMATCH_TYPE_COLOR: Record<MismatchType, string> = {
-  ToolMismatch: "text-slate-600 bg-slate-50",
-  FilePathEscalation: "text-red-600 bg-red-50",
-  NetworkDeviation: "text-purple-600 bg-purple-50",
-  CommandDeviation: "text-orange-600 bg-orange-50",
-  UndeclaredBehavior: "text-pink-600 bg-pink-50",
-  DeclaredButNotExecuted: "text-gray-500 bg-gray-50",
+  ToolMismatch: 'text-slate-600 bg-slate-50',
+  FilePathEscalation: 'text-red-600 bg-red-50',
+  NetworkDeviation: 'text-purple-600 bg-purple-50',
+  CommandDeviation: 'text-orange-600 bg-orange-50',
+  UndeclaredBehavior: 'text-pink-600 bg-pink-50',
+  DeclaredButNotExecuted: 'text-gray-500 bg-gray-50',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -82,16 +82,16 @@ export const MismatchSeverityBadge: React.FC<MismatchSeverityBadgeProps> = ({
   showLabel = true,
 }) => {
   const colors: Record<MismatchSeverity, string> = {
-    Info: "bg-blue-100 text-blue-800",
-    Warning: "bg-amber-100 text-amber-800",
-    Critical: "bg-red-100 text-red-800",
+    Info: 'bg-blue-100 text-blue-800',
+    Warning: 'bg-amber-100 text-amber-800',
+    Critical: 'bg-red-100 text-red-800',
   };
 
   return (
     <span
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${colors[severity]}`}
+      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ${colors[severity]}`}
     >
-      <span className={`inline-block w-1.5 h-1.5 rounded-full ${SEVERITY_DOT[severity]}`} />
+      <span className={`inline-block h-1.5 w-1.5 rounded-full ${SEVERITY_DOT[severity]}`} />
       {showLabel && MISMATCH_SEVERITY_LABEL[severity]}
     </span>
   );
@@ -103,9 +103,9 @@ export const MismatchSeverityBadge: React.FC<MismatchSeverityBadgeProps> = ({
 
 export const MismatchTypeIcon: React.FC<MismatchTypeIconProps> = ({
   mismatch_type,
-  size = "md",
+  size = 'md',
 }) => {
-  const sizeClass = size === "sm" ? "text-sm" : size === "lg" ? "text-xl" : "text-base";
+  const sizeClass = size === 'sm' ? 'text-sm' : size === 'lg' ? 'text-xl' : 'text-base';
   return (
     <span className={sizeClass} title={MISMATCH_TYPE_LABEL[mismatch_type]}>
       {MISMATCH_TYPE_ICON[mismatch_type]}
@@ -123,50 +123,39 @@ export const MismatchCard: React.FC<MismatchCardProps> = ({
   onSelect,
   onAcknowledge,
 }) => {
-  const isCritical = mismatch.severity === "Critical";
+  const isCritical = mismatch.severity === 'Critical';
 
   return (
     <button
       onClick={onSelect}
-      className={`w-full text-left p-3 rounded border transition-all cursor-pointer
-        border-l-4 ${SEVERITY_BORDER[mismatch.severity]}
-        ${selected ? "ring-2 ring-blue-400 bg-blue-50" : "bg-white hover:bg-slate-50"}
-      `}
+      className={`w-full cursor-pointer rounded border border-l-4 p-3 text-left transition-all ${SEVERITY_BORDER[mismatch.severity]} ${selected ? 'bg-blue-50 ring-2 ring-blue-400' : 'bg-white hover:bg-slate-50'} `}
     >
       {/* 顶部行：类型图标 + 工具名 + 严重度 */}
-      <div className="flex items-center gap-2 mb-1.5">
+      <div className="mb-1.5 flex items-center gap-2">
         <MismatchTypeIcon mismatch_type={mismatch.mismatch_type} size="sm" />
-        <span className="font-mono font-semibold text-sm truncate">
-          {mismatch.tool_name}
-        </span>
+        <span className="truncate font-mono text-sm font-semibold">{mismatch.tool_name}</span>
         <MismatchSeverityBadge severity={mismatch.severity} />
         {mismatch.acknowledged ? (
-          <span className="text-xs text-green-600 font-medium ml-auto flex-shrink-0">
-            ✓ 已确认
-          </span>
+          <span className="ml-auto flex-shrink-0 text-xs font-medium text-green-600">✓ 已确认</span>
         ) : (
-          <span className="text-xs text-red-500 font-medium ml-auto flex-shrink-0">
-            ● 新
-          </span>
+          <span className="ml-auto flex-shrink-0 text-xs font-medium text-red-500">● 新</span>
         )}
       </div>
 
       {/* 描述 */}
-      <div className="text-xs text-gray-600 mb-1.5 line-clamp-2">
-        {mismatch.description}
-      </div>
+      <div className="mb-1.5 line-clamp-2 text-xs text-gray-600">{mismatch.description}</div>
 
       {/* 声明 vs 观测 对比行 */}
-      <div className="text-xs space-y-0.5 mb-2">
+      <div className="mb-2 space-y-0.5 text-xs">
         <div className="flex gap-1.5">
-          <span className="text-gray-400 flex-shrink-0">声称:</span>
-          <span className="text-gray-700 truncate font-mono">
+          <span className="flex-shrink-0 text-gray-400">声称:</span>
+          <span className="truncate font-mono text-gray-700">
             {describeDeclaredTarget(mismatch.declared)}
           </span>
         </div>
         <div className="flex gap-1.5">
-          <span className="text-gray-400 flex-shrink-0">观测:</span>
-          <span className={`truncate font-mono ${isCritical ? "text-red-600" : "text-gray-700"}`}>
+          <span className="flex-shrink-0 text-gray-400">观测:</span>
+          <span className={`truncate font-mono ${isCritical ? 'text-red-600' : 'text-gray-700'}`}>
             {describeObservedBehavior(mismatch.observed)}
           </span>
         </div>
@@ -177,8 +166,8 @@ export const MismatchCard: React.FC<MismatchCardProps> = ({
         <span>⏱ {formatTimestampNs(mismatch.detected_at_ns)}</span>
         <span className="font-mono">PID {mismatch.agent_pid}</span>
         {mismatch.sensitive_path_match && (
-          <span className="text-red-400 truncate ml-auto" title={mismatch.sensitive_path_match}>
-            ⚠ {mismatch.sensitive_path_match.split("/").pop()}
+          <span className="ml-auto truncate text-red-400" title={mismatch.sensitive_path_match}>
+            ⚠ {mismatch.sensitive_path_match.split('/').pop()}
           </span>
         )}
         {!mismatch.acknowledged && onAcknowledge && (
@@ -187,7 +176,7 @@ export const MismatchCard: React.FC<MismatchCardProps> = ({
               e.stopPropagation();
               onAcknowledge();
             }}
-            className="ml-auto text-blue-500 hover:text-blue-700 cursor-pointer flex-shrink-0"
+            className="ml-auto flex-shrink-0 cursor-pointer text-blue-500 hover:text-blue-700"
           >
             确认
           </button>
@@ -207,28 +196,26 @@ export const MismatchDetailPanel: React.FC<MismatchDetailPanelProps> = ({
   onAgentPidClick,
   onAcknowledge,
 }) => {
-  const isCritical = mismatch.severity === "Critical";
+  const isCritical = mismatch.severity === 'Critical';
 
   return (
-    <div className={`p-4 rounded-lg border ${SEVERITY_BG[mismatch.severity]} space-y-4`}>
+    <div className={`rounded-lg border p-4 ${SEVERITY_BG[mismatch.severity]} space-y-4`}>
       {/* 标题行 */}
       <div className="flex items-center gap-2">
         <MismatchTypeIcon mismatch_type={mismatch.mismatch_type} size="lg" />
         <div>
-          <h3 className="font-semibold text-sm">
-            {MISMATCH_TYPE_LABEL[mismatch.mismatch_type]}
-          </h3>
+          <h3 className="text-sm font-semibold">{MISMATCH_TYPE_LABEL[mismatch.mismatch_type]}</h3>
           <div className="flex items-center gap-2">
             <button
               onClick={() => onToolNameClick?.(mismatch.tool_name)}
-              className="font-mono text-sm text-blue-600 hover:underline cursor-pointer"
+              className="cursor-pointer font-mono text-sm text-blue-600 hover:underline"
             >
               {mismatch.tool_name}
             </button>
-            <span className="text-gray-400 text-xs">·</span>
+            <span className="text-xs text-gray-400">·</span>
             <button
               onClick={() => onAgentPidClick?.(mismatch.agent_pid)}
-              className="font-mono text-xs text-blue-600 hover:underline cursor-pointer"
+              className="cursor-pointer font-mono text-xs text-blue-600 hover:underline"
             >
               PID {mismatch.agent_pid}
             </button>
@@ -237,14 +224,14 @@ export const MismatchDetailPanel: React.FC<MismatchDetailPanelProps> = ({
         <div className="ml-auto flex items-center gap-2">
           <MismatchSeverityBadge severity={mismatch.severity} />
           {mismatch.acknowledged ? (
-            <span className="text-xs text-green-700 bg-green-100 px-1.5 py-0.5 rounded font-medium">
+            <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
               已确认
             </span>
           ) : (
             onAcknowledge && (
               <button
                 onClick={onAcknowledge}
-                className="text-xs text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded font-medium hover:bg-blue-200 cursor-pointer"
+                className="cursor-pointer rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-200"
               >
                 标记确认
               </button>
@@ -254,23 +241,23 @@ export const MismatchDetailPanel: React.FC<MismatchDetailPanelProps> = ({
       </div>
 
       {/* 描述 */}
-      <div className="text-sm text-gray-700 p-3 bg-white/60 rounded border border-slate-100">
+      <div className="rounded border border-slate-100 bg-white/60 p-3 text-sm text-gray-700">
         {mismatch.description}
       </div>
 
       {/* 声明 vs 观测 对比 */}
       <div className="grid grid-cols-2 gap-3">
         {/* 声明 */}
-        <div className="p-3 bg-white/80 rounded border border-slate-100">
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+        <div className="rounded border border-slate-100 bg-white/80 p-3">
+          <h4 className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
             📋 Agent 声称
           </h4>
-          <div className="space-y-1.5 text-xs font-mono">
+          <div className="space-y-1.5 font-mono text-xs">
             <div>
               <span className="text-gray-400">工具: </span>
               <span className="text-gray-700">{mismatch.declared.tool_name}</span>
             </div>
-            {mismatch.declared.target.type === "FilePath" && (
+            {mismatch.declared.target.type === 'FilePath' && (
               <>
                 <div>
                   <span className="text-gray-400">路径: </span>
@@ -282,13 +269,13 @@ export const MismatchDetailPanel: React.FC<MismatchDetailPanelProps> = ({
                 </div>
               </>
             )}
-            {mismatch.declared.target.type === "NetworkTarget" && (
+            {mismatch.declared.target.type === 'NetworkTarget' && (
               <>
                 <div>
                   <span className="text-gray-400">目标: </span>
                   <span className="text-gray-700">
                     {mismatch.declared.target.host}
-                    {mismatch.declared.target.port ? `:${mismatch.declared.target.port}` : ""}
+                    {mismatch.declared.target.port ? `:${mismatch.declared.target.port}` : ''}
                   </span>
                 </div>
                 <div>
@@ -297,18 +284,20 @@ export const MismatchDetailPanel: React.FC<MismatchDetailPanelProps> = ({
                 </div>
               </>
             )}
-            {mismatch.declared.target.type === "Command" && (
+            {mismatch.declared.target.type === 'Command' && (
               <div>
                 <span className="text-gray-400">命令: </span>
                 <span className="text-gray-700">
-                  {[mismatch.declared.target.binary, ...mismatch.declared.target.args_prefix].join(" ")}
+                  {[mismatch.declared.target.binary, ...mismatch.declared.target.args_prefix].join(
+                    ' ',
+                  )}
                 </span>
               </div>
             )}
             {mismatch.declared.raw_args && (
               <div className="mt-2">
                 <span className="text-gray-400">原始参数: </span>
-                <pre className="text-gray-500 mt-0.5 text-xs whitespace-pre-wrap break-all">
+                <pre className="mt-0.5 text-xs break-all whitespace-pre-wrap text-gray-500">
                   {JSON.stringify(mismatch.declared.raw_args, null, 2)}
                 </pre>
               </div>
@@ -317,15 +306,19 @@ export const MismatchDetailPanel: React.FC<MismatchDetailPanelProps> = ({
         </div>
 
         {/* 观测 */}
-        <div className={`p-3 rounded border ${
-          isCritical ? "bg-red-50/80 border-red-200" : "bg-white/80 border-slate-100"
-        }`}>
-          <h4 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${
-            isCritical ? "text-red-600" : "text-gray-500"
-          }`}>
+        <div
+          className={`rounded border p-3 ${
+            isCritical ? 'border-red-200 bg-red-50/80' : 'border-slate-100 bg-white/80'
+          }`}
+        >
+          <h4
+            className={`mb-2 text-xs font-semibold tracking-wide uppercase ${
+              isCritical ? 'text-red-600' : 'text-gray-500'
+            }`}
+          >
             🔍 eBPF 实际观测
           </h4>
-          <div className="space-y-1.5 text-xs font-mono">
+          <div className="space-y-1.5 font-mono text-xs">
             <div>
               <span className="text-gray-400">来源: </span>
               <span className="text-gray-700">{mismatch.observed.source}</span>
@@ -333,7 +326,7 @@ export const MismatchDetailPanel: React.FC<MismatchDetailPanelProps> = ({
             {mismatch.observed.path && (
               <div>
                 <span className="text-gray-400">路径: </span>
-                <span className={isCritical ? "text-red-600 font-semibold" : "text-gray-700"}>
+                <span className={isCritical ? 'font-semibold text-red-600' : 'text-gray-700'}>
                   {mismatch.observed.path}
                 </span>
               </div>
@@ -341,16 +334,16 @@ export const MismatchDetailPanel: React.FC<MismatchDetailPanelProps> = ({
             {mismatch.observed.host && (
               <div>
                 <span className="text-gray-400">主机: </span>
-                <span className={isCritical ? "text-red-600 font-semibold" : "text-gray-700"}>
+                <span className={isCritical ? 'font-semibold text-red-600' : 'text-gray-700'}>
                   {mismatch.observed.host}
-                  {mismatch.observed.port ? `:${mismatch.observed.port}` : ""}
+                  {mismatch.observed.port ? `:${mismatch.observed.port}` : ''}
                 </span>
               </div>
             )}
             {(mismatch.observed.command || mismatch.observed.binary) && (
               <div>
                 <span className="text-gray-400">命令: </span>
-                <span className={isCritical ? "text-red-600 font-semibold" : "text-gray-700"}>
+                <span className={isCritical ? 'font-semibold text-red-600' : 'text-gray-700'}>
                   {mismatch.observed.command ?? mismatch.observed.binary}
                 </span>
               </div>
@@ -362,7 +355,7 @@ export const MismatchDetailPanel: React.FC<MismatchDetailPanelProps> = ({
               </div>
             )}
             {mismatch.sensitive_path_match && (
-              <div className="mt-2 p-1.5 bg-red-100 rounded text-red-700">
+              <div className="mt-2 rounded bg-red-100 p-1.5 text-red-700">
                 <span className="text-red-500">⚠ 敏感路径: </span>
                 {mismatch.sensitive_path_match}
               </div>
@@ -370,7 +363,7 @@ export const MismatchDetailPanel: React.FC<MismatchDetailPanelProps> = ({
             {mismatch.observed.extra && (
               <div className="mt-2">
                 <span className="text-gray-400">额外上下文: </span>
-                <pre className="text-gray-500 mt-0.5 text-xs whitespace-pre-wrap break-all">
+                <pre className="mt-0.5 text-xs break-all whitespace-pre-wrap text-gray-500">
                   {JSON.stringify(mismatch.observed.extra, null, 2)}
                 </pre>
               </div>
@@ -400,12 +393,12 @@ export const AgentMismatchChart: React.FC<AgentMismatchChartProps> = ({
   const maxCount = entries[0]?.[1] ?? 1;
 
   if (entries.length === 0) {
-    return <div className="text-sm text-gray-400 p-4">暂无 Agent 数据</div>;
+    return <div className="p-4 text-sm text-gray-400">暂无 Agent 数据</div>;
   }
 
   return (
     <div className="space-y-2">
-      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+      <h4 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
         Agent 不匹配排行
       </h4>
       {entries.map(([pidStr, count]) => {
@@ -415,22 +408,22 @@ export const AgentMismatchChart: React.FC<AgentMismatchChartProps> = ({
           <button
             key={pidStr}
             onClick={() => onPidSelect(isSelected ? null : pid)}
-            className="w-full text-left group"
+            className="group w-full text-left"
           >
-            <div className="flex items-center justify-between text-xs mb-1">
+            <div className="mb-1 flex items-center justify-between text-xs">
               <span
-                className={`font-mono truncate ${
-                  isSelected ? "text-blue-600 font-semibold" : "text-gray-700"
+                className={`truncate font-mono ${
+                  isSelected ? 'font-semibold text-blue-600' : 'text-gray-700'
                 }`}
               >
                 PID {pidStr}
               </span>
-              <span className="text-gray-400 ml-2 flex-shrink-0">{count} 次</span>
+              <span className="ml-2 flex-shrink-0 text-gray-400">{count} 次</span>
             </div>
-            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
               <div
                 className={`h-full rounded-full transition-all ${
-                  isSelected ? "bg-blue-500" : "bg-slate-400"
+                  isSelected ? 'bg-blue-500' : 'bg-slate-400'
                 }`}
                 style={{ width: `${(count / maxCount) * 100}%` }}
               />
@@ -463,11 +456,11 @@ const MismatchTypeDistribution: React.FC<{
       {entries.map(([type, count]) => (
         <div key={type} className="flex items-center gap-2 text-xs">
           <MismatchTypeIcon mismatch_type={type} size="sm" />
-          <span className="text-gray-600 flex-1">{MISMATCH_TYPE_LABEL[type]}</span>
+          <span className="flex-1 text-gray-600">{MISMATCH_TYPE_LABEL[type]}</span>
           <span className="font-mono font-semibold">{count}</span>
-          <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100">
             <div
-              className="h-full bg-slate-400 rounded-full"
+              className="h-full rounded-full bg-slate-400"
               style={{ width: `${total > 0 ? (count / total) * 100 : 0}%` }}
             />
           </div>
@@ -482,7 +475,7 @@ const MismatchTypeDistribution: React.FC<{
 // ═══════════════════════════════════════════════════════════════════════════
 
 const SummaryCard: React.FC<{
-  summary: NonNullable<IntentVerifierDashboardState["latest_summary"]>;
+  summary: NonNullable<IntentVerifierDashboardState['latest_summary']>;
 }> = ({ summary }) => {
   const matchRate =
     summary.total_intents_declared > 0
@@ -492,25 +485,27 @@ const SummaryCard: React.FC<{
   const hasIssues = summary.mismatched > 0;
 
   return (
-    <div className={`grid grid-cols-2 md:grid-cols-4 gap-2 text-xs`}>
-      <div className="p-2 bg-white/60 rounded">
+    <div className={`grid grid-cols-2 gap-2 text-xs md:grid-cols-4`}>
+      <div className="rounded bg-white/60 p-2">
         <div className="text-gray-500">声明意图</div>
-        <div className="font-mono font-semibold text-lg">{summary.total_intents_declared}</div>
+        <div className="font-mono text-lg font-semibold">{summary.total_intents_declared}</div>
       </div>
-      <div className="p-2 bg-white/60 rounded">
+      <div className="rounded bg-white/60 p-2">
         <div className="text-gray-500">匹配成功</div>
-        <div className="font-mono font-semibold text-lg text-green-600">{summary.matched}</div>
+        <div className="font-mono text-lg font-semibold text-green-600">{summary.matched}</div>
         <div className="text-gray-400">{matchRate}%</div>
       </div>
-      <div className={`p-2 rounded ${hasIssues ? "bg-red-50" : "bg-white/60"}`}>
+      <div className={`rounded p-2 ${hasIssues ? 'bg-red-50' : 'bg-white/60'}`}>
         <div className="text-gray-500">不匹配</div>
-        <div className={`font-mono font-semibold text-lg ${hasIssues ? "text-red-600" : "text-gray-700"}`}>
+        <div
+          className={`font-mono text-lg font-semibold ${hasIssues ? 'text-red-600' : 'text-gray-700'}`}
+        >
           {summary.mismatched}
         </div>
       </div>
-      <div className="p-2 bg-white/60 rounded">
+      <div className="rounded bg-white/60 p-2">
         <div className="text-gray-500">过期未决</div>
-        <div className="font-mono font-semibold text-lg text-amber-600">
+        <div className="font-mono text-lg font-semibold text-amber-600">
           {summary.expired_unresolved}
         </div>
       </div>
@@ -565,18 +560,27 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
   const selectedMismatch = useMemo(
     () =>
       selected_mismatch_id
-        ? filteredMismatches.find((m) => m.intent_id === selected_mismatch_id) ?? null
+        ? (filteredMismatches.find((m) => m.intent_id === selected_mismatch_id) ?? null)
         : null,
     [filteredMismatches, selected_mismatch_id],
   );
 
   // ── 统计数据 ──
   const typeCounts = useMemo(() => countByMismatchType(filteredMismatches), [filteredMismatches]);
-  const severityCounts = useMemo(() => countByMismatchSeverity(filteredMismatches), [filteredMismatches]);
+  const severityCounts = useMemo(
+    () => countByMismatchSeverity(filteredMismatches),
+    [filteredMismatches],
+  );
   const overallSeverity = useMemo(() => maxMismatchSeverity(mismatches), [mismatches]);
   const criticalCount = useMemo(() => countCritical(mismatches), [mismatches]);
-  const pidFrequency = useMemo(() => aggregateMismatchByPid(filteredMismatches), [filteredMismatches]);
-  const toolFrequency = useMemo(() => aggregateMismatchByTool(filteredMismatches), [filteredMismatches]);
+  const pidFrequency = useMemo(
+    () => aggregateMismatchByPid(filteredMismatches),
+    [filteredMismatches],
+  );
+  const toolFrequency = useMemo(
+    () => aggregateMismatchByTool(filteredMismatches),
+    [filteredMismatches],
+  );
 
   // ── 工具名列表（用于过滤器）──
   const toolNames = useMemo(() => {
@@ -596,11 +600,9 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
   if (mismatches.length === 0 && !latest_summary) {
     return (
       <div className="p-6 text-center text-gray-400">
-        <div className="text-2xl mb-2">🛡️</div>
+        <div className="mb-2 text-2xl">🛡️</div>
         <div className="text-sm">未检测到意图-行为不一致</div>
-        <div className="text-xs mt-1">
-          AgentIntentVerifier 正在交叉验证声明意图与实际行为...
-        </div>
+        <div className="mt-1 text-xs">AgentIntentVerifier 正在交叉验证声明意图与实际行为...</div>
       </div>
     );
   }
@@ -609,23 +611,20 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
     <div className="space-y-4">
       {/* ═══ 顶部状态栏 ═══ */}
       {criticalCount > 0 && (
-        <div className="flex items-center gap-3 p-3 rounded-lg border bg-red-50 border-red-200 text-sm">
+        <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm">
           <span className="text-lg">🚨</span>
           <div className="flex-1">
-            <span className="font-semibold text-red-700">
-              {criticalCount} 个严重不匹配
-            </span>
-            <span className="text-red-500 ml-2">
-              · 共 {mismatches.length} 个不匹配 · 最高: {overallSeverity && MISMATCH_SEVERITY_LABEL[overallSeverity]}
+            <span className="font-semibold text-red-700">{criticalCount} 个严重不匹配</span>
+            <span className="ml-2 text-red-500">
+              · 共 {mismatches.length} 个不匹配 · 最高:{' '}
+              {overallSeverity && MISMATCH_SEVERITY_LABEL[overallSeverity]}
             </span>
           </div>
           {latest_summary && (
             <span className="text-xs text-gray-400">
-              匹配率{" "}
+              匹配率{' '}
               {latest_summary.total_intents_declared > 0
-                ? Math.round(
-                    (latest_summary.matched / latest_summary.total_intents_declared) * 100
-                  )
+                ? Math.round((latest_summary.matched / latest_summary.total_intents_declared) * 100)
                 : 0}
               %
             </span>
@@ -636,16 +635,14 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
       {/* 无严重项时的温和告警 */}
       {criticalCount === 0 && mismatches.length > 0 && overallSeverity && (
         <div
-          className={`flex items-center gap-3 p-3 rounded-lg border text-sm ${
+          className={`flex items-center gap-3 rounded-lg border p-3 text-sm ${
             SEVERITY_BG[overallSeverity]
           }`}
         >
           <span className="text-lg">⚠️</span>
           <div className="flex-1">
-            <span className="font-semibold">
-              {mismatches.length} 个不匹配
-            </span>
-            <span className="text-gray-500 ml-2">
+            <span className="font-semibold">{mismatches.length} 个不匹配</span>
+            <span className="ml-2 text-gray-500">
               · 最高严重度: {MISMATCH_SEVERITY_LABEL[overallSeverity]}
             </span>
           </div>
@@ -653,17 +650,17 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
       )}
 
       {/* ═══ 顶部工具栏 ═══ */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex flex-wrap items-center gap-3">
         {/* 视图切换 */}
         <div className="flex rounded-lg bg-slate-100 p-0.5">
           {VIEW_LABELS.map(({ mode, label }) => (
             <button
               key={mode}
               onClick={() => onViewModeChange(mode)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 view_mode === mode
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               {label}
@@ -672,7 +669,7 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
         </div>
 
         {/* 未确认过滤 */}
-        <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-600">
           <input
             type="checkbox"
             checked={show_unacknowledged_only}
@@ -684,8 +681,8 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
 
         {/* 不匹配类型过滤 */}
         <select
-          className="text-xs border border-slate-300 rounded px-2 py-1.5 bg-white"
-          value={type_filter ?? ""}
+          className="rounded border border-slate-300 bg-white px-2 py-1.5 text-xs"
+          value={type_filter ?? ''}
           onChange={(e) => {
             const v = e.target.value;
             onTypeFilterChange(v ? (v as MismatchType) : null);
@@ -701,8 +698,8 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
 
         {/* 严重度过滤 */}
         <select
-          className="text-xs border border-slate-300 rounded px-2 py-1.5 bg-white"
-          value={severity_filter ?? ""}
+          className="rounded border border-slate-300 bg-white px-2 py-1.5 text-xs"
+          value={severity_filter ?? ''}
           onChange={(e) => {
             const v = e.target.value;
             onSeverityFilterChange(v ? (v as MismatchSeverity) : null);
@@ -719,8 +716,8 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
         {/* 工具名过滤 */}
         {toolNames.length > 0 && (
           <select
-            className="text-xs border border-slate-300 rounded px-2 py-1.5 bg-white max-w-[160px]"
-            value={tool_filter ?? ""}
+            className="max-w-[160px] rounded border border-slate-300 bg-white px-2 py-1.5 text-xs"
+            value={tool_filter ?? ''}
             onChange={(e) => {
               const v = e.target.value;
               onToolFilterChange(v || null);
@@ -738,8 +735,8 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
         {/* PID 过滤 */}
         {allPids.length > 0 && (
           <select
-            className="text-xs border border-slate-300 rounded px-2 py-1.5 bg-white"
-            value={pid_filter ?? ""}
+            className="rounded border border-slate-300 bg-white px-2 py-1.5 text-xs"
+            value={pid_filter ?? ''}
             onChange={(e) => {
               const v = e.target.value;
               onPidFilterChange(v ? Number(v) : null);
@@ -756,16 +753,14 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
       </div>
 
       {/* ═══ 概览视图 ═══ */}
-      {view_mode === "overview" && (
-        <div
-          className={`grid gap-4 ${
-            compact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
-          }`}
-        >
+      {view_mode === 'overview' && (
+        <div className={`grid gap-4 ${compact ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
           {/* 统计摘要 */}
           {latest_summary && (
-            <div className={`p-4 rounded-lg border border-slate-200 bg-white ${compact ? "" : "md:col-span-2"}`}>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            <div
+              className={`rounded-lg border border-slate-200 bg-white p-4 ${compact ? '' : 'md:col-span-2'}`}
+            >
+              <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                 📊 会话统计
               </h4>
               <SummaryCard summary={latest_summary} />
@@ -773,21 +768,21 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
           )}
 
           {/* 严重度分布 */}
-          <div className="p-4 rounded-lg border border-slate-200 bg-white">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
               严重度分布
             </h4>
             <div className="space-y-2">
-              {(["Critical", "Warning", "Info"] as MismatchSeverity[]).map((sev) => {
+              {(['Critical', 'Warning', 'Info'] as MismatchSeverity[]).map((sev) => {
                 const count = severityCounts[sev];
                 const total = filteredMismatches.length;
                 return (
                   <div key={sev} className="flex items-center gap-2 text-xs">
                     <MismatchSeverityBadge severity={sev} showLabel={true} />
                     <span className="font-mono font-semibold">{count}</span>
-                    <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
                       <div
-                        className={`h-full rounded-full ${sev === "Critical" ? "bg-red-400" : sev === "Warning" ? "bg-amber-400" : "bg-blue-400"}`}
+                        className={`h-full rounded-full ${sev === 'Critical' ? 'bg-red-400' : sev === 'Warning' ? 'bg-amber-400' : 'bg-blue-400'}`}
                         style={{ width: `${total > 0 ? (count / total) * 100 : 0}%` }}
                       />
                     </div>
@@ -798,8 +793,8 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
           </div>
 
           {/* 类型分布 */}
-          <div className="p-4 rounded-lg border border-slate-200 bg-white">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
               不匹配类型分布
             </h4>
             <MismatchTypeDistribution counts={typeCounts} total={filteredMismatches.length} />
@@ -807,7 +802,7 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
 
           {/* 选中的不匹配详情 */}
           {selectedMismatch && (
-            <div className={compact ? "" : "md:col-span-2"}>
+            <div className={compact ? '' : 'md:col-span-2'}>
               <MismatchDetailPanel
                 mismatch={selectedMismatch}
                 onToolNameClick={(name) => onToolFilterChange(name)}
@@ -824,15 +819,15 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
       )}
 
       {/* ═══ 时间线视图 ═══ */}
-      {view_mode === "timeline" && (
+      {view_mode === 'timeline' && (
         <div
           className={`grid gap-4 ${
-            compact || !selectedMismatch ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
+            compact || !selectedMismatch ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'
           }`}
         >
-          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+          <div className="max-h-[60vh] space-y-2 overflow-y-auto">
             {filteredMismatches.length === 0 ? (
-              <div className="text-sm text-gray-400 p-4">暂无匹配的记录</div>
+              <div className="p-4 text-sm text-gray-400">暂无匹配的记录</div>
             ) : (
               filteredMismatches.map((mismatch) => (
                 <MismatchCard
@@ -865,17 +860,17 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
       )}
 
       {/* ═══ Agent 视图 ═══ */}
-      {view_mode === "agents" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 rounded-lg border border-slate-200 bg-white">
+      {view_mode === 'agents' && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
             <AgentMismatchChart
               frequency={pidFrequency}
               selected_pid={pid_filter}
               onPidSelect={onPidFilterChange}
             />
           </div>
-          <div className="p-4 rounded-lg border border-slate-200 bg-white">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
               工具不匹配频率
             </h4>
             {Object.entries(toolFrequency).length === 0 ? (
@@ -888,8 +883,8 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
                   .map(([name, count]) => (
                     <div key={name} className="flex items-center gap-2 text-xs">
                       <span
-                        className={`font-mono flex-1 truncate ${
-                          tool_filter === name ? "text-blue-600 font-semibold" : "text-gray-700"
+                        className={`flex-1 truncate font-mono ${
+                          tool_filter === name ? 'font-semibold text-blue-600' : 'text-gray-700'
                         }`}
                       >
                         {name}
@@ -901,7 +896,7 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
             )}
           </div>
           {selectedMismatch && (
-            <div className={compact ? "" : "md:col-span-2"}>
+            <div className={compact ? '' : 'md:col-span-2'}>
               <MismatchDetailPanel
                 mismatch={selectedMismatch}
                 onToolNameClick={(name) => onToolFilterChange(name)}
@@ -918,7 +913,7 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
       )}
 
       {/* ═══ 底部状态栏 ═══ */}
-      <div className="text-xs text-gray-400 flex items-center justify-between pt-2 border-t border-slate-100">
+      <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-xs text-gray-400">
         <span>
           共 {mismatches.length} 个不匹配 · Critical {criticalCount} 个
           {latest_summary &&
@@ -930,8 +925,12 @@ export const IntentVerifierDashboard: React.FC<IntentVerifierDashboardProps> = (
         </span>
         <span>
           显示 {filteredMismatches.length} 条
-          {(type_filter || severity_filter || tool_filter || pid_filter != null || show_unacknowledged_only) &&
-            " (已过滤)"}
+          {(type_filter ||
+            severity_filter ||
+            tool_filter ||
+            pid_filter != null ||
+            show_unacknowledged_only) &&
+            ' (已过滤)'}
         </span>
       </div>
     </div>

@@ -67,18 +67,8 @@ def _kill_leftover_claude() -> None:
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
 
-    try:
-        for pattern in ("claude", "claude.exe"):
-            subprocess.run(
-                ["pkill", "-x", pattern],
-                timeout=5, capture_output=True,
-            )
-        subprocess.run(
-            ["pkill", "-f", r"/claude-code/.*/claude"],
-            timeout=5, capture_output=True,
-        )
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        pass
+    # NOTE: pkill removed — it kills the orchestrating Claude Code session.
+    # Only tmux session cleanup (above) is safe for in-session benchmarks.
 
 
 def execute_scenario(
@@ -106,11 +96,10 @@ def execute_scenario(
 
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / ".scenario_id").write_text(config.id)
-    prompts_dir = run_dir / "prompts"
     logs_dir = run_dir / "logs"
     status_dir = run_dir / "status"
     collector_dir = run_dir / "collector"
-    for d in [prompts_dir, logs_dir, status_dir]:
+    for d in [logs_dir, status_dir]:
         d.mkdir(exist_ok=True)
 
     # ── Start collector (before agents) ──
@@ -182,6 +171,12 @@ def execute_scenario(
                     f"Rejected: {binary_diag.get('rejected_reasons', [])}"
                 )
 
+    # Resolve actual Claude binary path for both modes.
+    # Default "claude" only works in non-sudo contexts.
+    binary_path, _ = _find_claude_binary_with_diagnostics()
+    if binary_path:
+        claude_bin = binary_path
+
     try:
         if execution_mode in ("process", "batch"):
             success, summary = _run_process_mode(config, run_dir, status_dir, logs_dir)
@@ -248,8 +243,11 @@ def execute_scenario(
                         "Responsibility scoring produced no graph or evidence signals."
                     )
 
-    collector_out = collector_dir / "trace.log" if collector_started else None
+    collector_out = collector_dir / "collector.log" if collector_started else None
     db_path = collector.database_path if collector and collector_started else None
+
+    # ── Clean up empty directories left by Claude's internals ──
+    _cleanup_empty_dirs(run_dir)
 
     return RunResult(
         run_id=run_id, scenario_id=config.id, success=success,
@@ -302,6 +300,7 @@ def _run_process_mode(
         env["NODE_OPTIONS"] = f"{existing} {tls_keylog_opt}".strip()
 
     prompts_dir = run_dir / "prompts"
+    prompts_dir.mkdir(parents=True, exist_ok=True)
     agent_statuses = []
 
     for i, agent in enumerate(config.agents):
@@ -337,13 +336,14 @@ def _run_process_mode(
                 f'export HOME="{user_home}" PATH="{full_path}" '
                 f'NODE_OPTIONS="{tls_keylog_opt}"; '
                 f'{claude_bin} -p "{task_escaped}" '
-                f'--model {config.model} --output-format text{perm_flag}'
+                f'--model {config.model} --effort {getattr(config, "effort", "low")} --output-format text{perm_flag}'
             )
             cmd = agent_prefix + ["bash", "-c", inner_cmd]
         else:
             cmd = agent_prefix + [
                 claude_bin, "-p", str(agent.task),
                 "--model", config.model,
+                "--effort", str(getattr(config, "effort", "low")),
                 "--output-format", "text",
             ]
             if config.permission_mode != "default":
@@ -430,7 +430,12 @@ def _run_tmux_mode(
         user_home = os.path.expanduser(f"~{original_user}")
         env["HOME"] = user_home
         env["USER"] = original_user
-        env["PATH"] = os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin")
+        base_path = os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin")
+        # Ensure /home/<user>/.local/bin is in PATH so tmux can find claude
+        local_bin = os.path.join(user_home, ".local", "bin")
+        paths = [local_bin] + base_path.split(":")
+        env["PATH"] = ":".join(paths)
+        env["MTAGENTLENS_SUDO_USER"] = original_user
 
     # ── Write essential env vars to a temp file ──
     # Avoids tmux send-keys truncation when env_str has 100+ variables.
@@ -443,12 +448,18 @@ def _run_tmux_mode(
         "CLAUDE_CONFIG_DIR", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
         "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "CLAUDE_SUBAGENTS_MODE",
         "HOME", "USER", "PATH", "API_TIMEOUT_MS", "LANGUAGE",
-        "ENABLE_TOOL_SEARCH", "MODEL",
+        "ENABLE_TOOL_SEARCH", "MODEL", "MTAGENTLENS_SUDO_USER",
     }
     for k, v in sorted(env.items()):
         if k in essential_keys or k.startswith("ANTHROPIC_") or k.startswith("CLAUDE_"):
             env_lines.append(f'{k}={shlex.quote(v)}')
     env_file.write_text("\n".join(env_lines), encoding="utf-8")
+
+    # De-escalate from root → original user for Claude Code in tmux.
+    # Claude refuses --dangerously-skip-permissions when running as root.
+    agent_prefix = ""
+    if is_root and original_user:
+        agent_prefix = f"sudo -u {original_user} "
 
     create_tmux_session(session_name, config)
 
@@ -471,7 +482,7 @@ def _run_tmux_mode(
         launch_agent_in_pane(
             session_name=session_name, pane_index=i,
             agent_task=agent.task, role_file=agent.role_file,
-            mode_env={}, launch_env={},
+            mode_env={}, launch_env={"MTAGENTLENS_SUDO_USER": original_user} if is_root and original_user else {},
             log_file=log_file, status_file=status_file,
             pane_mode="task", claude_bin=claude_bin,
             timeout_seconds=config.timeout_seconds,
@@ -604,25 +615,25 @@ def _verify_collector_output(
         "warnings": [],
     }
 
-    trace_path = collector_dir / "trace"
+    trace_path = collector_dir / "collector.log"
     if trace_path.exists():
         diag["trace_exists"] = True
         diag["trace_size_bytes"] = trace_path.stat().st_size
         diag["trace_non_empty"] = trace_path.stat().st_size > 0
         if not diag["trace_non_empty"]:
             diag["trace_note"] = (
-                "trace JSONL is empty; responsibility data may still be available in SQLite"
+                "collector log is empty; collector may not have produced output"
             )
     else:
         diag["warnings"].append(
-            "trace file does not exist — collector may have crashed before writing output"
+            "collector.log does not exist — collector may have crashed before writing output"
         )
 
-    err_log = collector_dir / "trace.err.log"
+    err_log = collector_dir / "collector.log"
     if err_log.exists():
         diag["err_log_exists"] = True
     else:
-        diag["warnings"].append("trace.err.log missing — collector may not have started")
+        diag["warnings"].append("collector.log missing — collector may not have started")
 
     db_path = getattr(collector, "database_path", None)
     if db_path and db_path.exists():
@@ -720,6 +731,34 @@ def _capture_agent_artifacts(run_dir: Path, logs_dir: Path, config) -> None:
     (run_dir / "behavior.json").write_text(
         json.dumps(behavior, indent=2, ensure_ascii=False), encoding="utf-8",
     )
+
+
+def _cleanup_empty_dirs(run_dir: Path) -> None:
+    """Remove empty directories left by Claude's internal machinery.
+
+    Claude Code creates session-env, sessions, shell-snapshots, and tasks
+    directories under .claude_benchmark/. Many of these are empty after the
+    run completes. We remove only truly empty directories — any directory
+    containing files is left intact.
+    """
+    claude_dir = run_dir / ".claude_benchmark"
+    if not claude_dir.is_dir():
+        return
+    # Walk bottom-up so we can remove nested empty dirs
+    for root, dirs, files in os.walk(str(claude_dir), topdown=False):
+        for d in dirs:
+            dpath = Path(root) / d
+            try:
+                if not any(dpath.iterdir()):
+                    dpath.rmdir()
+            except OSError:
+                pass  # permission error or not empty — skip
+    # Remove .claude_benchmark itself if entirely empty
+    try:
+        if not any(claude_dir.iterdir()):
+            claude_dir.rmdir()
+    except OSError:
+        pass
 
 
 def _write_status(path: Path, data: dict) -> None:

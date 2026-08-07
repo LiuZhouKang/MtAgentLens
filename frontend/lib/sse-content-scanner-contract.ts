@@ -12,7 +12,7 @@
 //   timestamp_ns — 连接 TimelinePanel（定位原始 SSE 事件）
 //   signal_id   — 连接 EvidencePanel（查看证据详情）
 
-import type { AnomalySeverity } from "./data-contract";
+import type { AnomalySeverity } from './data-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 检测层类型
@@ -20,14 +20,14 @@ import type { AnomalySeverity } from "./data-contract";
 
 /** 检测层：对应 Rust 侧 MatchLayer */
 export type DetectionLayer =
-  | "pattern"   // Layer1: 已知模式匹配（Regex）
-  | "ood";      // Layer4: OOD 语义离群检测
+  | 'pattern' // Layer1: 已知模式匹配（Regex）
+  | 'ood'; // Layer4: OOD 语义离群检测
 
 /** SSE 事件类型（Rust 侧匹配的分支） */
 export type ScannedEventType =
-  | "tool_result"          // 工具执行结果
-  | "content_block_delta"  // 内容块增量
-  | "text_delta";          // 文本增量（仅 >50 字符时扫描）
+  | 'tool_result' // 工具执行结果
+  | 'content_block_delta' // 内容块增量
+  | 'text_delta'; // 文本增量（仅 >50 字符时扫描）
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 信号数据
@@ -35,14 +35,14 @@ export type ScannedEventType =
 
 /** Layer 1 模式匹配详情 */
 export interface PatternMatchDetail {
-  layer: "pattern";
+  layer: 'pattern';
   /** 匹配到的正则模式名称 */
   pattern_name: string;
 }
 
 /** Layer 4 OOD 检测详情 */
 export interface OodMatchDetail {
-  layer: "ood";
+  layer: 'ood';
   /** 异常分数 (0.0–1.0, 阈值 > ANOMALY_THRESHOLD) */
   anomaly_score: number;
 }
@@ -97,7 +97,7 @@ export interface SseScannerStats {
 // 仪表板状态
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export type ScannerViewMode = "overview" | "signals" | "tools";
+export type ScannerViewMode = 'overview' | 'signals' | 'tools';
 
 export interface SseContentScannerDashboardState {
   /** 近期信号列表（最近 N 条） */
@@ -171,45 +171,45 @@ export interface ToolSignalRowProps {
 
 /** 检测层人类可读标签 */
 export const DETECTION_LAYER_LABEL: Record<DetectionLayer, string> = {
-  pattern: "模式匹配",
-  ood: "离群检测",
+  pattern: '模式匹配',
+  ood: '离群检测',
 };
 
 /** 检测层颜色 */
 export const DETECTION_LAYER_COLOR: Record<DetectionLayer, string> = {
-  pattern: "text-indigo-600 bg-indigo-50 border-indigo-200",
-  ood: "text-amber-600 bg-amber-50 border-amber-200",
+  pattern: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+  ood: 'text-amber-600 bg-amber-50 border-amber-200',
 };
 
 /** 事件类型人类可读标签 */
 export const EVENT_TYPE_LABEL: Record<ScannedEventType, string> = {
-  tool_result: "工具结果",
-  content_block_delta: "内容块",
-  text_delta: "文本增量",
+  tool_result: '工具结果',
+  content_block_delta: '内容块',
+  text_delta: '文本增量',
 };
 
 /** 信号置信度转严重度等级 */
 export function signalConfidenceToSeverity(confidence: number): AnomalySeverity {
-  if (confidence >= 0.9) return "critical";
-  if (confidence >= 0.7) return "warning";
-  if (confidence >= 0.5) return "warning";
-  return "info";
+  if (confidence >= 0.9) return 'critical';
+  if (confidence >= 0.7) return 'warning';
+  if (confidence >= 0.5) return 'warning';
+  return 'info';
 }
 
 /** 信号置信度对应颜色 */
 export function signalConfidenceColor(confidence: number): string {
-  if (confidence >= 0.9) return "text-red-600";
-  if (confidence >= 0.7) return "text-orange-500";
-  if (confidence >= 0.5) return "text-amber-500";
-  return "text-slate-400";
+  if (confidence >= 0.9) return 'text-red-600';
+  if (confidence >= 0.7) return 'text-orange-500';
+  if (confidence >= 0.5) return 'text-amber-500';
+  return 'text-slate-400';
 }
 
 /** 信号置信度对应背景色 */
 export function signalConfidenceBg(confidence: number): string {
-  if (confidence >= 0.9) return "bg-red-50 border-red-200";
-  if (confidence >= 0.7) return "bg-orange-50 border-orange-200";
-  if (confidence >= 0.5) return "bg-amber-50 border-amber-200";
-  return "bg-slate-50 border-slate-200";
+  if (confidence >= 0.9) return 'bg-red-50 border-red-200';
+  if (confidence >= 0.7) return 'bg-orange-50 border-orange-200';
+  if (confidence >= 0.5) return 'bg-amber-50 border-amber-200';
+  return 'bg-slate-50 border-slate-200';
 }
 
 /** 创建空的仪表板状态 */
@@ -225,7 +225,7 @@ export function createDefaultScannerState(): SseContentScannerDashboardState {
       top_tools: [],
       last_signal_ns: null,
     },
-    view_mode: "overview",
+    view_mode: 'overview',
     selected_signal_id: null,
     layer_filter: null,
     event_type_filter: null,

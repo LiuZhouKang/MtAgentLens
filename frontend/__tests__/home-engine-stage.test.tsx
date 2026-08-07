@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import * as THREE from 'three';
+import React from 'react';
 import { render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import HomeEngineStage, { deriveAlertFocus } from '@/components/ui/home-engine-stage';
@@ -12,7 +13,7 @@ const mockStoreState = {
 
 const mockState = vi.hoisted(() => ({
   latestGraphApi: null as ReturnType<typeof createGraphApi> | null,
-  constructorCalls: [] as unknown[][],
+  latestReactGraphProps: null as Record<string, unknown> | null,
 }));
 
 function createGraphApi() {
@@ -24,7 +25,10 @@ function createGraphApi() {
     strength: vi.fn(() => linkForce),
   };
   const accessors: Record<string, unknown> = {};
-  let currentGraphData: { nodes: Array<Record<string, unknown>>; links: Array<Record<string, unknown>> } | null = null;
+  let currentGraphData: {
+    nodes: Array<Record<string, unknown>>;
+    links: Array<Record<string, unknown>>;
+  } | null = null;
 
   const accessor = (key: string) =>
     vi.fn((...args: [unknown?]) => {
@@ -47,13 +51,18 @@ function createGraphApi() {
     zoomToFit: vi.fn(() => api),
     cameraPosition: vi.fn(() => api),
     d3Force: vi.fn((name: string) => (name === 'link' ? linkForce : chargeForce)),
-    graphData: vi.fn((value?: { nodes: Array<Record<string, unknown>>; links: Array<Record<string, unknown>> }) => {
-      if (value === undefined) {
-        return currentGraphData;
-      }
-      currentGraphData = value;
-      return api;
-    }),
+    graphData: vi.fn(
+      (value?: {
+        nodes: Array<Record<string, unknown>>;
+        links: Array<Record<string, unknown>>;
+      }) => {
+        if (value === undefined) {
+          return currentGraphData;
+        }
+        currentGraphData = value;
+        return api;
+      },
+    ),
     backgroundColor: vi.fn(() => api),
     showNavInfo: vi.fn(() => api),
     width: vi.fn(() => api),
@@ -125,9 +134,12 @@ function createGraphApi() {
 }
 
 vi.mock('@/lib/store', () => ({
-  useAppStore: Object.assign((selector: (state: typeof mockStoreState) => unknown) => selector(mockStoreState), {
-    getState: () => mockStoreState,
-  }),
+  useAppStore: Object.assign(
+    (selector: (state: typeof mockStoreState) => unknown) => selector(mockStoreState),
+    {
+      getState: () => mockStoreState,
+    },
+  ),
 }));
 
 vi.mock('@/engine/alert-pulse', () => ({
@@ -138,23 +150,43 @@ vi.mock('@/engine/alert-pulse', () => ({
   },
 }));
 
-vi.mock('3d-force-graph', () => {
-  function MockForceGraph3D(...args: unknown[]) {
-    mockState.constructorCalls.push(args);
-    mockState.latestGraphApi = createGraphApi();
-    return mockState.latestGraphApi;
-  }
+vi.mock('react-force-graph-3d', () => {
+  const MockReactForceGraph3D = React.forwardRef((props: Record<string, unknown>, ref) => {
+    const api = createGraphApi();
+    mockState.latestGraphApi = api;
+    mockState.latestReactGraphProps = props;
+    React.useImperativeHandle(ref, () => api);
+    return <div data-testid="force-graph-mock" />;
+  });
+  MockReactForceGraph3D.displayName = 'MockReactForceGraph3D';
 
   return {
     __esModule: true,
-    default: MockForceGraph3D,
+    default: MockReactForceGraph3D,
   };
 });
 
 describe('HomeEngineStage', () => {
   beforeEach(() => {
     mockState.latestGraphApi = null;
-    mockState.constructorCalls = [];
+    mockState.latestReactGraphProps = null;
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          nodes: [
+            {
+              id: 'oss-node-1',
+              user: 'frontend-expert',
+              description: 'demo node',
+            },
+          ],
+          links: [],
+        }),
+      })),
+    );
 
     vi.stubGlobal(
       'ResizeObserver',
@@ -163,7 +195,10 @@ describe('HomeEngineStage', () => {
         disconnect() {}
       },
     );
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
   });
 
@@ -171,8 +206,35 @@ describe('HomeEngineStage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('enables node dragging and pins dragged node positions', async () => {
+  it('keeps the oss demo graph from re-centering during interaction', async () => {
+    render(
+      <HomeEngineStage
+        active
+        featuredAlert={demoAlerts[0]}
+        theme="dark"
+        panelLevel={0}
+        dataMode="oss-demo"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(mockState.latestGraphApi).not.toBeNull();
+      expect(mockState.latestReactGraphProps).not.toBeNull();
+    });
+
+    const graphApi = mockState.latestGraphApi as ReturnType<typeof createGraphApi>;
+    const props = mockState.latestReactGraphProps as Record<string, unknown>;
+
+    expect(props.enableNodeDrag).toBe(false);
+    await waitFor(() => {
+      expect(graphApi.zoomToFit).toHaveBeenCalled();
+    });
+    expect(graphApi.cameraPosition).not.toHaveBeenCalled();
+  });
+
+  it('renders the semantic stage with stable 3D props and selection callbacks', async () => {
     const onReady = vi.fn();
+    const onNodeSelected = vi.fn();
     render(
       <HomeEngineStage
         active
@@ -181,43 +243,42 @@ describe('HomeEngineStage', () => {
         panelLevel={0}
         dataMode="semantic"
         onReady={onReady}
+        onNodeSelected={onNodeSelected}
       />,
     );
 
     await waitFor(() => {
       expect(onReady).toHaveBeenCalled();
       expect(mockState.latestGraphApi).not.toBeNull();
+      expect(mockState.latestReactGraphProps).not.toBeNull();
     });
 
     const graphApi = mockState.latestGraphApi as ReturnType<typeof createGraphApi>;
-    expect(graphApi.enableNodeDrag).toHaveBeenCalledWith(true);
-    expect(graphApi.onNodeDrag).toHaveBeenCalled();
-    expect(graphApi.linkDirectionalParticles).toHaveBeenCalled();
-    expect(graphApi.linkDirectionalParticleOffset).toHaveBeenCalled();
-    expect(graphApi.linkDirectionalParticleThreeObject).toHaveBeenCalled();
+    expect(graphApi.zoomToFit).toHaveBeenCalled();
 
-    const particleAccessor = graphApi.linkDirectionalParticles.mock.calls.at(-1)?.[0] as ((link: Record<string, unknown>) => number) | undefined;
-    expect(particleAccessor?.({ kind: 'real', edgeType: 'PolicyBoundaryCrossing' })).toBe(0);
+    const props = mockState.latestReactGraphProps as Record<string, unknown>;
+    expect(props.enableNodeDrag).toBe(false);
+    expect(typeof props.onNodeClick).toBe('function');
+    expect(typeof props.linkDirectionalParticles).toBe('function');
 
-    const dragHandler = graphApi.onNodeDragEnd.mock.calls.at(-1)?.[0] as ((node: Record<string, unknown>) => void) | undefined;
-
-    const draggedNode = {
-      id: 'agent-security',
-      x: 128,
-      y: -36,
-      z: 214,
+    const graphData = props.graphData as {
+      nodes: Array<Record<string, unknown>>;
+      links: Array<Record<string, unknown>>;
     };
+    const realNode = graphData.nodes.find(
+      (node) => node.kind === 'core' && node.realNodeId === 'agent-security',
+    );
+    expect(realNode).toBeTruthy();
 
-    dragHandler?.(draggedNode);
+    const clickHandler = props.onNodeClick as (node: Record<string, unknown>) => void;
+    clickHandler(realNode as Record<string, unknown>);
 
-    expect(draggedNode).toMatchObject({
-      fx: 128,
-      fy: -36,
-      fz: 214,
-    });
-
-    expect(graphApi.d3ReheatSimulation).toHaveBeenCalled();
-    expect(graphApi.resumeAnimation).toHaveBeenCalled();
+    expect(onNodeSelected).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodeId: 'agent-security',
+        nodeType: 'Agent',
+      }),
+    );
   });
 
   it('derives default alert focus from primary agent and risky edges', () => {

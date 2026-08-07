@@ -61,8 +61,11 @@ export default function Home3DStoryDirector({
         <div className="prism-kicker-rule" style={{ gap: 0 }}>
           Scene Director
         </div>
-        <div className="prism-display" style={{ fontSize: 15, lineHeight: 1.14, color: 'var(--text-primary)' }}>
-          用真实责任图谱驱动 3D 镜头，而不是把地球当背景视频
+        <div
+          className="prism-display"
+          style={{ fontSize: 15, lineHeight: 1.14, color: 'var(--text-primary)' }}
+        >
+          用真实拓扑谱驱动 3D 镜头，而不是把地球当背景视频
         </div>
       </div>
 
@@ -91,10 +94,20 @@ export default function Home3DStoryDirector({
                 background: 'rgba(7, 12, 22, 0.22)',
               }}
             >
-              <div style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-quaternary)' }}>
+              <div
+                style={{
+                  fontSize: 9,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-quaternary)',
+                }}
+              >
                 {label}
               </div>
-              <div className="prism-display" style={{ marginTop: 3, fontSize: 16, lineHeight: 1, color: 'var(--text-primary)' }}>
+              <div
+                className="prism-display"
+                style={{ marginTop: 3, fontSize: 16, lineHeight: 1, color: 'var(--text-primary)' }}
+              >
                 {value}
               </div>
             </div>
@@ -128,11 +141,21 @@ export default function Home3DStoryDirector({
                   : 'rgba(7, 12, 22, 0.2)',
                 color: 'var(--text-primary)',
                 cursor: 'pointer',
-                boxShadow: active ? `0 10px 22px color-mix(in srgb, ${chapter.accent} 10%, transparent)` : 'none',
-                transition: 'transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease',
+                boxShadow: active
+                  ? `0 10px 22px color-mix(in srgb, ${chapter.accent} 10%, transparent)`
+                  : 'none',
+                transition:
+                  'transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                }}
+              >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <span
                     aria-hidden="true"
@@ -153,16 +176,29 @@ export default function Home3DStoryDirector({
                   >
                     0{index + 1}
                   </span>
-                  <div style={{ fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-quaternary)' }}>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                      color: 'var(--text-quaternary)',
+                    }}
+                  >
                     {chapter.stage}
                   </div>
                 </div>
-                <div aria-hidden="true" style={{ fontSize: 9, color: active ? chapter.accent : 'var(--text-tertiary)' }}>
+                <div
+                  aria-hidden="true"
+                  style={{ fontSize: 9, color: active ? chapter.accent : 'var(--text-tertiary)' }}
+                >
                   {chapter.metricLabel} {chapter.metricValue}
                 </div>
               </div>
 
-              <div className="prism-display" style={{ fontSize: 13, lineHeight: 1.16, color: 'var(--text-primary)' }}>
+              <div
+                className="prism-display"
+                style={{ fontSize: 13, lineHeight: 1.16, color: 'var(--text-primary)' }}
+              >
                 {chapter.title}
               </div>
 

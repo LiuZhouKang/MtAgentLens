@@ -57,7 +57,7 @@ class AtlasCredentialAccessVerifier(BaseVerifier):
         evidence.append(f"cat commands targeting credentials: {cat_credential_count}")
 
         # Check DB for alerts
-        db_path = run_dir / "trace.log.responsibility.db"
+        db_path = run_dir / "collector.responsibility.db"
         if db_path.exists():
             conn = sqlite3.connect(str(db_path))
             alert_count = conn.execute(

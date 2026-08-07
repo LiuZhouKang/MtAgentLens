@@ -17,11 +17,15 @@ interface EvidencePanelProps {
 }
 
 export default function EvidencePanel({
-  evidence, nonLinks, tracebackNodeIds, tracebackEdgeIds, onClose,
+  evidence,
+  nonLinks,
+  tracebackNodeIds,
+  tracebackEdgeIds,
+  onClose,
 }: EvidencePanelProps) {
   return (
     <div
-      className="absolute right-0 top-0 bottom-0 w-[60%] z-40 overflow-y-auto"
+      className="absolute top-0 right-0 bottom-0 z-40 w-[60%] overflow-y-auto"
       style={{
         background: 'rgba(8, 12, 24, 0.92)',
         backdropFilter: 'blur(32px)',
@@ -29,9 +33,11 @@ export default function EvidencePanel({
       }}
     >
       <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <h3 className="text-sm font-semibold tracking-wider text-white/80">证据取证</h3>
-          <button onClick={onClose} className="text-white/40 hover:text-white/80"><X size={20} /></button>
+          <button onClick={onClose} className="text-white/40 hover:text-white/80">
+            <X size={20} />
+          </button>
         </div>
         {tracebackNodeIds && tracebackEdgeIds && (
           <section className="mb-6">
@@ -39,16 +45,20 @@ export default function EvidencePanel({
           </section>
         )}
         <section className="mb-6">
-          <h4 className="text-[12px] uppercase tracking-wider text-[#68687a] mb-3">
+          <h4 className="mb-3 text-[12px] tracking-wider text-[#68687a] uppercase">
             关联证据 ({evidence.length})
           </h4>
-          {evidence.map((ev) => <IntentActionMatch key={ev.evidence_id} evidence={ev} />)}
+          {evidence.map((ev) => (
+            <IntentActionMatch key={ev.evidence_id} evidence={ev} />
+          ))}
         </section>
         <section>
-          <h4 className="text-[12px] uppercase tracking-wider text-[#68687a] mb-3">
+          <h4 className="mb-3 text-[12px] tracking-wider text-[#68687a] uppercase">
             失败关联诊断 ({nonLinks.length})
           </h4>
-          {nonLinks.map((nl) => <NonLinkDiagnosticView key={nl.diagnostic_id} diagnostic={nl} />)}
+          {nonLinks.map((nl) => (
+            <NonLinkDiagnosticView key={nl.diagnostic_id} diagnostic={nl} />
+          ))}
         </section>
       </div>
     </div>

@@ -12,8 +12,12 @@ describe('stellar model builders', () => {
     expect(model.primaryAlertIds).toEqual(['demo-alert-1']);
     expect(model.supportingAlertIds).toEqual([]);
     expect(model.leadAgentId).toBe('agent-security');
-    expect(model.relatedAgentIds).toEqual(expect.arrayContaining(['agent-security', 'agent-frontend']));
-    expect(model.highlightEdgeIds).toEqual(expect.arrayContaining(['e-delegate', 'e-taint', 'e-boundary']));
+    expect(model.relatedAgentIds).toEqual(
+      expect.arrayContaining(['agent-security', 'agent-frontend']),
+    );
+    expect(model.highlightEdgeIds).toEqual(
+      expect.arrayContaining(['e-delegate', 'e-taint', 'e-boundary']),
+    );
     expect(model.linkedEvidence.map((item) => item.evidence_id)).toEqual(['ev-3', 'ev-4']);
     expect(model.surfacedResources).toEqual(
       expect.arrayContaining([
@@ -40,9 +44,15 @@ describe('stellar model builders', () => {
 
     expect(model.agentId).toBe('agent-frontend');
     expect(model.alertIds).toEqual(expect.arrayContaining(['demo-alert-1', 'demo-alert-2']));
-    expect(model.relatedAgentIds).toEqual(expect.arrayContaining(['agent-security', 'agent-builder']));
+    expect(model.relatedAgentIds).toEqual(
+      expect.arrayContaining(['agent-security', 'agent-builder']),
+    );
     expect(model.touchedResources).toEqual(
-      expect.arrayContaining(['/src/components/Button.tsx', '/package.json', 'api.anthropic.com:443']),
+      expect.arrayContaining([
+        '/src/components/Button.tsx',
+        '/package.json',
+        'api.anthropic.com:443',
+      ]),
     );
     expect(model.surfacedResources).toEqual(
       expect.arrayContaining([
@@ -54,7 +64,9 @@ describe('stellar model builders', () => {
     expect(model.surfacedResources.length).toBeLessThanOrEqual(8);
     expect(model.resourceCounts.files).toBeGreaterThan(0);
     expect(model.resourceCounts.networks).toBeGreaterThan(0);
-    expect(model.linkedEvidence.map((item) => item.evidence_id)).toEqual(expect.arrayContaining(['ev-1', 'ev-2', 'ev-4']));
+    expect(model.linkedEvidence.map((item) => item.evidence_id)).toEqual(
+      expect.arrayContaining(['ev-1', 'ev-2', 'ev-4']),
+    );
   });
 
   it('returns a stable empty cluster model when no matching data is found', () => {

@@ -56,12 +56,12 @@ def build_frozen_dataset(
         scenario_trace_dir = traces_dir / scenario.id
         scenario_trace_dir.mkdir(exist_ok=True)
 
-        db_src = run_dir / "trace.log.responsibility.db"
-        if db_src.exists():
+        db_src = _resolve_db(run_dir)
+        if db_src and db_src.exists():
             shutil.copy2(db_src, scenario_trace_dir / db_src.name)
 
-        jsonl_src = run_dir / "trace.log.jsonl"
-        if jsonl_src.exists():
+        jsonl_src = _resolve_jsonl(run_dir)
+        if jsonl_src and jsonl_src.exists():
             shutil.copy2(jsonl_src, scenario_trace_dir / jsonl_src.name)
 
     # Copy ground truth
@@ -99,6 +99,29 @@ def _write_json(path: Path, data: object) -> None:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def _resolve_db(run_dir: Path) -> Path | None:
+    """Resolve the responsibility database."""
+    collector_dir = run_dir / "collector"
+    for candidate in (
+        collector_dir / "collector.responsibility.db",
+    ):
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _resolve_jsonl(run_dir: Path) -> Path | None:
+    """Resolve the JSONL collector log file."""
+    collector_dir = run_dir / "collector"
+    for candidate in (
+        collector_dir / "collector.log",
+        run_dir / "collector.log",
+    ):
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def _write_readme(dataset_dir: Path, version: str) -> None:
     readme = f"""# MtAgentLens Benchmark v{version} — Frozen Dataset
 
@@ -110,7 +133,10 @@ from pathlib import Path
 
 dataset = Path(".")
 for scenario_dir in sorted((dataset / "traces").iterdir()):
-    db = sqlite3.connect(str(scenario_dir / "trace.log.responsibility.db"))
+    db_path = scenario_dir / "responsibility.db"
+    if not db_path.exists():
+        db_path = scenario_dir / "collector.responsibility.db"
+    db = sqlite3.connect(str(db_path))
     alerts = db.execute("SELECT COUNT(*) FROM responsibility_alerts").fetchone()[0]
     print(f"{{scenario_dir.name}}: {{alerts}} alerts")
 ```

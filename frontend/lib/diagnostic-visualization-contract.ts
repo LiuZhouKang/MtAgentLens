@@ -28,13 +28,7 @@ export type VitalityLevel = 'alive' | 'silent' | 'dead';
 
 /** 运行时阶段 — 对应 Rust `RuntimePhase` */
 export type RuntimePhase =
-  | 'bootstrap'
-  | 'phase1'
-  | 'phase2_triggered'
-  | 'phase2'
-  | 'complete'
-  | 'stuck'
-  | 'unknown';
+  'bootstrap' | 'phase1' | 'phase2_triggered' | 'phase2' | 'complete' | 'stuck' | 'unknown';
 
 /** 诊断链根因层 — 对应 Rust `RootCauseLayer` */
 export type RootCauseLayer = 'kernel' | 'pipeline' | 'framework' | 'none';
@@ -53,12 +47,21 @@ export type ProbeName = 'tls_capture' | 'browsertrace' | 'process' | 'stdiocap';
 
 /** 已知事件类型枚举 — 对应 shared_handoff.md Template E 的 KNOWN_TYPES */
 export const KNOWN_EVENT_TYPES = [
-  'ssl_read', 'ssl_write',
-  'process_exec', 'process_exit', 'process_file', 'process_signal', 'process_net',
-  'stdio_read', 'stdio_write',
-  'system_cpu', 'system_mem',
-  'sse_text', 'sse_done',
-  'http_request', 'http_response',
+  'ssl_read',
+  'ssl_write',
+  'process_exec',
+  'process_exit',
+  'process_file',
+  'process_signal',
+  'process_net',
+  'stdio_read',
+  'stdio_write',
+  'system_cpu',
+  'system_mem',
+  'sse_text',
+  'sse_done',
+  'http_request',
+  'http_response',
 ] as const;
 
 export type KnownEventType = (typeof KNOWN_EVENT_TYPES)[number];
@@ -409,11 +412,7 @@ export interface DiagHistoryTableProps {
 
 /** SSE 流类型鉴别符 */
 export type DiagStreamType =
-  | 'diag_probe'
-  | 'diag_stream'
-  | 'diag_runtime'
-  | 'diag_cascade'
-  | 'diag_complete';
+  'diag_probe' | 'diag_stream' | 'diag_runtime' | 'diag_cascade' | 'diag_complete';
 
 /** 诊断 SSE 事件基类 */
 export interface DiagEventBase {
@@ -696,35 +695,53 @@ export type DiagThresholdsUpdateRequest = Partial<DiagThresholdConfig>;
 
 /** 诊断状态 → 语义色 */
 export const DIAG_STATUS_COLORS: Record<DiagnosticStatus, string> = {
-  healthy: '#22c55e',   // green-500
-  degraded: '#eab308',  // yellow-500
+  healthy: '#22c55e', // green-500
+  degraded: '#eab308', // yellow-500
   unhealthy: '#ef4444', // red-500
 };
 
 /** 生机等级 → 语义色 + 图标 */
-export const VITALITY_LEVEL_DISPLAY: Record<VitalityLevel, { color: string; icon: string; label: string }> = {
-  alive:  { color: '#22c55e', icon: '●', label: '存活' },
+export const VITALITY_LEVEL_DISPLAY: Record<
+  VitalityLevel,
+  { color: string; icon: string; label: string }
+> = {
+  alive: { color: '#22c55e', icon: '●', label: '存活' },
   silent: { color: '#eab308', icon: '◑', label: '静默' },
-  dead:   { color: '#ef4444', icon: '○', label: '阵亡' },
+  dead: { color: '#ef4444', icon: '○', label: '阵亡' },
 };
 
 /** 运行时阶段 → 语义色 + 标签 */
 export const RUNTIME_PHASE_DISPLAY: Record<RuntimePhase, { color: string; label: string }> = {
-  bootstrap:        { color: '#3b82f6', label: '初始化' },
-  phase1:           { color: '#22c55e', label: '流式分类' },
+  bootstrap: { color: '#3b82f6', label: '初始化' },
+  phase1: { color: '#22c55e', label: '流式分类' },
   phase2_triggered: { color: '#eab308', label: '触发终结' },
-  phase2:           { color: '#06b6d4', label: '批量终结' },
-  complete:         { color: '#8b5cf6', label: '完成' },
-  stuck:            { color: '#ef4444', label: '僵滞' },
-  unknown:          { color: '#6b7280', label: '未知' },
+  phase2: { color: '#06b6d4', label: '批量终结' },
+  complete: { color: '#8b5cf6', label: '完成' },
+  stuck: { color: '#ef4444', label: '僵滞' },
+  unknown: { color: '#6b7280', label: '未知' },
 };
 
 /** 根因层 → 语义色 + 排查范围 */
-export const ROOT_CAUSE_LAYER_DISPLAY: Record<RootCauseLayer, { color: string; label: string; scope: string }> = {
-  kernel:    { color: '#ef4444', label: '内核/eBPF 层', scope: '检查 bpftool、内核版本、verifier 日志' },
-  pipeline:  { color: '#f97316', label: '数据管道层', scope: '检查 perf buffer、磁盘空间、时钟同步' },
-  framework: { color: '#eab308', label: 'Rust 框架层', scope: '检查 analyzer 管线、SQLite 写入、claim builder' },
-  none:      { color: '#22c55e', label: '无故障', scope: '系统运行正常' },
+export const ROOT_CAUSE_LAYER_DISPLAY: Record<
+  RootCauseLayer,
+  { color: string; label: string; scope: string }
+> = {
+  kernel: {
+    color: '#ef4444',
+    label: '内核/eBPF 层',
+    scope: '检查 bpftool、内核版本、verifier 日志',
+  },
+  pipeline: {
+    color: '#f97316',
+    label: '数据管道层',
+    scope: '检查 perf buffer、磁盘空间、时钟同步',
+  },
+  framework: {
+    color: '#eab308',
+    label: 'Rust 框架层',
+    scope: '检查 analyzer 管线、SQLite 写入、claim builder',
+  },
+  none: { color: '#22c55e', label: '无故障', scope: '系统运行正常' },
 };
 
 // ════════════════════════════════════════════════════════════════

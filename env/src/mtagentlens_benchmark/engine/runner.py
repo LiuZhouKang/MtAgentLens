@@ -37,15 +37,31 @@ def run_scenarios(
             (run_dir / ".scenario_id").write_text(scenario.id)
             _save_summary(run_dir, result)
     else:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as pool:
-            futures = {}
-            for scenario in scenarios:
-                run_dir = workspace.runs_dir / f"{timestamp}-{_uuid.uuid4().hex[:12]}"
+        # Parallel mode: run scenarios concurrently but serialize collector
+        # operations. Multiple collector instances cannot attach to the same
+        # eBPF hooks simultaneously — they would conflict and produce corrupted
+        # or empty traces. We use a ThreadPoolExecutor for I/O-bound work
+        # (agent execution) but ensure only one collector runs at a time via
+        # a lock. Each scenario still gets its own collector subprocess for
+        # clean isolation.
+        import threading
+        collector_lock = threading.Lock()
+
+        def _run_one(scenario: ScenarioConfig) -> RunResult:
+            run_dir = workspace.runs_dir / f"{timestamp}-{_uuid.uuid4().hex[:12]}"
+            with collector_lock:
                 collector = collector_factory() if collector_factory else None
-                future = pool.submit(execute_scenario, scenario, run_dir, workspace, execution_mode, collector)
-                futures[future] = scenario
-            for future in concurrent.futures.as_completed(futures):
-                scenario = futures[future]
+                result = execute_scenario(scenario, run_dir, workspace, execution_mode, collector)
+            (run_dir / ".scenario_id").write_text(scenario.id)
+            _save_summary(run_dir, result)
+            return result
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as pool:
+            future_to_scenario = {
+                pool.submit(_run_one, s): s for s in scenarios
+            }
+            for future in concurrent.futures.as_completed(future_to_scenario):
+                scenario = future_to_scenario[future]
                 try:
                     result = future.result()
                     results.append(result)

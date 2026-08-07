@@ -66,14 +66,14 @@ SCENARIO_SEMANTIC_CATEGORIES = {
 
 GENERIC_OPERATIONAL_CATEGORIES = {"logic", "resource", "unknown"}
 
-REQUIRED_RUN_ARTIFACTS = ["trace.log"]
+REQUIRED_RUN_ARTIFACTS = ["collector.log"]
 OPTIONAL_RUN_ARTIFACTS = [
-    "trace.log.causal.db",
-    "trace.log.causal.jsonl",
+    "collector.causal.db",
+    "collector.causal.jsonl",
     "summary.json",
     "replay.report.json",
-    "trace.log.replayed.causal.db",
-    "trace.log.replayed.causal.jsonl",
+    "collector.replayed.causal.db",
+    "collector.replayed.causal.jsonl",
 ]
 
 MIN_TRACE_EVENTS = 500
@@ -261,11 +261,11 @@ def verify_s0_pipeline_structure(run_dir: Path) -> Dict[str, Any]:
 def _find_alerts_db(run_dir: Path) -> Optional[Path]:
     """Find the alerts database in the run directory.
 
-    Priority: trace.log.alerts.db > trace.log.db (legacy naming).
+    Priority: collector.alerts.db > collector.alerts.db (legacy naming).
     """
     candidates = [
-        run_dir / "trace.log.alerts.db",
-        run_dir / "trace.log.db",
+        run_dir / "collector.alerts.db",
+        run_dir / "collector.alerts.db",
     ]
     for path in candidates:
         if path.exists():
@@ -671,9 +671,9 @@ def verify_s3_telemetry_coverage(events: EventSource) -> Dict[str, Any]:
         # Alert events
         alert_count = events.count_events(source="alert")
         if alert_count > 0:
-            evidence.append(f"S3: Alert events in trace.log: {alert_count:,}")
+            evidence.append(f"S3: Alert events in collector.log: {alert_count:,}")
         else:
-            evidence.append("S3: Alert events: 0 in trace.log")
+            evidence.append("S3: Alert events: 0 in collector.log")
 
         # Event source diversity
         if ssl_count > 0 and process_count > 0:
@@ -749,7 +749,7 @@ def verify_s4_artifact_completeness(
         evidence.append(f"S4: Could not read collector events: {e}")
 
     # Causal DB check
-    causal_db = run_dir / "trace.log.causal.db"
+    causal_db = run_dir / "collector.causal.db"
     if causal_db.exists() and causal_db.stat().st_size >= MIN_CAUSAL_DB_BYTES:
         evidence.append(
             f"S4: Causal DB present "
@@ -800,7 +800,7 @@ def verify_s4_artifact_completeness(
 
     status = (
         "fail"
-        if missing and "trace.log" in missing
+        if missing and "collector.log" in missing
         else "degraded"
         if len(failures) >= 2
         else "pass"

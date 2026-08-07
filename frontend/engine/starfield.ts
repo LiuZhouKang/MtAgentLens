@@ -45,7 +45,7 @@ function sphericalPoint(radiusMin: number, radiusMax: number, squash = 1): THREE
   return new THREE.Vector3(
     radius * Math.sin(phi) * Math.cos(theta),
     radius * Math.sin(phi) * Math.sin(theta) * squash,
-    radius * Math.cos(phi)
+    radius * Math.cos(phi),
   );
 }
 
@@ -55,7 +55,7 @@ function discPoint(radiusMax: number, thickness: number): THREE.Vector3 {
   return new THREE.Vector3(
     Math.cos(angle) * radius,
     randomBetween(-thickness, thickness),
-    Math.sin(angle) * radius
+    Math.sin(angle) * radius,
   );
 }
 
@@ -125,7 +125,12 @@ function createStarLayer(options: {
   return new THREE.Points(geometry, material);
 }
 
-function createOrbitRing(radiusX: number, radiusY: number, color: string, rotation: THREE.Euler): THREE.Line {
+function createOrbitRing(
+  radiusX: number,
+  radiusY: number,
+  color: string,
+  rotation: THREE.Euler,
+): THREE.Line {
   const curve = new THREE.EllipseCurve(0, 0, radiusX, radiusY, 0, Math.PI * 2, false, 0);
   const points = curve.getPoints(220).map((point) => new THREE.Vector3(point.x, point.y, 0));
   const geometry = new THREE.BufferGeometry().setFromPoints(points);
@@ -144,7 +149,7 @@ function createFractureLine(
   start: THREE.Vector3,
   control: THREE.Vector3,
   end: THREE.Vector3,
-  color: string
+  color: string,
 ): THREE.Line {
   const curve = new THREE.QuadraticBezierCurve3(start, control, end);
   const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(68));
@@ -167,7 +172,8 @@ function disposeObject(root: THREE.Object3D): void {
     const material = (child as THREE.Mesh).material;
     const materials = Array.isArray(material) ? material : material ? [material] : [];
     for (const entry of materials) {
-      const texture = (entry as THREE.Material & { map?: THREE.Texture; alphaMap?: THREE.Texture }).map;
+      const texture = (entry as THREE.Material & { map?: THREE.Texture; alphaMap?: THREE.Texture })
+        .map;
       const alphaTexture = (entry as THREE.Material & { alphaMap?: THREE.Texture }).alphaMap;
       texture?.dispose();
       if (alphaTexture && alphaTexture !== texture) {
@@ -242,8 +248,7 @@ export function createStarfield(scene: THREE.Scene, count = 1200): StarfieldCont
         nearStars.rotation.y += delta * 0.012;
         nearStars.position.y = Math.sin(elapsed * 0.18) * 10;
       },
-    }
-    ,
+    },
     {
       object: coreStars,
       update: (elapsed, delta) => {
@@ -251,7 +256,7 @@ export function createStarfield(scene: THREE.Scene, count = 1200): StarfieldCont
         const material = coreStars.material as THREE.PointsMaterial;
         material.opacity = 0.28 + Math.sin(elapsed * 0.9) * 0.08;
       },
-    }
+    },
   );
 
   const orbitGroup = new THREE.Group();
@@ -293,7 +298,7 @@ export function createStarfield(scene: THREE.Scene, count = 1200): StarfieldCont
         opacity: 0.24,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-      })
+      }),
     );
     halo.position.copy(center);
     halo.scale.setScalar(index % 2 === 0 ? 188 : 144);
@@ -302,7 +307,7 @@ export function createStarfield(scene: THREE.Scene, count = 1200): StarfieldCont
       randomBetween(34, 54),
       randomBetween(18, 26),
       index % 3 === 0 ? '#5ed7ff' : index % 3 === 1 ? '#9884ff' : '#f4b565',
-      new THREE.Euler(randomBetween(0.1, 1.2), randomBetween(-0.6, 0.6), randomBetween(-0.8, 0.8))
+      new THREE.Euler(randomBetween(0.1, 1.2), randomBetween(-0.6, 0.6), randomBetween(-0.8, 0.8)),
     );
     orbit.position.copy(center);
 
@@ -327,9 +332,11 @@ export function createStarfield(scene: THREE.Scene, count = 1200): StarfieldCont
         opacity: i % 2 === 0 ? 0.11 : 0.08,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-      })
+      }),
     );
-    sprite.position.copy(CLUSTER_CENTERS[(i + 1) % CLUSTER_CENTERS.length].clone().multiplyScalar(0.86));
+    sprite.position.copy(
+      CLUSTER_CENTERS[(i + 1) % CLUSTER_CENTERS.length].clone().multiplyScalar(0.86),
+    );
     sprite.position.y += i % 2 === 0 ? 56 : -42;
     sprite.scale.set(320 + i * 44, 220 + i * 30, 1);
     nebulaGroup.add(sprite);
@@ -353,13 +360,13 @@ export function createStarfield(scene: THREE.Scene, count = 1200): StarfieldCont
       new THREE.Vector3(-210, -118, 122),
       new THREE.Vector3(-12, -14, 8),
       new THREE.Vector3(264, 136, -62),
-      '#ff5b86'
+      '#ff5b86',
     ),
     createFractureLine(
       new THREE.Vector3(-138, 152, 94),
       new THREE.Vector3(58, 24, -34),
       new THREE.Vector3(242, -168, -104),
-      '#ff9b63'
+      '#ff9b63',
     ),
   ];
   fractures.forEach((line) => fractureGroup.add(line));
@@ -382,7 +389,7 @@ export function createStarfield(scene: THREE.Scene, count = 1200): StarfieldCont
       opacity: 0.18,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-    })
+    }),
   );
   coreGlow.scale.set(280, 280, 1);
   root.add(coreGlow);
@@ -394,7 +401,6 @@ export function createStarfield(scene: THREE.Scene, count = 1200): StarfieldCont
       coreGlow.scale.set(280 * scale, 280 * scale, 1);
     },
   });
-
 
   scene.add(root);
 

@@ -5,7 +5,7 @@
 // 四种外泄模式: ReadThenSend | LargeUpload | BatchExport | CovertChannel
 // 四级严重度:    Low → Medium → High → Critical
 
-import type { AnomalySeverity } from "./data-contract";
+import type { AnomalySeverity } from './data-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 外泄类型（与 Rust ExfilType 对齐）
@@ -13,25 +13,25 @@ import type { AnomalySeverity } from "./data-contract";
 
 /** 外泄检测模式 */
 export type ExfilType =
-  | "ReadThenSend"   // 读取敏感文件后短时间内向外部发送内容匹配的请求
-  | "LargeUpload"    // 单次 POST 请求体超过阈值
-  | "BatchExport"    // 短时间内向同一外部端点累计发送超过阈值
-  | "CovertChannel"; // 检测到分片/编码等隐蔽传输模式
+  | 'ReadThenSend' // 读取敏感文件后短时间内向外部发送内容匹配的请求
+  | 'LargeUpload' // 单次 POST 请求体超过阈值
+  | 'BatchExport' // 短时间内向同一外部端点累计发送超过阈值
+  | 'CovertChannel'; // 检测到分片/编码等隐蔽传输模式
 
 /** 外泄类型的人类可读标签 */
 export const EXFIL_TYPE_LABEL: Record<ExfilType, string> = {
-  ReadThenSend: "读后即发",
-  LargeUpload: "大容量上载",
-  BatchExport: "批量导出",
-  CovertChannel: "隐蔽通道",
+  ReadThenSend: '读后即发',
+  LargeUpload: '大容量上载',
+  BatchExport: '批量导出',
+  CovertChannel: '隐蔽通道',
 };
 
 /** 外泄类型的描述 */
 export const EXFIL_TYPE_DESC: Record<ExfilType, string> = {
-  ReadThenSend: "Agent 读取敏感文件后，短时间内向外部发送了内容匹配的请求",
-  LargeUpload: "单次 POST 请求体超过阈值大小，可能包含敏感数据",
-  BatchExport: "短时间内向同一外部端点累计发送大量数据",
-  CovertChannel: "检测到分片传输、编码伪装等隐蔽数据外传模式",
+  ReadThenSend: 'Agent 读取敏感文件后，短时间内向外部发送了内容匹配的请求',
+  LargeUpload: '单次 POST 请求体超过阈值大小，可能包含敏感数据',
+  BatchExport: '短时间内向同一外部端点累计发送大量数据',
+  CovertChannel: '检测到分片传输、编码伪装等隐蔽数据外传模式',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -39,27 +39,27 @@ export const EXFIL_TYPE_DESC: Record<ExfilType, string> = {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** 外泄告警严重程度 */
-export type ExfilSeverity = "Low" | "Medium" | "High" | "Critical";
+export type ExfilSeverity = 'Low' | 'Medium' | 'High' | 'Critical';
 
 /** 严重程度标签 */
 export const EXFIL_SEVERITY_LABEL: Record<ExfilSeverity, string> = {
-  Low: "低",
-  Medium: "中",
-  High: "高",
-  Critical: "严重",
+  Low: '低',
+  Medium: '中',
+  High: '高',
+  Critical: '严重',
 };
 
 /** ExfilSeverity → AnomalySeverity 映射（用于与现有异常系统互操作） */
 export function exfilSeverityToAnomalySeverity(s: ExfilSeverity): AnomalySeverity {
   switch (s) {
-    case "Low":
-      return "info";
-    case "Medium":
-      return "warning";
-    case "High":
-      return "critical";
-    case "Critical":
-      return "critical";
+    case 'Low':
+      return 'info';
+    case 'Medium':
+      return 'warning';
+    case 'High':
+      return 'critical';
+    case 'Critical':
+      return 'critical';
   }
 }
 
@@ -185,12 +185,11 @@ export interface DestinationStats {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** data_exfil 流类型 */
-export type DataExfilStreamType = "data_exfil";
+export type DataExfilStreamType = 'data_exfil';
 
 /** 扩展后的完整 stream_type（包含 data_exfil） */
 export type ExtendedExfilStreamType =
-  | import("./data-contract").UnifiedStreamEvent["stream_type"]
-  | DataExfilStreamType;
+  import('./data-contract').UnifiedStreamEvent['stream_type'] | DataExfilStreamType;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 仪表板 UI 状态
@@ -198,10 +197,10 @@ export type ExtendedExfilStreamType =
 
 /** 仪表板视图模式 */
 export type ExfilDashboardViewMode =
-  | "overview"      // 概览：严重度分布 + 类型分布 + 统计摘要
-  | "alerts"        // 告警列表：可过滤、可排序的告警卡片网格
-  | "destinations"  // 目标分析：按目标端点聚合的统计视图
-  | "timeline";     // 时间线：按时间排序的告警流
+  | 'overview' // 概览：严重度分布 + 类型分布 + 统计摘要
+  | 'alerts' // 告警列表：可过滤、可排序的告警卡片网格
+  | 'destinations' // 目标分析：按目标端点聚合的统计视图
+  | 'timeline'; // 时间线：按时间排序的告警流
 
 /** 仪表板全局状态 */
 export interface DataExfilDashboardState {
@@ -273,7 +272,7 @@ export interface ExfilSeverityBadgeProps {
 /** 外泄类型图标 Props */
 export interface ExfilTypeIconProps {
   exfil_type: ExfilType;
-  size?: "sm" | "md";
+  size?: 'sm' | 'md';
 }
 
 /** 目标分布图 Props */
@@ -319,8 +318,8 @@ export function formatTimeWindow(ms: number): string {
 /** 计算告警的时间戳 (epoch ms)，从 related_events 中提取最早时间戳 */
 export function extractAlertTimestamp(alert: DataExfilAlert): number {
   if (alert.related_events.length === 0) return 0;
-  const earliest = alert.related_events.reduce((min, e) =>
-    e.timestamp_ns < min ? e.timestamp_ns : min,
+  const earliest = alert.related_events.reduce(
+    (min, e) => (e.timestamp_ns < min ? e.timestamp_ns : min),
     Infinity,
   );
   return Math.floor(earliest / 1_000_000); // ns → ms
@@ -328,15 +327,18 @@ export function extractAlertTimestamp(alert: DataExfilAlert): number {
 
 /** 按 agent_root_pid 聚合告警统计 */
 export function aggregateByAgent(alerts: DataExfilAlert[]): AgentExfilStats[] {
-  const map = new Map<number, {
-    total: number;
-    byType: Record<ExfilType, number>;
-    bySeverity: Record<ExfilSeverity, number>;
-    totalBytes: number;
-    destinations: Set<string>;
-    corrScores: number[];
-    maxSev: ExfilSeverity | null;
-  }>();
+  const map = new Map<
+    number,
+    {
+      total: number;
+      byType: Record<ExfilType, number>;
+      bySeverity: Record<ExfilSeverity, number>;
+      totalBytes: number;
+      destinations: Set<string>;
+      corrScores: number[];
+      maxSev: ExfilSeverity | null;
+    }
+  >();
 
   for (const alert of alerts) {
     const pid = alert.agent_root_pid;
@@ -361,36 +363,41 @@ export function aggregateByAgent(alerts: DataExfilAlert[]): AgentExfilStats[] {
       agg.corrScores.push(alert.correlation_score);
     }
     // 跟踪最高严重程度
-    const sevOrder: ExfilSeverity[] = ["Low", "Medium", "High", "Critical"];
+    const sevOrder: ExfilSeverity[] = ['Low', 'Medium', 'High', 'Critical'];
     if (!agg.maxSev || sevOrder.indexOf(alert.severity) > sevOrder.indexOf(agg.maxSev)) {
       agg.maxSev = alert.severity;
     }
   }
 
-  return Array.from(map.entries()).map(([pid, agg]) => ({
-    agent_root_pid: pid,
-    total_alerts: agg.total,
-    alerts_by_type: agg.byType,
-    alerts_by_severity: agg.bySeverity,
-    total_exported_bytes: agg.totalBytes,
-    unique_destinations: Array.from(agg.destinations).sort(),
-    avg_correlation_score:
-      agg.corrScores.length > 0
-        ? agg.corrScores.reduce((a, b) => a + b, 0) / agg.corrScores.length
-        : 0,
-    max_severity: agg.maxSev,
-  })).sort((a, b) => b.total_alerts - a.total_alerts);
+  return Array.from(map.entries())
+    .map(([pid, agg]) => ({
+      agent_root_pid: pid,
+      total_alerts: agg.total,
+      alerts_by_type: agg.byType,
+      alerts_by_severity: agg.bySeverity,
+      total_exported_bytes: agg.totalBytes,
+      unique_destinations: Array.from(agg.destinations).sort(),
+      avg_correlation_score:
+        agg.corrScores.length > 0
+          ? agg.corrScores.reduce((a, b) => a + b, 0) / agg.corrScores.length
+          : 0,
+      max_severity: agg.maxSev,
+    }))
+    .sort((a, b) => b.total_alerts - a.total_alerts);
 }
 
 /** 按目标主机聚合告警统计 */
 export function aggregateByDestination(alerts: DataExfilAlert[]): DestinationStats[] {
-  const map = new Map<string, {
-    count: number;
-    bytes: number;
-    types: Set<ExfilType>;
-    sevs: ExfilSeverity[];
-    agents: Set<number>;
-  }>();
+  const map = new Map<
+    string,
+    {
+      count: number;
+      bytes: number;
+      types: Set<ExfilType>;
+      sevs: ExfilSeverity[];
+      agents: Set<number>;
+    }
+  >();
 
   for (const alert of alerts) {
     const host = alert.destination.host;
@@ -411,23 +418,27 @@ export function aggregateByDestination(alerts: DataExfilAlert[]): DestinationSta
     agg.agents.add(alert.agent_root_pid);
   }
 
-  const sevOrder: ExfilSeverity[] = ["Low", "Medium", "High", "Critical"];
+  const sevOrder: ExfilSeverity[] = ['Low', 'Medium', 'High', 'Critical'];
 
-  return Array.from(map.entries()).map(([host, agg]) => ({
-    host,
-    alert_count: agg.count,
-    total_bytes: agg.bytes,
-    exfil_types: Array.from(agg.types),
-    max_severity: agg.sevs.reduce((max, s) =>
-      sevOrder.indexOf(s) > sevOrder.indexOf(max) ? s : max,
-      "Low" as ExfilSeverity,
-    ),
-    affected_agents: Array.from(agg.agents).sort((a, b) => a - b),
-  })).sort((a, b) => b.total_bytes - a.total_bytes);
+  return Array.from(map.entries())
+    .map(([host, agg]) => ({
+      host,
+      alert_count: agg.count,
+      total_bytes: agg.bytes,
+      exfil_types: Array.from(agg.types),
+      max_severity: agg.sevs.reduce(
+        (max, s) => (sevOrder.indexOf(s) > sevOrder.indexOf(max) ? s : max),
+        'Low' as ExfilSeverity,
+      ),
+      affected_agents: Array.from(agg.agents).sort((a, b) => a - b),
+    }))
+    .sort((a, b) => b.total_bytes - a.total_bytes);
 }
 
 /** 计算严重程度分布百分比 */
-export function severityDistribution(alerts: DataExfilAlert[]): Record<ExfilSeverity, { count: number; pct: number }> {
+export function severityDistribution(
+  alerts: DataExfilAlert[],
+): Record<ExfilSeverity, { count: number; pct: number }> {
   const total = alerts.length || 1;
   const counts: Record<ExfilSeverity, number> = { Low: 0, Medium: 0, High: 0, Critical: 0 };
   for (const a of alerts) counts[a.severity]++;
@@ -462,7 +473,7 @@ export function findSelectedAlert(
 export function createDefaultExfilState(): DataExfilDashboardState {
   return {
     alerts: [],
-    view_mode: "overview",
+    view_mode: 'overview',
     selected_alert_id: null,
     type_filter: null,
     severity_filter: null,

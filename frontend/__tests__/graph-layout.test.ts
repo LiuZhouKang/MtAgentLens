@@ -32,8 +32,14 @@ describe('GraphLayout', () => {
       { id: 'b', type: 'Agent' as const, x: 5, y: 0, z: 0 },
     ];
     // Test each edge type produces valid results
-    const types = ['IntentCausesAction', 'AgentDelegatesTo', 'ContextFlowsFrom',
-      'TaintPropagatesTo', 'PolicyBoundaryCrossing', 'CompetingExplanation'] as const;
+    const types = [
+      'IntentCausesAction',
+      'AgentDelegatesTo',
+      'ContextFlowsFrom',
+      'TaintPropagatesTo',
+      'PolicyBoundaryCrossing',
+      'CompetingExplanation',
+    ] as const;
     for (const t of types) {
       const edges = [{ source: 'a', target: 'b', edge_type: t }];
       const result = forceLayout3D(nodes, edges, 50);

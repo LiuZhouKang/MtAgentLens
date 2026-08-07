@@ -41,7 +41,7 @@ def verify(run_dir: Path, scenario_dir: Path, events: EventSource) -> dict:
         evidence.append(f"Alert: decision={decision} title={alert.get('title', '?')[:120]}")
 
     import sqlite3
-    db_path = run_dir / "trace.log.db"
+    db_path = run_dir / "collector.alerts.db"
     if db_path.exists():
         conn = sqlite3.connect(str(db_path))
         cursor = conn.execute("SELECT count(*) FROM responsibility_alerts WHERE decision = 'unsafe'")

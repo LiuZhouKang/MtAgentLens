@@ -6,53 +6,53 @@
 // 三级风险等级: low | medium | high
 // 工作空间边界: inside | outside
 
-import type { AnomalySeverity } from "./data-contract";
+import type { AnomalySeverity } from './data-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 访问类型与风险等级
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** 文件访问类型（与 Rust access_type 对齐） */
-export type FileAccessType = "Read" | "Write" | "Execute" | "Stat" | "Delete";
+export type FileAccessType = 'Read' | 'Write' | 'Execute' | 'Stat' | 'Delete';
 
 /** 风险等级（与 Rust risk_level 对齐） */
-export type FileAccessRiskLevel = "low" | "medium" | "high";
+export type FileAccessRiskLevel = 'low' | 'medium' | 'high';
 
 /** 工作空间边界（与 Rust workspace_boundary 对齐） */
-export type WorkspaceBoundary = "inside" | "outside";
+export type WorkspaceBoundary = 'inside' | 'outside';
 
 /** 严重程度（与 Rust severity 对齐） */
-export type FileAccessSeverity = "info" | "warn";
+export type FileAccessSeverity = 'info' | 'warn';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 标签映射
 // ═══════════════════════════════════════════════════════════════════════════
 
 export const FILE_ACCESS_TYPE_LABEL: Record<FileAccessType, string> = {
-  Read: "读取",
-  Write: "写入",
-  Execute: "执行",
-  Stat: "状态查询",
-  Delete: "删除",
+  Read: '读取',
+  Write: '写入',
+  Execute: '执行',
+  Stat: '状态查询',
+  Delete: '删除',
 };
 
 export const FILE_ACCESS_TYPE_ICON: Record<FileAccessType, string> = {
-  Read: "📖",
-  Write: "✏️",
-  Execute: "⚡",
-  Stat: "🔍",
-  Delete: "🗑️",
+  Read: '📖',
+  Write: '✏️',
+  Execute: '⚡',
+  Stat: '🔍',
+  Delete: '🗑️',
 };
 
 export const FILE_ACCESS_RISK_LABEL: Record<FileAccessRiskLevel, string> = {
-  low: "低",
-  medium: "中",
-  high: "高",
+  low: '低',
+  medium: '中',
+  high: '高',
 };
 
 export const WORKSPACE_BOUNDARY_LABEL: Record<WorkspaceBoundary, string> = {
-  inside: "工作空间内",
-  outside: "工作空间外",
+  inside: '工作空间内',
+  outside: '工作空间外',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -87,7 +87,7 @@ export interface FileAccessRecord {
   /** 事件 ID */
   id: string;
   /** 事件类型，固定为 "FILE_OPEN" */
-  event: "FILE_OPEN";
+  event: 'FILE_OPEN';
   /** 文件绝对路径 */
   filepath: string;
   /** 访问类型 */
@@ -168,7 +168,7 @@ export interface WorkspaceAccessSnapshot {
 // 仪表板状态
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type FileAccessViewMode = "overview" | "timeline" | "by_agent" | "by_type";
+export type FileAccessViewMode = 'overview' | 'timeline' | 'by_agent' | 'by_type';
 
 export interface FileAccessDashboardState {
   /** 原始事件记录列表（最近 N 条） */
@@ -196,11 +196,13 @@ export interface FileAccessDashboardState {
 }
 
 /** 创建默认状态 */
-export function createDefaultFileAccessState(workspace_roots: string[] = []): FileAccessDashboardState {
+export function createDefaultFileAccessState(
+  workspace_roots: string[] = [],
+): FileAccessDashboardState {
   return {
     recent_records: [],
     workspace_snapshot: null,
-    view_mode: "overview",
+    view_mode: 'overview',
     selected_record_id: null,
     type_filter: null,
     risk_filter: null,

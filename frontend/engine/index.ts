@@ -4,7 +4,12 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { createStarfield, animateStarfield } from './starfield';
 import { AlertPulseOverlay } from './alert-pulse';
 import { TimelineRing } from './timeline-ring';
-import type { GraphData, ResponsibilityAlert, ResponsibilityEdge, ResponsibilityNode } from '@/lib/types';
+import type {
+  GraphData,
+  ResponsibilityAlert,
+  ResponsibilityEdge,
+  ResponsibilityNode,
+} from '@/lib/types';
 
 export interface EngineAPI {
   setVisualizationMode(mode: string): void;
@@ -144,7 +149,8 @@ function buildForceLink(edge: ResponsibilityEdge): ForceLink {
           ? 1.35
           : 0.95,
     color: highlightedColor,
-    particles: edge.edge_type === 'PolicyBoundaryCrossing' || edge.edge_type === 'TaintPropagatesTo' ? 3 : 1,
+    particles:
+      edge.edge_type === 'PolicyBoundaryCrossing' || edge.edge_type === 'TaintPropagatesTo' ? 3 : 1,
   };
 }
 
@@ -175,22 +181,26 @@ export async function initEngine(container: HTMLElement): Promise<EngineAPI> {
     .showNavInfo(false)
     .enableNodeDrag(true)
     .linkOpacity(0.82)
-    .linkColor((link) => highlightedEdgeIds.has(link.edge_id) ? '#b8f3ff' : link.color)
+    .linkColor((link) => (highlightedEdgeIds.has(link.edge_id) ? '#b8f3ff' : link.color))
     .linkWidth((link) => {
       const base = currentMode === 'focus' ? link.width * 1.12 : link.width * 0.9;
       return highlightedEdgeIds.has(link.edge_id) ? base * 1.9 : base;
     })
     .linkCurvature((link) => link.curvature)
-    .linkDirectionalParticles((link) => highlightedEdgeIds.has(link.edge_id) ? Math.max(link.particles, 5) : link.particles)
-    .linkDirectionalParticleWidth((link) => highlightedEdgeIds.has(link.edge_id) ? 5.4 : 3.1)
-    .linkDirectionalParticleSpeed((link) => highlightedEdgeIds.has(link.edge_id) ? 0.012 : 0.006)
-    .linkDirectionalParticleColor((link) => highlightedEdgeIds.has(link.edge_id) ? '#ffffff' : link.color)
-    .linkDirectionalArrowLength((link) => link.edge_type === 'AgentDelegatesTo' ? 7.5 : 0)
+    .linkDirectionalParticles((link) =>
+      highlightedEdgeIds.has(link.edge_id) ? Math.max(link.particles, 5) : link.particles,
+    )
+    .linkDirectionalParticleWidth((link) => (highlightedEdgeIds.has(link.edge_id) ? 5.4 : 3.1))
+    .linkDirectionalParticleSpeed((link) => (highlightedEdgeIds.has(link.edge_id) ? 0.012 : 0.006))
+    .linkDirectionalParticleColor((link) =>
+      highlightedEdgeIds.has(link.edge_id) ? '#ffffff' : link.color,
+    )
+    .linkDirectionalArrowLength((link) => (link.edge_type === 'AgentDelegatesTo' ? 7.5 : 0))
     .linkDirectionalArrowRelPos(0.82)
     .linkDirectionalArrowColor((link) => link.color)
     .nodeVisibility((node) => node.id !== BOOTSTRAP_NODE_ID)
     .nodeRelSize(7)
-    .nodeVal((node) => currentMode === 'focus' ? node.val * 1.08 : node.val)
+    .nodeVal((node) => (currentMode === 'focus' ? node.val * 1.08 : node.val))
     .nodeColor((node) => node.color)
     .nodeOpacity(0.96)
     .nodeResolution(18)
@@ -227,13 +237,14 @@ export async function initEngine(container: HTMLElement): Promise<EngineAPI> {
   const alertPulse = new AlertPulseOverlay(scene);
   const timelineRing = new TimelineRing(scene);
 
-  const resizeObserver = typeof ResizeObserver !== 'undefined'
-    ? new ResizeObserver(() => {
-        graph
-          .width(container.clientWidth || window.innerWidth)
-          .height(container.clientHeight || window.innerHeight);
-      })
-    : null;
+  const resizeObserver =
+    typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => {
+          graph
+            .width(container.clientWidth || window.innerWidth)
+            .height(container.clientHeight || window.innerHeight);
+        })
+      : null;
   resizeObserver?.observe(container);
 
   const keyLight = new THREE.PointLight(0x8ad8ff, 1.45, 1800);
@@ -267,10 +278,13 @@ export async function initEngine(container: HTMLElement): Promise<EngineAPI> {
   controls.panSpeed = 0.6;
 
   const bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight),
+    new THREE.Vector2(
+      container.clientWidth || window.innerWidth,
+      container.clientHeight || window.innerHeight,
+    ),
     0.72,
     1.1,
-    0.18
+    0.18,
   );
   composer.addPass(bloomPass);
 
@@ -312,12 +326,15 @@ export async function initEngine(container: HTMLElement): Promise<EngineAPI> {
       .d3VelocityDecay(currentMode === 'focus' ? 0.22 : 0.28)
       .d3AlphaDecay(currentMode === 'focus' ? 0.035 : 0.026);
 
-    const chargeForce = graph.d3Force('charge') as { strength?: (value: number) => unknown } | undefined;
+    const chargeForce = graph.d3Force('charge') as
+      { strength?: (value: number) => unknown } | undefined;
     chargeForce?.strength?.(currentMode === 'focus' ? -280 : -220);
-    const linkForce = graph.d3Force('link') as {
-      distance?: (fn: (link: ForceLink) => number) => unknown;
-      strength?: (fn: (link: ForceLink) => number) => unknown;
-    } | undefined;
+    const linkForce = graph.d3Force('link') as
+      | {
+          distance?: (fn: (link: ForceLink) => number) => unknown;
+          strength?: (fn: (link: ForceLink) => number) => unknown;
+        }
+      | undefined;
     linkForce?.distance?.((link) => {
       if (link.edge_type === 'PolicyBoundaryCrossing') return 190;
       if (link.edge_type === 'AgentDelegatesTo') return 132;
@@ -376,7 +393,7 @@ export async function initEngine(container: HTMLElement): Promise<EngineAPI> {
           z: (node.z ?? 0) + 120,
         },
         { x: node.x ?? 0, y: node.y ?? 0, z: node.z ?? 0 },
-        Math.round((duration ?? 1.2) * 1000)
+        Math.round((duration ?? 1.2) * 1000),
       );
     },
     flyToNode(nodeId: string, duration?: number) {
@@ -389,11 +406,17 @@ export async function initEngine(container: HTMLElement): Promise<EngineAPI> {
           z: (node.z ?? 0) + 94,
         },
         { x: node.x ?? 0, y: node.y ?? 0, z: node.z ?? 0 },
-        Math.round((duration ?? 0.8) * 1000)
+        Math.round((duration ?? 0.8) * 1000),
       );
     },
     flyToLevel(level: number, duration?: number) {
-      const presets: Record<number, { position: { x: number; y: number; z: number }; lookAt: { x: number; y: number; z: number } }> = {
+      const presets: Record<
+        number,
+        {
+          position: { x: number; y: number; z: number };
+          lookAt: { x: number; y: number; z: number };
+        }
+      > = {
         0: { position: { x: 88, y: 38, z: 420 }, lookAt: { x: 0, y: 0, z: 0 } },
         1: { position: { x: 44, y: 22, z: 284 }, lookAt: { x: 0, y: 0, z: 0 } },
         2: { position: { x: 18, y: 10, z: 196 }, lookAt: { x: 0, y: 0, z: 0 } },
@@ -402,7 +425,11 @@ export async function initEngine(container: HTMLElement): Promise<EngineAPI> {
       graph.cameraPosition(preset.position, preset.lookAt, Math.round((duration ?? 1.1) * 1000));
     },
     resetCamera(duration?: number) {
-      graph.cameraPosition({ x: 0, y: 56, z: 460 }, { x: 0, y: 0, z: 0 }, Math.round((duration ?? 1.4) * 1000));
+      graph.cameraPosition(
+        { x: 0, y: 56, z: 460 },
+        { x: 0, y: 0, z: 0 },
+        Math.round((duration ?? 1.4) * 1000),
+      );
     },
     updateGraph(graphData: GraphData) {
       currentGraph = graphData;
@@ -422,14 +449,18 @@ export async function initEngine(container: HTMLElement): Promise<EngineAPI> {
         (alert.timeline?.steps ?? []).map((step) => ({
           timestamp_ns: step.timestamp_ns,
           operation: step.operation ?? undefined,
-        }))
+        })),
       );
     },
     clearAlertPulses() {
       alertPulse.clear();
     },
     orbit(deltaX: number, deltaY: number) {
-      const controls = graph.controls() as { rotateLeft?: (v: number) => void; rotateUp?: (v: number) => void; update?: () => void };
+      const controls = graph.controls() as {
+        rotateLeft?: (v: number) => void;
+        rotateUp?: (v: number) => void;
+        update?: () => void;
+      };
       controls.rotateLeft?.(deltaX * 0.0028);
       controls.rotateUp?.(deltaY * 0.0028);
       controls.update?.();

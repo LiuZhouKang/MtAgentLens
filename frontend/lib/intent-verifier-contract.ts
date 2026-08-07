@@ -10,50 +10,50 @@
 //   tool_name   — 关联到 ToolExecutionDashboard
 //   file_path   — 关联到 FileAccessAudit 面板
 
-import type { AnomalySeverity } from "./data-contract";
+import type { AnomalySeverity } from './data-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 不匹配类型（与 Rust MismatchType 对齐）
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type MismatchType =
-  | "ToolMismatch"            // 工具名不匹配：声称调用 A 工具，行为匹配到 B 工具
-  | "FilePathEscalation"     // 文件路径越权：声称读 A，实际访问敏感路径 B
-  | "NetworkDeviation"       // 网络目标偏离：声称访问域名 A，实际连接到 B
-  | "CommandDeviation"       // 命令注入/偏离：声称执行命令 A，实际包含额外参数
-  | "UndeclaredBehavior"     // 未声明的额外行为：无对应工具调用的系统操作
-  | "DeclaredButNotExecuted"; // 声明但未执行：声称要做但未观测到对应行为
+  | 'ToolMismatch' // 工具名不匹配：声称调用 A 工具，行为匹配到 B 工具
+  | 'FilePathEscalation' // 文件路径越权：声称读 A，实际访问敏感路径 B
+  | 'NetworkDeviation' // 网络目标偏离：声称访问域名 A，实际连接到 B
+  | 'CommandDeviation' // 命令注入/偏离：声称执行命令 A，实际包含额外参数
+  | 'UndeclaredBehavior' // 未声明的额外行为：无对应工具调用的系统操作
+  | 'DeclaredButNotExecuted'; // 声明但未执行：声称要做但未观测到对应行为
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 不匹配严重度（与 Rust MismatchSeverity 对齐）
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type MismatchSeverity =
-  | "Info"       // 信息级别：轻微偏差，可能是 API 格式差异
-  | "Warning"    // 警告级别：中度偏差，需要关注
-  | "Critical";  // 严重：明显行为偏离，可能是攻击迹象
+  | 'Info' // 信息级别：轻微偏差，可能是 API 格式差异
+  | 'Warning' // 警告级别：中度偏差，需要关注
+  | 'Critical'; // 严重：明显行为偏离，可能是攻击迹象
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 意图目标类型（与 Rust IntentTarget 对齐）
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type FileOperation = "Read" | "Write" | "ReadWrite" | "Delete";
+export type FileOperation = 'Read' | 'Write' | 'ReadWrite' | 'Delete';
 
 export interface FilePathTarget {
-  type: "FilePath";
+  type: 'FilePath';
   path: string;
   operation: FileOperation;
 }
 
 export interface NetworkTargetTarget {
-  type: "NetworkTarget";
+  type: 'NetworkTarget';
   host: string;
   port?: number;
   scheme: string;
 }
 
 export interface CommandTarget {
-  type: "Command";
+  type: 'Command';
   binary: string;
   args_prefix: string[];
 }
@@ -189,16 +189,14 @@ export interface MismatchSummary {
 // SSE 流集成 — 扩展 stream_type
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type IntentVerifierStreamType =
-  | "intent_mismatch"
-  | "intent_verifier_summary";
+export type IntentVerifierStreamType = 'intent_mismatch' | 'intent_verifier_summary';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 仪表板 UI 状态
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** 仪表板视图模式 */
-export type IntentVerifierDashboardViewMode = "overview" | "timeline" | "agents";
+export type IntentVerifierDashboardViewMode = 'overview' | 'timeline' | 'agents';
 
 /** 仪表板全局状态 */
 export interface IntentVerifierDashboardState {
@@ -277,7 +275,7 @@ export interface MismatchSeverityBadgeProps {
 
 export interface MismatchTypeIconProps {
   mismatch_type: MismatchType;
-  size?: "sm" | "md" | "lg";
+  size?: 'sm' | 'md' | 'lg';
 }
 
 export interface AgentMismatchChartProps {
@@ -293,66 +291,66 @@ export interface AgentMismatchChartProps {
 
 /** 不匹配类型 → 人类可读标签 */
 export const MISMATCH_TYPE_LABEL: Record<MismatchType, string> = {
-  ToolMismatch: "工具不匹配",
-  FilePathEscalation: "文件越权",
-  NetworkDeviation: "网络偏离",
-  CommandDeviation: "命令偏离",
-  UndeclaredBehavior: "未声明行为",
-  DeclaredButNotExecuted: "声明未执行",
+  ToolMismatch: '工具不匹配',
+  FilePathEscalation: '文件越权',
+  NetworkDeviation: '网络偏离',
+  CommandDeviation: '命令偏离',
+  UndeclaredBehavior: '未声明行为',
+  DeclaredButNotExecuted: '声明未执行',
 };
 
 /** 不匹配类型 → 图标（emoji） */
 export const MISMATCH_TYPE_ICON: Record<MismatchType, string> = {
-  ToolMismatch: "🔧",
-  FilePathEscalation: "📁",
-  NetworkDeviation: "🌐",
-  CommandDeviation: "⚡",
-  UndeclaredBehavior: "👻",
-  DeclaredButNotExecuted: "💤",
+  ToolMismatch: '🔧',
+  FilePathEscalation: '📁',
+  NetworkDeviation: '🌐',
+  CommandDeviation: '⚡',
+  UndeclaredBehavior: '👻',
+  DeclaredButNotExecuted: '💤',
 };
 
 /** 严重度 → 人类可读标签 */
 export const MISMATCH_SEVERITY_LABEL: Record<MismatchSeverity, string> = {
-  Info: "信息",
-  Warning: "警告",
-  Critical: "严重",
+  Info: '信息',
+  Warning: '警告',
+  Critical: '严重',
 };
 
 /** 文件操作 → 人类可读标签 */
 export const FILE_OPERATION_LABEL: Record<FileOperation, string> = {
-  Read: "读取",
-  Write: "写入",
-  ReadWrite: "读写",
-  Delete: "删除",
+  Read: '读取',
+  Write: '写入',
+  ReadWrite: '读写',
+  Delete: '删除',
 };
 
 /** 不匹配类型 → 简要描述 */
 export function describeMismatchType(type: MismatchType): string {
   switch (type) {
-    case "ToolMismatch":
-      return "Agent 声称使用某工具，行为特征匹配到另一工具";
-    case "FilePathEscalation":
-      return "Agent 声称操作某文件，实际访问了不同的敏感路径";
-    case "NetworkDeviation":
-      return "Agent 声称访问某域名，实际连接到不同目标";
-    case "CommandDeviation":
-      return "Agent 声称执行某命令，实际执行的命令包含额外参数";
-    case "UndeclaredBehavior":
-      return "Agent 执行了未通过任何工具调用声明的系统操作";
-    case "DeclaredButNotExecuted":
-      return "Agent 声称要执行某操作，但在有效窗口内未观测到";
+    case 'ToolMismatch':
+      return 'Agent 声称使用某工具，行为特征匹配到另一工具';
+    case 'FilePathEscalation':
+      return 'Agent 声称操作某文件，实际访问了不同的敏感路径';
+    case 'NetworkDeviation':
+      return 'Agent 声称访问某域名，实际连接到不同目标';
+    case 'CommandDeviation':
+      return 'Agent 声称执行某命令，实际执行的命令包含额外参数';
+    case 'UndeclaredBehavior':
+      return 'Agent 执行了未通过任何工具调用声明的系统操作';
+    case 'DeclaredButNotExecuted':
+      return 'Agent 声称要执行某操作，但在有效窗口内未观测到';
   }
 }
 
 /** 不匹配严重度 → AnomalySeverity 映射（用于着色系统） */
 export function mismatchSeverityToAnomalySeverity(severity: MismatchSeverity): AnomalySeverity {
   switch (severity) {
-    case "Info":
-      return "info";
-    case "Warning":
-      return "warning";
-    case "Critical":
-      return "critical";
+    case 'Info':
+      return 'info';
+    case 'Warning':
+      return 'warning';
+    case 'Critical':
+      return 'critical';
   }
 }
 
@@ -390,7 +388,9 @@ export function countByMismatchType(mismatches: MismatchSummary[]): Record<Misma
 }
 
 /** 按严重度分组统计 */
-export function countByMismatchSeverity(mismatches: MismatchSummary[]): Record<MismatchSeverity, number> {
+export function countByMismatchSeverity(
+  mismatches: MismatchSummary[],
+): Record<MismatchSeverity, number> {
   const counts: Record<MismatchSeverity, number> = { Info: 0, Warning: 0, Critical: 0 };
   for (const m of mismatches) {
     counts[m.severity]++;
@@ -418,15 +418,15 @@ export function aggregateMismatchByTool(mismatches: MismatchSummary[]): Record<s
 
 /** 获取最高的严重度级别 */
 export function maxMismatchSeverity(mismatches: MismatchSummary[]): MismatchSeverity | null {
-  if (mismatches.some((m) => m.severity === "Critical")) return "Critical";
-  if (mismatches.some((m) => m.severity === "Warning")) return "Warning";
-  if (mismatches.some((m) => m.severity === "Info")) return "Info";
+  if (mismatches.some((m) => m.severity === 'Critical')) return 'Critical';
+  if (mismatches.some((m) => m.severity === 'Warning')) return 'Warning';
+  if (mismatches.some((m) => m.severity === 'Info')) return 'Info';
   return null;
 }
 
 /** 获取 Critical 级别的不匹配数 */
 export function countCritical(mismatches: MismatchSummary[]): number {
-  return mismatches.filter((m) => m.severity === "Critical").length;
+  return mismatches.filter((m) => m.severity === 'Critical').length;
 }
 
 /** 格式化纳秒为相对时间 */
@@ -434,7 +434,7 @@ export function formatTimestampNs(ns: number): string {
   const ms = ns / 1_000_000;
   const now = Date.now();
   const diff = now - ms;
-  if (diff < 1000) return "刚刚";
+  if (diff < 1000) return '刚刚';
   if (diff < 60_000) return `${Math.round(diff / 1000)}秒前`;
   if (diff < 3600_000) return `${Math.round(diff / 60_000)}分钟前`;
   return new Date(ms).toLocaleTimeString();
@@ -443,27 +443,27 @@ export function formatTimestampNs(ns: number): string {
 /** 获取声明目标的简短摘要文本 */
 export function describeDeclaredTarget(declared: DeclaredIntentPayload): string {
   switch (declared.target.type) {
-    case "FilePath":
+    case 'FilePath':
       return `${FILE_OPERATION_LABEL[declared.target.operation]} ${declared.target.path}`;
-    case "NetworkTarget":
-      return `访问 ${declared.target.host}${declared.target.port ? `:${declared.target.port}` : ""}`;
-    case "Command":
-      return `执行 ${[declared.target.binary, ...declared.target.args_prefix].join(" ")}`;
+    case 'NetworkTarget':
+      return `访问 ${declared.target.host}${declared.target.port ? `:${declared.target.port}` : ''}`;
+    case 'Command':
+      return `执行 ${[declared.target.binary, ...declared.target.args_prefix].join(' ')}`;
   }
 }
 
 /** 获取观测行为的简短摘要文本 */
 export function describeObservedBehavior(observed: ObservedBehaviorPayload): string {
   if (observed.path) {
-    return `${observed.operation ?? "访问"}: ${observed.path}`;
+    return `${observed.operation ?? '访问'}: ${observed.path}`;
   }
   if (observed.host) {
-    return `连接: ${observed.host}${observed.port ? `:${observed.port}` : ""}`;
+    return `连接: ${observed.host}${observed.port ? `:${observed.port}` : ''}`;
   }
   if (observed.command || observed.binary) {
     return `执行: ${observed.command ?? observed.binary}`;
   }
-  return `${observed.source}: ${observed.event_type ?? "未知操作"}`;
+  return `${observed.source}: ${observed.event_type ?? '未知操作'}`;
 }
 
 /** 创建空的仪表板状态 */
@@ -472,7 +472,7 @@ export function createDefaultIntentVerifierState(): IntentVerifierDashboardState
     mismatches: [],
     latest_summary: null,
     summary_history: [],
-    view_mode: "overview",
+    view_mode: 'overview',
     selected_mismatch_id: null,
     type_filter: null,
     severity_filter: null,

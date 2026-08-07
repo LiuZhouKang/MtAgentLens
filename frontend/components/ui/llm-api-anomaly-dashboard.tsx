@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React, { useMemo } from "react";
+import React, { useMemo } from 'react';
 import type {
   LlmApiAnomalyDashboardProps,
   LlmApiAnomalyDashboardState,
@@ -13,7 +13,7 @@ import type {
   LlmApiSeverity,
   LlmApiDashboardViewMode,
   LlmApiAnomalyAlert,
-} from "@/lib/llm-api-anomaly-contract";
+} from '@/lib/llm-api-anomaly-contract';
 import {
   ANOMALY_TYPE_LABEL,
   ANOMALY_TYPE_DESC,
@@ -31,60 +31,57 @@ import {
   calcWindowDurationMs,
   formatWindowDuration,
   formatWindowUs,
-} from "@/lib/llm-api-anomaly-contract";
+} from '@/lib/llm-api-anomaly-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 常量
 // ═══════════════════════════════════════════════════════════════════════════
 
 const VIEW_LABELS: { mode: LlmApiDashboardViewMode; label: string }[] = [
-  { mode: "overview", label: "概览" },
-  { mode: "alerts", label: "告警列表" },
-  { mode: "endpoints", label: "端点分析" },
+  { mode: 'overview', label: '概览' },
+  { mode: 'alerts', label: '告警列表' },
+  { mode: 'endpoints', label: '端点分析' },
 ];
 
 const SEVERITY_RING: Record<LlmApiSeverity, string> = {
-  Info: "ring-blue-400",
-  Warning: "ring-amber-400",
-  Critical: "ring-red-600",
+  Info: 'ring-blue-400',
+  Warning: 'ring-amber-400',
+  Critical: 'ring-red-600',
 };
 
 const SEVERITY_BG: Record<LlmApiSeverity, string> = {
-  Info: "bg-blue-50 border-blue-200",
-  Warning: "bg-amber-50 border-amber-200",
-  Critical: "bg-red-50 border-red-200",
+  Info: 'bg-blue-50 border-blue-200',
+  Warning: 'bg-amber-50 border-amber-200',
+  Critical: 'bg-red-50 border-red-200',
 };
 
 const SEVERITY_DOT: Record<LlmApiSeverity, string> = {
-  Info: "bg-blue-400",
-  Warning: "bg-amber-400 animate-pulse",
-  Critical: "bg-red-600 animate-pulse",
+  Info: 'bg-blue-400',
+  Warning: 'bg-amber-400 animate-pulse',
+  Critical: 'bg-red-600 animate-pulse',
 };
 
 const SEVERITY_BORDER: Record<LlmApiSeverity, string> = {
-  Info: "border-l-blue-400",
-  Warning: "border-l-amber-400",
-  Critical: "border-l-red-600",
+  Info: 'border-l-blue-400',
+  Warning: 'border-l-amber-400',
+  Critical: 'border-l-red-600',
 };
 
 const ANOMALY_TYPE_COLOR: Record<AnomalyType, string> = {
-  RateBurst: "text-amber-600 bg-amber-50",
-  RepeatedIdenticalRequest: "text-indigo-600 bg-indigo-50",
-  OversizedRequest: "text-purple-600 bg-purple-50",
-  NewDestination: "text-teal-600 bg-teal-50",
-  SustainedHighFrequency: "text-orange-600 bg-orange-50",
-  ErrorStorm: "text-rose-600 bg-rose-50",
+  RateBurst: 'text-amber-600 bg-amber-50',
+  RepeatedIdenticalRequest: 'text-indigo-600 bg-indigo-50',
+  OversizedRequest: 'text-purple-600 bg-purple-50',
+  NewDestination: 'text-teal-600 bg-teal-50',
+  SustainedHighFrequency: 'text-orange-600 bg-orange-50',
+  ErrorStorm: 'text-rose-600 bg-rose-50',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 子组件: AnomalyTypeIcon — 异常类型图标
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const AnomalyTypeIcon: React.FC<AnomalyTypeIconProps> = ({
-  anomaly_type,
-  size = "md",
-}) => {
-  const sizeClass = size === "sm" ? "text-sm" : size === "lg" ? "text-xl" : "text-base";
+export const AnomalyTypeIcon: React.FC<AnomalyTypeIconProps> = ({ anomaly_type, size = 'md' }) => {
+  const sizeClass = size === 'sm' ? 'text-sm' : size === 'lg' ? 'text-xl' : 'text-base';
   return (
     <span className={sizeClass} title={ANOMALY_TYPE_DESC[anomaly_type]}>
       {ANOMALY_TYPE_ICON[anomaly_type]}
@@ -101,16 +98,16 @@ export const LlmApiSeverityBadge: React.FC<LlmApiSeverityBadgeProps> = ({
   showLabel = true,
 }) => {
   const colors: Record<LlmApiSeverity, string> = {
-    Info: "bg-blue-100 text-blue-800",
-    Critical: "bg-red-100 text-red-800",
-    Warning: "bg-amber-100 text-amber-800",
+    Info: 'bg-blue-100 text-blue-800',
+    Critical: 'bg-red-100 text-red-800',
+    Warning: 'bg-amber-100 text-amber-800',
   };
 
   return (
     <span
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${colors[severity]}`}
+      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ${colors[severity]}`}
     >
-      <span className={`inline-block w-1.5 h-1.5 rounded-full ${SEVERITY_DOT[severity]}`} />
+      <span className={`inline-block h-1.5 w-1.5 rounded-full ${SEVERITY_DOT[severity]}`} />
       {showLabel && LLM_API_SEVERITY_LABEL[severity]}
     </span>
   );
@@ -130,32 +127,25 @@ export const AnomalyAlertCard: React.FC<AnomalyAlertCardProps> = ({
   return (
     <button
       onClick={onSelect}
-      className={`w-full text-left p-3 rounded border transition-all cursor-pointer
-        border-l-4 ${SEVERITY_BORDER[alert.severity]}
-        ${selected ? "ring-2 ring-blue-400 bg-blue-50" : "bg-white hover:bg-slate-50"}
-      `}
+      className={`w-full cursor-pointer rounded border border-l-4 p-3 text-left transition-all ${SEVERITY_BORDER[alert.severity]} ${selected ? 'bg-blue-50 ring-2 ring-blue-400' : 'bg-white hover:bg-slate-50'} `}
     >
       {/* 顶部行：类型图标 + 异常类型 + 严重度 */}
-      <div className="flex items-center gap-2 mb-1.5">
+      <div className="mb-1.5 flex items-center gap-2">
         <AnomalyTypeIcon anomaly_type={alert.anomaly_type} size="sm" />
-        <span className="font-semibold text-sm">
-          {ANOMALY_TYPE_LABEL[alert.anomaly_type]}
-        </span>
+        <span className="text-sm font-semibold">{ANOMALY_TYPE_LABEL[alert.anomaly_type]}</span>
         <LlmApiSeverityBadge severity={alert.severity} />
         {alert.is_cooldown && (
-          <span className="text-xs text-gray-400 ml-auto flex-shrink-0">冷却中</span>
+          <span className="ml-auto flex-shrink-0 text-xs text-gray-400">冷却中</span>
         )}
       </div>
 
       {/* 描述行 */}
-      <div className="text-xs text-gray-500 mb-1.5 line-clamp-2">
-        {alert.description}
-      </div>
+      <div className="mb-1.5 line-clamp-2 text-xs text-gray-500">{alert.description}</div>
 
       {/* 关键指标行 */}
       <div className="flex items-center gap-3 text-xs text-gray-400">
         <span>
-          📞 {alert.call_count} 次调用{" "}
+          📞 {alert.call_count} 次调用{' '}
           <span className="text-gray-300">/ 阈值 {alert.threshold}</span>
         </span>
         <span>⏱ {formatWindowDuration(alert.window_end_ns - alert.window_start_ns)}</span>
@@ -168,7 +158,7 @@ export const AnomalyAlertCard: React.FC<AnomalyAlertCardProps> = ({
           {alert.affected_endpoints.slice(0, 3).map((ep) => (
             <span
               key={ep}
-              className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-mono truncate max-w-[200px]"
+              className="max-w-[200px] truncate rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-500"
             >
               {ep}
             </span>
@@ -196,14 +186,12 @@ export const AnomalyAlertDetail: React.FC<AnomalyAlertDetailProps> = ({
   const windowMs = calcWindowDurationMs(alert);
 
   return (
-    <div className={`p-4 rounded-lg border ${SEVERITY_BG[alert.severity]} space-y-4`}>
+    <div className={`rounded-lg border p-4 ${SEVERITY_BG[alert.severity]} space-y-4`}>
       {/* 标题行 */}
       <div className="flex items-center gap-2">
         <AnomalyTypeIcon anomaly_type={alert.anomaly_type} size="lg" />
         <div>
-          <h3 className="font-semibold text-sm">
-            {ANOMALY_TYPE_LABEL[alert.anomaly_type]}
-          </h3>
+          <h3 className="text-sm font-semibold">{ANOMALY_TYPE_LABEL[alert.anomaly_type]}</h3>
           <p className="text-xs text-gray-500">{ANOMALY_TYPE_DESC[alert.anomaly_type]}</p>
         </div>
         <div className="ml-auto">
@@ -212,36 +200,32 @@ export const AnomalyAlertDetail: React.FC<AnomalyAlertDetailProps> = ({
       </div>
 
       {/* 描述 */}
-      <div className="text-sm text-gray-700 bg-white/60 rounded p-2">
-        {alert.description}
-      </div>
+      <div className="rounded bg-white/60 p-2 text-sm text-gray-700">{alert.description}</div>
 
       {/* 关键指标网格 */}
       <div className="grid grid-cols-2 gap-2 text-xs">
-        <div className="p-2 bg-white/60 rounded">
+        <div className="rounded bg-white/60 p-2">
           <div className="text-gray-500">API 调用次数</div>
-          <div className="font-mono font-semibold text-lg">
+          <div className="font-mono text-lg font-semibold">
             {alert.call_count}
-            <span className="text-gray-400 text-xs ml-1">/ {alert.threshold} 阈值</span>
+            <span className="ml-1 text-xs text-gray-400">/ {alert.threshold} 阈值</span>
           </div>
         </div>
-        <div className="p-2 bg-white/60 rounded">
+        <div className="rounded bg-white/60 p-2">
           <div className="text-gray-500">检测窗口</div>
-          <div className="font-mono font-semibold text-lg">
+          <div className="font-mono text-lg font-semibold">
             {formatWindowDuration(alert.window_end_ns - alert.window_start_ns)}
           </div>
         </div>
-        <div className="p-2 bg-white/60 rounded">
+        <div className="rounded bg-white/60 p-2">
           <div className="text-gray-500">平均调用间隔</div>
-          <div className="font-mono font-semibold">
-            {formatWindowUs(alert.avg_interval_us)}
-          </div>
+          <div className="font-mono font-semibold">{formatWindowUs(alert.avg_interval_us)}</div>
         </div>
-        <div className="p-2 bg-white/60 rounded">
+        <div className="rounded bg-white/60 p-2">
           <div className="text-gray-500">触发 Agent</div>
           <button
             onClick={() => onAgentClick(alert.agent_root_pid)}
-            className="font-mono font-semibold text-blue-600 hover:underline cursor-pointer"
+            className="cursor-pointer font-mono font-semibold text-blue-600 hover:underline"
           >
             PID {alert.agent_root_pid}
           </button>
@@ -251,7 +235,7 @@ export const AnomalyAlertDetail: React.FC<AnomalyAlertDetailProps> = ({
       {/* 涉及端点 */}
       {alert.affected_endpoints.length > 0 && (
         <div>
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          <h4 className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
             涉及端点 ({alert.affected_endpoints.length})
           </h4>
           <div className="space-y-1">
@@ -259,7 +243,7 @@ export const AnomalyAlertDetail: React.FC<AnomalyAlertDetailProps> = ({
               <button
                 key={ep}
                 onClick={() => onEndpointClick(ep)}
-                className="block w-full text-left text-xs font-mono text-blue-600 hover:underline bg-white/60 rounded px-2 py-1 cursor-pointer"
+                className="block w-full cursor-pointer rounded bg-white/60 px-2 py-1 text-left font-mono text-xs text-blue-600 hover:underline"
               >
                 {ep}
               </button>
@@ -271,19 +255,19 @@ export const AnomalyAlertDetail: React.FC<AnomalyAlertDetailProps> = ({
       {/* Payload 指纹 */}
       {alert.sample_payload_hash && (
         <div>
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          <h4 className="mb-1 text-xs font-semibold tracking-wide text-gray-500 uppercase">
             采样 Payload 指纹
           </h4>
-          <div className="p-2 bg-white/60 rounded text-xs font-mono text-gray-600 break-all">
+          <div className="rounded bg-white/60 p-2 font-mono text-xs break-all text-gray-600">
             {alert.sample_payload_hash}
           </div>
         </div>
       )}
 
       {/* 时间信息 */}
-      <div className="text-xs text-gray-400 border-t border-white/40 pt-2">
+      <div className="border-t border-white/40 pt-2 text-xs text-gray-400">
         <div>
-          窗口范围: {new Date(alert.window_start_ns / 1_000_000).toLocaleTimeString()} →{" "}
+          窗口范围: {new Date(alert.window_start_ns / 1_000_000).toLocaleTimeString()} →{' '}
           {new Date(alert.window_end_ns / 1_000_000).toLocaleTimeString()}
         </div>
       </div>
@@ -307,7 +291,7 @@ const AnomalyTypeDistribution: React.FC<AnomalyTypeDistributionProps> = ({
   const maxCount = entries[0]?.[1] ?? 1;
 
   if (entries.length === 0) {
-    return <div className="text-sm text-gray-400 p-4">暂无异常记录</div>;
+    return <div className="p-4 text-sm text-gray-400">暂无异常记录</div>;
   }
 
   return (
@@ -318,25 +302,23 @@ const AnomalyTypeDistribution: React.FC<AnomalyTypeDistributionProps> = ({
           <button
             key={type}
             onClick={() => onTypeSelect(isSelected ? null : type)}
-            className="w-full text-left group"
+            className="group w-full text-left"
           >
-            <div className="flex items-center justify-between text-xs mb-1">
+            <div className="mb-1 flex items-center justify-between text-xs">
               <span className="flex items-center gap-1.5">
                 <AnomalyTypeIcon anomaly_type={type} size="sm" />
-                <span
-                  className={`${isSelected ? "text-blue-600 font-semibold" : "text-gray-700"}`}
-                >
+                <span className={`${isSelected ? 'font-semibold text-blue-600' : 'text-gray-700'}`}>
                   {ANOMALY_TYPE_LABEL[type]}
                 </span>
               </span>
-              <span className="text-gray-400 ml-2 flex-shrink-0">
+              <span className="ml-2 flex-shrink-0 text-gray-400">
                 {count} 次 · {total > 0 ? Math.round((count / total) * 100) : 0}%
               </span>
             </div>
-            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
               <div
                 className={`h-full rounded-full transition-all ${
-                  isSelected ? "bg-blue-500" : "bg-slate-400"
+                  isSelected ? 'bg-blue-500' : 'bg-slate-400'
                 }`}
                 style={{ width: `${(count / maxCount) * 100}%` }}
               />
@@ -356,16 +338,16 @@ const SeverityDistributionChart: React.FC<{
   distribution: Record<LlmApiSeverity, { count: number; pct: number }>;
 }> = ({ distribution }) => {
   const severities: { key: LlmApiSeverity; color: string }[] = [
-    { key: "Critical", color: "bg-red-500" },
-    { key: "Warning", color: "bg-amber-400" },
-    { key: "Info", color: "bg-blue-400" },
+    { key: 'Critical', color: 'bg-red-500' },
+    { key: 'Warning', color: 'bg-amber-400' },
+    { key: 'Info', color: 'bg-blue-400' },
   ];
 
   const total = Object.values(distribution).reduce((s, v) => s + v.count, 0);
 
   return (
     <div>
-      <div className="h-2 bg-slate-100 rounded-full overflow-hidden flex mb-2">
+      <div className="mb-2 flex h-2 overflow-hidden rounded-full bg-slate-100">
         {severities.map(({ key, color }) => {
           const pct = distribution[key].pct * 100;
           return pct > 0 ? (
@@ -381,7 +363,7 @@ const SeverityDistributionChart: React.FC<{
       <div className="flex gap-3 text-xs text-gray-500">
         {severities.map(({ key, color }) => (
           <div key={key} className="flex items-center gap-1">
-            <span className={`inline-block w-2 h-2 rounded-full ${color}`} />
+            <span className={`inline-block h-2 w-2 rounded-full ${color}`} />
             {LLM_API_SEVERITY_LABEL[key]} {distribution[key].count}
           </div>
         ))}
@@ -405,11 +387,11 @@ const AlertsTimeline: React.FC<{
   );
 
   if (sorted.length === 0) {
-    return <div className="text-sm text-gray-400 p-4">暂无告警记录</div>;
+    return <div className="p-4 text-sm text-gray-400">暂无告警记录</div>;
   }
 
   return (
-    <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+    <div className="max-h-[60vh] space-y-2 overflow-y-auto">
       {sorted.map((alert) => (
         <AnomalyAlertCard
           key={alert.alert_uid}
@@ -434,23 +416,21 @@ const EndpointStatsTable: React.FC<{
   const stats = useMemo(() => aggregateByEndpoint(alerts), [alerts]);
 
   if (stats.length === 0) {
-    return <div className="text-sm text-gray-400 p-4">暂无端点异常数据</div>;
+    return <div className="p-4 text-sm text-gray-400">暂无端点异常数据</div>;
   }
 
   return (
-    <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+    <div className="max-h-[60vh] space-y-2 overflow-y-auto">
       {stats.map((ep) => {
         const isSelected = selected_endpoint === ep.endpoint;
         return (
           <button
             key={ep.endpoint}
             onClick={() => onEndpointSelect(isSelected ? null : ep.endpoint)}
-            className={`w-full text-left p-3 rounded border transition-all cursor-pointer
-              ${isSelected ? "ring-2 ring-blue-400 bg-blue-50 border-blue-300" : "bg-white border-slate-200 hover:bg-slate-50"}
-            `}
+            className={`w-full cursor-pointer rounded border p-3 text-left transition-all ${isSelected ? 'border-blue-300 bg-blue-50 ring-2 ring-blue-400' : 'border-slate-200 bg-white hover:bg-slate-50'} `}
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="font-mono text-sm font-semibold text-gray-800 truncate max-w-[300px]">
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="max-w-[300px] truncate font-mono text-sm font-semibold text-gray-800">
                 {ep.endpoint}
               </span>
               <LlmApiSeverityBadge severity={ep.max_severity} showLabel={false} />
@@ -460,18 +440,18 @@ const EndpointStatsTable: React.FC<{
               <span>告警 {ep.alert_count} 次</span>
               <span>涉及 {ep.affected_agents.length} 个 Agent</span>
               {ep.new_destination_alerts > 0 && (
-                <span className="text-teal-600 font-medium">
+                <span className="font-medium text-teal-600">
                   新发现 ({ep.new_destination_alerts})
                 </span>
               )}
             </div>
 
             {/* 异常类型标签 */}
-            <div className="flex flex-wrap gap-1 mt-1.5">
+            <div className="mt-1.5 flex flex-wrap gap-1">
               {ep.anomaly_types.map((type) => (
                 <span
                   key={type}
-                  className={`text-xs px-1.5 py-0.5 rounded ${ANOMALY_TYPE_COLOR[type]}`}
+                  className={`rounded px-1.5 py-0.5 text-xs ${ANOMALY_TYPE_COLOR[type]}`}
                 >
                   {ANOMALY_TYPE_ICON[type]} {ANOMALY_TYPE_LABEL[type]}
                 </span>
@@ -479,8 +459,8 @@ const EndpointStatsTable: React.FC<{
             </div>
 
             {/* Agent PID 列表 */}
-            <div className="mt-1.5 text-xs text-gray-400 font-mono">
-              PID: {ep.affected_agents.join(", ")}
+            <div className="mt-1.5 font-mono text-xs text-gray-400">
+              PID: {ep.affected_agents.join(', ')}
             </div>
           </button>
         );
@@ -546,9 +526,9 @@ export const LlmApiAnomalyDashboard: React.FC<LlmApiAnomalyDashboardProps> = ({
   if (alerts.length === 0) {
     return (
       <div className="p-6 text-center text-gray-400">
-        <div className="text-2xl mb-2">📡</div>
+        <div className="mb-2 text-2xl">📡</div>
         <div className="text-sm">未检测到 LLM API 用量异常</div>
-        <div className="text-xs mt-1">LLMApiUsageAnomalyAnalyzer 正在监控中...</div>
+        <div className="mt-1 text-xs">LLMApiUsageAnomalyAnalyzer 正在监控中...</div>
       </div>
     );
   }
@@ -558,37 +538,36 @@ export const LlmApiAnomalyDashboard: React.FC<LlmApiAnomalyDashboardProps> = ({
       {/* ═══ 顶部状态栏 ═══ */}
       {overallSeverity && (
         <div
-          className={`flex items-center gap-3 p-3 rounded-lg border text-sm ${
-            hasCriticalAnomaly
-              ? "bg-red-50 border-red-200"
-              : SEVERITY_BG[overallSeverity]
+          className={`flex items-center gap-3 rounded-lg border p-3 text-sm ${
+            hasCriticalAnomaly ? 'border-red-200 bg-red-50' : SEVERITY_BG[overallSeverity]
           }`}
         >
-          <span className="text-lg">{hasCriticalAnomaly ? "🚨" : "⚠️"}</span>
+          <span className="text-lg">{hasCriticalAnomaly ? '🚨' : '⚠️'}</span>
           <div className="flex-1">
             <span className="font-semibold">{alerts.length} 个 API 异常告警</span>
-            <span className="text-gray-500 ml-2">
+            <span className="ml-2 text-gray-500">
               · 最高严重度: {LLM_API_SEVERITY_LABEL[overallSeverity]}
             </span>
           </div>
           <span className="text-xs text-gray-400">
-            {filteredAlerts.length !== alerts.length && `显示 ${filteredAlerts.length}/${alerts.length}`}
+            {filteredAlerts.length !== alerts.length &&
+              `显示 ${filteredAlerts.length}/${alerts.length}`}
           </span>
         </div>
       )}
 
       {/* ═══ 顶部工具栏 ═══ */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex flex-wrap items-center gap-3">
         {/* 视图切换 */}
         <div className="flex rounded-lg bg-slate-100 p-0.5">
           {VIEW_LABELS.map(({ mode, label }) => (
             <button
               key={mode}
               onClick={() => onViewModeChange(mode)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 view_mode === mode
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               {label}
@@ -598,8 +577,8 @@ export const LlmApiAnomalyDashboard: React.FC<LlmApiAnomalyDashboardProps> = ({
 
         {/* 异常类型过滤 */}
         <select
-          className="text-xs border border-slate-300 rounded px-2 py-1.5 bg-white"
-          value={type_filter ?? ""}
+          className="rounded border border-slate-300 bg-white px-2 py-1.5 text-xs"
+          value={type_filter ?? ''}
           onChange={(e) => {
             const v = e.target.value;
             onTypeFilterChange(v ? (v as AnomalyType) : null);
@@ -615,28 +594,26 @@ export const LlmApiAnomalyDashboard: React.FC<LlmApiAnomalyDashboardProps> = ({
 
         {/* 严重度过滤 */}
         <select
-          className="text-xs border border-slate-300 rounded px-2 py-1.5 bg-white"
-          value={severity_filter ?? ""}
+          className="rounded border border-slate-300 bg-white px-2 py-1.5 text-xs"
+          value={severity_filter ?? ''}
           onChange={(e) => {
             const v = e.target.value;
             onSeverityFilterChange(v ? (v as LlmApiSeverity) : null);
           }}
         >
           <option value="">全部严重度</option>
-          {(Object.entries(LLM_API_SEVERITY_LABEL) as [LlmApiSeverity, string][]).map(
-            ([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ),
-          )}
+          {(Object.entries(LLM_API_SEVERITY_LABEL) as [LlmApiSeverity, string][]).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v}
+            </option>
+          ))}
         </select>
 
         {/* Agent PID 过滤 */}
         {agentPids.length > 0 && (
           <select
-            className="text-xs border border-slate-300 rounded px-2 py-1.5 bg-white"
-            value={agent_filter ?? ""}
+            className="rounded border border-slate-300 bg-white px-2 py-1.5 text-xs"
+            value={agent_filter ?? ''}
             onChange={(e) => {
               const v = e.target.value;
               onAgentFilterChange(v ? Number(v) : null);
@@ -654,8 +631,8 @@ export const LlmApiAnomalyDashboard: React.FC<LlmApiAnomalyDashboardProps> = ({
         {/* 端点过滤 */}
         {endpoints.length > 0 && (
           <select
-            className="text-xs border border-slate-300 rounded px-2 py-1.5 bg-white max-w-[200px]"
-            value={endpoint_filter ?? ""}
+            className="max-w-[200px] rounded border border-slate-300 bg-white px-2 py-1.5 text-xs"
+            value={endpoint_filter ?? ''}
             onChange={(e) => {
               const v = e.target.value;
               onEndpointFilterChange(v || null);
@@ -672,23 +649,19 @@ export const LlmApiAnomalyDashboard: React.FC<LlmApiAnomalyDashboardProps> = ({
       </div>
 
       {/* ═══ 概览视图 ═══ */}
-      {view_mode === "overview" && (
-        <div
-          className={`grid gap-4 ${
-            compact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
-          }`}
-        >
+      {view_mode === 'overview' && (
+        <div className={`grid gap-4 ${compact ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
           {/* 严重度分布 */}
-          <div className="p-4 rounded-lg border border-slate-200 bg-white">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
               严重度分布
             </h4>
             <SeverityDistributionChart distribution={sevDist} />
           </div>
 
           {/* 异常类型分布 */}
-          <div className="p-4 rounded-lg border border-slate-200 bg-white">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
               异常类型分布
             </h4>
             <AnomalyTypeDistribution
@@ -699,28 +672,22 @@ export const LlmApiAnomalyDashboard: React.FC<LlmApiAnomalyDashboardProps> = ({
           </div>
 
           {/* 快速统计卡片 */}
-          <div className={compact ? "" : "md:col-span-2"}>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <div className="p-3 rounded-lg border border-slate-200 bg-white text-center">
-                <div className="text-2xl font-mono font-bold text-gray-800">
-                  {alerts.length}
-                </div>
+          <div className={compact ? '' : 'md:col-span-2'}>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+              <div className="rounded-lg border border-slate-200 bg-white p-3 text-center">
+                <div className="font-mono text-2xl font-bold text-gray-800">{alerts.length}</div>
                 <div className="text-xs text-gray-500">总告警数</div>
               </div>
-              <div className="p-3 rounded-lg border border-slate-200 bg-white text-center">
-                <div className="text-2xl font-mono font-bold text-gray-800">
-                  {agentPids.length}
-                </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-3 text-center">
+                <div className="font-mono text-2xl font-bold text-gray-800">{agentPids.length}</div>
                 <div className="text-xs text-gray-500">涉及 Agent</div>
               </div>
-              <div className="p-3 rounded-lg border border-slate-200 bg-white text-center">
-                <div className="text-2xl font-mono font-bold text-gray-800">
-                  {endpoints.length}
-                </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-3 text-center">
+                <div className="font-mono text-2xl font-bold text-gray-800">{endpoints.length}</div>
                 <div className="text-xs text-gray-500">涉及端点</div>
               </div>
-              <div className="p-3 rounded-lg border border-slate-200 bg-white text-center">
-                <div className="text-2xl font-mono font-bold text-red-600">
+              <div className="rounded-lg border border-slate-200 bg-white p-3 text-center">
+                <div className="font-mono text-2xl font-bold text-red-600">
                   {sevDist.Critical.count}
                 </div>
                 <div className="text-xs text-gray-500">严重异常</div>
@@ -730,7 +697,7 @@ export const LlmApiAnomalyDashboard: React.FC<LlmApiAnomalyDashboardProps> = ({
 
           {/* 选中的告警详情 */}
           {selectedAlert && (
-            <div className={compact ? "" : "md:col-span-2"}>
+            <div className={compact ? '' : 'md:col-span-2'}>
               <AnomalyAlertDetail
                 alert={selectedAlert}
                 onAgentClick={onNavigateToAgent}
@@ -742,10 +709,10 @@ export const LlmApiAnomalyDashboard: React.FC<LlmApiAnomalyDashboardProps> = ({
       )}
 
       {/* ═══ 告警列表视图 ═══ */}
-      {view_mode === "alerts" && (
+      {view_mode === 'alerts' && (
         <div
           className={`grid gap-4 ${
-            compact || !selectedAlert ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
+            compact || !selectedAlert ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'
           }`}
         >
           <AlertsTimeline
@@ -764,14 +731,14 @@ export const LlmApiAnomalyDashboard: React.FC<LlmApiAnomalyDashboardProps> = ({
       )}
 
       {/* ═══ 端点分析视图 ═══ */}
-      {view_mode === "endpoints" && (
+      {view_mode === 'endpoints' && (
         <div
           className={`grid gap-4 ${
-            compact || !selectedAlert ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
+            compact || !selectedAlert ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'
           }`}
         >
-          <div className="p-4 rounded-lg border border-slate-200 bg-white">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <h4 className="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
               LLM API 端点异常统计
             </h4>
             <EndpointStatsTable
@@ -791,12 +758,12 @@ export const LlmApiAnomalyDashboard: React.FC<LlmApiAnomalyDashboardProps> = ({
       )}
 
       {/* ═══ 底部状态栏 ═══ */}
-      <div className="text-xs text-gray-400 flex items-center justify-between pt-2 border-t border-slate-100">
+      <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-xs text-gray-400">
         <span>共 {alerts.length} 条告警</span>
         <span>
           显示 {filteredAlerts.length} 条
           {(type_filter || severity_filter || agent_filter != null || endpoint_filter) &&
-            " (已过滤)"}
+            ' (已过滤)'}
         </span>
       </div>
     </div>

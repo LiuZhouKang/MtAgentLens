@@ -25,24 +25,33 @@ export type CommandSelectionContext = {
 
 function alertTouchesAgent(alert: ResponsibilityAlert, agentId: string) {
   return (
-    alert.primary_agent.agent_id === agentId
-    || alert.involved_agents.some((agent) => agent.agent_id === agentId)
-    || alert.timeline.steps.some((step) => step.agent_id === agentId)
+    alert.primary_agent.agent_id === agentId ||
+    alert.involved_agents.some((agent) => agent.agent_id === agentId) ||
+    alert.timeline.steps.some((step) => step.agent_id === agentId)
   );
 }
 
 function alertTouchesBoundary(alert: ResponsibilityAlert, boundaryKey: string) {
   return (
-    alert.timeline.steps.some((step) => step.resource === boundaryKey || step.description.includes(boundaryKey))
-    || alert.graph_snapshot.nodes.some((node) => node.node_id === boundaryKey)
-    || alert.graph_snapshot.edges.some((edge) => edge.source === boundaryKey || edge.target === boundaryKey)
+    alert.timeline.steps.some(
+      (step) => step.resource === boundaryKey || step.description.includes(boundaryKey),
+    ) ||
+    alert.graph_snapshot?.nodes?.some((node) => node.node_id === boundaryKey) ||
+    alert.graph_snapshot?.edges?.some(
+      (edge) => edge.source === boundaryKey || edge.target === boundaryKey,
+    )
   );
 }
 
-function alertTouchesEdge(alert: ResponsibilityAlert, edgeId: string, sourceId: string, targetId: string) {
-  return alert.graph_snapshot.edges.some(
+function alertTouchesEdge(
+  alert: ResponsibilityAlert,
+  edgeId: string,
+  sourceId: string,
+  targetId: string,
+) {
+  return alert.graph_snapshot?.edges?.some(
     (edge) => edge.edge_id === edgeId || (edge.source === sourceId && edge.target === targetId),
-  );
+  ) ?? false;
 }
 
 function resolveRelatedAlert(
@@ -50,10 +59,11 @@ function resolveRelatedAlert(
   selectedStageNode: StageNodeSelection | null,
   selectedStageEdge: StageEdgeSelection | null,
 ) {
-  const agentId = selectedStageNode?.agentId
-    ?? (selectedStageNode?.nodeType === 'Agent' ? selectedStageNode.nodeId : null)
-    ?? (selectedStageEdge?.sourceType === 'Agent' ? selectedStageEdge.sourceId : null)
-    ?? null;
+  const agentId =
+    selectedStageNode?.agentId ??
+    (selectedStageNode?.nodeType === 'Agent' ? selectedStageNode.nodeId : null) ??
+    (selectedStageEdge?.sourceType === 'Agent' ? selectedStageEdge.sourceId : null) ??
+    null;
 
   if (agentId) {
     const agentAlert = alerts.find((alert) => alertTouchesAgent(alert, agentId));
@@ -72,7 +82,13 @@ function resolveRelatedAlert(
 
   if (selectedStageEdge) {
     const edgeAlert = alerts.find((alert) =>
-      alertTouchesEdge(alert, selectedStageEdge.edgeId, selectedStageEdge.sourceId, selectedStageEdge.targetId));
+      alertTouchesEdge(
+        alert,
+        selectedStageEdge.edgeId,
+        selectedStageEdge.sourceId,
+        selectedStageEdge.targetId,
+      ),
+    );
     if (edgeAlert) {
       return edgeAlert;
     }
@@ -88,13 +104,17 @@ export function resolveCommandSelectionContext({
   selectedStageEdge,
 }: ResolveCommandSelectionContextInput): CommandSelectionContext {
   const hasExplicitEdgeSelection = Boolean(selectedStageEdge);
-  const relatedAlert = resolveRelatedAlert(alerts, selectedStageNode, selectedStageEdge) ?? featuredAlert ?? null;
+  const relatedAlert =
+    resolveRelatedAlert(alerts, selectedStageNode, selectedStageEdge) ?? featuredAlert ?? null;
   const alertId = relatedAlert?.alert_id ?? null;
-  const agentId = selectedStageNode?.agentId
-    ?? (selectedStageNode?.nodeType === 'Agent' ? selectedStageNode.nodeId : null)
-    ?? (!hasExplicitEdgeSelection && selectedStageEdge?.sourceType === 'Agent' ? selectedStageEdge.sourceId : null)
-    ?? relatedAlert?.primary_agent.agent_id
-    ?? null;
+  const agentId =
+    selectedStageNode?.agentId ??
+    (selectedStageNode?.nodeType === 'Agent' ? selectedStageNode.nodeId : null) ??
+    (!hasExplicitEdgeSelection && selectedStageEdge?.sourceType === 'Agent'
+      ? selectedStageEdge.sourceId
+      : null) ??
+    relatedAlert?.primary_agent.agent_id ??
+    null;
   const clusterId = selectedStageNode?.clusterId ?? null;
   const boundaryKey = selectedStageNode?.boundaryKey ?? selectedStageEdge?.boundaryKey ?? null;
 
@@ -105,7 +125,7 @@ export function resolveCommandSelectionContext({
       clusterId,
       boundaryKey,
       surfaceHref: buildAgentHref(agentId),
-      surfaceLabel: '打开主体画像',
+      surfaceLabel: '打开主体',
       investigationHref: buildInvestigationHref(alertId),
       traceHref: buildTraceHref(alertId),
     };
@@ -143,7 +163,7 @@ export function resolveCommandSelectionContext({
     clusterId,
     boundaryKey,
     surfaceHref: '/overview',
-    surfaceLabel: '打开总览',
+    surfaceLabel: '打开仪表盘',
     investigationHref: buildInvestigationHref(null),
     traceHref: buildTraceHref(null),
   };

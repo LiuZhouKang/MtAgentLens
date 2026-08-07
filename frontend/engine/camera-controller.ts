@@ -67,7 +67,11 @@ export class CameraController {
       const t = Math.min(this.flyElapsed / this.flyDuration, 1.0);
       const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
       this.camera.position.lerpVectors(this.flyStartPos, this.flyTarget, ease);
-      const currentLookAt = new THREE.Vector3().lerpVectors(this.flyStartLookAt, this.flyLookAt, ease);
+      const currentLookAt = new THREE.Vector3().lerpVectors(
+        this.flyStartLookAt,
+        this.flyLookAt,
+        ease,
+      );
       this.camera.lookAt(currentLookAt);
       if (t >= 1.0) {
         this.isFlying = false;
@@ -85,7 +89,7 @@ export class CameraController {
     this.camera.position.set(
       radius * Math.sin(phi) * Math.sin(theta),
       radius * Math.cos(phi),
-      radius * Math.sin(phi) * Math.cos(theta)
+      radius * Math.sin(phi) * Math.cos(theta),
     );
     this.camera.lookAt(0, 0, 0);
   }

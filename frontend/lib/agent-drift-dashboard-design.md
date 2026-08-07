@@ -199,13 +199,13 @@ AgentDriftDashboard (主容器 / layout shell)
 
 ### 3.1 跨仪表板联动
 
-| 触发操作 | 目标 | 参数 |
-|----------|------|------|
-| 点击 agent 卡片 | ProcessTree 定位 | `agent_root_pid` |
-| 点击快照时间 | TimelinePanel 定位 | `window_start_ms`, `window_end_ms` |
-| 点击维度分析条 | 聚焦该维度 → 切换到趋势视图 | `DriftDimension` |
-| 点击工具名 | ToolExecutionDashboard | `tool_name` |
-| 选中 agent 行 | 下方展开 AgentDetailPanel | `agent_root_pid` |
+| 触发操作        | 目标                        | 参数                               |
+| --------------- | --------------------------- | ---------------------------------- |
+| 点击 agent 卡片 | ProcessTree 定位            | `agent_root_pid`                   |
+| 点击快照时间    | TimelinePanel 定位          | `window_start_ms`, `window_end_ms` |
+| 点击维度分析条  | 聚焦该维度 → 切换到趋势视图 | `DriftDimension`                   |
+| 点击工具名      | ToolExecutionDashboard      | `tool_name`                        |
+| 选中 agent 行   | 下方展开 AgentDetailPanel   | `agent_root_pid`                   |
 
 ### 3.2 筛选行为
 
@@ -309,30 +309,30 @@ if (event.source === "agent_drift") {
 
 ## 6. 组件实现优先级
 
-| 优先级 | 组件 | 理由 |
-|--------|------|------|
-| **P0** | `AgentDriftDashboard` 主壳 + `OverviewTab` | 最小可用版本，展示核心统计和 agent 列表 |
-| **P0** | `AgentDriftCard` + `StatsGrid` | Agent 级别的基本信息展示 |
-| **P1** | `AgentsTab` + `AgentDetailPanel` | Agent 详情和历史趋势 |
-| **P1** | `FilterBar` | 筛选功能 |
-| **P2** | `DimensionsTab` + `DriftRadarChart` | 六维对比视图（可复用纯 SVG/Canvas 方案） |
-| **P2** | `TrendTab` + `DriftTrendChart` | 全局时间线 + agent 叠加对比 |
-| **P3** | `DriftSnapshotDetail` 弹出面板 | 快照详情展开 |
-| **P3** | `AgentOverlayLegend` 图例组件 | 多 agent 对比时的彩色图例 |
+| 优先级 | 组件                                       | 理由                                     |
+| ------ | ------------------------------------------ | ---------------------------------------- |
+| **P0** | `AgentDriftDashboard` 主壳 + `OverviewTab` | 最小可用版本，展示核心统计和 agent 列表  |
+| **P0** | `AgentDriftCard` + `StatsGrid`             | Agent 级别的基本信息展示                 |
+| **P1** | `AgentsTab` + `AgentDetailPanel`           | Agent 详情和历史趋势                     |
+| **P1** | `FilterBar`                                | 筛选功能                                 |
+| **P2** | `DimensionsTab` + `DriftRadarChart`        | 六维对比视图（可复用纯 SVG/Canvas 方案） |
+| **P2** | `TrendTab` + `DriftTrendChart`             | 全局时间线 + agent 叠加对比              |
+| **P3** | `DriftSnapshotDetail` 弹出面板             | 快照详情展开                             |
+| **P3** | `AgentOverlayLegend` 图例组件              | 多 agent 对比时的彩色图例                |
 
 ---
 
 ## 7. 视觉规格速查
 
-| 元素 | 值 |
-|------|-----|
-| 主色调 | 白底 + slate 边框（与现有仪表板一致） |
-| 恶化态 | Red-600（`text-red-600`, `bg-red-50`） |
-| 告警态 | Orange-600（`text-orange-600`, `bg-orange-50`） |
-| 稳定态 | Emerald-600（`text-emerald-600`, `bg-emerald-50`） |
-| 不确定态 | Slate-500（`text-slate-500`, `bg-slate-50`） |
-| 维度颜色 | 6 色循环: indigo, amber, rose, emerald, violet, teal |
-| 阈值线 | 虚线 `border-dashed border-red-300` |
-| 趋势线(sparkline) | SVG `<polyline>`，无填充，1.5px 描边 |
-| 字体 | 等宽数字 `font-mono` 用于评分/百分数；`text-xs`/`text-[10px]` 用于标签 |
-| 动画 | 恶化态 pulsing dot `animate-pulse`；Tab 切换 `transition-all` |
+| 元素              | 值                                                                     |
+| ----------------- | ---------------------------------------------------------------------- |
+| 主色调            | 白底 + slate 边框（与现有仪表板一致）                                  |
+| 恶化态            | Red-600（`text-red-600`, `bg-red-50`）                                 |
+| 告警态            | Orange-600（`text-orange-600`, `bg-orange-50`）                        |
+| 稳定态            | Emerald-600（`text-emerald-600`, `bg-emerald-50`）                     |
+| 不确定态          | Slate-500（`text-slate-500`, `bg-slate-50`）                           |
+| 维度颜色          | 6 色循环: indigo, amber, rose, emerald, violet, teal                   |
+| 阈值线            | 虚线 `border-dashed border-red-300`                                    |
+| 趋势线(sparkline) | SVG `<polyline>`，无填充，1.5px 描边                                   |
+| 字体              | 等宽数字 `font-mono` 用于评分/百分数；`text-xs`/`text-[10px]` 用于标签 |
+| 动画              | 恶化态 pulsing dot `animate-pulse`；Tab 切换 `transition-all`          |

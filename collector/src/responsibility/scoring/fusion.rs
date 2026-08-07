@@ -11,40 +11,49 @@ use crate::responsibility::scoring::progressive::NUM_DIMS;
 /// Default OWA orness: 0.70 — leans optimistic (strong signal in any
 /// dimension can elevate the composite, reflecting that agent attacks
 /// don't always leave traces in every signal dimension).
-pub const DEFAULT_OWA_ORNESS: f64 = 0.70;
-
-/// GeoMean weight in the OWA+GeoMean blend (v3: 20%).
-pub const GEOMEAN_WEIGHT: f64 = 0.20;
+pub const DEFAULT_OWA_ORNESS: f64 = 0.50;
+pub const GEOMEAN_WEIGHT: f64 = 0.50;
 
 /// Fuse six dimension scores into a raw composite score.
 ///
-/// v3 (2026-06-14): GeoMean computed only over ACTIVE dimensions (dim > 0.01).
-/// Previously, zero dimensions (D4 Temporal never fed, D6 Behavioral baseline
-/// unestablished, D2 Patterns unmatched) dragged GeoMean to near-zero,
-/// preventing any Phase 1 DirectUnsafe even for strong attacks.
+/// v14 (2026-07): Dimension activation with continuous weight scaling.
 ///
-/// Active-dimension GeoMean: only dimensions with signal participate.
-/// Blend: OWA(0.80) + GeoMean_active(0.20), both using all weights for OWA
-/// and active-only weights for GeoMean.
+/// Each dimension's effective weight is scaled by its signal strength:
+///   eff_weight[i] = base_weight[i] × min(dim[i] / 0.15, 1.0)
+///
+/// Dimensions with score 0.0 get zero weight — no signal, no influence.
+/// This prevents the 52% of weight assigned to D2-D6 from diluting the
+/// composite when those dimensions carry no signal (common in practice).
+/// Active-dim GeoMean still only includes dims > 0.01.
 pub fn fuse_dimensions(dim_scores: &[f64; NUM_DIMS], dim_weights: &[f64; NUM_DIMS]) -> f64 {
     let owa = compute_owa(dim_scores, DEFAULT_OWA_ORNESS);
 
-    // GeoMean over active dimensions only (dim > 0.01)
+    // Dimension activation: scale each weight by signal strength
+    let activated_weights: Vec<f64> = dim_scores.iter().zip(dim_weights.iter())
+        .map(|(&d, &w)| w * (d / 0.15).min(1.0))
+        .collect();
+    let weight_sum: f64 = activated_weights.iter().sum();
+
+    // GeoMean over active dimensions (dim > 0.01) with activated weights
     let active_count = dim_scores.iter().filter(|&&d| d > 0.01).count();
-    if active_count == 0 {
+    if active_count == 0 || weight_sum < 1e-9 {
         return owa; // No active dims → pure OWA
     }
 
+    // Normalize activated weights
+    let norm_weights: Vec<f64> = activated_weights.iter()
+        .map(|&w| w / weight_sum).collect();
+
     let mut active_dims: Vec<f64> = Vec::new();
-    let mut active_weights: Vec<f64> = Vec::new();
+    let mut active_norm_weights: Vec<f64> = Vec::new();
     for i in 0..NUM_DIMS {
         if dim_scores[i] > 0.01 {
             active_dims.push(dim_scores[i]);
-            active_weights.push(dim_weights[i]);
+            active_norm_weights.push(norm_weights[i]);
         }
     }
 
-    let geo = compute_weighted_geometric_mean_raw(&active_dims, &active_weights);
+    let geo = compute_weighted_geometric_mean_raw(&active_dims, &active_norm_weights);
 
     owa * (1.0 - GEOMEAN_WEIGHT) + geo * GEOMEAN_WEIGHT
 }
@@ -155,26 +164,26 @@ pub fn platt_multi(dim_scores: &[f64; NUM_DIMS], weights: &[f64; NUM_DIMS + 1]) 
 
 /// Compute Expected Calibration Error (Naeini et al. AAAI 2015).
 ///
-/// ECE = Σ (|B_m|/n) × |acc(B_m) - conf(B_m)|
+/// ECE = Σ (|B_m|/n) × |acc(B_m) - conf(B_m)|.
+///
+/// Correctly uses labels from (confidence, label) pairs.
+/// Prefer CalibrationMonitor::ece() for online use; this is the standalone version.
 pub fn compute_ece(predictions: &[(f64, bool)], n_bins: usize) -> f64 {
     if predictions.is_empty() || n_bins == 0 {
         return 0.0;
     }
-    let mut bins: Vec<Vec<f64>> = vec![Vec::new(); n_bins];
-    for (conf, _) in predictions {
+    let mut bins: Vec<Vec<(f64, bool)>> = vec![Vec::new(); n_bins];
+    for (conf, label) in predictions {
         let bin = ((conf * n_bins as f64) as usize).min(n_bins - 1);
-        bins[bin].push(*conf);
+        bins[bin].push((*conf, *label));
     }
     let mut ece = 0.0;
     let n = predictions.len() as f64;
     for bin in &bins {
-        if bin.is_empty() {
-            continue;
-        }
-        let avg_conf: f64 = bin.iter().sum::<f64>() / bin.len() as f64;
-        // acc(B_m) requires labels — approximated here from stored predictions
-        let bin_n = bin.len() as f64;
-        ece += (bin_n / n) * (avg_conf - avg_conf).abs(); // placeholder — needs labels
+        if bin.is_empty() { continue; }
+        let avg_conf: f64 = bin.iter().map(|(c, _)| c).sum::<f64>() / bin.len() as f64;
+        let acc: f64 = bin.iter().filter(|(_, l)| *l).count() as f64 / bin.len() as f64;
+        ece += (bin.len() as f64 / n) * (acc - avg_conf).abs();
     }
     ece
 }

@@ -30,7 +30,7 @@ type SelectionSummary = {
   description: string;
 };
 
-type DockTool = 'incident' | 'evidence' | 'trace' | 'agent' | 'handoff';
+type DockTool = 'incident' | 'evidence' | 'trace';
 
 type DockItem = {
   id: DockTool;
@@ -43,7 +43,6 @@ type LensTone = 'danger' | 'warning' | 'ready' | 'info';
 
 type LensMeta = {
   eyebrow: string;
-  state: string;
   tone: LensTone;
 };
 
@@ -67,12 +66,10 @@ type IncidentRailProps = {
   onWidthChange?: (width: number) => void;
 };
 
-const dockItems: DockItem[] = [
+export const dockItems: DockItem[] = [
   { id: 'incident', label: '事件', icon: 'warning' },
   { id: 'evidence', label: '证据', icon: 'files' },
   { id: 'trace', label: '链路', icon: 'graph-line' },
-  { id: 'agent', label: '主体', icon: 'organization' },
-  { id: 'handoff', label: '委派', icon: 'git-pull-request' },
 ];
 
 const handoffEdgeTypes = new Set([
@@ -83,11 +80,9 @@ const handoffEdgeTypes = new Set([
 ]);
 
 const lensMeta: Record<DockTool, LensMeta> = {
-  incident: { eyebrow: '运行态分诊', state: '当前调查', tone: 'danger' },
-  evidence: { eyebrow: '证据链', state: '证据就绪', tone: 'ready' },
-  trace: { eyebrow: '责任链路', state: '路径关联', tone: 'info' },
-  agent: { eyebrow: '主体身份', state: '权限映射', tone: 'warning' },
-  handoff: { eyebrow: '边界转移', state: '委派审查', tone: 'danger' },
+  incident: { eyebrow: '事件研判', tone: 'danger' },
+  evidence: { eyebrow: '证据核验', tone: 'ready' },
+  trace: { eyebrow: '责任溯源', tone: 'info' },
 };
 
 function formatDuration(totalDurationMs: number) {
@@ -136,28 +131,6 @@ function buildTraceRows(selectedModel: InvestigationModel) {
   ];
 }
 
-function buildAgentRows(selectedAlert: ResponsibilityAlert, selectedModel: InvestigationModel) {
-  return [
-    { label: '主主体', value: selectedAlert.primary_agent.agent_id },
-    { label: '声明角色', value: selectedAlert.primary_agent.claimed_role ?? 'unknown' },
-    { label: '权限', value: selectedAlert.authority },
-    { label: '涉及主体', value: String(selectedModel.involvedAgentIds.length) },
-  ];
-}
-
-function buildHandoffRows(selectedModel: InvestigationModel) {
-  const handoffEdges = selectedModel.pathEdges.filter((edge) =>
-    handoffEdgeTypes.has(edge.edge_type),
-  );
-
-  return [
-    { label: '委派边', value: String(handoffEdges.length) },
-    { label: '边界穿越', value: String(selectedModel.boundaryCrossingCount) },
-    { label: '委派深度', value: String(Math.max(0, selectedModel.pathNodes.length - 1)) },
-    { label: '证据引用', value: String(selectedModel.evidenceRefs.length) },
-  ];
-}
-
 function buildLensStrip(
   activeTool: DockTool,
   selectedAlert: ResponsibilityAlert,
@@ -191,22 +164,7 @@ function buildLensStrip(
     ];
   }
 
-  if (activeTool === 'agent') {
-    return [
-      { label: '角色', value: selectedAlert.primary_agent.claimed_role ?? 'unknown' },
-      { label: '权限', value: selectedAlert.authority },
-      { label: '主体', value: String(selectedModel.involvedAgentIds.length) },
-    ];
-  }
-
-  const handoffEdges = selectedModel.pathEdges.filter((edge) =>
-    handoffEdgeTypes.has(edge.edge_type),
-  );
-  return [
-    { label: '委派', value: String(handoffEdges.length) },
-    { label: '边界', value: String(selectedModel.boundaryCrossingCount) },
-    { label: '深度', value: String(Math.max(0, selectedModel.pathNodes.length - 1)) },
-  ];
+  return [];
 }
 
 function buildPathPreview(selectedModel: InvestigationModel) {
@@ -387,24 +345,9 @@ function buildNarrativeRailItems(
   return visibleItems;
 }
 
-function buildWorkspaceAction(
-  activeTool: DockTool,
-  selectedAlert: ResponsibilityAlert,
-  selectedModel: InvestigationModel,
-) {
+export function buildWorkspaceAction(activeTool: DockTool, selectedAlert: ResponsibilityAlert) {
   if (activeTool === 'trace') {
     return { href: buildTraceHref(selectedAlert.alert_id), label: '打开链路' };
-  }
-
-  if (activeTool === 'agent') {
-    return {
-      href: selectedModel.primaryAgentId ? buildAgentHref(selectedModel.primaryAgentId) : '/agents',
-      label: '打开主体',
-    };
-  }
-
-  if (activeTool === 'handoff') {
-    return { href: '/handoff', label: '打开委派' };
   }
 
   return { href: buildInvestigationHref(selectedAlert.alert_id), label: '打开调查' };
@@ -555,6 +498,7 @@ function TheaterRailNav({ items }: { items: DockItemData[] }) {
           <button
             type="button"
             aria-label={item.ariaLabel ?? item.label}
+            title={item.ariaLabel ?? item.label}
             aria-pressed={item.selected}
             aria-expanded={item.ariaExpanded}
             aria-controls={item.controls}
@@ -595,8 +539,6 @@ export default function IncidentRail({
   const factRows = buildFactRows(selectedAlert, selectedModel);
   const evidenceRows = buildEvidenceRows(selectedModel);
   const traceRows = buildTraceRows(selectedModel);
-  const agentRows = buildAgentRows(selectedAlert, selectedModel);
-  const handoffRows = buildHandoffRows(selectedModel);
   const readiness = evidenceStatus(selectedModel, selectedAlert);
   const readinessIcon = readiness.icon;
   const nextAction = buildNextAction(selectedAlert);
@@ -625,13 +567,6 @@ export default function IncidentRail({
       meta: index === 0 ? '主证据' : undefined,
     };
   });
-  const agentItems = selectedModel.involvedAgentIds.slice(0, 5).map((agentId, index) => ({
-    id: agentId,
-    label: agentId,
-    detail:
-      index === 0 ? (selectedAlert.primary_agent.claimed_role ?? '主运行主体') : '参与当前责任路径',
-    meta: index === 0 ? '主主体' : undefined,
-  }));
   const handoffItems = handoffEdges.slice(0, 5).map((edge) => ({
     id: edge.edge_id,
     label: edge.edge_type,
@@ -657,24 +592,6 @@ export default function IncidentRail({
       selectedModel.pathEdges.length * 12 +
         selectedModel.timelineSteps.length * 4 +
         selectedModel.boundaryCrossingCount * 14,
-    ),
-  );
-  const agentPulse = Math.min(
-    98,
-    Math.max(
-      14,
-      selectedModel.involvedAgentIds.length * 16 +
-        Math.round(selectedAlert.confidence * 42) +
-        (selectedAlert.authority === 'Authoritative' ? 18 : 8),
-    ),
-  );
-  const handoffPulse = Math.min(
-    98,
-    Math.max(
-      12,
-      handoffEdges.length * 24 +
-        selectedModel.boundaryCrossingCount * 16 +
-        selectedModel.evidenceRefs.length * 7,
     ),
   );
   const incidentNarrative = buildNarrativeRailItems(
@@ -704,20 +621,6 @@ export default function IncidentRail({
       meta: index === 0 ? '起始边' : `${Math.round(edge.confidence * 100)}%`,
     })),
   );
-  const agentNarrative = buildNarrativeRailItems(
-    selectedModel.involvedAgentIds.map((agentId, index) => ({
-      id: `${agentId}-${index}`,
-      label: agentId,
-      meta: index === 0 ? '主主体' : '关联主体',
-    })),
-  );
-  const handoffNarrative = buildNarrativeRailItems(
-    handoffEdges.map((edge, index) => ({
-      id: edge.edge_id,
-      label: edge.edge_type,
-      meta: index === 0 ? '第一跳' : `${edge.evidence_refs.length} 条引用`,
-    })),
-  );
   const panelTransition = reduceMotion
     ? { duration: 0 }
     : { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const };
@@ -726,18 +629,13 @@ export default function IncidentRail({
   const activeLens = lensMeta[activeTool];
   const lensStripItems = buildLensStrip(activeTool, selectedAlert, selectedModel, formatPercent);
   const headerTitle = inspectorTitle;
-  const headerSubtitle =
-    activeTool === 'incident'
-      ? `当前事件 / ${selectedAlert.primary_agent.agent_id}`
-      : selectionSummary.title;
+  const headerSubtitle = `${activeLens.eyebrow} / ${selectedAlert.primary_agent.agent_id}`;
 
   const getFluidPalette = (toolId: string) => {
     switch (toolId) {
       case 'incident': return FLUID_PALETTES.incident;
-      case 'agent': return FLUID_PALETTES.entity;
       case 'evidence': return FLUID_PALETTES.evidence;
       case 'trace': return FLUID_PALETTES.narrative;
-      case 'handoff': return FLUID_PALETTES.delegation;
       default: return FLUID_PALETTES.incident;
     }
   };
@@ -752,7 +650,7 @@ export default function IncidentRail({
   const activeDockItem =
     decoratedDockItems.find((item) => item.id === activeTool) ?? decoratedDockItems[0];
   const activeIcon = activeDockItem.icon;
-  const workspaceAction = buildWorkspaceAction(activeTool, selectedAlert, selectedModel);
+  const workspaceAction = buildWorkspaceAction(activeTool, selectedAlert);
   const effectiveWidth = customWidth;
   const theaterAsideStyle: CSSProperties | undefined = isTheater
     ? {
@@ -760,9 +658,10 @@ export default function IncidentRail({
         top: 'auto',
         left: 'auto',
         flexShrink: 0,
+        // 展开宽度自适应视口：极窄窗口自动收缩，给主内容保底 320px，避免挤压重叠
         width: isResizable
           ? expanded
-            ? `${effectiveWidth ?? 434}px`
+            ? `min(${effectiveWidth ?? 434}px, calc(100vw - 320px))`
             : '58px'
           : expanded
             ? 'min(612px, calc(100vw - 28px))'
@@ -1239,6 +1138,9 @@ export default function IncidentRail({
                                   <Link href={buildTraceHref(selectedAlert.alert_id)} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white">
                                     查看链路 <Codicon name="arrow-right" size={12} />
                                   </Link>
+                                  <Link href={buildAgentHref(selectedAlert.primary_agent.agent_id)} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white">
+                                    主体画像 <Codicon name="organization" size={12} />
+                                  </Link>
                                 </div>
                               </div>
                             </BentoCard>
@@ -1527,236 +1429,19 @@ export default function IncidentRail({
                                 </div>
                               </div>
                             </BentoCard>
-                          </div>
-                        </section>
-                      )}
-
-                      {activeTool === 'agent' && (
-                        <section className="incident-panel-flow w-full" aria-label="主体工作台" style={theaterSurfaceStyle}>
-                          <div className="flex flex-col gap-4 pb-12">
-                            <BentoCard className="p-6">
-                              <div className="flex flex-col gap-5">
-                                <div className="flex flex-wrap items-center gap-3">
-                                  <ToolbenchStatus icon="organization" label="主体" value={selectedAlert.primary_agent.agent_id} />
-                                  <ToolbenchStatus icon="key" label="权限" value={selectedAlert.authority} />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">主体身份</span>
-                                  <h2 className="text-2xl font-light leading-snug tracking-tight text-white/90 break-all">{selectedAlert.primary_agent.agent_id}</h2>
-                                  <p className="mt-1 text-sm leading-relaxed text-white/50 font-light">声明角色 {selectedAlert.primary_agent.claimed_role ?? 'unknown'}，判定为 {decisionLabel(selectedAlert.decision)}。</p>
-                                </div>
-                              </div>
-                            </BentoCard>
-
-                            <BentoCard className="p-6">
-                              <div className="flex flex-col gap-5">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">主体可信度</span>
-                                    <small className="text-xs text-white/40 font-light">{selectedModel.involvedAgentIds.length} 个主体 · {Math.round(selectedAlert.confidence * 100)}% 置信度</small>
-                                  </div>
-                                  <div className="flex items-baseline gap-1">
-                                    <strong className="text-5xl font-extralight tracking-tighter text-white/90 tabular-nums"><CountUp value={agentPulse} /></strong>
-                                    <span className="text-lg font-light text-white/30">%</span>
-                                  </div>
-                                </div>
-                                <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.03]" aria-hidden="true">
-                                  <motion.i className="block h-full rounded-full bg-gradient-to-r from-amber-500/80 to-orange-400/80" initial={{ width: 0 }} animate={{ width: `${agentPulse}%` }} transition={{ delay: 0.3, duration: 0.8, ease: 'easeOut' }} />
-                                </div>
-                              </div>
-                            </BentoCard>
-
-                            <BentoCard className="p-6 relative overflow-hidden group">
-                              <div className="absolute inset-0 bg-gradient-to-br from-rose-500/[0.03] to-orange-500/[0.01] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                              <div className="flex flex-col gap-4 relative z-10">
-                                <div className="flex items-center gap-3">
-                                  <div className="flex items-center justify-center w-8 h-8 rounded-full border border-rose-500/20 bg-rose-500/10 shadow-[0_0_15px_rgba(244,63,94,0.2)]">
-                                    <Codicon name="shield" size={14} className="text-rose-400" />
-                                  </div>
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-rose-400/80 uppercase">权限检查</span>
-                                </div>
-                                <motion.p 
-                                  initial={{ opacity: 0, y: 5 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  transition={{ delay: 0.2, duration: 0.5 }}
-                                  className="text-sm font-light leading-relaxed text-white/80 border-l-2 border-rose-500/30 pl-3 py-1 bg-gradient-to-r from-rose-500/[0.05] to-transparent"
-                                >
-                                  {selectedAlert.reasoning}
-                                </motion.p>
-                                <div className="flex items-center gap-3 mt-2">
-                                  <Link href={selectedModel.primaryAgentId ? buildAgentHref(selectedModel.primaryAgentId) : '/agents'} className="group/btn flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-medium tracking-wide text-white/80 transition-all hover:bg-white/[0.08] hover:border-white/20 hover:shadow-[0_0_20px_rgba(255,255,255,0.05)]">
-                                    打开主体 
-                                    <motion.span className="group-hover/btn:translate-x-1 transition-transform duration-300">
-                                      <Codicon name="arrow-right" size={12} />
-                                    </motion.span>
-                                  </Link>
-                                </div>
-                              </div>
-                            </BentoCard>
-
-                            <BentoCard className="p-6">
-                              <div className="flex flex-col gap-5">
-                                <div className="flex items-center gap-2">
-                                  <Codicon name="references" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">主体特征</span>
-                                </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-y-5 gap-x-4">
-                                  {agentRows.slice(0, 4).map((row) => (
-                                    <div key={row.label} className="flex flex-col gap-1 min-w-0">
-                                      <span className="text-[10px] font-medium tracking-widest text-white/30 truncate uppercase">{row.label}</span>
-                                      <span className="text-base font-light tabular-nums tracking-tight text-white/80 truncate" title={String(row.value)}>{row.value}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </BentoCard>
-
-                            <BentoCard className="p-6">
-                              <div className="flex flex-col gap-5">
-                                <div className="flex items-center gap-2">
-                                  <Codicon name="organization" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">主体谱系</span>
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                  {agentNarrative.map((item, idx) => (
-                                    <motion.div 
-                                      key={item.id} 
-                                      className="group/label flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.01] px-4 py-3 transition-all hover:border-white/20 hover:bg-white/[0.04]"
-                                      initial={{ opacity: 0, y: 8 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      transition={{ delay: 0.3 + idx * 0.06, type: "spring", stiffness: 200, damping: 20 }}
-                                    >
-                                      <span className="text-sm font-light tracking-wide text-white/80 group-hover/label:text-white truncate pr-4">{item.label}</span>
-                                      <span className="shrink-0 text-[9px] font-medium uppercase tracking-widest text-white/30">{item.meta}</span>
-                                    </motion.div>
-                                  ))}
-                                </div>
-                              </div>
-                            </BentoCard>
-
-                            <BentoCard className="p-6">
-                              <div className="flex flex-col gap-5">
-                                <div className="flex items-center gap-2">
-                                  <Codicon name="layers" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">主体列表</span>
-                                </div>
-                                <SignalList items={agentItems} emptyLabel="当前事件没有挂接更多相关主体。" icon="organization" />
-                              </div>
-                            </BentoCard>
-                          </div>
-                        </section>
-                      )}
-
-                      {activeTool === 'handoff' && (
-                        <section className="incident-panel-flow w-full" aria-label="委派工作台" style={theaterSurfaceStyle}>
-                          <div className="flex flex-col gap-4 pb-12">
-                            <BentoCard className="p-6">
-                              <div className="flex flex-col gap-5">
-                                <div className="flex flex-wrap items-center gap-3">
-                                  <ToolbenchStatus icon="git-pull-request" label="委派边" value={`${handoffEdges.length}`} />
-                                  <ToolbenchStatus icon="target" label="边界穿越" value={`${selectedModel.boundaryCrossingCount} 次`} />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">委派工作台</span>
-                                  <h2 className="text-2xl font-light leading-snug tracking-tight text-white/90">沿着委派链追责</h2>
-                                  <p className="mt-1 text-sm leading-relaxed text-white/50 font-light">{nextAction}</p>
-                                </div>
-                              </div>
-                            </BentoCard>
-
-                            <BentoCard className="p-6">
-                              <div className="flex flex-col gap-5">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">委派热度</span>
-                                    <small className="text-xs text-white/40 font-light">{handoffEdges.length} 条委派边 · {selectedModel.boundaryCrossingCount} 次越界</small>
-                                  </div>
-                                  <div className="flex items-baseline gap-1">
-                                    <strong className="text-5xl font-extralight tracking-tighter text-white/90 tabular-nums"><CountUp value={handoffPulse} /></strong>
-                                    <span className="text-lg font-light text-white/30">%</span>
-                                  </div>
-                                </div>
-                                <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.03]" aria-hidden="true">
-                                  <motion.i className="block h-full rounded-full bg-gradient-to-r from-purple-500/80 to-fuchsia-400/80" initial={{ width: 0 }} animate={{ width: `${handoffPulse}%` }} transition={{ delay: 0.3, duration: 0.8, ease: 'easeOut' }} />
-                                </div>
-                              </div>
-                            </BentoCard>
-
-                            <BentoCard className="p-6">
-                              <div className="flex flex-col gap-4">
-                                <div className="flex items-center gap-2">
-                                  <Codicon name="link" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">边界动作</span>
-                                </div>
-                                <p className="text-sm font-light leading-relaxed text-white/80">{nextAction}</p>
-                                <div className="flex items-center gap-3 mt-1">
-                                  <Link href="/handoff" className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white">
-                                    打开委派 <Codicon name="arrow-right" size={12} />
-                                  </Link>
-                                  <Link href={buildTraceHref(selectedAlert.alert_id)} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white">
-                                    查看链路 <Codicon name="arrow-right" size={12} />
-                                  </Link>
-                                </div>
-                              </div>
-                            </BentoCard>
-
-                            <BentoCard className="p-6">
-                              <div className="flex flex-col gap-5">
-                                <div className="flex items-center gap-2">
-                                  <Codicon name="references" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">委派特征</span>
-                                </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-y-5 gap-x-4">
-                                  {handoffRows.slice(0, 4).map((row) => (
-                                    <div key={row.label} className="flex flex-col gap-1 min-w-0">
-                                      <span className="text-[10px] font-medium tracking-widest text-white/30 truncate uppercase">{row.label}</span>
-                                      <span className="text-base font-light tabular-nums tracking-tight text-white/80 truncate" title={String(row.value)}>{row.value}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </BentoCard>
 
                             <BentoCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="git-pull-request" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">委派顺序</span>
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">委派与边界转移</span>
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                  {handoffNarrative.map((item, idx) => (
-                                    <motion.div 
-                                      key={item.id} 
-                                      className="group/label flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.01] px-4 py-3 transition-all hover:border-white/20 hover:bg-white/[0.04]"
-                                      initial={{ opacity: 0, y: 8 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      transition={{ delay: 0.3 + idx * 0.06, type: "spring", stiffness: 200, damping: 20 }}
-                                    >
-                                      <span className="text-sm font-light tracking-wide text-white/80 group-hover/label:text-white truncate pr-4">{item.label}</span>
-                                      <span className="shrink-0 text-[9px] font-medium uppercase tracking-widest text-white/30">{item.meta}</span>
-                                    </motion.div>
-                                  ))}
-                                </div>
-                              </div>
-                            </BentoCard>
-
-                            <BentoCard className="p-6">
-                              <div className="flex flex-col gap-5">
-                                <div className="flex items-center gap-2">
-                                  <Codicon name="git-pull-request" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">委派边界 & 委派链</span>
-                                </div>
-                                <div className="flex flex-col gap-5">
-                                  <div className="flex flex-col gap-2 min-w-0">
-                                    <span className="text-[9px] tracking-[0.2em] text-white/20 uppercase">委派边界</span>
-                                    <strong className="text-sm font-light tracking-wide text-white/80 leading-relaxed break-words">{boundaryLabel}</strong>
-                                    <p className="text-xs text-white/40 font-light">把第一处边界突破固定成锚点，避免只停留在结果层。</p>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[9px] tracking-[0.2em] text-white/20 uppercase">委派边</span>
+                                    <span className="text-[9px] font-medium uppercase tracking-widest text-white/30">{handoffEdges.length} 条</span>
                                   </div>
-                                  <div className="h-px w-full bg-white/5" />
-                                  <div className="flex flex-col gap-3 min-w-0">
-                                    <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">委派链</span>
-                                    <SignalList items={handoffItems} emptyLabel="当前路径没有挂接委派或权限转移边。" icon="git-pull-request" />
-                                  </div>
+                                  <SignalList items={handoffItems} emptyLabel="当前路径没有挂接委派或权限转移边。" icon="git-pull-request" />
                                 </div>
                               </div>
                             </BentoCard>

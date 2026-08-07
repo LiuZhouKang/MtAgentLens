@@ -10,9 +10,7 @@ const median = (values) => {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[middle - 1] + sorted[middle]) / 2
-    : sorted[middle];
+  return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
 };
 
 const pkg = JSON.parse(read('package.json'));
@@ -47,8 +45,12 @@ const headerChecks = {
 };
 
 const compatConfigured =
-  pkg.scripts['audit:compat'] && workflow.includes('audit:compat') && read('playwright.config.ts').includes("name: 'firefox'");
-const webkitConfigured = Boolean(pkg.scripts['audit:compat:webkit']) && read('playwright.config.ts').includes("name: 'webkit'");
+  pkg.scripts['audit:compat'] &&
+  workflow.includes('audit:compat') &&
+  read('playwright.config.ts').includes("name: 'firefox'");
+const webkitConfigured =
+  Boolean(pkg.scripts['audit:compat:webkit']) &&
+  read('playwright.config.ts').includes("name: 'webkit'");
 const webkitCiConfigured = workflow.includes('audit:compat:webkit');
 const staticExportNormalized =
   existsSync(path.join(root, 'out', 'handoff', 'index.html')) &&
@@ -62,8 +64,18 @@ const lighthouseSummaryByUrl = Object.entries(
     return acc;
   }, {}),
 ).map(([url, reports]) => {
-  const score = (category) => median(reports.map((report) => report.categories?.[category]?.score).filter((value) => typeof value === 'number'));
-  const metric = (auditId) => median(reports.map((report) => report.audits?.[auditId]?.numericValue).filter((value) => typeof value === 'number'));
+  const score = (category) =>
+    median(
+      reports
+        .map((report) => report.categories?.[category]?.score)
+        .filter((value) => typeof value === 'number'),
+    );
+  const metric = (auditId) =>
+    median(
+      reports
+        .map((report) => report.audits?.[auditId]?.numericValue)
+        .filter((value) => typeof value === 'number'),
+    );
 
   return {
     url,
@@ -80,14 +92,20 @@ const lighthouseSummaryByUrl = Object.entries(
 
 const lighthouseMeasuredSection = lighthouseSummaryByUrl.length
   ? lighthouseSummaryByUrl
-      .map((item) => `- \`${item.url}\`：性能 ${formatScore(item.performance)} / 可访问性 ${formatScore(item.accessibility)} / Best Practices ${formatScore(item.bestPractices)} / SEO ${formatScore(item.seo)} / LCP ${formatMs(item.lcp)} / INP ${formatMs(item.inp)} / CLS ${formatCls(item.cls)} / FCP ${formatMs(item.fcp)}`)
+      .map(
+        (item) =>
+          `- \`${item.url}\`：性能 ${formatScore(item.performance)} / 可访问性 ${formatScore(item.accessibility)} / Best Practices ${formatScore(item.bestPractices)} / SEO ${formatScore(item.seo)} / LCP ${formatMs(item.lcp)} / INP ${formatMs(item.inp)} / CLS ${formatCls(item.cls)} / FCP ${formatMs(item.fcp)}`,
+      )
       .join('\n')
   : '- 尚未生成 Lighthouse 实测结果';
 
 const lighthouseWarningsSection = lighthouseAssertions.length
   ? lighthouseAssertions
       .filter((item) => item.passed === false)
-      .map((item) => `- \`${item.url}\`：${item.auditId} ${item.name} 未达预期，当前 ${item.actual ?? 'N/A'}，目标 ${item.operator} ${item.expected}`)
+      .map(
+        (item) =>
+          `- \`${item.url}\`：${item.auditId} ${item.name} 未达预期，当前 ${item.actual ?? 'N/A'}，目标 ${item.operator} ${item.expected}`,
+      )
       .join('\n')
   : '- 当前未检测到 Lighthouse 断言告警';
 

@@ -15,13 +15,16 @@ const reasonLabels: Record<string, string> = {
 
 export default function NonLinkDiagnosticView({ diagnostic }: { diagnostic: NonLinkDiagnostic }) {
   return (
-    <div className="rounded-lg p-3 mb-2 flex items-start gap-3" style={{ background: 'rgba(255,255,255,0.02)' }}>
-      <Link2Off size={14} className="text-[#f43f5e] shrink-0 mt-0.5" />
+    <div
+      className="mb-2 flex items-start gap-3 rounded-lg p-3"
+      style={{ background: 'rgba(255,255,255,0.02)' }}
+    >
+      <Link2Off size={14} className="mt-0.5 shrink-0 text-[#f43f5e]" />
       <div>
         <span className="text-xs text-white/60">
           {reasonLabels[diagnostic.reason] ?? diagnostic.reason}
         </span>
-        <span className="text-[12px] text-[#68687a] ml-2">{diagnostic.stage}</span>
+        <span className="ml-2 text-[12px] text-[#68687a]">{diagnostic.stage}</span>
       </div>
     </div>
   );

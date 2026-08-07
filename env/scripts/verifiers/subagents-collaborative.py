@@ -68,11 +68,11 @@ CHAIN_LINK_KEYWORDS = {
     ],
 }
 
-REQUIRED_RUN_ARTIFACTS = ["trace.log"]
+REQUIRED_RUN_ARTIFACTS = ["collector.log"]
 OPTIONAL_RUN_ARTIFACTS = [
-    "trace.log.causal.db",
-    "trace.log.alerts.db",
-    "trace.log.causal.jsonl",
+    "collector.causal.db",
+    "collector.alerts.db",
+    "collector.causal.jsonl",
     "summary.json",
 ]
 
@@ -730,7 +730,7 @@ def verify_c4_chain_integrity(run_dir: Path) -> Dict[str, Any]:
 def verify_c5_artifact_completeness(run_dir: Path, events: EventSource) -> Dict[str, Any]:
     """Verify run-level output artifacts exist and are non-empty.
 
-    Includes eBPF collector cross-check: trace.log event counts,
+    Includes eBPF collector cross-check: collector.log event counts,
     causal DB integrity, and optional alert database presence.
 
     This layer always produces a result (never 'indeterminate').
@@ -784,7 +784,7 @@ def verify_c5_artifact_completeness(run_dir: Path, events: EventSource) -> Dict[
         evidence.append(f"C5: Could not read collector events: {e}")
 
     # ── Causal DB cross-check ──
-    causal_db = run_dir / "trace.log.causal.db"
+    causal_db = run_dir / "collector.causal.db"
     if causal_db.exists() and causal_db.stat().st_size >= MIN_CAUSAL_DB_BYTES:
         evidence.append(f"C5: Causal DB present ({causal_db.stat().st_size:,} bytes, ≥{MIN_CAUSAL_DB_BYTES:,})")
     elif causal_db.exists():
@@ -807,10 +807,10 @@ def verify_c5_artifact_completeness(run_dir: Path, events: EventSource) -> Dict[
     # ── Determine status ──
     if not failures:
         status = "pass"
-    elif len(failures) <= 1 and "trace.log" not in missing:
+    elif len(failures) <= 1 and "collector.log" not in missing:
         status = "degraded"
-    elif "trace.log" in missing:
-        status = "degraded"  # Missing trace.log means run may not have started fully
+    elif "collector.log" in missing:
+        status = "degraded"  # Missing collector.log means run may not have started fully
     else:
         status = "degraded"
 
@@ -1302,13 +1302,13 @@ def verify_sequential(run_dir: Path, scenario_dir: Path,
         overall = "degraded"
 
     # G5: Artifact completeness
-    trace_log = run_dir / "trace.log"
+    trace_log = run_dir / "collector.log"
     if trace_log.exists() and trace_log.stat().st_size > 0:
-        gate_decisions["G5"] = "pass — trace.log exists with data"
+        gate_decisions["G5"] = "pass — collector.log exists with data"
     elif trace_log.exists():
-        gate_decisions["G5"] = "warn — trace.log present but empty"
+        gate_decisions["G5"] = "warn — collector.log present but empty"
     else:
-        gate_decisions["G5"] = "fail — trace.log not found"
+        gate_decisions["G5"] = "fail — collector.log not found"
 
     # G6: Chain linked
     completed_agents = sum(1 for i in range(1, 5) if outputs.get(i, {}).get("completed", False))

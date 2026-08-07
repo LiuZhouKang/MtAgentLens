@@ -48,7 +48,7 @@ export interface DedupDroppedEvent {
 // SSE 流集成
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type DedupStreamType = "dedup_metrics" | "dedup_dropped";
+export type DedupStreamType = 'dedup_metrics' | 'dedup_dropped';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 仪表板 UI 状态

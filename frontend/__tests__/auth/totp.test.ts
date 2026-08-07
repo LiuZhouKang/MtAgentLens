@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  generateTOTPSecret,
-  generateBackupCodes,
-  validateTOTP,
-} from '@/lib/auth/totp';
+import { generateTOTPSecret, generateBackupCodes, validateTOTP } from '@/lib/auth/totp';
 
 // ---- generateTOTPSecret ----
 
@@ -47,7 +43,7 @@ describe('generateTOTPSecret', () => {
     const decoded = base32Decode(secret);
     expect(decoded.length).toBe(16);
     // Not all zeros
-    expect(decoded.some(b => b !== 0)).toBe(true);
+    expect(decoded.some((b) => b !== 0)).toBe(true);
   });
 
   it('has sufficient Shannon entropy', () => {
@@ -130,9 +126,7 @@ describe('generateBackupCodes', () => {
 
   it('no sequential pattern', () => {
     const codes = generateBackupCodes(50);
-    const sorted = codes
-      .map(c => parseInt(c, 10))
-      .sort((a, b) => a - b);
+    const sorted = codes.map((c) => parseInt(c, 10)).sort((a, b) => a - b);
     for (let i = 0; i < sorted.length - 2; i++) {
       const diff1 = sorted[i + 1] - sorted[i];
       const diff2 = sorted[i + 2] - sorted[i + 1];
@@ -143,7 +137,7 @@ describe('generateBackupCodes', () => {
   it('independent calls produce different sets', () => {
     const a = new Set(generateBackupCodes(10));
     const b = new Set(generateBackupCodes(10));
-    const intersection = [...a].filter(x => b.has(x));
+    const intersection = [...a].filter((x) => b.has(x));
     expect(intersection.length).toBeLessThan(2);
   });
 });
@@ -223,9 +217,7 @@ describe('validateTOTP', () => {
     const secret = generateTOTPSecret();
     const validCode = await computeTOTPCode(secret, 0);
     // Flip the last digit
-    const invalidCode =
-      validCode.slice(0, 5) +
-      ((parseInt(validCode[5], 10) + 1) % 10).toString();
+    const invalidCode = validCode.slice(0, 5) + ((parseInt(validCode[5], 10) + 1) % 10).toString();
     expect(await validateTOTP(secret, invalidCode)).toBe(false);
   });
 

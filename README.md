@@ -1,13 +1,28 @@
-# MtAgentLens
+```text
+ /$$      /$$   /$$      /$$$$$$                                  /$$     /$$
+| $$$    /$$$  | $$     /$$__  $$                                | $$    | $$
+| $$$$  /$$$$ /$$$$$$  | $$  \ $$  /$$$$$$   /$$$$$$  /$$$$$$$  /$$$$$$  | $$        /$$$$$$  /$$$$$$$   /$$$$$$$
+| $$ $$/$$ $$|_  $$_/  | $$$$$$$$ /$$__  $$ /$$__  $$| $$__  $$|_  $$_/  | $$       /$$__  $$| $$__  $$ /$$_____/
+| $$  $$$| $$  | $$    | $$__  $$| $$  \ $$| $$$$$$$$| $$  \ $$  | $$    | $$      | $$$$$$$$| $$  \ $$|  $$$$$$
+| $$\  $ | $$  | $$ /$$| $$  | $$| $$  | $$| $$_____/| $$  | $$  | $$ /$$| $$      | $$_____/| $$  | $$ \____  $$
+| $$ \/  | $$  |  $$$$/| $$  | $$|  $$$$$$$|  $$$$$$$| $$  | $$  |  $$$$/| $$$$$$$$|  $$$$$$$| $$  | $$ /$$$$$$$/
+|__/     |__/   \___/  |__/  |__/ \____  $$ \_______/|__/  |__/   \___/  |________/ \_______/|__/  |__/|_______/
+                                  /$$  \ $$
+                                 |  $$$$$$/
+                                  \______/
+```
 
-**零插桩 · 内核级 · 多 Agent 攻击可观测性**
+**<img src="frontend/public/brand/mtl-logo.svg" alt="" width="51" height="51" style="vertical-align:middle" />&nbsp;零插桩 · 内核级 · 多 Agent 攻击可观测性**
 
-从系统调用到责任归因——在 OS 边界采集可验证的运行事实
+从系统调用到责任归因 —— 在 OS 边界采集可验证的运行事实
 
-<a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue"></a>
-<a href="#性能"><img src="https://img.shields.io/badge/probe_latency-~101ns-blueviolet"></a>
-<a href="#性能"><img src="https://img.shields.io/badge/overhead-<3%25-brightgreen"></a>
-<a href="#FuxiBench"><img src="https://img.shields.io/badge/FuxiBench-F1%3D0.945-orange"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-007ec6?logo=apache&logoColor=white" alt="Apache 2.0"></a>
+<a href="#架构"><img src="https://img.shields.io/badge/eBPF-0a0b10?logo=linux&logoColor=white" alt="eBPF"></a>
+<a href="#架构"><img src="https://img.shields.io/badge/Rust-CE422B?logo=rust&logoColor=white" alt="Rust"></a>
+<a href="#架构"><img src="https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white" alt="Next.js"></a>
+<a href="#性能"><img src="https://img.shields.io/badge/probe_latency-%7E101ns-60a5fa" alt="Probe latency ~101ns"></a>
+<a href="#性能"><img src="https://img.shields.io/badge/overhead-%3C3%25-22c55e" alt="Overhead &lt;3%"></a>
+<a href="#FuxiBench"><img src="https://img.shields.io/badge/FuxiBench-F1_0.945-f97316" alt="FuxiBench F1 0.945"></a>
 
 ---
 
@@ -43,7 +58,7 @@ MtAgentLens 基于这一缺口构建。项目面向的不是一段可疑文本�
 
 ---
 
-## MtAgentLens
+## 介绍
 
 MtAgentLens 是一个面向多 Agent 运行系统的 **零插桩 OS 级可观测与责任归因工具**。它在 Linux 内核边界采集进程、文件、网络、stdio 和 TLS 明文片段等运行事实，不依赖 Agent 框架，不修改目标代码，也不要求接入 SDK。
 
@@ -169,13 +184,11 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |  Next.js 16 · React 19 · TypeScript 5 · Tailwind CSS 4          |
   |  rust-embed: compiled into mtagentlens binary at build time    |
   |                                                                 |
-  |  /           3D responsibility stage + alert entry point         |
-  |  /overview   global posture and probe coverage                   |
-  |  /traces     trace workbench and replay timeline                 |
-  |  /agents     agent risk profiles                                 |
-  |  /clusters   responsibility clusters                             |
-  |  /handoff    handoff / delegation observability                  |
-  |  /investigations  claim, evidence and traceback workbench        |
+  |  /           态势 · 3D responsibility stage + alert entry         |
+  |  /overview   仪表盘 · global posture, probe coverage & cluster    |
+  |  /investigations  告警 · claim, evidence and traceback workbench  |
+  |  /traces     追踪 · trace workbench and replay timeline           |
+  |  (agent/cluster deep links land on /overview#agentId=/#clusterId=) |
   |  /api/events legacy log-backed event stream                      |
   |  /api/runs/{id}/{alerts,correlation-evidence,events,diff,...}    |
   +-----------------------------------------------------------------+
@@ -200,59 +213,58 @@ LLM Guard、Meta Prompt Guard 等工具主要扫描 prompt 文本中的恶意模
 ## 快速开始
 
 ```bash
-git clone https://github.com/mtagentlens/mtagentlens.git --recursive
+# 克隆（注意 --recursive，项目包含子模块）
+git clone --recursive https://github.com/mtagentlens/mtagentlens.git
 cd mtagentlens
 ```
 
 ### 1. 安装依赖
 
-推荐直接使用仓库提供的安装脚本：
-
 ```bash
-./install.sh
+./install.sh        # 一键安装（支持 Ubuntu/Debian/Fedora/Arch/macOS）
 ```
 
-脚本会检查并安装以下依赖：
+脚本会自动检测系统并安装所需依赖：clang, llvm, libelf, zlib, Rust, Node.js 22。
 
-- `libelf1`
-- `libelf-dev`
-- `zlib1g-dev`
-- `make`
-- `clang`
-- `llvm`
-- `nvm` / 最新 LTS Node.js
-- `rustup` / Rust
-
-如需手动安装，也可以按系统环境自行补齐上述依赖。
-
-### 2. 全量构建
+### 2. 检查环境
 
 ```bash
-make build
+make check          # 验证所有依赖就绪
 ```
 
-### 3. 运行采集
+### 3. 构建
 
 ```bash
-sudo ./collector/build/release/mtagentlens record -c claude \
+make build          # 全量构建（BPF → 前端 → Rust）
+```
+
+### 4. 运行采集
+
+```bash
+sudo ./collector/target/release/mtagentlens record -c claude \
   --binary-path ~/.local/share/claude/versions/$(claude --version | head -1)
 ```
 
-### 4. 访问前端
+### 5. 访问前端
 
 浏览器访问 `http://127.0.0.1:7395`
 
+> [!NOTE]
 > **当前验证状态**：MtAgentLens 已在 **Claude Code**（Bun 运行时，静态链接 BoringSSL）上完成全面测试。对于动态链接系统 `libssl.so` 的 Agent（大多数 Python/Node.js AI 工具），eBPF uprobe 机制在架构上同样适用，尚未系统性验证。对其他 LLM Agent 的实验性支持可通过 `-c <进程名>` 尝试。
 
-Docker：
+### Docker（无需本地安装依赖）
 
 ```bash
 docker build -t mtagentlens .
 docker run --rm -it --privileged --pid=host \
   -v /sys:/sys:ro -v /usr:/usr:ro -v /lib:/lib:ro \
   -p 7395:7395 \
-mtagentlens record -c claude --binary-path /path/to/claude/binary
+  mtagentlens record -c claude --binary-path /path/to/claude/binary
 ```
+
+### VS Code / GitHub Codespaces
+
+项目包含 `.devcontainer/devcontainer.json`，打开后自动构建 eBPF 环境。
 
 ---
 
@@ -432,18 +444,31 @@ conversation_id ───┘
 
 ```bash
 make build              # 全量构建 (BPF → 前端 → Rust)
-make build-frontend     # 仅前端
-make build-bpf          # 仅 eBPF (bpftools/)
-make build-rust         # 仅 Rust (collector/)
+make dev                # 开发构建 (debug, 增量编译)
+make check              # 环境预检
 make test               # 全量测试
-make docker             # Docker 镜像
+make lint               # 代码质量检查
+make fmt                # 格式化所有代码
+make help               # 显示所有可用目标
 
 cd collector
-cargo build --release   # → build/release/mtagentlens
-cargo test              # 862+ 测试
+cargo build --release   # → target/release/mtagentlens
+cargo test              # 869+ 测试
+cargo clippy            # Lint
 
 cd frontend
-npm run dev             # 开发服务器
+npm run dev             # 开发服务器 (:7395)
+```
+
+Docker 开发环境：
+
+```bash
+make docker-dev         # 构建开发镜像（含完整编译工具链）
+docker run --rm -it -v $(pwd):/workspace -w /workspace \
+  --privileged --pid=host \
+  -v /sys:/sys:ro -v /usr:/usr:ro -v /lib:/lib:ro \
+  -p 7395:7395 \
+  mtagentlens:dev bash
 ```
 
 ---
@@ -453,9 +478,9 @@ npm run dev             # 开发服务器
 | 组件 | 要求 |
 |------|------|
 | Linux 内核 | 4.1+ (推荐 5.0+，需 `CONFIG_DEBUG_INFO_BTF`) |
-| Rust | 1.88+ (edition 2024) |
-| Node.js | 18+ |
-| 构建工具 | clang, llvm, libelf-dev, zlib1g-dev, make |
+| Rust | 1.85+ (edition 2024) |
+| Node.js | 18+ (推荐 22 LTS) |
+| 构建工具 | clang, llvm, libelf-dev, zlib1g-dev, make, pkg-config |
 | 运行时权限 | root 或 `CAP_BPF` + `CAP_SYS_ADMIN` |
 
 ---

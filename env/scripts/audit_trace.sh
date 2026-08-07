@@ -6,8 +6,8 @@ set -euo pipefail
 RUN_DIR="${1:?Usage: $0 <run-dir> <scenario-id>}"
 SCENARIO_ID="${2:?}"
 
-DB="$RUN_DIR/collector/trace.responsibility.db"
-ERR_LOG="$RUN_DIR/collector/trace.err.log"
+DB="$RUN_DIR/collector/collector.responsibility.db"
+ERR_LOG="$RUN_DIR/collector/collector.log"
 
 echo "═══════════════════════════════════════════════════════════"
 echo "  TRACE AUDIT: $SCENARIO_ID"
@@ -104,7 +104,7 @@ warnings=$(grep -c "WARN" "$ERR_LOG" 2>/dev/null || echo "0")
 echo "    ERROR/FATAL/panic lines: $errors"
 echo "    WARN lines: $warnings"
 if [ "$errors" -gt 5 ]; then
-    echo "    ⚠️  High error count — review trace.err.log"
+    echo "    ⚠️  High error count — review collector.log"
 fi
 
 echo ""

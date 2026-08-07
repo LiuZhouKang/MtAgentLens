@@ -1,0 +1,56 @@
+/* Unified Fluid Cards CSS */
+:root .incident-rail .incident-evidence-stage__hero,
+:root .incident-rail .incident-evidence-stage__status,
+:root .incident-rail .incident-evidence-ribbon__primary,
+:root .incident-rail .incident-evidence-ribbon__trace,
+:root .incident-rail .incident-evidence-structure,
+:root .incident-rail .incident-evidence-list,
+:root .incident-rail .incident-evidence-focus-card {
+  position: relative !important;
+  overflow: hidden !important;
+  /* Dark translucent glass background */
+  background: rgba(20, 20, 22, 0.4) !important;
+  backdrop-filter: blur(20px) saturate(1.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Base Gradient Injection */
+:root .incident-rail .incident-evidence-stage__hero::before,
+:root .incident-rail .incident-evidence-stage__status::before,
+:root .incident-rail .incident-evidence-ribbon__primary::before,
+:root .incident-rail .incident-evidence-ribbon__trace::before,
+:root .incident-rail .incident-evidence-structure::before,
+:root .incident-rail .incident-evidence-list::before,
+:root .incident-rail .incident-evidence-focus-card::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: -50% !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+  
+  /* Inherit colors if provided, otherwise default to a subtle glow */
+  background: radial-gradient(
+    circle at 20% 100%, 
+    var(--fluid-color-1, rgba(255, 255, 255, 0.05)) 0%, 
+    var(--fluid-color-2, rgba(255, 255, 255, 0.02)) 40%, 
+    transparent 70%
+  ) !important;
+  
+  filter: blur(40px) !important;
+  opacity: 0.8 !important;
+  display: block !important;
+  animation: card-fluid-breathe 8s ease-in-out infinite alternate !important;
+}
+
+/* Ensure content stays above the fluid background */
+:root .incident-rail .incident-evidence-stage__hero > *,
+:root .incident-rail .incident-evidence-stage__status > *,
+:root .incident-rail .incident-evidence-ribbon__primary > *,
+:root .incident-rail .incident-evidence-ribbon__trace > *,
+:root .incident-rail .incident-evidence-structure > *,
+:root .incident-rail .incident-evidence-list > *,
+:root .incident-rail .incident-evidence-focus-card > * {
+  position: relative !important;
+  z-index: 1 !important;
+}

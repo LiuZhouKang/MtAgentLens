@@ -149,7 +149,7 @@ def main():
 
         # Find the DB and compact it
         collector_dir = run_dir / "collector"
-        for db_name in ["trace.responsibility.db", "trace.log.responsibility.db"]:
+        for db_name in ["collector.responsibility.db"]:
             db_src = collector_dir / db_name
             if db_src.exists():
                 compact_db(str(db_src), str(trace_dst / "responsibility.db"))

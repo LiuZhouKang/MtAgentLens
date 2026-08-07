@@ -4,9 +4,3 @@
 [submodule "bpftool"]
 	path = bpftool
 	url = https://github.com/libbpf/bpftool.git
-[submodule "agent-sentinel"]
-	path = agent-sentinel
-	url = https://github.com/m4p1e/agent-sentinel.git
-[submodule "awesome-design-md"]
-	path = awesome-design-md
-	url = https://github.com/VoltAgent/awesome-design-md.git

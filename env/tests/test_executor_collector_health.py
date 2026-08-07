@@ -397,7 +397,7 @@ def test_collector_manager_preserves_observer_env_when_explicit(
 
 
 def test_runtime_health_uses_responsibility_db_component_evidence(tmp_path: Path) -> None:
-    db = tmp_path / "trace.responsibility.db"
+    db = tmp_path / "collector.responsibility.db"
     with sqlite3.connect(db) as conn:
         conn.executescript(
             """
@@ -502,7 +502,7 @@ def test_stable_db_metrics_keep_final_counts(
     )
 
     metrics = _read_stable_responsibility_db_metrics(
-        tmp_path / "trace.responsibility.db",
+        tmp_path / "collector.responsibility.db",
         attempts=3,
         delay_seconds=0.0,
     )

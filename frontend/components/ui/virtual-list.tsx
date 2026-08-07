@@ -72,7 +72,10 @@ export default function VirtualList<T>({
               top: 0,
               left: 0,
               width: '100%',
-              height: vi.size,
+              // dynamic: 行高由内容决定（measureElement 用 ResizeObserver 测真实高度），
+              // 行内容展开增高时能触发重排，下一行随之下移——否则固定 height 会锁死
+              // 行高，展开内容溢出行 div 覆盖下一行（traces 责任链路展开重叠 BUG）。
+              ...(dynamic ? {} : { height: vi.size }),
               transform: `translateY(${vi.start}px)`,
             }}
           >

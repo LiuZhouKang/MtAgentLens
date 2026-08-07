@@ -19,7 +19,7 @@ def export_log(stream_json_path: Path, output_path: Path | None = None):
         for line in f:
             try:
                 msg = json.loads(line.strip())
-            except:
+            except (json.JSONDecodeError, ValueError):
                 continue
             
             msg_type = msg.get('type', '?')

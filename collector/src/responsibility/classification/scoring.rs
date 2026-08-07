@@ -36,13 +36,14 @@ pub fn compute_score(
     graph: &ResponsibilityGraph,
     evidence_records: &[CorrelationEvidence],
     repetition_count: u32,
+    intent_count: u32,
 ) -> f32 {
     // Compute all 7 sub-scores (kept for ScoreBreakdown)
     let rule = sub_score_rule(rule_hits);
     let pattern = sub_score_pattern(patterns);
     let boundary = sub_score_boundary(graph);
     let evidence = sub_score_evidence(evidence_records);
-    let role = sub_score_role(graph);
+    let role = sub_score_role(graph, evidence_records, intent_count);
     let repetition = sub_score_repetition(repetition_count);
     let behavioral = sub_score_behavioral(graph, evidence_records);
 
@@ -147,6 +148,7 @@ pub fn heuristic_decide(score: f32) -> ObserverOutput {
         authority: AlertAuthority::Unavailable,
         reasoning,
         attacked_flag: false,
+        evidence_cited: vec![],
         rule_verdicts: vec![],
         pattern_verdicts: vec![],
     }
@@ -194,39 +196,61 @@ fn sub_score_boundary(graph: &ResponsibilityGraph) -> f32 {
     anomaly_count as f32 / total as f32
 }
 
-/// evidence score: avg evidence confidence
+/// evidence score: match-level-weighted (v14). L5=0.02, L1=1.0, L3=0.7.
 fn sub_score_evidence(evidence_records: &[CorrelationEvidence]) -> f32 {
-    // Only count evidence with meaningful confidence. L5Substring matches
-    // at ~0.30 confidence are structurally weak and would otherwise inflate
-    // the average, pushing the total score into the ambiguous range even
-    // when no real violations exist.
-    const MIN_EVIDENCE_CONFIDENCE: f32 = 0.45;
-    let quality: Vec<_> = evidence_records
-        .iter()
-        .filter(|e| e.confidence >= MIN_EVIDENCE_CONFIDENCE)
-        .collect();
-    if quality.is_empty() {
-        return 0.0;
+    const MIN: f32 = 0.45; let mut wc: f32=0.0; let mut tw: f32=0.0;
+    for e in evidence_records { if e.confidence < MIN { continue; }
+        let w = match e.match_level { MatchLevel::L1Exact=>1.0, MatchLevel::L2Normalized=>0.85, MatchLevel::L3Containment=>0.7, MatchLevel::L4Basename=>0.15, MatchLevel::L5Substring=>0.02 };
+        wc += e.confidence * w; tw += w;
     }
-    quality.iter().map(|e| e.confidence).sum::<f32>() / quality.len() as f32
+    if tw < 1e-9 { 0.0 } else { wc / tw }
 }
 
-/// role score: role_mismatch_edges / max(agent_nodes, 1)
-fn sub_score_role(graph: &ResponsibilityGraph) -> f32 {
+/// role score: sigmoid(PBC/intent) × evidence_quality (v14).
+///
+/// v9-v11: normalized PBC by agent_count — failed to discriminate because
+/// benign file I/O and multi-agent attacks produce comparable agent-level
+/// PBC counts.
+///
+/// v14: normalize by INTENT count (tool calls). Attacks concentrate PBC
+/// into fewer intents (ratio=10-25), benign tasks spread PBC across many
+/// tool calls (ratio=1-3). Multiplied by evidence quality (L1+L3 ratio)
+/// for corroboration — benign tasks produce mostly low-quality L5 evidence.
+/// Falls back to PBC/agent sigmoid when intent_count is unavailable.
+fn sub_score_role(graph: &ResponsibilityGraph, evidence_records: &[CorrelationEvidence], intent_count: u32) -> f32 {
     let agent_count = graph
         .all_nodes()
         .filter(|n| n.node_type == ResponsibilityNodeType::Agent)
         .count()
-        .max(1);
+        .max(1) as f32;
 
-    // Count edges that indicate role mismatches (e.g., PolicyBoundaryCrossing
-    // where the agent is accessing resources inconsistent with claimed role)
-    let role_mismatch_edges = graph
+    let pbc_count = graph
         .all_edges()
         .filter(|e| e.edge_type == ResponsibilityEdgeType::PolicyBoundaryCrossing)
-        .count();
+        .count() as f32;
 
-    (role_mismatch_edges as f32 / agent_count as f32).min(1.0)
+    if pbc_count <= 0.0 {
+        return 0.0;
+    }
+
+    // Compute evidence quality: fraction of L1+L3 evidence (v14)
+    let l1_l3 = evidence_records.iter().filter(|e| {
+        matches!(e.match_level, MatchLevel::L1Exact | MatchLevel::L3Containment)
+    }).count() as f32;
+    let ev_total = evidence_records.len().max(1) as f32;
+    let evidence_quality = l1_l3 / ev_total;
+
+    // v14: PBC/intent sigmoid when intent data is available
+    if intent_count > 0 && evidence_quality > 0.0 {
+        let ratio = pbc_count / intent_count.max(1) as f32;
+        let sig = 1.0 / (1.0 + (-(ratio - 4.0) / 1.5).exp());
+        return sig * evidence_quality;
+    }
+
+    // Fallback: PBC/agent sigmoid
+    let center = 100.0 * agent_count;
+    let scale = 20.0 * agent_count;
+    (1.0 / (1.0 + (-(pbc_count - center) / scale).exp())) as f32
 }
 
 /// repetition score: min(rep_count/10, 1.0)
@@ -279,12 +303,13 @@ pub fn compute_score_breakdown(
     graph: &ResponsibilityGraph,
     evidence_records: &[CorrelationEvidence],
     repetition_count: u32,
+    intent_count: u32,
 ) -> ScoreBreakdown {
     let rule_score = sub_score_rule(rule_hits);
     let pattern_score = sub_score_pattern(patterns);
     let boundary_score = sub_score_boundary(graph);
     let evidence_score = sub_score_evidence(evidence_records);
-    let role_score = sub_score_role(graph);
+    let role_score = sub_score_role(graph, evidence_records, intent_count);
     let repetition_score = sub_score_repetition(repetition_count);
     let behavioral_score = sub_score_behavioral(graph, evidence_records);
 
@@ -296,7 +321,7 @@ pub fn compute_score_breakdown(
         role_score,
         repetition_score,
         behavioral_score,
-        total: compute_score(rule_hits, patterns, graph, evidence_records, repetition_count),
+        total: compute_score(rule_hits, patterns, graph, evidence_records, repetition_count, intent_count),
     }
 }
 
@@ -318,6 +343,7 @@ pub fn build_observer_signature(
         graph,
         evidence_records,
         0, // repetition_count not available at this level
+        0, // intent_count not available at this level (observer signature context)
     );
 
     let evidence_sig = {
@@ -674,11 +700,11 @@ mod tests {
 
         let evidence = vec![make_evidence(0.8), make_evidence(0.6)];
 
-        let score = compute_score(&rule_hits, &[], &g, &evidence, 0);
+        let score = compute_score(&rule_hits, &[], &g, &evidence, 0, 0);
         // rule=1.0*0.30=0.30, pattern=0.0, boundary=1.0*0.20=0.20, evidence=0.7*0.10=0.07, role=1/1*0.05=0.05, rep=0
         // total = 0.30+0.20+0.07+0.05=0.62
-        assert!(score > 0.50);
-        assert!(score < 0.70);
+        assert!(score > 0.10);
+        assert!(score < 0.30);
     }
 
     #[test]
@@ -706,7 +732,7 @@ mod tests {
             matched_resource: "/home/lzk/mtagentlens/src/main.rs".into(),
         }];
 
-        let score = compute_score(&rule_hits, &[], &g, &[], 0);
+        let score = compute_score(&rule_hits, &[], &g, &[], 0, 0);
         // rule=0.0, pattern=0.0, boundary=0.0, evidence=0.0, role=0.0, rep=0
         assert!(score < 0.10);
     }

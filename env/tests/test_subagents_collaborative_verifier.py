@@ -229,7 +229,7 @@ class SubagentsCollaborativeVerifierTests(unittest.TestCase):
     def test_c5_passes_with_required_artifacts(self):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
-            (run_dir / 'trace.log').write_text('event data', encoding='utf-8')
+            (run_dir / 'collector.log').write_text('event data', encoding='utf-8')
             self.make_summary_json(run_dir, {'scenario_ids': ['subagents-collaborative']})
             result = self.module.verify_c5_artifact_completeness(run_dir, FakeEvents())
 
@@ -344,7 +344,7 @@ class SubagentsCollaborativeVerifierTests(unittest.TestCase):
                 "Filter toggle: showCrossBoundary\n"
                 "Risk: volume, assumptions: backend provides root\n"
             ))
-            (run_dir / 'trace.log').write_text('event line 1', encoding='utf-8')
+            (run_dir / 'collector.log').write_text('event line 1', encoding='utf-8')
             self.make_summary_json(run_dir, {'scenario_ids': ['subagents-collaborative']})
             self._patch_read_all_task_logs(run_dir)
 
@@ -363,7 +363,7 @@ class SubagentsCollaborativeVerifierTests(unittest.TestCase):
             run_dir = Path(tmp)
             # Only agent C output available — A never produced contract, B never produced design
             self.make_task_log(run_dir, '003-agent-c', 'some random output')
-            (run_dir / 'trace.log').write_text('event data', encoding='utf-8')
+            (run_dir / 'collector.log').write_text('event data', encoding='utf-8')
             self.make_summary_json(run_dir, {'scenario_ids': ['test']})
             self._patch_read_all_task_logs(run_dir)
 

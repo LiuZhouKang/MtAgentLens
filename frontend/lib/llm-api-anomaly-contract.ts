@@ -6,7 +6,7 @@
 //               NewDestination | SustainedHighFrequency | ErrorStorm
 // 三级严重度:   Info → Warning → Critical
 
-import type { AnomalySeverity } from "./data-contract";
+import type { AnomalySeverity } from './data-contract';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 异常类型（与 Rust AnomalyType 对齐）
@@ -14,41 +14,41 @@ import type { AnomalySeverity } from "./data-contract";
 
 /** LLM API 用量异常类型 */
 export type AnomalyType =
-  | "RateBurst"               // 短时间内调用次数过多（10s 内 >20 次）
-  | "RepeatedIdenticalRequest" // 相同 payload 重复发送（>5 次）
-  | "OversizedRequest"         // 单次请求异常庞大（>1MB）
-  | "NewDestination"           // 连接了之前未见过的 LLM API 端点
-  | "SustainedHighFrequency"   // 持续高频率调用（5min 内 >100 次）
-  | "ErrorStorm";              // 错误状态码比例过高（>50%）
+  | 'RateBurst' // 短时间内调用次数过多（10s 内 >20 次）
+  | 'RepeatedIdenticalRequest' // 相同 payload 重复发送（>5 次）
+  | 'OversizedRequest' // 单次请求异常庞大（>1MB）
+  | 'NewDestination' // 连接了之前未见过的 LLM API 端点
+  | 'SustainedHighFrequency' // 持续高频率调用（5min 内 >100 次）
+  | 'ErrorStorm'; // 错误状态码比例过高（>50%）
 
 /** 异常类型的人类可读标签 */
 export const ANOMALY_TYPE_LABEL: Record<AnomalyType, string> = {
-  RateBurst: "速率突发",
-  RepeatedIdenticalRequest: "重复请求",
-  OversizedRequest: "超大请求",
-  NewDestination: "新目标端点",
-  SustainedHighFrequency: "持续高频",
-  ErrorStorm: "错误风暴",
+  RateBurst: '速率突发',
+  RepeatedIdenticalRequest: '重复请求',
+  OversizedRequest: '超大请求',
+  NewDestination: '新目标端点',
+  SustainedHighFrequency: '持续高频',
+  ErrorStorm: '错误风暴',
 };
 
 /** 异常类型的描述 */
 export const ANOMALY_TYPE_DESC: Record<AnomalyType, string> = {
-  RateBurst: "短时间内 LLM API 调用次数超过阈值，可能陷入无退避重试循环",
-  RepeatedIdenticalRequest: "相同 payload 被重复发送多次，Agent 可能陷入确定性重试-失败循环",
-  OversizedRequest: "单次 API 请求/响应体超过阈值，可能为上下文污染或数据外泄",
-  NewDestination: "Agent 连接了之前未记录过的 LLM API 端点，存在供应链风险",
-  SustainedHighFrequency: "长时间窗口内持续高频率调用，Agent 进程可能失控",
-  ErrorStorm: "API 返回错误状态码的比例超过阈值，服务端可能拒绝请求或配置错误",
+  RateBurst: '短时间内 LLM API 调用次数超过阈值，可能陷入无退避重试循环',
+  RepeatedIdenticalRequest: '相同 payload 被重复发送多次，Agent 可能陷入确定性重试-失败循环',
+  OversizedRequest: '单次 API 请求/响应体超过阈值，可能为上下文污染或数据外泄',
+  NewDestination: 'Agent 连接了之前未记录过的 LLM API 端点，存在供应链风险',
+  SustainedHighFrequency: '长时间窗口内持续高频率调用，Agent 进程可能失控',
+  ErrorStorm: 'API 返回错误状态码的比例超过阈值，服务端可能拒绝请求或配置错误',
 };
 
 /** 异常类型的 emoji 图标 */
 export const ANOMALY_TYPE_ICON: Record<AnomalyType, string> = {
-  RateBurst: "⚡",
-  RepeatedIdenticalRequest: "🔄",
-  OversizedRequest: "📦",
-  NewDestination: "🛰️",
-  SustainedHighFrequency: "🔥",
-  ErrorStorm: "💥",
+  RateBurst: '⚡',
+  RepeatedIdenticalRequest: '🔄',
+  OversizedRequest: '📦',
+  NewDestination: '🛰️',
+  SustainedHighFrequency: '🔥',
+  ErrorStorm: '💥',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -56,24 +56,24 @@ export const ANOMALY_TYPE_ICON: Record<AnomalyType, string> = {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** LLM API 异常严重程度 */
-export type LlmApiSeverity = "Info" | "Warning" | "Critical";
+export type LlmApiSeverity = 'Info' | 'Warning' | 'Critical';
 
 /** 严重程度标签 */
 export const LLM_API_SEVERITY_LABEL: Record<LlmApiSeverity, string> = {
-  Info: "信息",
-  Warning: "警告",
-  Critical: "严重",
+  Info: '信息',
+  Warning: '警告',
+  Critical: '严重',
 };
 
 /** LlmApiSeverity → AnomalySeverity 映射（用于与现有异常系统互操作） */
 export function llmApiSeverityToAnomalySeverity(s: LlmApiSeverity): AnomalySeverity {
   switch (s) {
-    case "Info":
-      return "info";
-    case "Warning":
-      return "warning";
-    case "Critical":
-      return "critical";
+    case 'Info':
+      return 'info';
+    case 'Warning':
+      return 'warning';
+    case 'Critical':
+      return 'critical';
   }
 }
 
@@ -164,9 +164,9 @@ export interface EndpointAnomalyStats {
 
 /** 仪表板视图模式 */
 export type LlmApiDashboardViewMode =
-  | "overview"      // 概览：严重度分布 + 类型分布 + 统计摘要卡片
-  | "alerts"        // 告警列表：可过滤、可排序的告警卡片 + 详情面板
-  | "endpoints";    // 端点分析：按 LLM API 端点聚合的统计视图
+  | 'overview' // 概览：严重度分布 + 类型分布 + 统计摘要卡片
+  | 'alerts' // 告警列表：可过滤、可排序的告警卡片 + 详情面板
+  | 'endpoints'; // 端点分析：按 LLM API 端点聚合的统计视图
 
 /** 仪表板全局状态 */
 export interface LlmApiAnomalyDashboardState {
@@ -219,7 +219,7 @@ export interface LlmApiAnomalyDashboardProps {
 /** 异常类型图标 Props */
 export interface AnomalyTypeIconProps {
   anomaly_type: AnomalyType;
-  size?: "sm" | "md" | "lg";
+  size?: 'sm' | 'md' | 'lg';
 }
 
 /** 严重度徽章 Props */
@@ -284,15 +284,18 @@ export function calcWindowDurationMs(alert: LlmApiAnomalyAlert): number {
 
 /** 按 agent_root_pid 聚合告警统计 */
 export function aggregateByAgent(alerts: LlmApiAnomalyAlert[]): AgentApiAnomalyStats[] {
-  const map = new Map<number, {
-    total: number;
-    byType: Record<AnomalyType, number>;
-    bySeverity: Record<LlmApiSeverity, number>;
-    totalCalls: number;
-    endpoints: Set<string>;
-    sevs: LlmApiSeverity[];
-    lastMs: number;
-  }>();
+  const map = new Map<
+    number,
+    {
+      total: number;
+      byType: Record<AnomalyType, number>;
+      bySeverity: Record<LlmApiSeverity, number>;
+      totalCalls: number;
+      endpoints: Set<string>;
+      sevs: LlmApiSeverity[];
+      lastMs: number;
+    }
+  >();
 
   const emptyTypeCounts = (): Record<AnomalyType, number> => ({
     RateBurst: 0,
@@ -334,32 +337,37 @@ export function aggregateByAgent(alerts: LlmApiAnomalyAlert[]): AgentApiAnomalyS
     }
   }
 
-  const sevOrder: LlmApiSeverity[] = ["Info", "Warning", "Critical"];
+  const sevOrder: LlmApiSeverity[] = ['Info', 'Warning', 'Critical'];
 
-  return Array.from(map.entries()).map(([pid, agg]) => ({
-    agent_root_pid: pid,
-    total_alerts: agg.total,
-    alerts_by_type: agg.byType,
-    alerts_by_severity: agg.bySeverity,
-    total_tracked_calls: agg.totalCalls,
-    unique_endpoints: Array.from(agg.endpoints).sort(),
-    max_severity: agg.sevs.reduce((max, s) =>
-      sevOrder.indexOf(s) > sevOrder.indexOf(max) ? s : max,
-      "Info" as LlmApiSeverity,
-    ),
-    last_alert_ms: agg.lastMs,
-  })).sort((a, b) => b.total_alerts - a.total_alerts);
+  return Array.from(map.entries())
+    .map(([pid, agg]) => ({
+      agent_root_pid: pid,
+      total_alerts: agg.total,
+      alerts_by_type: agg.byType,
+      alerts_by_severity: agg.bySeverity,
+      total_tracked_calls: agg.totalCalls,
+      unique_endpoints: Array.from(agg.endpoints).sort(),
+      max_severity: agg.sevs.reduce(
+        (max, s) => (sevOrder.indexOf(s) > sevOrder.indexOf(max) ? s : max),
+        'Info' as LlmApiSeverity,
+      ),
+      last_alert_ms: agg.lastMs,
+    }))
+    .sort((a, b) => b.total_alerts - a.total_alerts);
 }
 
 /** 按端点聚合告警统计 */
 export function aggregateByEndpoint(alerts: LlmApiAnomalyAlert[]): EndpointAnomalyStats[] {
-  const map = new Map<string, {
-    count: number;
-    types: Set<AnomalyType>;
-    sevs: LlmApiSeverity[];
-    agents: Set<number>;
-    newDestCount: number;
-  }>();
+  const map = new Map<
+    string,
+    {
+      count: number;
+      types: Set<AnomalyType>;
+      sevs: LlmApiSeverity[];
+      agents: Set<number>;
+      newDestCount: number;
+    }
+  >();
 
   for (const alert of alerts) {
     for (const endpoint of alert.affected_endpoints) {
@@ -377,23 +385,25 @@ export function aggregateByEndpoint(alerts: LlmApiAnomalyAlert[]): EndpointAnoma
       agg.types.add(alert.anomaly_type);
       agg.sevs.push(alert.severity);
       agg.agents.add(alert.agent_root_pid);
-      if (alert.anomaly_type === "NewDestination") agg.newDestCount++;
+      if (alert.anomaly_type === 'NewDestination') agg.newDestCount++;
     }
   }
 
-  const sevOrder: LlmApiSeverity[] = ["Info", "Warning", "Critical"];
+  const sevOrder: LlmApiSeverity[] = ['Info', 'Warning', 'Critical'];
 
-  return Array.from(map.entries()).map(([endpoint, agg]) => ({
-    endpoint,
-    alert_count: agg.count,
-    anomaly_types: Array.from(agg.types),
-    max_severity: agg.sevs.reduce((max, s) =>
-      sevOrder.indexOf(s) > sevOrder.indexOf(max) ? s : max,
-      "Info" as LlmApiSeverity,
-    ),
-    affected_agents: Array.from(agg.agents).sort((a, b) => a - b),
-    new_destination_alerts: agg.newDestCount,
-  })).sort((a, b) => b.alert_count - a.alert_count);
+  return Array.from(map.entries())
+    .map(([endpoint, agg]) => ({
+      endpoint,
+      alert_count: agg.count,
+      anomaly_types: Array.from(agg.types),
+      max_severity: agg.sevs.reduce(
+        (max, s) => (sevOrder.indexOf(s) > sevOrder.indexOf(max) ? s : max),
+        'Info' as LlmApiSeverity,
+      ),
+      affected_agents: Array.from(agg.agents).sort((a, b) => a - b),
+      new_destination_alerts: agg.newDestCount,
+    }))
+    .sort((a, b) => b.alert_count - a.alert_count);
 }
 
 /** 计算严重程度分布的计数和百分比 */
@@ -427,16 +437,16 @@ export function anomalyTypeCounts(alerts: LlmApiAnomalyAlert[]): Record<AnomalyT
 /** 获取告警列表中的最高严重程度 */
 export function maxSeverity(alerts: LlmApiAnomalyAlert[]): LlmApiSeverity | null {
   if (alerts.length === 0) return null;
-  const order: LlmApiSeverity[] = ["Info", "Warning", "Critical"];
-  return alerts.reduce((max, a) =>
-    order.indexOf(a.severity) > order.indexOf(max) ? a.severity : max,
-    "Info" as LlmApiSeverity,
+  const order: LlmApiSeverity[] = ['Info', 'Warning', 'Critical'];
+  return alerts.reduce(
+    (max, a) => (order.indexOf(a.severity) > order.indexOf(max) ? a.severity : max),
+    'Info' as LlmApiSeverity,
   );
 }
 
 /** 检测告警中是否有 Critical 级别的异常 */
 export function hasCritical(alerts: LlmApiAnomalyAlert[]): boolean {
-  return alerts.some((a) => a.severity === "Critical");
+  return alerts.some((a) => a.severity === 'Critical');
 }
 
 /** 从告警列表中提取所有唯一的 Agent PID */
@@ -501,7 +511,7 @@ export function buildAnomalyAlert(
 export function createDefaultLlmApiAnomalyState(): LlmApiAnomalyDashboardState {
   return {
     alerts: [],
-    view_mode: "overview",
+    view_mode: 'overview',
     selected_alert_uid: null,
     type_filter: null,
     severity_filter: null,

@@ -3,11 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import {
-  UserProfile,
-  processAvatar,
-  getErrorMessage,
-} from '@/components/ui/user-profile';
+import { UserProfile, processAvatar, getErrorMessage } from '@/components/ui/user-profile';
 
 // ---- Mock state for @tanstack/react-virtual ----
 // Mutable ref pattern: each test updates virtualItems before rendering.
@@ -52,13 +48,14 @@ function createWrapper() {
     },
   });
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   };
 }
 
-function mockFetchUser(user: Record<string, unknown> | null, activities: Array<Record<string, unknown>>) {
+function mockFetchUser(
+  user: Record<string, unknown> | null,
+  activities: Array<Record<string, unknown>>,
+) {
   vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
     new Response(JSON.stringify({ user, activities }), {
       status: 200,
@@ -115,9 +112,7 @@ describe('getErrorMessage', () => {
   });
 
   it('handles TypeError (common for network failures)', () => {
-    expect(getErrorMessage(new TypeError('Failed to fetch'))).toBe(
-      'Failed to fetch',
-    );
+    expect(getErrorMessage(new TypeError('Failed to fetch'))).toBe('Failed to fetch');
   });
 
   it('returns fallback for object with non-string .message', () => {
@@ -143,9 +138,7 @@ describe('UserProfile', () => {
   it('renders loading skeleton on mount', () => {
     render(<UserProfile userId="user-1" />, { wrapper: createWrapper() });
     // Skeleton uses aria-label — no sr-only span needed
-    expect(
-      screen.getByRole('status', { name: 'Loading user profile' }),
-    ).toBeDefined();
+    expect(screen.getByRole('status', { name: 'Loading user profile' })).toBeDefined();
   });
 
   it('renders error state when query fails', async () => {
@@ -206,9 +199,7 @@ describe('UserProfile', () => {
 
     render(<UserProfile userId="bad-id" />, { wrapper: createWrapper() });
 
-    expect(
-      await screen.findByText('Failed to fetch profile for user bad-id'),
-    ).toBeDefined();
+    expect(await screen.findByText('Failed to fetch profile for user bad-id')).toBeDefined();
   });
 });
 

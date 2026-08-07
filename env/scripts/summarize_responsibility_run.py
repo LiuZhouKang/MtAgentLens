@@ -131,7 +131,7 @@ def print_bullets(items: list[str]) -> None:
 
 
 def health_lines(run: Path) -> list[str]:
-    path = run / "collector" / "trace.err.log"
+    path = run / "collector" / "collector.log"
     if not path.exists():
         return []
     patterns = (
@@ -156,7 +156,7 @@ def health_lines(run: Path) -> list[str]:
 
 
 def runtime_diagnostics(run: Path) -> dict:
-    path = run / "collector" / "trace.err.log"
+    path = run / "collector" / "collector.log"
     diagnostics = {
         "observer_calls": None,
         "observer_classify_lines": 0,
@@ -222,7 +222,7 @@ def main() -> int:
 
     run = args.run or latest_run()
     run = run.resolve()
-    db = run / "collector" / "trace.responsibility.db"
+    db = run / "collector" / "collector.responsibility.db"
     if not db.exists():
         raise SystemExit(f"Responsibility database not found: {db}")
 

@@ -15,7 +15,7 @@ SPEC.loader.exec_module(adjudicate_rerun_evidence)
 
 def test_verifier_pass_with_no_claims_is_false_negative(tmp_path: Path, monkeypatch):
     run_dir = tmp_path / "run"
-    db_path = run_dir / "collector" / "trace.responsibility.db"
+    db_path = run_dir / "collector" / "collector.responsibility.db"
     log_path = run_dir / "logs" / "agent_0.log"
     db_path.parent.mkdir(parents=True)
     log_path.parent.mkdir(parents=True)

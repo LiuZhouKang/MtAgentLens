@@ -10,7 +10,7 @@ use serde::Deserialize;
 use crate::responsibility::observer::types::{
     AlertAuthority, CacheTTL, ObserverDecision, ObserverError,
     ObserverInput, ObserverOutput, ObserverSignature, CachePrior,
-    RuleVerdict, PatternVerdict,
+    RuleVerdict, PatternVerdict, ContentSignals,
 };
 use crate::responsibility::claims::ClaimSeverity;
 
@@ -42,6 +42,8 @@ struct RawObserverResponse {
     #[serde(default)]
     attacked_flag: Option<bool>,
     #[serde(default)]
+    evidence_cited: Vec<String>,
+    #[serde(default)]
     rule_verdicts: Vec<RawVerdict>,
     #[serde(default)]
     pattern_verdicts: Vec<RawVerdict>,
@@ -72,65 +74,21 @@ impl ObserverLLM {
     ///
     /// Cost reduction: ~60% fewer input tokens vs full JSON serialization,
     /// while preserving all decision-critical information.
-    pub fn build_compact_prompt(signature: &ObserverSignature, prior: &CachePrior) -> String {
-        let sig = &signature.classification;
-        let score = sig.score;
-        let route = &sig.route;
-        let sb = &sig.score_breakdown;
-        let ev = &signature.evidence;
-        let g = &signature.graph;
-        let corr = &signature.correlation_evidence;
-        let top_rules: Vec<&str> = signature.rule_hits.iter()
-            .map(|r| r.rule_id.as_str())
-            .take(5)
-            .collect();
-        let has_patterns = !signature.patterns.is_empty();
-        let pbc = g.boundary_crossings;
-        let agents = g.agent_count;
-        let ev_quality = if ev.total > 0 {
-            format!("{}/{} direct, avg={:.2} max={:.2}", ev.direct, ev.total, ev.avg_confidence, ev.max_confidence)
-        } else {
-            "none".to_string()
-        };
-        // Top resources touched (capped at 5, path-only, for token efficiency)
-        let top_resources: Vec<&str> = signature.resources_touched.iter()
-            .take(5)
-            .map(|r| r.path.as_str())
-            .collect();
-        // Correlation flags for cross-context assessment
-        let mut corr_flags = Vec::new();
-        if corr.has_delegation_chain { corr_flags.push("delegation"); }
-        if corr.has_tainted_context { corr_flags.push("tainted"); }
-        if corr.has_credential_pattern { corr_flags.push("credential"); }
-
-        let resources_str = if top_resources.is_empty() { "none".to_string() } else { top_resources.join("; ") };
-        let corr_str = if corr_flags.is_empty() { "none".to_string() } else { corr_flags.join(",") };
-        let rules_str = if top_rules.is_empty() { "none".to_string() } else { top_rules.join(",") };
-        let patterns_str = if has_patterns { "yes".to_string() } else { "no".to_string() };
-
-        format!(
-            "Responsibility classification: score={:.3} route={} | \
-             Dims: D1_boundary={:.2} D2_content={:.2} D3_agentic={:.2} D4_temporal={:.2} D5_crossctx={:.2} D6_behavioral={:.2} | \
-             Graph: {}PBC {}agents {}deleg | Evidence: {} | \
-             Resources: {} | CorrFlags: {} | \
-             Rules: {} | Patterns: {} | \
-             Prior: l2={} rate={:.2}\n\n\
-             Reply JSON: {{\"decision\":\"safe|unsafe|uncertain\",\"severity\":\"info|warning|critical\",\
-             \"confidence\":0.0-1.0,\"reasoning\":\"<80 chars\"}}",
-            score, route,
-            // 6 progressive dimensions (matching DimIndex order):
-            if sb.boundary_score > sb.rule_score { sb.boundary_score } else { sb.rule_score },  // D1 = boundary severity
-            sb.pattern_score,                       // D2 = content threat
-            sb.role_score,                          // D3 = agentic amplification
-            sb.repetition_score,                    // D4 = temporal dynamics
-            sb.evidence_score,                      // D5 = cross-context corroboration
-            sb.behavioral_score,                    // D6 = behavioral deviation
-            pbc, agents, g.delegation_depth,
-            ev_quality,
-            resources_str, corr_str, rules_str, patterns_str,
-            prior.l2_hit,
-            prior.l2_prior_anomaly_rate.unwrap_or(0.0),
-        )
+    pub fn build_compact_prompt(signature: &ObserverSignature, prior: &CachePrior, content: Option<&ContentSignals>) -> String {
+        let sig = &signature.classification; let score = sig.score; let sb = &sig.score_breakdown;
+        let pbc = signature.graph.boundary_crossings; let agents = signature.graph.agent_count;
+        let mut cf = Vec::new();
+        if signature.correlation_evidence.has_delegation_chain { cf.push("delegation"); }
+        if signature.correlation_evidence.has_tainted_context { cf.push("tainted"); }
+        if signature.correlation_evidence.has_credential_pattern { cf.push("credential"); }
+        let evq = if signature.evidence.total > 0 { format!("{}/{} avg={:.2}", signature.evidence.direct, signature.evidence.total, signature.evidence.avg_confidence) } else { "none".into() };
+        let ops = if let Some(cs) = content { cs.resource_paths_touched.iter().take(10).map(|s| s.as_str()).collect::<Vec<_>>().join("; ") } else { "none".into() };
+        let pf = format!("{:.3}", sig.progressive_fused);
+        let cu = if sig.cusum_triggered { format!("YES [{}]", sig.cusum_dimensions.join(",")) } else { "no".into() };
+        format!("Operations: {ops}\nDims: D1={d1:.2} D2={d2:.2} D3={d3:.2} D4={d4:.2} D5={d5:.2} D6={d6:.2} | Score={s:.3} pfuse={pf} | {pbc}PBC {ag}agents | Ev:{evq} | Corr:{corr} | CUSUM:{cu} | L2:hit={l2} rate={r:.2}\n\nReply JSON: {{\"decision\":\"safe|unsafe|uncertain\",\"severity\":\"info|warning|critical\",\"confidence\":0.0-1.0,\"reasoning\":\"<200 chars\",\"evidence_cited\":[],\"cache_ttl\":\"once|task|all\"}}",
+            ops=ops, d1=if sb.boundary_score>sb.rule_score{sb.boundary_score}else{sb.rule_score}, d2=sb.pattern_score, d3=sb.role_score, d4=sb.repetition_score,
+            d5=sb.evidence_score, d6=sb.behavioral_score, s=score, pf=pf, pbc=pbc, ag=agents, evq=evq,
+            corr=if cf.is_empty(){"none".into()}else{cf.join(",")}, cu=cu, l2=prior.l2_hit, r=prior.l2_prior_anomaly_rate.unwrap_or(0.0))
     }
 
     /// Parse and validate raw LLM response into ObserverOutput.
@@ -238,6 +196,7 @@ impl ObserverLLM {
             decision, severity, confidence: raw.confidence,
             cache_ttl, authority,
             reasoning: raw.reasoning, attacked_flag: false,
+            evidence_cited: raw.evidence_cited,
             rule_verdicts, pattern_verdicts,
         })
     }

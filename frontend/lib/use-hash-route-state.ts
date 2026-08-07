@@ -6,8 +6,12 @@ type SearchParamsLike = {
   get: (key: string) => string | null;
 };
 
+const EMPTY_SEARCH_PARAMS: SearchParamsLike = {
+  get: () => null,
+};
+
 type UseHashRouteStateOptions<TSearchParams extends SearchParamsLike> = {
-  searchParams: TSearchParams;
+  searchParams: TSearchParams | null;
   parseValue: (searchParams: TSearchParams, hash?: string | null) => string | null;
   buildHref: (value?: string | null) => string;
 };
@@ -18,6 +22,7 @@ export function useHashRouteState<TSearchParams extends SearchParamsLike>({
   buildHref,
 }: UseHashRouteStateOptions<TSearchParams>) {
   const [hashValue, setHashValue] = useState<string | null>(null);
+  const safeSearchParams = searchParams ?? (EMPTY_SEARCH_PARAMS as TSearchParams);
 
   useEffect(() => {
     const syncHashValue = () => {
@@ -30,21 +35,22 @@ export function useHashRouteState<TSearchParams extends SearchParamsLike>({
   }, [parseValue]);
 
   const selectedValue = useMemo(
-    () =>
-      parseValue(
-        searchParams,
-        hashValue,
-      ),
-    [hashValue, parseValue, searchParams],
+    () => parseValue(safeSearchParams, hashValue),
+    [hashValue, parseValue, safeSearchParams],
   );
 
-  const setRouteValue = useCallback((nextValue: string | null) => {
-    setHashValue(nextValue);
+  const setRouteValue = useCallback(
+    (nextValue: string | null) => {
+      const nextHref = buildHref(nextValue);
+      const nextHash = nextHref.includes('#') ? nextHref.slice(nextHref.indexOf('#')) : null;
+      setHashValue(nextHash);
 
-    if (typeof window !== 'undefined') {
-      window.history.replaceState(window.history.state, '', buildHref(nextValue));
-    }
-  }, [buildHref]);
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(window.history.state, '', nextHref);
+      }
+    },
+    [buildHref],
+  );
 
   return {
     hashValue,

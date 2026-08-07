@@ -579,7 +579,7 @@ class RunBoundIsolationTests(unittest.TestCase):
                             "pid": 43210,
                             "server_port": 7395,
                             "auto_increment_port": False,
-                            "log_file": "trace.log",
+                            "log_file": "collector.log",
                             "trace_args": ["--ssl", "true", "--process", "true"],
                             "enable_system": True,
                             "extra_args": [],
@@ -977,8 +977,8 @@ class RunLabReplayTests(unittest.TestCase):
         def fake_subprocess_run(cmd, **kwargs):
             if len(cmd) >= 3 and cmd[0] == str(replay_bin) and cmd[1] == "--run-dir":
                 (run_dir / "replay.report.json").write_text('{"status":"ok","mode":"authoritative_sqlite"}', encoding="utf-8")
-                (run_dir / "trace.log.replayed.causal.db").write_bytes(b"")
-                (run_dir / "trace.log.replayed.causal.jsonl").write_text("", encoding="utf-8")
+                (run_dir / "collector.replayed.causal.db").write_bytes(b"")
+                (run_dir / "collector.replayed.causal.jsonl").write_text("", encoding="utf-8")
             return mock.Mock(returncode=0)
 
         try:
@@ -1004,8 +1004,8 @@ class RunLabReplayTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             summary = run_lab.read_json(run_dir / "summary.json")
             self.assertEqual(summary["artifacts"]["replay_report"], str(run_dir / "replay.report.json"))
-            self.assertEqual(summary["artifacts"]["replayed_causal_db"], str(run_dir / "trace.log.replayed.causal.db"))
-            self.assertEqual(summary["artifacts"]["replayed_causal_jsonl"], str(run_dir / "trace.log.replayed.causal.jsonl"))
+            self.assertEqual(summary["artifacts"]["replayed_causal_db"], str(run_dir / "collector.replayed.causal.db"))
+            self.assertEqual(summary["artifacts"]["replayed_causal_jsonl"], str(run_dir / "collector.replayed.causal.jsonl"))
             self.assertEqual(summary["replay"]["status"], "ok")
             self.assertEqual(summary["replay"]["mode"], "authoritative_sqlite")
         finally:

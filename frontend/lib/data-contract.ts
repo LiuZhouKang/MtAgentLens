@@ -170,11 +170,7 @@ export interface ProcessEdge {
  * edge_removed  — relationship ended; `edge` is populated.
  */
 export type ProcessTreeUpdateType =
-  | 'node_added'
-  | 'node_removed'
-  | 'node_updated'
-  | 'edge_added'
-  | 'edge_removed';
+  'node_added' | 'node_removed' | 'node_updated' | 'edge_added' | 'edge_removed';
 
 export interface ProcessTreeUpdate {
   tree_id: string;
@@ -286,9 +282,9 @@ export interface BatchMarker {
  * Serialized with `stream_type` tag, matching the Rust `#[serde(tag = "stream_type")]`.
  */
 export type UnifiedStreamEvent =
-  | { stream_type: 'timeline' } & TimelineStep
-  | { stream_type: 'process_tree' } & ProcessTreeUpdate
-  | { stream_type: 'anomaly' } & AnomalyStreamEvent;
+  | ({ stream_type: 'timeline' } & TimelineStep)
+  | ({ stream_type: 'process_tree' } & ProcessTreeUpdate)
+  | ({ stream_type: 'anomaly' } & AnomalyStreamEvent);
 
 /**
  * v2 envelope: carries stream_version and sequence_number at the top level.
@@ -310,11 +306,12 @@ export interface StreamEnvelope {
 }
 
 /** StreamEnvelope + the flattened event fields — what actually arrives on the wire. */
-export type StreamEnvelopeWithEvent = StreamEnvelope & (
-  | ({ stream_type: 'timeline' } & TimelineStep)
-  | ({ stream_type: 'process_tree' } & ProcessTreeUpdate)
-  | ({ stream_type: 'anomaly' } & AnomalyStreamEvent)
-);
+export type StreamEnvelopeWithEvent = StreamEnvelope &
+  (
+    | ({ stream_type: 'timeline' } & TimelineStep)
+    | ({ stream_type: 'process_tree' } & ProcessTreeUpdate)
+    | ({ stream_type: 'anomaly' } & AnomalyStreamEvent)
+  );
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SNAPSHOT RESPONSE (REST endpoint: GET /api/runs/:id/snapshot)
@@ -453,9 +450,7 @@ export function applyProcessTreeUpdate(
 /**
  * Build a lookup map: pid → ProcessNode (latest by node_id if multiple).
  */
-export function buildProcessIndex(
-  nodes: ProcessNode[],
-): Map<number, ProcessNode> {
+export function buildProcessIndex(nodes: ProcessNode[]): Map<number, ProcessNode> {
   const map = new Map<number, ProcessNode>();
   // Reverse iteration so earlier entries are overwritten by later ones.
   for (let i = nodes.length - 1; i >= 0; i--) {

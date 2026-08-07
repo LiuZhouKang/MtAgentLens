@@ -58,10 +58,15 @@ def _inspect_run_dir(run_dir: Path) -> dict[str, Any]:
     summary = _read_json(run_dir / "summary.json")
     collector_dir = run_dir / "collector"
     db_path = _resolve_db_path(run_dir, summary)
-    trace_log = collector_dir / "trace.log"
-    trace_err = collector_dir / "trace.err.log"
-    pcap = collector_dir / "trace.pcap"
-    counters = _parse_trace_err_counters(trace_err)
+    # Resolve log files: collector.log is the unified collector output.
+    trace_err = _first_existing(
+        collector_dir / "collector.log",
+    )
+    trace_log = _first_existing(
+        collector_dir / "collector.log",
+    )
+    pcap = collector_dir / "trace.pcap"  # pcap name is unchanged
+    counters = _parse_trace_err_counters(trace_err) if trace_err.exists() else {}
     db = _inspect_db(db_path)
     collector_health = summary.get("collector_health", {}) if isinstance(summary, dict) else {}
     problems: list[str] = []
@@ -83,7 +88,7 @@ def _inspect_run_dir(run_dir: Path) -> dict[str, Any]:
         if db["table_counts"].get(table, 0) <= 0:
             problems.append(f"required DB table {table} must be non-empty")
     if not trace_err.exists():
-        problems.append("trace.err.log missing")
+        problems.append("collector.log missing")
 
     run_id = str(summary.get("run_id") if isinstance(summary, dict) else run_dir.name)
     scenario_id = _scenario_id(run_dir, summary)
@@ -222,11 +227,22 @@ def _resolve_db_path(run_dir: Path, summary: dict[str, Any] | None) -> Path:
         if candidate.exists():
             return candidate.resolve()
     collector_dir = run_dir / "collector"
-    for candidate in (collector_dir / "trace.responsibility.db", run_dir / "trace.log.responsibility.db"):
+    # Try new naming first, then legacy naming
+    for candidate in (
+        collector_dir / "collector.responsibility.db",
+    ):
         if candidate.exists():
             return candidate.resolve()
     matches = sorted(run_dir.rglob("*.responsibility.db"))
-    return matches[0].resolve() if matches else (collector_dir / "trace.responsibility.db").resolve()
+    return matches[0].resolve() if matches else (collector_dir / "collector.responsibility.db").resolve()
+
+
+def _first_existing(*paths: Path) -> Path:
+    """Return the first existing path, or the last candidate as default."""
+    for p in paths:
+        if p.exists():
+            return p
+    return paths[-1] if paths else Path(".")
 
 
 def _read_json(path: Path) -> dict[str, Any] | None:

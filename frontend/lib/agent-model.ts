@@ -5,7 +5,11 @@ import {
   findAgentNode,
   formatNodeLabelById,
 } from './stellar-model-helpers';
-import { summarizeResourceSurface, type ResourceCounts, type SurfacedResource } from './resource-surface';
+import {
+  summarizeResourceSurface,
+  type ResourceCounts,
+  type SurfacedResource,
+} from './resource-surface';
 export type AgentResourceCounts = ResourceCounts;
 export type AgentSurfacedResource = SurfacedResource;
 
@@ -50,7 +54,9 @@ export function buildAgentModel(
       ),
     ),
   );
-  const directlyConnectedEdges = graph.edges.filter((edge) => edge.source === agentNodeId || edge.target === agentNodeId);
+  const directlyConnectedEdges = graph.edges.filter(
+    (edge) => edge.source === agentNodeId || edge.target === agentNodeId,
+  );
   const relatedAgentIds = Array.from(
     new Set(
       [
@@ -74,16 +80,20 @@ export function buildAgentModel(
         .map((node) => [node.node_id, node]),
     ).values(),
   );
-  const touchedResources = connectedResourceNodes.map((node) => formatNodeLabelById(graph, node.node_id));
-  const { resourceCounts, surfacedResources } = summarizeResourceSurface(connectedResourceNodes, graph, 8);
+  const touchedResources = connectedResourceNodes.map((node) =>
+    formatNodeLabelById(graph, node.node_id),
+  );
+  const { resourceCounts, surfacedResources } = summarizeResourceSurface(
+    connectedResourceNodes,
+    graph,
+    8,
+  );
   const highestSeverity =
     relevantAlerts
       .map((alert) => alert.severity)
       .sort((left, right) => severityWeight[right] - severityWeight[left])[0] ?? null;
   const parentClusterId =
-    relevantAlerts[0]?.primary_agent?.agent_id ??
-    relatedAgentIds[0] ??
-    agentId;
+    relevantAlerts[0]?.primary_agent?.agent_id ?? relatedAgentIds[0] ?? agentId;
 
   return {
     agentId,
@@ -91,7 +101,7 @@ export function buildAgentModel(
     title: directNode ? formatNodeLabelById(graph, directNode.node_id) : agentId,
     summary:
       relevantAlerts[0]?.summary ??
-      '当前尚未发现与该 agent 直接绑定的风险事件，后续接入更多实时数据后这里会显示成熟监测摘要。',
+      '当前尚未发现与该 agent 直接绑定的告警，后续接入更多实时数据后这里会显示成熟监测摘要。',
     alertIds: relevantAlerts.map((alert) => alert.alert_id),
     leadAlertId: relevantAlerts[0]?.alert_id ?? null,
     claimedRoles,
@@ -99,7 +109,11 @@ export function buildAgentModel(
     touchedResources,
     surfacedResources,
     resourceCounts,
-    linkedEvidence: collectLinkedEvidence(relevantAlerts, evidence, directNode?.evidence_refs ?? []),
+    linkedEvidence: collectLinkedEvidence(
+      relevantAlerts,
+      evidence,
+      directNode?.evidence_refs ?? [],
+    ),
     highestSeverity,
   };
 }

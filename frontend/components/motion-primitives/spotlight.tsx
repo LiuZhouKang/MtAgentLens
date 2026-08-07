@@ -42,7 +42,7 @@ export function Spotlight({
       mouseX.set(event.clientX - left);
       mouseY.set(event.clientY - top);
     },
-    [mouseX, mouseY, parentElement]
+    [mouseX, mouseY, parentElement],
   );
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export function Spotlight({
         'pointer-events-none absolute rounded-full bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops),transparent_80%)] blur-xl transition-opacity duration-200',
         'from-zinc-100 via-zinc-200 to-zinc-400 dark:from-zinc-50 dark:via-zinc-100 dark:to-zinc-200',
         isHovered ? 'opacity-100' : 'opacity-0',
-        className
+        className,
       )}
       style={{
         width: size,

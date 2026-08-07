@@ -496,6 +496,7 @@ mod tests {
             authority: ClassAlertAuthority::Supporting,
             reasoning: "Observer LLM evaluation".to_string(),
             attacked_flag: false,
+            evidence_cited: vec![],
             rule_verdicts: vec![ClassRuleVerdict {
                 rule_id: "rule.test".into(),
                 description: "Test rule".into(),

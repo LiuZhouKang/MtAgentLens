@@ -1,122 +1,381 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '@/lib/store';
+import type { DataSourceMeta } from '@/lib/store';
 import { api } from '@/lib/api';
-import { Check, ChevronDown, Database, Loader2, Search } from 'lucide-react';
+import type { SnapshotImport } from '@/lib/snapshot-import';
+import { parseSnapshotJson } from '@/lib/snapshot-import';
+import type { DbImport } from '@/lib/db-import';
+import { loadDatabase as loadDatabaseFromBytes } from '@/lib/db-import';
+import {
+  Check,
+  ChevronDown,
+  Database,
+  FileJson,
+  FlaskConical,
+  Loader2,
+  Search,
+  Sparkles,
+  Upload,
+} from 'lucide-react';
 
+/** Run summary as served by the collector's /api/runs endpoint. */
 type RunInfo = {
   run_id: string;
-  scenario: string | null;
-  has_data: boolean;
-  node_count?: number;
-  edge_count?: number;
+  scenario_ids?: string[];
+  run_status?: string;
+  artifact_availability?: {
+    alerts?: boolean;
+    correlation_evidence?: boolean;
+    events?: boolean;
+    evaluation?: boolean;
+    /** A real SQLite artifact (collector.responsibility.db) is present. */
+    database?: boolean;
+  };
 };
 
+/** A locally imported file — either a JSON snapshot or a SQLite db. */
+type LocalImport = SnapshotImport | DbImport;
+
+function isDbImport(value: LocalImport): value is DbImport {
+  return 'evidence' in value;
+}
+
+function runLabel(run: RunInfo): string {
+  return run.scenario_ids?.[0] ?? run.run_id.slice(0, 12);
+}
+
+/** A run is loadable if it has any graph/alerts/events/db artifact (or is unknown). */
+function isRunUsable(run: RunInfo): boolean {
+  const avail = run.artifact_availability;
+  if (!avail) return true;
+  return (
+    avail.alerts === true ||
+    avail.correlation_evidence === true ||
+    avail.events === true ||
+    avail.database === true
+  );
+}
+
+/** A single selectable row in the data source browser. */
+type SourceEntry =
+  | { type: 'sample' }
+  | { type: 'demo' }
+  | { type: 'file'; snapshot: LocalImport }
+  | { type: 'import' }
+  | { type: 'run'; run: RunInfo };
+
+type SourceGroup = {
+  key: 'local' | 'files' | 'runs';
+  title: string;
+  entries: SourceEntry[];
+};
+
+const LOCAL_SOURCES: SourceEntry[] = [{ type: 'sample' }, { type: 'demo' }];
+
+function entryLabel(entry: SourceEntry): string {
+  switch (entry.type) {
+    case 'sample':
+      return '样例运行';
+    case 'demo':
+      return '演示数据';
+    case 'file':
+      return entry.snapshot.label;
+    case 'import':
+      return '导入本地数据（JSON / DB）';
+    case 'run':
+      return runLabel(entry.run);
+  }
+}
+
+function entryMeta(entry: SourceEntry): string | null {
+  switch (entry.type) {
+    case 'sample':
+      return '内置';
+    case 'demo':
+      return '演示';
+    case 'file':
+      // Db imports carry real correlation evidence; JSON snapshots do not.
+      return isDbImport(entry.snapshot)
+        ? `${entry.snapshot.nodeCount} 节点 · ${entry.snapshot.alertCount} 告警 · ${entry.snapshot.evidenceCount} 证据`
+        : `${entry.snapshot.nodeCount} 节点 · ${entry.snapshot.alertCount} 告警`;
+    case 'import':
+      return null;
+    case 'run':
+      return entry.run.scenario_ids?.length ? entry.run.run_id.slice(0, 8) : null;
+  }
+}
+
+function isSelected(entry: SourceEntry, source: DataSourceMeta | null): boolean {
+  switch (entry.type) {
+    case 'sample':
+      return source?.kind === 'sample';
+    case 'demo':
+      return source?.kind === 'demo';
+    case 'file':
+      return (
+        (source?.kind === 'file' && source.label === entry.snapshot.label) ||
+        (source?.kind === 'db' && source.label === entry.snapshot.label)
+      );
+    case 'run':
+      return (
+        (source?.kind === 'run' && source.runId === entry.run.run_id) ||
+        (source?.kind === 'db' && source.runId === entry.run.run_id)
+      );
+    case 'import':
+      return false;
+  }
+}
+
+function EntryIcon({ entry }: { entry: SourceEntry }) {
+  switch (entry.type) {
+    case 'sample':
+      return <Sparkles size={13} style={{ opacity: 0.7, flexShrink: 0 }} />;
+    case 'demo':
+      return <FlaskConical size={13} style={{ opacity: 0.7, flexShrink: 0 }} />;
+    case 'file':
+      return <FileJson size={13} style={{ opacity: 0.7, flexShrink: 0 }} />;
+    case 'import':
+      return <Upload size={13} style={{ opacity: 0.7, flexShrink: 0 }} />;
+    case 'run':
+      return <Database size={13} style={{ opacity: 0.7, flexShrink: 0 }} />;
+  }
+}
+
 export default function RunSelector() {
+  const dataSource = useAppStore((s) => s.dataSource);
+
   const [runs, setRuns] = useState<RunInfo[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [runsError, setRunsError] = useState<string | null>(null);
+  const [importedFiles, setImportedFiles] = useState<LocalImport[]>([]);
+
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
-  const activeRunId = useAppStore((s) => s.activeRunId);
-  const listRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
 
-  // Load run list on mount
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const dragDepth = useRef(0);
+
+  // Backend runs — optional; local sources work regardless of its availability.
   useEffect(() => {
+    let cancelled = false;
     api
       .getRuns()
       .then((data: any) => {
+        if (cancelled) return;
         const list = data?.runs ?? data ?? [];
-        setRuns(list.filter((r: RunInfo) => r.has_data));
+        setRuns(list.filter((r: RunInfo) => isRunUsable(r)));
+        setRunsError(null);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setRunsError('后端不可用');
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const handleSelect = useCallback(
-    async (runId: string) => {
-      setLoading(true);
+  /** Apply a parsed import to the store and remember it for re-selection. */
+  const applyImport = useCallback((local: LocalImport) => {
+    setImportedFiles((prev) => prev.filter((s) => s.id !== local.id).concat(local));
+    if (isDbImport(local)) {
+      useAppStore.getState().loadDatabase(local);
+    } else {
+      useAppStore.getState().loadSnapshot(local);
+    }
+  }, []);
+
+  const importFile = useCallback(
+    async (file: File) => {
+      setImportError(null);
       setLoadError(null);
-      setOpen(false);
       try {
-        await useAppStore.getState().loadRun(runId);
-      } catch (e) {
-        setLoadError(e instanceof Error ? e.message : '加载失败，请重试');
+        if (/\.(db|sqlite|sqlite3)$/i.test(file.name)) {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          applyImport(await loadDatabaseFromBytes(bytes, file.name));
+        } else {
+          const text = await file.text();
+          applyImport(parseSnapshotJson(text, file.name));
+        }
+        setOpen(false);
+      } catch (err) {
+        setImportError(err instanceof Error ? err.message : '导入失败，请检查文件内容');
       }
-      setLoading(false);
     },
-    [],
+    [applyImport],
   );
 
-  // Search filter
-  const filtered = useMemo(() => {
+  const selectEntry = useCallback(
+    async (entry: SourceEntry) => {
+      if (entry.type === 'import') {
+        fileInputRef.current?.click();
+        return;
+      }
+      setLoadError(null);
+      setImportError(null);
+      setLoading(true);
+      try {
+        switch (entry.type) {
+          case 'sample':
+            await useAppStore.getState().loadSample();
+            break;
+          case 'demo':
+            useAppStore.getState().loadDemo();
+            break;
+          case 'file':
+            applyImport(entry.snapshot);
+            break;
+          case 'run':
+            await useAppStore.getState().loadRun(entry.run.run_id);
+            break;
+        }
+        setOpen(false);
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : '加载失败，请重试');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [applyImport],
+  );
+
+  const handleFilePick = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) void importFile(file);
+      e.target.value = '';
+    },
+    [importFile],
+  );
+
+  // ── Search / grouping ──
+  const groups = useMemo<SourceGroup[]>(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return runs;
-    return runs.filter(
-      (r) =>
-        r.run_id.toLowerCase().includes(q) ||
-        (r.scenario ?? '').toLowerCase().includes(q),
-    );
-  }, [runs, query]);
+    const matches = (entry: SourceEntry) => {
+      if (!q) return true;
+      return (
+        entryLabel(entry).toLowerCase().includes(q) ||
+        (entry.type === 'run' && entry.run.run_id.toLowerCase().includes(q))
+      );
+    };
 
-  // Group by scenario
-  const scenarios = useMemo(
-    () =>
-      filtered.reduce<Record<string, RunInfo[]>>((acc, r) => {
-        const key = r.scenario ?? 'unknown';
-        (acc[key] = acc[key] ?? []).push(r);
-        return acc;
-      }, {}),
-    [filtered],
-  );
+    const groups: SourceGroup[] = [];
 
-  // Flatten list for keyboard nav
-  const flatItems = useMemo(() => filtered, [filtered]);
+    const local = LOCAL_SOURCES.filter(matches);
+    if (local.length > 0) groups.push({ key: 'local', title: '本地数据源', entries: local });
+
+    const files: SourceEntry[] = [];
+    importedFiles.forEach((snapshot) => {
+      const entry: SourceEntry = { type: 'file', snapshot };
+      if (matches(entry)) files.push(entry);
+    });
+    // The import row stays pinned unless actively searching.
+    if (!q) files.push({ type: 'import' });
+    if (files.length > 0) groups.push({ key: 'files', title: '本地文件', entries: files });
+
+    const runEntries = runs.filter((r) => {
+      const entry: SourceEntry = { type: 'run', run: r };
+      return matches(entry);
+    }).map((run) => ({ type: 'run', run }) as SourceEntry);
+    if (runEntries.length > 0) groups.push({ key: 'runs', title: '后端会话', entries: runEntries });
+
+    return groups;
+  }, [runs, importedFiles, query]);
+
+  // Flat list mirrors exactly what is rendered → keyboard nav can't skip rows.
+  const flatEntries = useMemo(() => groups.flatMap((g) => g.entries), [groups]);
 
   useEffect(() => {
     setActiveIndex(0);
-  }, [query, open]);
+  }, [open, query]);
 
-  // Scroll active item into view
   useEffect(() => {
     const el = listRef.current?.querySelector(`[data-idx="${activeIndex}"]`);
     el?.scrollIntoView({ block: 'nearest' });
   }, [activeIndex]);
 
-  // Keyboard navigation (Linear / command-palette standard)
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setActiveIndex((i) => Math.min(i + 1, flatItems.length - 1));
+        setActiveIndex((i) => Math.min(i + 1, flatEntries.length - 1));
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setActiveIndex((i) => Math.max(i - 1, 0));
-      } else if (e.key === 'Enter' && flatItems[activeIndex]) {
+      } else if (e.key === 'Enter' && flatEntries[activeIndex]) {
         e.preventDefault();
-        handleSelect(flatItems[activeIndex].run_id);
+        void selectEntry(flatEntries[activeIndex]);
       } else if (e.key === 'Escape') {
         setOpen(false);
       }
     },
-    [activeIndex, flatItems, handleSelect],
+    [activeIndex, flatEntries, selectEntry],
   );
 
-  const activeRun = runs.find((r) => r.run_id === activeRunId);
-  const runCount = runs.length;
+  // ── Trigger button label / icon ──
+  const sourceLabel = useMemo(() => {
+    if (!dataSource) return '导入数据';
+    if (dataSource.kind === 'run') {
+      const run = runs.find((r) => r.run_id === dataSource.runId);
+      return run ? runLabel(run) : dataSource.runId.slice(0, 12);
+    }
+    if (dataSource.kind === 'db' && dataSource.runId) {
+      // A backend run consumed from its db — show the scenario label.
+      const run = runs.find((r) => r.run_id === dataSource.runId);
+      if (run) return runLabel(run);
+    }
+    return dataSource.label;
+  }, [dataSource, runs]);
 
-  // Flatten items with their index for rendering + data-idx
+  const ButtonIcon = !dataSource
+    ? Upload
+    : dataSource.kind === 'run' || dataSource.kind === 'db'
+      ? Database
+      : dataSource.kind === 'sample'
+        ? Sparkles
+        : dataSource.kind === 'demo'
+          ? FlaskConical
+          : FileJson;
+
+  // ── Drag & drop import ──
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepth.current += 1;
+    setDragging(true);
+  };
+  const handleDragLeave = () => {
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragging(false);
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepth.current = 0;
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) void importFile(file);
+  };
+
   let flatIdx = 0;
-  const scenarioEntries = Object.entries(scenarios);
 
   return (
     <div style={{ position: 'relative' }}>
       <button
         type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={sourceLabel}
+        data-testid="data-source-trigger"
         onClick={() => {
-          setOpen(!open);
+          setOpen((v) => !v);
           setQuery('');
+          setLoadError(null);
+          setImportError(null);
         }}
         style={{
           display: 'flex', alignItems: 'center', gap: 7,
@@ -134,33 +393,48 @@ export default function RunSelector() {
         {loading ? (
           <Loader2 size={15} className="mtl-spinner" style={{ opacity: 0.7 }} />
         ) : (
-          <Database size={15} style={{ opacity: 0.75 }} />
+          <ButtonIcon size={15} style={{ opacity: 0.75 }} />
         )}
-        <span style={{ fontWeight: 500 }}>
-          {activeRun ? activeRun.scenario ?? activeRun.run_id.slice(0, 12) : '导入数据'}
-        </span>
+        <span style={{ fontWeight: 500 }}>{sourceLabel}</span>
         <ChevronDown
           size={13}
           style={{ opacity: 0.4, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }}
         />
       </button>
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,application/json,.db,.sqlite,.sqlite3,application/x-sqlite3"
+        onChange={handleFilePick}
+        style={{ display: 'none' }}
+        aria-hidden
+        tabIndex={-1}
+      />
+
       {open && (
         <>
           <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setOpen(false)} />
           <div
+            role="listbox"
+            aria-label="数据源"
+            onKeyDown={handleKeyDown}
+            onDragEnter={handleDragEnter}
+            onDragOver={(e) => e.preventDefault()}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
             style={{
               position: 'absolute', top: 'calc(100% + 6px)', right: 0,
-              width: 400, maxHeight: 480,
+              width: 440, maxHeight: 480,
               background: 'rgba(13,14,15,0.98)',
               backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              border: dragging ? '1px dashed rgba(94,106,210,0.6)' : '1px solid rgba(255,255,255,0.08)',
               borderRadius: 12,
               overflow: 'hidden', zIndex: 100,
               boxShadow: '0 16px 48px rgba(0,0,0,0.4)',
               display: 'flex', flexDirection: 'column',
+              transition: 'border-color 100ms',
             }}
-            onKeyDown={handleKeyDown}
           >
             {/* Header + search */}
             <div style={{ padding: '12px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -170,15 +444,15 @@ export default function RunSelector() {
                   padding: '0 10px', height: 30, borderRadius: 6,
                   background: 'rgba(255,255,255,0.04)',
                   border: '1px solid rgba(255,255,255,0.06)',
-                  transition: 'border-color 120ms',
                 }}
               >
                 <Search size={13} style={{ opacity: 0.4, flexShrink: 0 }} />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder={`搜索 ${runCount} 个运行…`}
+                  placeholder="搜索运行、场景或文件…"
                   autoFocus
+                  aria-label="搜索数据源"
                   style={{
                     flex: 1, background: 'none', border: 'none', outline: 'none',
                     fontSize: 12, color: 'rgba(255,255,255,0.85)', fontFamily: 'inherit',
@@ -188,10 +462,38 @@ export default function RunSelector() {
               </div>
             </div>
 
+            {/* Inline errors */}
+            {(loadError || importError) && (
+              <div
+                role="alert"
+                style={{
+                  margin: '8px 12px 0', padding: '6px 10px', borderRadius: 6,
+                  background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.18)',
+                  color: 'rgba(248,113,113,0.85)', fontSize: 11,
+                }}
+              >
+                {importError ?? loadError}
+              </div>
+            )}
+
+            {/* Drag-drop hint */}
+            {dragging && (
+              <div
+                style={{
+                  margin: '8px 12px 0', padding: '10px 12px', borderRadius: 8,
+                  background: 'rgba(94,106,210,0.12)', border: '1px solid rgba(94,106,210,0.35)',
+                  color: 'rgba(196,201,255,0.9)', fontSize: 11, fontWeight: 500,
+                  textAlign: 'center',
+                }}
+              >
+                松开以导入数据文件（JSON / DB）
+              </div>
+            )}
+
             {/* List */}
             <div ref={listRef} style={{ maxHeight: 400, overflowY: 'auto', padding: 6 }}>
-              {scenarioEntries.map(([scenario, items]) => (
-                <div key={scenario}>
+              {groups.map((group) => (
+                <div key={group.key}>
                   <div
                     style={{
                       padding: '8px 12px 4px', fontSize: 10, fontWeight: 600,
@@ -199,22 +501,28 @@ export default function RunSelector() {
                       textTransform: 'uppercase',
                     }}
                   >
-                    {scenario.replace(/-/g, ' ')} · {items.length}
+                    {group.title} · {group.entries.length}
                   </div>
-                  {items.slice(0, 4).map((r) => {
+                  {group.entries.map((entry) => {
                     const idx = flatIdx++;
-                    const selected = activeRunId === r.run_id;
+                    const selected = isSelected(entry, dataSource);
                     const highlighted = idx === activeIndex;
-                    const scale =
-                      r.node_count != null && r.edge_count != null
-                        ? `${r.node_count}·${r.edge_count}`
-                        : null;
+                    const meta = entryMeta(entry);
                     return (
                       <button
-                        key={r.run_id}
+                        key={
+                          entry.type === 'run'
+                            ? `run:${entry.run.run_id}`
+                            : entry.type === 'file'
+                              ? `file:${entry.snapshot.id}`
+                              : entry.type
+                        }
                         type="button"
+                        role="option"
+                        aria-selected={selected}
                         data-idx={idx}
-                        onClick={() => handleSelect(r.run_id)}
+                        onClick={() => void selectEntry(entry)}
+                        onMouseEnter={() => setActiveIndex(idx)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 8,
                           width: '100%', textAlign: 'left',
@@ -228,38 +536,31 @@ export default function RunSelector() {
                           fontSize: 11, fontFamily: 'var(--ln-mono, monospace)',
                           transition: 'background 80ms',
                         }}
-                        onMouseEnter={() => setActiveIndex(idx)}
                       >
+                        <EntryIcon entry={entry} />
                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {r.run_id.slice(0, 16)}…
+                          {entryLabel(entry)}
                         </span>
-                        {scale && (
+                        {meta && (
                           <span
                             style={{
-                              flexShrink: 0, padding: '1px 6px', borderRadius: 4,
-                              background: 'rgba(251,191,36,0.08)',
-                              border: '1px solid rgba(251,191,36,0.14)',
-                              color: 'rgba(251,191,36,0.75)',
-                              fontSize: 9, fontFamily: 'var(--ln-mono, monospace)',
+                              flexShrink: 0, fontSize: 9, color: 'rgba(255,255,255,0.3)',
+                              fontFamily: 'var(--ln-mono, monospace)',
                             }}
                           >
-                            {scale}
+                            {meta}
                           </span>
                         )}
                         {selected && <Check size={13} style={{ color: '#5e6ad2', flexShrink: 0 }} />}
                       </button>
                     );
                   })}
-                  {items.length > 4 && (
-                    <div style={{ padding: '4px 12px', fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>
-                      +{items.length - 4} 更多
-                    </div>
-                  )}
                 </div>
               ))}
-              {filtered.length === 0 && (
-                <div style={{ padding: '24px 12px', textAlign: 'center', fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>
-                  未找到匹配的运行数据
+
+              {runsError && runs.length === 0 && (
+                <div style={{ padding: '6px 12px', fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>
+                  {runsError}，已为你展示本地数据源
                 </div>
               )}
             </div>

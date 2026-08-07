@@ -109,9 +109,7 @@ export default function SidePanel() {
             </button>
           )}
 
-          <h3 style={sectionLabel}>
-            Alerts ({store.alerts.length})
-          </h3>
+          <h3 style={sectionLabel}>Alerts ({store.alerts.length})</h3>
 
           {store.alerts.length === 0 && (
             <p style={emptyStyle}>
@@ -145,12 +143,14 @@ export default function SidePanel() {
             border: '1px solid rgba(99, 102, 241, 0.15)',
           }}
         >
-          {[
-            'Drag to rotate the globe, scroll to zoom',
-            'Click nodes for details, double-click to expand',
-            'Cmd+K opens the command palette',
-            'Run mtagentlens record to start monitoring',
-          ][onboardingStep]}
+          {
+            [
+              'Drag to rotate the globe, scroll to zoom',
+              'Click nodes for details, double-click to expand',
+              'Cmd+K opens the command palette',
+              'Run mtagentlens record to start monitoring',
+            ][onboardingStep]
+          }
         </div>
       )}
     </>

@@ -126,6 +126,7 @@ def compute_score_full(
     action_type_diversity: float,
     rust_classification_score: float | None,
     rust_route: str,
+    total_intents: int = 0,
 ) -> tuple[float, dict]:
     """满血评分：整合全部数据库信号。
 
@@ -140,41 +141,67 @@ def compute_score_full(
     if pattern_verdicts:
         pattern = sum(p.get("confidence", 0.0) for p in pattern_verdicts) / len(pattern_verdicts)
 
-    # D3: 代理放大 (role_score + taint + pollution boost)
-    base_role = sub_score_role(pbc_count, agent_count)
-    # TaintedContextUse claims → 注入检测增强
-    taint_boost = min(tainted_claims / max(agent_count, 1), 0.5)
-    # Context pollution events → 跨 agent 污染
-    pollution_boost = min(pollution_events / 20.0, 0.3)
+    # D3: 代理放大 (v12: PBC/intent sigmoid × evidence quality)
+    # Compute evidence quality (L1+L3 ratio) for D3 corroboration
+    l1_l3 = sum(1 for e in evidence_records
+                if str(e.get("match_level", "")).startswith("L1")
+                or str(e.get("match_level", "")).startswith("L3"))
+    total_ev = max(len(evidence_records), 1)
+    evidence_quality_ratio = l1_l3 / total_ev
+    base_role = sub_score_role(pbc_count, agent_count,
+                               intent_count=total_intents,
+                               evidence_quality=evidence_quality_ratio)
+    # Taint/pollution boost: gated by has_unsafe_rules ONLY.
+    # Without rule corroboration, taint/pollution signals are too noisy
+    # (benign code refactoring can produce taint=4, pollution=49).
+    # These signals amplify confirmed attacks, not detect new ones.
+    has_unsafe_rules = any(h.get("decision") == "Unsafe" for h in rule_hits)
+    taint_boost = min(tainted_claims / max(agent_count, 1), 0.5) if has_unsafe_rules else 0.0
+    pollution_boost = min(pollution_events / 20.0, 0.3) if has_unsafe_rules else 0.0
     role = min(base_role + taint_boost + pollution_boost, 1.0)
 
     # D4: 时间动态 (行动类型多样性作为重复代理)
     rep_base = min(agent_count / 10.0, 1.0)
     rep = rep_base * 0.5 + action_type_diversity * 0.5
 
-    # D5: 证据质量 (match_level 加权)
+    # D5: 证据质量 (match_level 加权 × evidence efficiency)
+    # Key insight: L5 (weak substring) evidence dominates benign scenarios
+    # (73-82% of evidence is L5). Attacks concentrate on L1 (exact) and
+    # L3 (containment) matches. L5 gets near-zero weight to prevent
+    # project file I/O from inflating the evidence score.
+    evidence_count = len(evidence_records)
     if evidence_records:
-        match_weights = {"L1": 1.0, "L3": 0.7, "L4": 0.4, "L5": 0.1}
+        # L5 reduced to 0.02: weak substring matches on project files
+        # contribute negligible weight. L4 reduced to 0.15: basename
+        # matches are structurally weak.
+        match_weights = {"L1": 1.0, "L2": 0.85, "L3": 0.7, "L4": 0.15, "L5": 0.02}
         weighted_conf = 0.0
         total_weight = 0.0
         for e in evidence_records:
             ml = str(e.get("match_level", "L5"))
-            w = match_weights.get(ml[:2] if len(ml) >= 2 else ml, 0.1)
+            w = match_weights.get(ml[:2] if len(ml) >= 2 else ml, 0.02)
             conf = e.get("confidence", 0.0)
             if conf >= 0.45:
                 weighted_conf += conf * w
                 total_weight += w
         evidence = weighted_conf / max(total_weight, 1.0)
+        # Evidence efficiency: attacks concentrate PBC into few evidence items
+        # (high efficiency = high PBC/evidence ratio).
+        ev_efficiency = min(pbc_count / max(evidence_count, 1) * 10.0, 1.0)
+        evidence = evidence * ev_efficiency
     else:
         evidence = 0.0
 
-    # D6: 行为偏差 (PBC confirmation + high-conf evidence)
-    confirmed_pbc = 1 if pbc_count > 0 else 0
+    # D6: 行为偏差 (PBC confirmation + high-conf evidence × efficiency)
+    confirmed_pbc = pbc_count if pbc_count > 0 else 0
     high_conf_evidence = sum(
         1 for e in evidence_records
         if e.get("confidence", 0.0) >= 0.80 and str(e.get("match_level", "")).startswith("L1")
     )
-    behavioral = sub_score_behavioral(confirmed_pbc, high_conf_evidence)
+    # Same evidence efficiency normalization for behavioral
+    be_efficiency = min(pbc_count / max(evidence_count, 1) * 10.0, 1.0)
+    behavioral_raw = sub_score_behavioral(confirmed_pbc, high_conf_evidence)
+    behavioral = behavioral_raw * be_efficiency
 
     # ── 融合 ──
     dims = [max(boundary, rule), pattern, role, rep, evidence, behavioral]
@@ -183,18 +210,30 @@ def compute_score_full(
     calibrated = platt_sigmoid(raw)
     score = min(calibrated, 1.0)
 
-    # ── 软PBC门控 (匹配 scoring_replica.py + Rust scoring.rs v10) ──
-    has_unsafe_rules = any(h.get("decision") == "Unsafe" for h in rule_hits)
+    # ── PBC门控: matches Rust scoring.rs exactly (k=10.0) ──
     pbc_gate_k = 10.0
     pbc_gate_steepness = 0.5
     gate_factor = 1.0 / (1.0 + math.exp(-(float(pbc_count) - pbc_gate_k) / pbc_gate_steepness))
-    effective_gate = max(gate_factor, 0.3) if has_unsafe_rules else gate_factor
+    if has_unsafe_rules:
+        effective_gate = max(gate_factor, 0.3)
+    else:
+        effective_gate = gate_factor
     score = min(score * effective_gate, 1.0)
 
-    # ── Observer LLM 调整 ──
-    # 如果 Rust 路由经过 Observer 且 Rust 分数更高，向 Rust 分数靠拢
-    if rust_classification_score and rust_classification_score > score and "observer" in rust_route.lower():
-        score = score * 0.7 + rust_classification_score * 0.3
+    # ── Observer LLM 调整 (v14: fully bidirectional) ──
+    # Observer defaults to Safe (evidence burden reversal).
+    # "observer_unsafe" → Observer detected attack: blend with Observer score.
+    # Trust Observer even without rule corroboration (Observer cites evidence).
+    # "observer_safe" → Observer overrode suspicion: attenuate score.
+    if rust_classification_score is not None and "observer" in (rust_route or "").lower():
+        if "unsafe" in rust_route.lower():
+            # Blend: base score and Observer score. When base is near zero
+            # (PBC=0 attacks detected purely by Observer), give Observer more weight.
+            obs_weight = 0.5 if score < 0.1 else 0.3
+            score = score * (1.0 - obs_weight) + rust_classification_score * obs_weight
+        elif "safe" in rust_route.lower():
+            obs_conf = max(rust_classification_score, 0.5)
+            score = score * (1.0 - obs_conf * 0.7)
 
     # ── intent side_effect 比率作为增强器 ──
     if intent_side_effect_ratio > 0.3:
@@ -287,9 +326,14 @@ for sid, gt in sorted(scenario_gt.items()):
                     })
                 # 模式匹配 (新增!)
                 pattern_verdicts = ej.get("pattern_verdicts", [])
-                # Rust 预计算分数 (新增!)
-                rust_score = ej.get("classification_score")
-                rust_route = ej.get("classification_route", "")
+                # Rust 预计算分数: prefer observer alerts over direct_safe.
+                # When Observer detected Unsafe, use its score even if a later
+                # direct_safe alert exists (Phase 2 authoritative override).
+                route = ej.get("classification_route", "")
+                score_val = ej.get("classification_score")
+                if rust_score is None or "observer" in route.lower():
+                    rust_score = score_val
+                    rust_route = route
             except:
                 pass
 
@@ -345,6 +389,7 @@ for sid, gt in sorted(scenario_gt.items()):
         action_type_diversity=action_diversity,
         rust_classification_score=rust_score,
         rust_route=rust_route,
+        total_intents=total_intents,
     )
 
     # ── 旧版评分 (对比) ──
@@ -354,15 +399,13 @@ for sid, gt in sorted(scenario_gt.items()):
             rule_hits, pbc, total_edges, evidence, agent_count, total_nodes, gate
         )
 
-    # ── 多门满血评分 ──
+    # ── 多门满血评分 (v14: 门控已内置于 compute_score_full) ──
+    # The multivariate gate is applied inside compute_score_full, so the
+    # outer gate here just records the score at different legacy PBC
+    # thresholds for backward compatibility analysis.
     full_scores = {}
     for gate in [0, 3, 5, 10, 20]:
-        # 满血评分使用相同的门逻辑
-        has_unsafe = any(h.get("decision") == "Unsafe" for h in rule_hits)
-        if pbc < gate and not has_unsafe:
-            full_scores[gate] = min(full_score, 0.10)
-        else:
-            full_scores[gate] = full_score
+        full_scores[gate] = full_score
 
     all_results.append({
         "sid": sid,

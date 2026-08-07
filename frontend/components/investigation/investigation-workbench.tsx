@@ -7,6 +7,7 @@ import gsap from 'gsap';
 import { ArrowRight, Clock, FileSearch, GitBranch, ShieldAlert, TerminalSquare } from 'lucide-react';
 import { SectionPanel } from '@/components/ui/linear/section-panel';
 import { StatusBadge, type StatusTone } from '@/components/ui/linear/status-badge';
+import LoadingIndicator from '@/components/ui/loading-indicator';
 import VirtualList from '@/components/ui/virtual-list';
 import type { ResponsibilityAlert } from '@/lib/types';
 import type { InvestigationModel } from '@/lib/investigation';
@@ -27,7 +28,7 @@ const evKindIcons: Record<string, typeof FileSearch> = {
 
 interface Props { alert: ResponsibilityAlert; model: InvestigationModel; activeRunId: string | null; availableAlerts: ResponsibilityAlert[]; onSelectAlert: (id: string) => void; evidenceLoading: boolean; evidenceError: string | null; }
 
-export default function InvestigationWorkbench({ alert, model, availableAlerts, onSelectAlert }: Props) {
+export default function InvestigationWorkbench({ alert, model, availableAlerts, onSelectAlert, evidenceLoading, evidenceError }: Props) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const evidenceRef = useRef<HTMLDivElement>(null);
 
@@ -64,7 +65,7 @@ export default function InvestigationWorkbench({ alert, model, availableAlerts, 
       </div>
 
       {/* main layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr) 320px', gap: S.lg, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 260px) minmax(0, 1fr) minmax(280px, 320px)', gap: S.lg, alignItems: 'start', overflowX: 'auto' }}>
         {/* ── LEFT: SentinelOne-style alert list ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: S.sm, position: 'sticky', top: 44 }}>
           <span className="ln-eyebrow">告警队列</span>
@@ -160,9 +161,15 @@ export default function InvestigationWorkbench({ alert, model, availableAlerts, 
           </SectionPanel>
 
           {/* evidence chain — premium cards */}
-          <SectionPanel eyebrow="证据链" title={`${model.linkedEvidence.length} 条`} bodyClassName="ln-panel-body">
+          <SectionPanel eyebrow="证据链" title={evidenceLoading ? '同步中…' : `${model.linkedEvidence.length} 条`} bodyClassName="ln-panel-body">
             <div ref={evidenceRef}>
-              {model.linkedEvidence.length === 0 ? (
+              {evidenceLoading && model.linkedEvidence.length === 0 ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '28px 0' }}>
+                  <LoadingIndicator size={28} label="正在同步证据…" />
+                </div>
+              ) : evidenceError ? (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: '#f87171', fontSize: T.sm }}>证据同步失败</div>
+              ) : model.linkedEvidence.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--ln-text-muted)', fontSize: T.sm }}>暂无关联证据</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0, maxHeight: 400, overflowY: 'auto', position: 'relative' }}>

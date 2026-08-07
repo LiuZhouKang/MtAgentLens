@@ -9,7 +9,7 @@ type StreamHandler = (streamType: string, data: unknown) => void;
 export function connectSSE(
   url: string,
   onAlert: AlertHandler,
-  onError: ErrorHandler
+  onError: ErrorHandler,
 ): { close: () => void } {
   let retries = 0;
   let es: EventSource | null = null;
@@ -58,7 +58,7 @@ export function connectUnifiedSSE(
   onAlert: AlertHandler,
   onStreamEvent: StreamHandler,
   onError: ErrorHandler,
-  maxRetries = 10
+  maxRetries = 10,
 ): { close: () => void } {
   let retries = 0;
   let es: EventSource | null = null;

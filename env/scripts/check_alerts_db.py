@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""检查 trace.log.db 中 responsibility_alerts 表的完整性和正确性."""
+"""检查 collector.alerts.db 中 responsibility_alerts 表的完整性和正确性."""
 import json, sqlite3, sys
 from pathlib import Path
 
@@ -12,9 +12,9 @@ REQUIRED_COLUMNS = [
 ]
 
 def check_db(run_dir: Path) -> dict:
-    db_path = run_dir / "trace.log.db"
+    db_path = run_dir / "collector.alerts.db"
     if not db_path.exists():
-        return {"status": "error", "reason": f"trace.log.db not found in {run_dir}"}
+        return {"status": "error", "reason": f"collector.alerts.db not found in {run_dir}"}
 
     conn = sqlite3.connect(str(db_path))
     tables = [t[0] for t in conn.execute(

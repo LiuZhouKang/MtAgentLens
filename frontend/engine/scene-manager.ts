@@ -38,7 +38,7 @@ export function createCamera(container: HTMLElement): THREE.PerspectiveCamera {
 export function onResize(
   renderer: THREE.WebGLRenderer,
   camera: THREE.PerspectiveCamera,
-  container: HTMLElement
+  container: HTMLElement,
 ): () => void {
   const resize = () => {
     const { width, height } = getContainerSize(container);
@@ -47,9 +47,7 @@ export function onResize(
     camera.updateProjectionMatrix();
   };
 
-  const observer = typeof ResizeObserver !== 'undefined'
-    ? new ResizeObserver(resize)
-    : null;
+  const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null;
 
   window.addEventListener('resize', resize);
   observer?.observe(container);

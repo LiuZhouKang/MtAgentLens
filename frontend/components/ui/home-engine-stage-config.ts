@@ -83,12 +83,22 @@ const EDGE_COLORS: Record<string, string> = {
   TaintPropagatesTo: '#ffc67a',
   PolicyBoundaryCrossing: '#ff8dc1',
   CompetingExplanation: '#b2bddc',
+  Delegation: '#8abbff',
+  AuthorityTransfer: '#9eb7ff',
+  CapabilityUse: '#d4b3ff',
+  ContextInheritance: '#78e5ff',
+  TaintPropagation: '#ffc67a',
+  ViolationProvenance: '#ff8dc1',
 };
 
 const FOREGROUND_NODE_COLORS: Record<ResponsibilityNode['node_type'], string> = {
   Agent: '#aef4ff',
   Resource: '#a4b7ff',
   PolicyBoundary: '#ff98c8',
+  Process: '#7dd3fc',
+  ToolCall: '#cfb7ff',
+  Credential: '#ffc980',
+  Context: '#78e5ff',
 };
 
 const BACKGROUND_NODE_PALETTE = ['#dde7ff', '#bfd5ff', '#a4c8ff', '#cad7ff'];
@@ -147,7 +157,12 @@ function createSeededRandom(seed: number): () => number {
   };
 }
 
-function createSeededPoint(seed: string, radiusMin: number, radiusMax: number, squash = 0.58): Vec3 {
+function createSeededPoint(
+  seed: string,
+  radiusMin: number,
+  radiusMax: number,
+  squash = 0.58,
+): Vec3 {
   const random = createSeededRandom(hashToInt(seed));
   const theta = random() * Math.PI * 2;
   const phi = Math.acos(2 * random() - 1);
@@ -169,13 +184,18 @@ function scaleVec3(value: Vec3, scale: number): Vec3 {
 
 function lightenHex(hex: string, amount: number): string {
   const normalized = hex.replace('#', '');
-  const value = normalized.length === 3
-    ? normalized.split('').map((char) => `${char}${char}`).join('')
-    : normalized;
+  const value =
+    normalized.length === 3
+      ? normalized
+          .split('')
+          .map((char) => `${char}${char}`)
+          .join('')
+      : normalized;
   const red = parseInt(value.slice(0, 2), 16);
   const green = parseInt(value.slice(2, 4), 16);
   const blue = parseInt(value.slice(4, 6), 16);
-  const lift = (channel: number) => Math.max(0, Math.min(255, Math.round(channel + (255 - channel) * amount)));
+  const lift = (channel: number) =>
+    Math.max(0, Math.min(255, Math.round(channel + (255 - channel) * amount)));
   return `#${lift(red).toString(16).padStart(2, '0')}${lift(green).toString(16).padStart(2, '0')}${lift(blue).toString(16).padStart(2, '0')}`;
 }
 
@@ -189,15 +209,22 @@ function getSemanticGroup(node: ResponsibilityNode): string {
 
   if (node.node_type === 'PolicyBoundary') {
     const id = node.node_id.toLowerCase();
-    if (id.includes('system') || id.includes('root') || id.includes('prod')) return 'boundary:system';
+    if (id.includes('system') || id.includes('root') || id.includes('prod'))
+      return 'boundary:system';
     if (id.includes('workspace') || id.includes('project')) return 'boundary:workspace';
     return 'boundary:generic';
   }
 
   if (node.resource && 'File' in node.resource) {
     const path = node.resource.File.canonical_path.toLowerCase();
-    if (path.startsWith('/etc') || path.includes('shadow') || path.includes('credential')) return 'resource:file:sensitive';
-    if (path.startsWith('/src') || path.startsWith('/home') || path.startsWith('/workspace') || path.includes('/project')) {
+    if (path.startsWith('/etc') || path.includes('shadow') || path.includes('credential'))
+      return 'resource:file:sensitive';
+    if (
+      path.startsWith('/src') ||
+      path.startsWith('/home') ||
+      path.startsWith('/workspace') ||
+      path.includes('/project')
+    ) {
       return 'resource:file:workspace';
     }
     return 'resource:other';
@@ -225,8 +252,9 @@ export function getNodeName(node: ResponsibilityNode): string {
 
 export function buildForceNode(node: ResponsibilityNode): ForceNode {
   const semanticGroup = getSemanticGroup(node);
-  const center = SEMANTIC_GROUP_CENTERS[semanticGroup]
-    ?? (node.node_type === 'Agent'
+  const center =
+    SEMANTIC_GROUP_CENTERS[semanticGroup] ??
+    (node.node_type === 'Agent'
       ? { x: -96, y: 12, z: 28 }
       : node.node_type === 'PolicyBoundary'
         ? { x: 218, y: 102, z: 26 }
@@ -238,7 +266,14 @@ export function buildForceNode(node: ResponsibilityNode): ForceNode {
         ? createSeededPoint(`${node.node_id}:agent`, 14, 46, 0.52)
         : createSeededPoint(`${node.node_id}:resource`, 18, 66, 0.58);
   const position = addVec3(center, spread);
-  const importance = node.node_type === 'Agent' ? 1 : node.node_type === 'PolicyBoundary' ? 0.92 : semanticGroup === 'resource:file:sensitive' ? 0.82 : 0.7;
+  const importance =
+    node.node_type === 'Agent'
+      ? 1
+      : node.node_type === 'PolicyBoundary'
+        ? 0.92
+        : semanticGroup === 'resource:file:sensitive'
+          ? 0.82
+          : 0.7;
 
   return {
     ...node,
@@ -248,7 +283,14 @@ export function buildForceNode(node: ResponsibilityNode): ForceNode {
     color: SEMANTIC_GROUP_COLORS[semanticGroup] ?? FOREGROUND_NODE_COLORS[node.node_type],
     semanticGroup,
     importance,
-    satellites: node.node_type === 'PolicyBoundary' ? 18 : node.node_type === 'Agent' ? 14 : semanticGroup === 'resource:file:sensitive' ? 11 : 8,
+    satellites:
+      node.node_type === 'PolicyBoundary'
+        ? 18
+        : node.node_type === 'Agent'
+          ? 14
+          : semanticGroup === 'resource:file:sensitive'
+            ? 11
+            : 8,
     x: position.x,
     y: position.y,
     z: position.z,
@@ -355,8 +397,8 @@ export function buildStageGraph(
       nodeType: node.node_type,
       kind: 'core',
       val:
-        (node.node_type === 'Agent' ? 2.4 : node.node_type === 'PolicyBoundary' ? 2.1 : 1.7)
-        + Math.min(0.9, degree * 0.18),
+        (node.node_type === 'Agent' ? 2.4 : node.node_type === 'PolicyBoundary' ? 2.1 : 1.7) +
+        Math.min(0.9, degree * 0.18),
       importance: node.importance,
       x: node.x,
       y: node.y,
@@ -375,13 +417,15 @@ export function buildStageGraph(
             ? 18 + Math.min(12, degree * 3)
             : 14 + Math.min(10, degree * 3);
 
-    const localAnchors = Array.from({ length: Math.min(4, Math.max(2, Math.ceil(clusterCount / 10))) }, (_, index) =>
-      createSeededPoint(
-        `${node.id}:cluster-anchor:${index}`,
-        8,
-        node.node_type === 'PolicyBoundary' ? 30 : node.node_type === 'Agent' ? 24 : 20,
-        0.62,
-      ),
+    const localAnchors = Array.from(
+      { length: Math.min(4, Math.max(2, Math.ceil(clusterCount / 10))) },
+      (_, index) =>
+        createSeededPoint(
+          `${node.id}:cluster-anchor:${index}`,
+          8,
+          node.node_type === 'PolicyBoundary' ? 30 : node.node_type === 'Agent' ? 24 : 20,
+          0.62,
+        ),
     );
 
     for (let i = 0; i < clusterCount; i += 1) {
@@ -475,8 +519,10 @@ export function buildStageGraph(
 
     for (let i = 0; i < bridgeCount; i += 1) {
       if (!sourceMembers.length || !targetMembers.length) break;
-      const sourceSatellite = sourceMembers[(hashToInt(`${edge.edge_id}:source:${i}`)) % sourceMembers.length];
-      const targetSatellite = targetMembers[(hashToInt(`${edge.edge_id}:target:${i}`)) % targetMembers.length];
+      const sourceSatellite =
+        sourceMembers[hashToInt(`${edge.edge_id}:source:${i}`) % sourceMembers.length];
+      const targetSatellite =
+        targetMembers[hashToInt(`${edge.edge_id}:target:${i}`) % targetMembers.length];
       links.push({
         id: `${edge.edge_id}::bridge:${i}`,
         source: sourceSatellite,
@@ -521,7 +567,10 @@ export function bootstrapGraph(): { nodes: ForceNode[]; links: ForceLink[] } {
   };
 }
 
-export function createBackgroundGraph(graph: GraphData): { nodes: BackgroundNode[]; links: BackgroundLink[] } {
+export function createBackgroundGraph(graph: GraphData): {
+  nodes: BackgroundNode[];
+  links: BackgroundLink[];
+} {
   const nodes: BackgroundNode[] = [];
   const links: BackgroundLink[] = [];
 
@@ -552,21 +601,28 @@ export function createBackgroundGraph(graph: GraphData): { nodes: BackgroundNode
   const anchorLimit = graph.nodes.length > 96 ? 72 : graph.nodes.length;
   const priorityAnchors = anchorCandidates.filter((node) => node.node_type !== 'Resource');
   const resourceAnchors = anchorCandidates.filter((node) => node.node_type === 'Resource');
-  const resourceStride = Math.max(1, Math.ceil(resourceAnchors.length / Math.max(1, anchorLimit - priorityAnchors.length)));
-  const anchors = graph.nodes.length <= anchorLimit
-    ? anchorCandidates
-    : [
-        ...priorityAnchors,
-        ...resourceAnchors.filter((_, index) => index % resourceStride === 0),
-      ].slice(0, anchorLimit);
+  const resourceStride = Math.max(
+    1,
+    Math.ceil(resourceAnchors.length / Math.max(1, anchorLimit - priorityAnchors.length)),
+  );
+  const anchors =
+    graph.nodes.length <= anchorLimit
+      ? anchorCandidates
+      : [
+          ...priorityAnchors,
+          ...resourceAnchors.filter((_, index) => index % resourceStride === 0),
+        ].slice(0, anchorLimit);
 
   anchors.forEach((anchor, index) => {
     const base = { x: anchor.x ?? 0, y: anchor.y ?? 0, z: anchor.z ?? 0 };
-    const hubPosition = addVec3(scaleVec3(base, anchor.node_type === 'PolicyBoundary' ? 1.38 : 1.74), {
-      x: anchor.node_type === 'PolicyBoundary' ? 0 : index % 2 === 0 ? -18 : 18,
-      y: anchor.node_type === 'Agent' ? 10 : 0,
-      z: index % 3 === 0 ? 14 : -12,
-    });
+    const hubPosition = addVec3(
+      scaleVec3(base, anchor.node_type === 'PolicyBoundary' ? 1.38 : 1.74),
+      {
+        x: anchor.node_type === 'PolicyBoundary' ? 0 : index % 2 === 0 ? -18 : 18,
+        y: anchor.node_type === 'Agent' ? 10 : 0,
+        z: index % 3 === 0 ? 14 : -12,
+      },
+    );
     const hubId = `bg-hub:${anchor.id}`;
     const clusterColor = anchor.color;
 
@@ -579,7 +635,12 @@ export function createBackgroundGraph(graph: GraphData): { nodes: BackgroundNode
     for (let i = 0; i < clusterCount; i += 1) {
       const offset = createSeededPoint(`${anchor.id}:cluster:${i}`, 16, 108, 0.54);
       const nodeId = `bg-cluster:${anchor.id}:${i}`;
-      pushNode(nodeId, addVec3(hubPosition, offset), i % 9 === 0 ? '#eef4ff' : clusterColor, 0.055 + random() * 0.075);
+      pushNode(
+        nodeId,
+        addVec3(hubPosition, offset),
+        i % 9 === 0 ? '#eef4ff' : clusterColor,
+        0.055 + random() * 0.075,
+      );
       clusterIds.push(nodeId);
 
       if (i > 0) {
@@ -593,7 +654,9 @@ export function createBackgroundGraph(graph: GraphData): { nodes: BackgroundNode
     }
   });
 
-  const ambientRandom = createSeededRandom(hashToInt(graph.nodes.map((node) => node.node_id).join('|')));
+  const ambientRandom = createSeededRandom(
+    hashToInt(graph.nodes.map((node) => node.node_id).join('|')),
+  );
   const ambientClusterCount = Math.max(20, Math.min(42, graph.nodes.length * 5));
 
   for (let clusterIndex = 0; clusterIndex < ambientClusterCount; clusterIndex += 1) {
@@ -605,7 +668,12 @@ export function createBackgroundGraph(graph: GraphData): { nodes: BackgroundNode
     for (let i = 0; i < clusterSize; i += 1) {
       const offset = createSeededPoint(`ambient:${clusterIndex}:${i}`, 12, 82, 0.42);
       const nodeId = `bg-ambient:${clusterIndex}:${i}`;
-      pushNode(nodeId, addVec3(center, offset), ambientRandom() > 0.9 ? '#f6f9ff' : clusterColor, 0.038 + ambientRandom() * 0.052);
+      pushNode(
+        nodeId,
+        addVec3(center, offset),
+        ambientRandom() > 0.9 ? '#f6f9ff' : clusterColor,
+        0.038 + ambientRandom() * 0.052,
+      );
       localIds.push(nodeId);
 
       if (i > 0) {

@@ -10,6 +10,7 @@ import { MetricCard } from '@/components/ui/linear/metric-card';
 import { SectionPanel } from '@/components/ui/linear/section-panel';
 import { StatusBadge, type StatusTone } from '@/components/ui/linear/status-badge';
 import OverviewDatasetPanel from '@/components/overview/dataset-overview-panel';
+import MonitoringSection from '@/components/overview/monitoring/monitoring-section';
 import { TrendChart } from '@/components/ui/linear/trend-chart';
 import LoadingScreen from '@/components/ui/loading-screen';
 import NetworkLoading from '@/components/ui/network-loading';
@@ -545,6 +546,7 @@ export default function OverviewPageClient() {
                 <TrendChart type="donut" data={clusterDonut} xKey="name" seriesKey="value" colors={CHART_COLORS} height={160} />
               </SectionPanel>
             </div>
+            <MonitoringSection />
             {overview && (
               <div style={{ marginTop: 12 }}>
                 <OverviewDatasetPanel overview={overview} />

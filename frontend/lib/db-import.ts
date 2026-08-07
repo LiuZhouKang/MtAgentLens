@@ -1,22 +1,32 @@
 import type { Database, SqlJsStatic } from 'sql.js';
 import type {
   Action,
+  AgentIdentity,
   AlertSeverity,
   BehaviorTimeline,
   ClaimState,
   ClaimType,
+  ContextPollutionEvent,
   CorrelationEvidence,
   DatasetOverview,
   EngineSection,
   GraphData,
   GraphMetrics,
   GraphSnapshot,
+  GraphSnapshotFrame,
+  IdentityProcessMapEntry,
   Intent,
+  NonLinkDiagnostic,
   NormalizedArgs,
   PhaseIndicator,
+  PolicyEvaluation,
+  ProcessEvent,
+  ProvisionalIdentity,
   ResponsibilityAlert,
   ResponsibilityClaim,
   ResponsibilityTraceback,
+  SubagentBoundary,
+  TlsSession,
 } from './types';
 import type {
   MismatchExtract,
@@ -73,9 +83,32 @@ export type DbImport = {
   intentCount: number;
   actionCount: number;
   runId: string | null;
+  /** M0 全行深链资产（process/tls 已 cap）。 */
+  dbAssets: DbAssets;
   /** True when any of the six consumable tables yielded rows. */
   hasConsumableData: boolean;
 };
+
+/** 带 cap 的全行提取产物——total 为真实行数，truncated 标记是否被 cap 截断。 */
+export type CappedExtract<T> = { items: T[]; total: number; truncated: boolean };
+
+/** M0 全行深链资产——M1–M4 四功能的原始数据源（均由纯函数派生，无造数）。 */
+export interface DbAssets {
+  pollutionEvents: ContextPollutionEvent[];
+  policyEvaluations: PolicyEvaluation[];
+  nonLinkDiagnostics: NonLinkDiagnostic[];
+  agentIdentities: AgentIdentity[];
+  provisionalIdentities: ProvisionalIdentity[];
+  identityProcessMap: IdentityProcessMapEntry[];
+  processEvents: ProcessEvent[];           // 已 cap
+  processEventCount: number;               // totalCount
+  processEventTruncated: boolean;
+  tlsSessions: TlsSession[];               // 已 cap
+  tlsSessionCount: number;
+  tlsSessionTruncated: boolean;
+  subagentBoundaries: SubagentBoundary[];
+  snapshotFrames: GraphSnapshotFrame[];    // 去重 + 降采样
+}
 
 const EMPTY_METRICS: GraphMetrics = {
   node_counts: {},
@@ -249,6 +282,31 @@ function parseJsonObject<T extends object>(raw: unknown): T | null {
 function parseJsonArray<T>(raw: unknown): T[] {
   const value = parseJsonObject<unknown[]>(raw);
   return Array.isArray(value) ? (value as T[]) : [];
+}
+
+/** 按 NormalizedArgs 形态解析 policy.resource_json；非该形态 → null（不幻觉）。 */
+export function parseNormalizedArgsLike(raw: unknown): NormalizedArgs | null {
+  const obj = parseJsonObject<Record<string, unknown>>(raw);
+  if (!obj || typeof obj !== 'object') return null;
+  const hasAnyKey = ['canonical_path', 'host', 'port', 'command', 'raw_args'].some((k) => k in obj);
+  if (!hasAnyKey) return null;
+  if ('raw_args' in obj && !Array.isArray(obj.raw_args)) return null;
+  return {
+    canonical_path: typeof obj.canonical_path === 'string' ? obj.canonical_path : null,
+    host: typeof obj.host === 'string' ? obj.host : null,
+    port: typeof obj.port === 'number' ? obj.port : null,
+    command: typeof obj.command === 'string' ? obj.command : null,
+    raw_args: Array.isArray(obj.raw_args) ? (obj.raw_args as string[]) : [],
+  };
+}
+
+/** 均匀降采样：超过 maxFrames 时等距取帧（含首尾）。首尾恒保留。 */
+export function pickRepresentativeFrames<T>(frames: T[], maxFrames: number): T[] {
+  if (maxFrames <= 0 || frames.length <= maxFrames) return frames;
+  const step = (frames.length - 1) / (maxFrames - 1);
+  const keep = new Set<number>();
+  for (let i = 0; i < maxFrames; i += 1) keep.add(Math.round(i * step));
+  return frames.filter((_, i) => keep.has(i));
 }
 
 function phaseTimestampNs(phase: PhaseIndicator): number {
@@ -521,6 +579,263 @@ export function extractGraphFromDb(
     metrics,
     runId: row.run_id ? String(row.run_id) : null,
   };
+}
+
+// ═══ M0 全行提取器（12 表深链，除已读 6 表外全量消费） ═══
+
+/** context_pollution_events 全行。 */
+export function extractPollutionEventsFromDb(db: Database): ContextPollutionEvent[] {
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(db, 'SELECT pollution_id, source_agent_id, contaminated_artifact, propagation_path_json, detected_at_ns, run_id FROM context_pollution_events');
+  } catch {
+    return []; // Table absent.
+  }
+  return rows.map((r) => ({
+    pollution_id: Number(r.pollution_id ?? 0),
+    source_agent_id: String(r.source_agent_id ?? ''),
+    contaminated_artifact: String(r.contaminated_artifact ?? ''),
+    propagation_path: parseJsonArray<string>(r.propagation_path_json),
+    detected_at_ns: Number(r.detected_at_ns ?? 0),
+    run_id: r.run_id ? String(r.run_id) : null,
+  }));
+}
+
+/** policy_evaluations 全行。judgment_json 解析为 object；resource_json 非 NormalizedArgs 形态 → null。 */
+export function extractPolicyEvaluationsFromDb(db: Database): PolicyEvaluation[] {
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(db, 'SELECT policy_id, boundary, judgment_json, subject_agent_id, resource_json, evidence_refs_json, confidence, reason, run_id FROM policy_evaluations');
+  } catch {
+    return []; // Table absent.
+  }
+  return rows.map((r) => ({
+    policy_id: String(r.policy_id ?? ''),
+    boundary: String(r.boundary ?? ''),
+    judgment: parseJsonObject<{ result?: string; [k: string]: unknown }>(r.judgment_json),
+    subject_agent_id: String(r.subject_agent_id ?? ''),
+    resource: parseNormalizedArgsLike(r.resource_json),
+    evidence_refs: parseJsonArray<string>(r.evidence_refs_json),
+    confidence: Number(r.confidence ?? 0),
+    reason: String(r.reason ?? ''),
+    run_id: r.run_id ? String(r.run_id) : null,
+  }));
+}
+
+/** non_link_diagnostics 全行。 */
+export function extractNonLinkDiagnosticsFromDb(db: Database): NonLinkDiagnostic[] {
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(db, 'SELECT diagnostic_id, intent_id, action_id, reason, timestamp_ns, run_id FROM non_link_diagnostics');
+  } catch {
+    return []; // Table absent.
+  }
+  return rows.map((r) => ({
+    diagnostic_id: String(r.diagnostic_id ?? ''),
+    intent_id: r.intent_id ? String(r.intent_id) : null,
+    action_id: r.action_id ? String(r.action_id) : null,
+    reason: String(r.reason ?? ''),
+    timestamp_ns: Number(r.timestamp_ns ?? 0),
+    run_id: r.run_id ? String(r.run_id) : null,
+  }));
+}
+
+/** agent_identities 全行。JSON 数组列逐列解析。 */
+export function extractAgentIdentitiesFromDb(db: Database): AgentIdentity[] {
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(db, 'SELECT agent_id, process_ids_json, message_ids_json, tls_sessions_json, confidence, provisional_refs_json, run_id FROM agent_identities');
+  } catch {
+    return []; // Table absent.
+  }
+  return rows.map((r) => ({
+    agent_id: String(r.agent_id ?? ''),
+    process_ids: parseJsonArray<{ pid: number; start_time_ns: number }>(r.process_ids_json),
+    message_ids: parseJsonArray<string>(r.message_ids_json),
+    tls_sessions: parseJsonArray<string>(r.tls_sessions_json),
+    confidence: String(r.confidence ?? ''),
+    provisional_refs: parseJsonArray<string>(r.provisional_refs_json),
+    run_id: r.run_id ? String(r.run_id) : null,
+  }));
+}
+
+/** provisional_identities 全行。 */
+export function extractProvisionalIdentitiesFromDb(db: Database): ProvisionalIdentity[] {
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(db, 'SELECT agent_id, process_ids_json, primary_signal, confidence, run_id FROM provisional_identities');
+  } catch {
+    return []; // Table absent.
+  }
+  return rows.map((r) => ({
+    agent_id: String(r.agent_id ?? ''),
+    process_ids: parseJsonArray<{ pid: number; start_time_ns: number }>(r.process_ids_json),
+    primary_signal: String(r.primary_signal ?? ''),
+    confidence: Number(r.confidence ?? 0),
+    run_id: r.run_id ? String(r.run_id) : null,
+  }));
+}
+
+/** identity_process_map 全行。 */
+export function extractIdentityProcessMapFromDb(db: Database): IdentityProcessMapEntry[] {
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(db, 'SELECT agent_id, pid, start_time_ns FROM identity_process_map');
+  } catch {
+    return []; // Table absent.
+  }
+  return rows.map((r) => ({
+    agent_id: String(r.agent_id ?? ''),
+    pid: Number(r.pid ?? 0),
+    start_time_ns: Number(r.start_time_ns ?? 0),
+  }));
+}
+
+/**
+ * process_events 全行 + JOIN identity_process_map 身份标注。
+ * 已识别进程优先入 cap（血缘树完整），再按时间升序；cap 命中用 total/truncated 诚实标注。
+ */
+export function extractProcessEventsFromDb(db: Database, cap = 25000): CappedExtract<ProcessEvent> {
+  const total = (() => {
+    try {
+      const rows = queryRows(db, 'SELECT COUNT(*) AS n FROM process_events');
+      return Number(rows[0]?.n ?? 0);
+    } catch {
+      return 0; // Table absent.
+    }
+  })();
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(
+      db,
+      `SELECT pe.process_event_id, pe.pid, pe.start_time_ns, pe.parent_pid,
+              pe.parent_start_time_ns, pe.comm, pe.timestamp_ns, ipm.agent_id
+       FROM process_events pe
+       LEFT JOIN identity_process_map ipm
+         ON ipm.pid = pe.pid AND ipm.start_time_ns = pe.start_time_ns
+       ORDER BY (ipm.agent_id IS NOT NULL) DESC, pe.timestamp_ns ASC
+       LIMIT ?`,
+      [cap],
+    );
+  } catch {
+    return { items: [], total, truncated: total > cap }; // Table absent.
+  }
+  return {
+    items: rows.map((r) => ({
+      process_event_id: Number(r.process_event_id ?? 0),
+      pid: Number(r.pid ?? 0),
+      start_time_ns: Number(r.start_time_ns ?? 0),
+      parent_pid: r.parent_pid != null ? Number(r.parent_pid) : null,
+      parent_start_time_ns: r.parent_start_time_ns != null ? Number(r.parent_start_time_ns) : null,
+      comm: String(r.comm ?? ''),
+      timestamp_ns: Number(r.timestamp_ns ?? 0),
+      agent_id: r.agent_id ? String(r.agent_id) : null,
+    })),
+    total,
+    truncated: total > cap,
+  };
+}
+
+/** tls_sessions 全行 + JOIN 身份标注，cap 语义同 process_events。 */
+export function extractTlsSessionsFromDb(db: Database, cap = 25000): CappedExtract<TlsSession> {
+  const total = (() => {
+    try {
+      const rows = queryRows(db, 'SELECT COUNT(*) AS n FROM tls_sessions');
+      return Number(rows[0]?.n ?? 0);
+    } catch {
+      return 0; // Table absent.
+    }
+  })();
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(
+      db,
+      `SELECT t.tls_session_id, t.pid, t.start_time_ns, t.timestamp_ns, ipm.agent_id
+       FROM tls_sessions t
+       LEFT JOIN identity_process_map ipm
+         ON ipm.pid = t.pid AND ipm.start_time_ns = t.start_time_ns
+       ORDER BY (ipm.agent_id IS NOT NULL) DESC, t.timestamp_ns ASC
+       LIMIT ?`,
+      [cap],
+    );
+  } catch {
+    return { items: [], total, truncated: total > cap }; // Table absent.
+  }
+  return {
+    items: rows.map((r) => ({
+      tls_session_id: String(r.tls_session_id ?? ''),
+      pid: Number(r.pid ?? 0),
+      start_time_ns: Number(r.start_time_ns ?? 0),
+      timestamp_ns: Number(r.timestamp_ns ?? 0),
+      agent_id: r.agent_id ? String(r.agent_id) : null,
+    })),
+    total,
+    truncated: total > cap,
+  };
+}
+
+/** subagent_boundaries 全行。 */
+export function extractSubagentBoundariesFromDb(db: Database): SubagentBoundary[] {
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(db, 'SELECT boundary_id, parent_agent_id, child_agent_id, parent_pid, parent_start_time_ns, child_pid, child_start_time_ns, reason, run_id FROM subagent_boundaries');
+  } catch {
+    return []; // Table absent.
+  }
+  return rows.map((r) => ({
+    boundary_id: String(r.boundary_id ?? ''),
+    parent_agent_id: String(r.parent_agent_id ?? ''),
+    child_agent_id: String(r.child_agent_id ?? ''),
+    parent_pid: Number(r.parent_pid ?? 0),
+    parent_start_time_ns: Number(r.parent_start_time_ns ?? 0),
+    child_pid: Number(r.child_pid ?? 0),
+    child_start_time_ns: Number(r.child_start_time_ns ?? 0),
+    reason: String(r.reason ?? ''),
+    run_id: r.run_id ? String(r.run_id) : null,
+  }));
+}
+
+/**
+ * graph_snapshots 全帧：metrics 连续相同帧去重（保留每段首个），null metrics 帧保留（图仍解析），
+ * 超过 maxFrames 均匀降采样。kept 帧的 nodes/edges 提取时即解析（db 关闭后无法懒加载），坏 JSON → 空图。
+ */
+export function extractSnapshotFramesFromDb(db: Database, maxFrames = 30): GraphSnapshotFrame[] {
+  let rows: Record<string, unknown>[];
+  try {
+    rows = queryRows(
+      db,
+      'SELECT snapshot_id, timestamp_ns, nodes_json, edges_json, metrics_json FROM graph_snapshots ORDER BY timestamp_ns ASC',
+    );
+  } catch {
+    return []; // Table absent.
+  }
+  const frames: GraphSnapshotFrame[] = rows.map((r) => {
+    let nodes: GraphData['nodes'] = [];
+    let edges: GraphData['edges'] = [];
+    try {
+      nodes = JSON.parse(String(r.nodes_json ?? '[]')) as GraphData['nodes'];
+    } catch {
+      nodes = [];
+    }
+    try {
+      edges = JSON.parse(String(r.edges_json ?? '[]')) as GraphData['edges'];
+    } catch {
+      edges = [];
+    }
+    return {
+      snapshot_id: String(r.snapshot_id ?? ''),
+      timestamp_ns: Number(r.timestamp_ns ?? 0),
+      graph: { nodes, edges },
+      metrics: parseJsonObject<GraphMetrics>(r.metrics_json),
+    };
+  });
+  const deduped = frames.filter((f, i) => {
+    if (i === 0) return true;
+    const prev = frames[i - 1].metrics;
+    if (f.metrics === null || prev === null) return true;
+    return JSON.stringify(f.metrics) !== JSON.stringify(prev);
+  });
+  return pickRepresentativeFrames(deduped, maxFrames);
 }
 
 const EMPTY_ENGINE: EngineSection = {
@@ -826,6 +1141,24 @@ export async function loadDatabase(bytes: Uint8Array, fileName: string): Promise
     const actions = extractActionsFromDb(db);
     const overview = extractDatasetOverviewFromDb(db);
     const counts = extractCountsFromDb(db);
+    const processExtract = extractProcessEventsFromDb(db);
+    const tlsExtract = extractTlsSessionsFromDb(db);
+    const dbAssets: DbAssets = {
+      pollutionEvents: extractPollutionEventsFromDb(db),
+      policyEvaluations: extractPolicyEvaluationsFromDb(db),
+      nonLinkDiagnostics: extractNonLinkDiagnosticsFromDb(db),
+      agentIdentities: extractAgentIdentitiesFromDb(db),
+      provisionalIdentities: extractProvisionalIdentitiesFromDb(db),
+      identityProcessMap: extractIdentityProcessMapFromDb(db),
+      processEvents: processExtract.items,
+      processEventCount: processExtract.total,
+      processEventTruncated: processExtract.truncated,
+      tlsSessions: tlsExtract.items,
+      tlsSessionCount: tlsExtract.total,
+      tlsSessionTruncated: tlsExtract.truncated,
+      subagentBoundaries: extractSubagentBoundariesFromDb(db),
+      snapshotFrames: extractSnapshotFramesFromDb(db),
+    };
     const resolvedMetrics = metrics ?? deriveGraphMetrics(graph);
 
     const monitoring = deriveMonitoringState({
@@ -860,13 +1193,16 @@ export async function loadDatabase(bytes: Uint8Array, fileName: string): Promise
       evidenceCount: evidence.length,
       ...counts,
       runId,
+      dbAssets,
       hasConsumableData:
         graph.nodes.length > 0 ||
         alerts.length > 0 ||
         evidence.length > 0 ||
         claims.length > 0 ||
         intents.length > 0 ||
-        actions.length > 0,
+        actions.length > 0 ||
+        dbAssets.processEvents.length > 0 ||
+        dbAssets.tlsSessions.length > 0,
     };
   } finally {
     db.close();

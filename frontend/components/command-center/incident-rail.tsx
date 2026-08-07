@@ -18,6 +18,8 @@ import { buildAgentHref } from '@/lib/agent-route';
 import { buildInvestigationHref } from '@/lib/investigation-route';
 import { buildTraceHref } from '@/lib/trace-route';
 import type { ResponsibilityAlert } from '@/lib/types';
+import { useAppStore } from '@/lib/store';
+import RawEventBrowser from '@/components/command-center/raw-event-browser';
 
 type AlertWithModel = {
   alert: ResponsibilityAlert;
@@ -533,6 +535,10 @@ export default function IncidentRail({
   const isResizable = onWidthChange != null;
   const layoutExpanded = expanded;
   const [activeTool, setActiveTool] = useState<DockTool>('incident');
+  const [eventsOpen, setEventsOpen] = useState(false);
+  const dbAssets = useAppStore((s) => s.dbAssets);
+  const dbIntents = useAppStore((s) => s.intents);
+  const dbActions = useAppStore((s) => s.actions);
   const reduceMotion = useReducedMotion();
   const isTheater = layoutMode === 'theater';
   useLiquidGlassEffects({ cursor: !isTheater, spotlight: false, reveal: false, scroll: false });
@@ -1141,6 +1147,13 @@ export default function IncidentRail({
                                   <Link href={buildAgentHref(selectedAlert.primary_agent.agent_id)} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white">
                                     主体画像 <Codicon name="organization" size={12} />
                                   </Link>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEventsOpen(true)}
+                                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white"
+                                  >
+                                    原始事件流 <Codicon name="list-unordered" size={12} />
+                                  </button>
                                 </div>
                               </div>
                             </BentoCard>
@@ -1469,6 +1482,19 @@ export default function IncidentRail({
           style={{ touchAction: 'none' }}
         />
       )}
+
+      {/* 原始事件流覆盖层 drawer——保留 3-dock 隐喻，不改 dock 项 */}
+      <AnimatePresence>
+        {eventsOpen && (
+          <RawEventBrowser
+            processEvents={dbAssets?.processEvents ?? []}
+            tlsSessions={dbAssets?.tlsSessions ?? []}
+            intents={dbIntents}
+            actions={dbActions}
+            onClose={() => setEventsOpen(false)}
+          />
+        )}
+      </AnimatePresence>
     </aside>
   );
 }

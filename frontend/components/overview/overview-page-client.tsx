@@ -11,6 +11,8 @@ import { SectionPanel } from '@/components/ui/linear/section-panel';
 import { StatusBadge, type StatusTone } from '@/components/ui/linear/status-badge';
 import OverviewDatasetPanel from '@/components/overview/dataset-overview-panel';
 import MonitoringSection from '@/components/overview/monitoring/monitoring-section';
+import AgentProcessTree from '@/components/overview/agent-process-tree';
+import AgentFamilyTree from '@/components/overview/agent-family-tree';
 import { TrendChart } from '@/components/ui/linear/trend-chart';
 import LoadingScreen from '@/components/ui/loading-screen';
 import NetworkLoading from '@/components/ui/network-loading';
@@ -87,6 +89,7 @@ export default function OverviewPageClient() {
   const graph = useAppStore((state) => state.graph);
   const setInvestigationContext = useAppStore((state) => state.setInvestigationContext);
   const overview = useAppStore((state) => state.overview);
+  const dbAssets = useAppStore((state) => state.dbAssets);
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [selectedSigmaNodeId, setSelectedSigmaNodeId] = useState<string | null>(null);
 
@@ -547,6 +550,15 @@ export default function OverviewPageClient() {
               </SectionPanel>
             </div>
             <MonitoringSection />
+            <AgentProcessTree
+              provisionalIdentities={dbAssets?.provisionalIdentities ?? []}
+              agentIdentities={dbAssets?.agentIdentities ?? []}
+              identityProcessMap={dbAssets?.identityProcessMap ?? []}
+              processEvents={dbAssets?.processEvents ?? []}
+              processEventCount={dbAssets?.processEventCount}
+              processEventTruncated={dbAssets?.processEventTruncated}
+            />
+            <AgentFamilyTree subagentBoundaries={dbAssets?.subagentBoundaries ?? []} />
             {overview && (
               <div style={{ marginTop: 12 }}>
                 <OverviewDatasetPanel overview={overview} />

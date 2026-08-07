@@ -63,6 +63,16 @@ describe('OverviewPageClient', () => {
     expect(screen.getAllByText('MtAgentLens').length).toBeGreaterThan(0);
   });
 
+  it('dbAssets 为空时进程谱系面板显示空态而非报错', () => {
+    // 前提：store 未导入 db（dbAssets=null）→ 进程谱系/委派树显示空态而非伪造
+    render(<OverviewPageClient />, { wrapper: createWrapper() });
+
+    expect(screen.getByText(/进程谱系/i)).toBeTruthy();
+    expect(screen.getByText(/导入含进程表的 \.db 后此处有数据/i)).toBeTruthy();
+    expect(screen.getByText(/委派家族/i)).toBeTruthy();
+    expect(screen.getByText(/此数据源无委派边界/i)).toBeTruthy();
+  });
+
   it('renders the dataset overview panel when a db overview is present', () => {
     useAppStore.setState({
       alerts: demoAlerts,

@@ -213,4 +213,33 @@ describe('store — SQLite db data source', () => {
     useAppStore.getState().loadDemo();
     expect(useAppStore.getState().monitoring).toBeNull();
   });
+
+  test('loadDatabase 填充 dbAssets 并初始化 snapshotFrameIndex 到最新帧', async () => {
+    const dbImport = await loadDatabaseFromBytes(new Uint8Array(fixtureBytes()), 'run-42.db');
+    useAppStore.getState().loadDatabase(dbImport);
+
+    const s = useAppStore.getState();
+    expect(s.dbAssets).not.toBeNull();
+    expect(s.dbAssets?.processEvents).toHaveLength(7);
+    expect(s.dbAssets?.snapshotFrames).toHaveLength(4);
+    // 帧索引指向最新帧（frames.length-1），与 store.graph（最新帧）一致
+    expect(s.snapshotFrameIndex).toBe(3);
+  });
+
+  test('setSnapshotFrameIndex 更新帧索引', async () => {
+    const dbImport = await loadDatabaseFromBytes(new Uint8Array(fixtureBytes()), 'run-42.db');
+    useAppStore.getState().loadDatabase(dbImport);
+    useAppStore.getState().setSnapshotFrameIndex(1);
+    expect(useAppStore.getState().snapshotFrameIndex).toBe(1);
+  });
+
+  test('db 导入后切 demo 清空 dbAssets 并复位帧索引', async () => {
+    const dbImport = await loadDatabaseFromBytes(new Uint8Array(fixtureBytes()), 'run-42.db');
+    useAppStore.getState().loadDatabase(dbImport);
+    expect(useAppStore.getState().dbAssets).not.toBeNull();
+
+    useAppStore.getState().loadDemo();
+    expect(useAppStore.getState().dbAssets).toBeNull();
+    expect(useAppStore.getState().snapshotFrameIndex).toBe(0);
+  });
 });

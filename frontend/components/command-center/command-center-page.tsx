@@ -6,6 +6,7 @@ import { useAppStore } from '@/lib/store';
 import { useAlertModels } from '@/lib/use-alert-models';
 import type { ResponsibilityNode } from '@/lib/types';
 import LoadingScreen from '@/components/ui/loading-screen';
+import GraphTimeScrubber from '@/components/graph/graph-time-scrubber';
 import NodeDetailPanel from './node-detail-panel';
 
 const MtAgentLensGraphStage = dynamic(
@@ -29,6 +30,9 @@ export default function CommandCenterPage() {
   const alerts = useAppStore((state) => state.alerts);
   const graph = useAppStore((state) => state.graph);
   const focusAlert = useAppStore((state) => state.focusAlert);
+  const dbAssets = useAppStore((state) => state.dbAssets);
+  const snapshotFrameIndex = useAppStore((state) => state.snapshotFrameIndex);
+  const snapshotFrames = dbAssets?.snapshotFrames ?? [];
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
@@ -104,10 +108,18 @@ export default function CommandCenterPage() {
               active
               onNodeClick={handleNodeClick}
               onBackgroundClick={handleBackgroundClick}
+              graphOverride={
+                snapshotFrames.length > 1
+                  ? snapshotFrames[Math.min(snapshotFrameIndex, snapshotFrames.length - 1)].graph
+                  : undefined
+              }
             />
           </div>
         </div>
       </div>
+
+      {/* 图时间演化滑杆——多帧 db 导入时自管显示/隐藏 */}
+      <GraphTimeScrubber />
 
       {/* Node detail panel */}
       {selectedNode && (

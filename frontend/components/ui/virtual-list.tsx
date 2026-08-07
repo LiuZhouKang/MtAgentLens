@@ -17,6 +17,8 @@ type Props<T> = {
   renderRow: (item: T, index: number) => ReactNode;
   className?: string;
   emptyLabel?: string;
+  /** 近底增量加载等场景：滚动容器事件（VirtualList 内部滚动 div）。 */
+  onScroll?: (e: React.UIEvent<HTMLDivElement>) => void;
 };
 
 export default function VirtualList<T>({
@@ -27,6 +29,7 @@ export default function VirtualList<T>({
   renderRow,
   className,
   emptyLabel = '暂无数据',
+  onScroll,
 }: Props<T>) {
   const ref = useRef<HTMLDivElement>(null);
   // TanStack Virtual's `useVirtualizer` returns functions that can't be memoized
@@ -59,6 +62,7 @@ export default function VirtualList<T>({
     <div
       ref={ref}
       className={className}
+      onScroll={onScroll}
       style={{ overflow: 'auto', height: '100%' }}
     >
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>

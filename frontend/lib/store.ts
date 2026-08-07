@@ -17,7 +17,7 @@ import { demoAlerts, demoGraph } from './demo-data';
 import { loadSampleData } from './load-sample-data';
 import { deriveGraphMetrics } from './graph-metrics';
 import type { SnapshotImport } from './snapshot-import';
-import { loadDatabase as loadDatabaseFromBytes, type DbImport } from './db-import';
+import { loadDatabase as loadDatabaseFromBytes, type DbImport, type DbAssets } from './db-import';
 import type { MonitoringState } from './monitoring/monitoring-types';
 import {
   DEFAULT_INVESTIGATION_CONTEXT,
@@ -76,6 +76,10 @@ interface AppStore {
   actions: Action[];
   overview: DatasetOverview | null;
   monitoring: MonitoringState | null;
+  /** M0 全行深链资产（db 导入时填充；sample/demo/file → null，四功能空态兜底）。 */
+  dbAssets: DbAssets | null;
+  /** 图时间演化当前帧索引（db 导入时指向最新帧，保持态势页初始视图不变）。 */
+  snapshotFrameIndex: number;
   timelinePosition: number;
   investigationContext: InvestigationContext;
   errorMessage: string | null;
@@ -91,6 +95,7 @@ interface AppStore {
   expandNode: (id: string) => void;
   collapseNode: (id: string) => void;
   setTimelinePosition: (pos: number) => void;
+  setSnapshotFrameIndex: (index: number) => void;
   setInvestigationContext: (patch: Partial<InvestigationContext>) => void;
   focusAlert: (alert: ResponsibilityAlert) => void;
   setError: (msg: string | null) => void;
@@ -153,6 +158,8 @@ function applySnapshot(
     actions: [],
     overview: null,
     monitoring: null,
+    dbAssets: null,
+    snapshotFrameIndex: 0,
     dataSource: opts.source,
     activeRunId: null,
     selectedNodeId: null,
@@ -182,6 +189,8 @@ function applyDbImport(
     actions: dbImport.actions,
     overview: dbImport.overview,
     monitoring: dbImport.monitoring,
+    dbAssets: dbImport.dbAssets,
+    snapshotFrameIndex: Math.max(0, dbImport.dbAssets.snapshotFrames.length - 1),
     dataSource: source,
     activeRunId: source.runId ?? null,
     selectedNodeId: null,
@@ -216,6 +225,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   actions: [],
   overview: null,
   monitoring: null,
+  dbAssets: null,
+  snapshotFrameIndex: 0,
   timelinePosition: 0,
   investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
   errorMessage: null,
@@ -245,6 +256,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ expandedNodeIds: next });
   },
   setTimelinePosition: (pos) => set({ timelinePosition: pos }),
+  setSnapshotFrameIndex: (index) => set({ snapshotFrameIndex: index }),
   setInvestigationContext: (patch) => {
     set({ investigationContext: mergeInvestigationContext(get().investigationContext, patch) });
   },
@@ -301,6 +313,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
         actions: [],
         overview: null,
         monitoring: null,
+        dbAssets: null,
+        snapshotFrameIndex: 0,
         selectedNodeId: null,
       });
     } catch (error) {

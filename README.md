@@ -189,6 +189,7 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |  /investigations  告警 · claim, evidence and traceback workbench  |
   |  /traces     追踪 · trace workbench and replay timeline           |
   |  (agent/cluster deep links land on /overview#agentId=/#clusterId=) |
+  |  db 深链四件套 · 取证链 / 身份血缘 / 原始事件流 / 图时间演化        |
   |  /api/events legacy log-backed event stream                      |
   |  /api/runs/{id}/{alerts,correlation-evidence,events,diff,...}    |
   +-----------------------------------------------------------------+

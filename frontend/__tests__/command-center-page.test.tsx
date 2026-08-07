@@ -5,6 +5,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import CommandCenterPage from '@/components/command-center/command-center-page';
 import { demoAlerts, demoGraph } from '@/lib/demo-data';
 import { useAppStore } from '@/lib/store';
+import type { DbAssets } from '@/lib/db-import';
+import type { GraphMetrics, GraphSnapshotFrame } from '@/lib/types';
 
 // Mock the WebGL 3D stage (jsdom has no WebGL) and capture its callbacks so the
 // tests can simulate graph interactions.
@@ -40,6 +42,41 @@ vi.mock('@/components/ui/command-palette', () => ({
   },
 }));
 
+// M4 时间演化：构造 2 帧 dbAssets 供 scrubber 测试（其余字段置空即可）。
+const snapMetrics: GraphMetrics = {
+  node_counts: {}, edge_counts: {}, agent_count: 0, cross_agent_edges: 0,
+  delegation_depth: 0, taint_chains: 0, avg_confidence: 0,
+};
+
+const snapFrame = (id: string, nodeId: string, ts: number): GraphSnapshotFrame => ({
+  snapshot_id: id,
+  timestamp_ns: ts,
+  graph: {
+    nodes: [
+      { node_id: nodeId, node_type: 'Agent', agent_id: nodeId, resource: null, evidence_refs: [], timestamp_ns: ts, phase: { Provisional: { timestamp_ns: ts } } },
+    ],
+    edges: [],
+  },
+  metrics: snapMetrics,
+});
+
+const twoFrameAssets: DbAssets = {
+  pollutionEvents: [],
+  policyEvaluations: [],
+  nonLinkDiagnostics: [],
+  agentIdentities: [],
+  provisionalIdentities: [],
+  identityProcessMap: [],
+  processEvents: [],
+  processEventCount: 0,
+  processEventTruncated: false,
+  tlsSessions: [],
+  tlsSessionCount: 0,
+  tlsSessionTruncated: false,
+  subagentBoundaries: [],
+  snapshotFrames: [snapFrame('f0', 'n1', 1), snapFrame('f1', 'n1', 2)],
+};
+
 function renderPage() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -65,6 +102,8 @@ describe('CommandCenterPage', () => {
       alerts: demoAlerts,
       graph: demoGraph,
       graphMetrics: demoAlerts[0].graph_snapshot?.metrics ?? null,
+      dbAssets: null,
+      snapshotFrameIndex: 0,
     });
   });
 
@@ -123,5 +162,17 @@ describe('CommandCenterPage', () => {
 
     fireEvent.keyDown(window, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByTestId('palette')).toBeNull());
+  });
+
+  it('snapshotFrames > 1 时渲染时间 scrubber', async () => {
+    useAppStore.setState({ dbAssets: twoFrameAssets, snapshotFrameIndex: 1 });
+    renderPage();
+    expect(await screen.findByRole('group', { name: /时间演化/i })).toBeTruthy();
+    expect(screen.getByText(/2 \/ 2/)).toBeTruthy(); // 帧索引「最新 / 总数」
+  });
+
+  it('snapshotFrames ≤ 1 时隐藏 scrubber', async () => {
+    renderPage();
+    expect(screen.queryByRole('group', { name: /时间演化/i })).toBeNull();
   });
 });

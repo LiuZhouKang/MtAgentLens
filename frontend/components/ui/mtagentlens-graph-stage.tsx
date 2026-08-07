@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactForceGraph3D from 'react-force-graph-3d';
 import LoadingIndicator from '@/components/ui/loading-indicator';
 import { useAppStore } from '@/lib/store';
+import type { GraphData } from '@/lib/types';
 import { adaptGraphToLargeGraph } from '@/lib/large-graph-adapter';
 import { pickLodLevel, summarizeToLod } from '@/lib/graph-lod';
 
@@ -18,6 +19,8 @@ type Props = {
   active: boolean;
   onNodeClick?: (node: GraphNodeInfo) => void;
   onBackgroundClick?: () => void;
+  /** 时间演化当前帧覆盖：传入时优先于 store.graph（不改全局态，scrubber 只读帧）。 */
+  graphOverride?: GraphData;
 };
 
 // ── Alert highlight colors ──
@@ -25,9 +28,10 @@ const VIOLATION_COLOR = '#f97316';   // orange — violation path
 const CONTEXT_COLOR = '#5e6ad2';     // blue — context edges
 const DIM_OPACITY = 0.04;            // dimmed nodes/links
 
-export default function MtAgentLensGraphStage({ active, onNodeClick, onBackgroundClick }: Props) {
+export default function MtAgentLensGraphStage({ active, onNodeClick, onBackgroundClick, graphOverride }: Props) {
   // Stable selectors — only re-render when data identity changes
-  const graph = useAppStore((s) => s.graph);
+  const storeGraph = useAppStore((s) => s.graph);
+  const graph = graphOverride ?? storeGraph;
   const highlightedEdgeIds = useAppStore((s) => s.investigationContext.highlightedPathEdgeIds);
   const fgRef = useRef<any>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);

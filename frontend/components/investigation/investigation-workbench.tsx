@@ -10,6 +10,7 @@ import { StatusBadge, type StatusTone } from '@/components/ui/linear/status-badg
 import LoadingIndicator from '@/components/ui/loading-indicator';
 import VirtualList from '@/components/ui/virtual-list';
 import ClaimList from '@/components/investigation/claim-list';
+import ForensicChain from '@/components/investigation/forensic-chain';
 import type { ResponsibilityAlert } from '@/lib/types';
 import type { InvestigationModel } from '@/lib/investigation';
 import { collectAlertEvidenceRefs } from '@/lib/investigation';
@@ -36,6 +37,8 @@ export default function InvestigationWorkbench({ alert, model, availableAlerts, 
   const claims = useAppStore((s) => s.claims);
   const tracebacks = useAppStore((s) => s.tracebacks);
   const graph = useAppStore((s) => s.graph);
+  const dbAssets = useAppStore((s) => s.dbAssets);
+  const evidence = useAppStore((s) => s.evidence);
   const tracebacksByClaimId = useMemo(() => buildTracebacksByClaimId(tracebacks), [tracebacks]);
   const alertEvidenceRefs = useMemo(
     () => collectAlertEvidenceRefs(alert, graph),
@@ -278,6 +281,17 @@ export default function InvestigationWorkbench({ alert, model, availableAlerts, 
               alertEvidenceRefs={alertEvidenceRefs}
             />
           </SectionPanel>
+
+          {/* 取证链——M1 db 深链：引擎判定 / 污染传播链 / 策略矩阵 / 失配诊断 */}
+          <ForensicChain
+            alert={alert}
+            pollutionEvents={dbAssets?.pollutionEvents ?? []}
+            policyEvaluations={dbAssets?.policyEvaluations ?? []}
+            nonLinkDiagnostics={dbAssets?.nonLinkDiagnostics ?? []}
+            claims={claims}
+            evidence={evidence}
+            fallbackGraph={graph}
+          />
         </div>
 
         {/* ── RIGHT: Verdict + reasoning + actions ── */}

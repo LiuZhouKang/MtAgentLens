@@ -35,8 +35,8 @@ describe('监控聚合提取器', () => {
     const r = extractMismatchAggregateFromDb(db);
     db.close();
     expect(r.available).toBe(true);
-    expect(r.count).toBe(3);
-    expect(r.byReason).toEqual({ BelowConfidenceCutoff: 2, NoArgumentMatch: 1 });
+    expect(r.count).toBe(4); // nld 3 → 4（追加 AmbiguousMatch）
+    expect(r.byReason).toEqual({ BelowConfidenceCutoff: 2, NoArgumentMatch: 1, AmbiguousMatch: 1 });
     expect(r.weak).toBe(1); // ev-3 L5Substring
     expect(r.strong).toBe(2); // ev-1 L1Exact + ev-2 L3Containment
   });
@@ -46,8 +46,8 @@ describe('监控聚合提取器', () => {
     const r = extractPollutionAggregateFromDb(db);
     db.close();
     expect(r.available).toBe(true);
-    expect(r.count).toBe(2);
-    expect(r.bySource).toEqual({ 'agent-a': 1, 'agent-b': 1 });
+    expect(r.count).toBe(3); // pollution 2 → 3
+    expect(r.bySource).toEqual({ 'agent-a': 2, 'agent-b': 1 });
   });
 
   it('extractPolicyComplianceFromDb 解析 judgment_json.result 得真实违规数', async () => {
@@ -55,9 +55,9 @@ describe('监控聚合提取器', () => {
     const r = extractPolicyComplianceFromDb(db);
     db.close();
     expect(r.available).toBe(true);
-    expect(r.total).toBe(3);
+    expect(r.total).toBe(6); // policy 3 → 6
     expect(r.violations).toBe(1); // 仅 pol-1 是 Violation
-    expect(r.byBoundary).toEqual({ Capability: 3 });
+    expect(r.byBoundary).toEqual({ Capability: 4, DataFlow: 2 });
   });
 
   it('extractTlsSessionAggregateFromDb 按 60s 桶聚合', async () => {
@@ -65,9 +65,9 @@ describe('监控聚合提取器', () => {
     const r = extractTlsSessionAggregateFromDb(db);
     db.close();
     expect(r.available).toBe(true);
-    expect(r.total).toBe(4);
-    expect(r.byPid).toEqual({ '42': 2, '43': 2 });
-    expect(r.trend.map((b) => b.count)).toEqual([2, 2]);
+    expect(r.total).toBe(6); // tls 4 → 6（s-5/s-6 未映射 pid 44）
+    expect(r.byPid).toEqual({ '42': 2, '43': 2, '44': 2 });
+    expect(r.trend.map((b) => b.count)).toEqual([3, 3]);
     expect(r.trend[1].t - r.trend[0].t).toBe(60_000_000_000);
   });
 

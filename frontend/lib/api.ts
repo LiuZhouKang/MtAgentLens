@@ -6,7 +6,7 @@ import type {
   CorrelationEvidence,
   Intent,
   Action,
-  NonLinkDiagnostic,
+  ApiNonLinkDiagnostic,
 } from './types';
 
 const BASE = '';
@@ -81,7 +81,7 @@ export const api = {
       evidence: CorrelationEvidence[];
       intents: Intent[];
       actions: Action[];
-      non_links: NonLinkDiagnostic[];
+      non_links: ApiNonLinkDiagnostic[];
     }>(`/api/runs/${id}/evidence`),
 
   getSnapshots: (id: string) => fetchJson<GraphSnapshot[]>(`/api/runs/${id}/snapshots`),

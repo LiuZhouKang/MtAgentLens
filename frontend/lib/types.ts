@@ -277,7 +277,8 @@ export interface DatasetOverview {
   non_link_diagnostics: { count: number };
 }
 
-export interface NonLinkDiagnostic {
+/** API `/api/runs/:id/evidence` non_links 响应元素（causal db 形状，与 db 全行形状不同）。 */
+export interface ApiNonLinkDiagnostic {
   schema_version: number;
   diagnostic_id: string;
   timestamp_ns: number;
@@ -311,3 +312,107 @@ export interface GraphData {
 
 export type AppState = 'init' | 'idle' | 'live' | 'replay' | 'error';
 export type ZoomLevel = 0 | 1 | 2 | 3;
+
+// ═══ DB 全行深链类型（responsibility.db 12 表全行，M0 提取器产物） ═══
+
+/** context_pollution_events 全行 */
+export interface ContextPollutionEvent {
+  pollution_id: number;
+  source_agent_id: string;
+  contaminated_artifact: string;
+  propagation_path: string[];      // propagation_path_json，agent 序列
+  detected_at_ns: number;
+  run_id: string | null;
+}
+
+/** policy_evaluations 全行 — judgment_json 解析为 { result, ... } */
+export interface PolicyEvaluation {
+  policy_id: string;
+  boundary: string;
+  subject_agent_id: string;
+  judgment: { result?: string; [k: string]: unknown } | null;
+  resource: NormalizedArgs | null;  // resource_json；非 NormalizedArgs 形态时 null
+  evidence_refs: string[];
+  confidence: number;
+  reason: string;
+  run_id: string | null;
+}
+
+/** non_link_diagnostics 全行 */
+export interface NonLinkDiagnostic {
+  diagnostic_id: string;
+  intent_id: string | null;
+  action_id: string | null;
+  reason: string;
+  timestamp_ns: number;
+  run_id: string | null;
+}
+
+/** agent_identities 全行 */
+export interface AgentIdentity {
+  agent_id: string;
+  process_ids: Array<{ pid: number; start_time_ns: number }>;
+  message_ids: string[];
+  tls_sessions: string[];
+  confidence: string;              // 'Authoritative' 等
+  provisional_refs: string[];
+  run_id: string | null;
+}
+
+/** provisional_identities 全行 */
+export interface ProvisionalIdentity {
+  agent_id: string;
+  process_ids: Array<{ pid: number; start_time_ns: number }>;
+  primary_signal: string;          // 'TlsSessionNew' 等
+  confidence: number;
+  run_id: string | null;
+}
+
+/** identity_process_map 全行 */
+export interface IdentityProcessMapEntry {
+  agent_id: string;
+  pid: number;
+  start_time_ns: number;
+}
+
+/** process_events 全行 + 身份标注（JOIN identity_process_map） */
+export interface ProcessEvent {
+  process_event_id: number;
+  pid: number;
+  start_time_ns: number;
+  parent_pid: number | null;
+  parent_start_time_ns: number | null;
+  comm: string;
+  timestamp_ns: number;
+  agent_id: string | null;         // JOIN 标注；无映射时 null
+}
+
+/** tls_sessions 全行 + 身份标注 */
+export interface TlsSession {
+  tls_session_id: string;
+  pid: number;
+  start_time_ns: number;
+  timestamp_ns: number;
+  agent_id: string | null;         // JOIN 标注
+}
+
+/** subagent_boundaries 全行 */
+export interface SubagentBoundary {
+  boundary_id: string;
+  parent_agent_id: string;
+  child_agent_id: string;
+  parent_pid: number;
+  parent_start_time_ns: number;
+  child_pid: number;
+  child_start_time_ns: number;
+  reason: string;
+  run_id: string | null;
+}
+
+/** graph_snapshots 演化帧（kept 帧提取时即解析 nodes/edges） */
+export interface GraphSnapshotFrame {
+  snapshot_id: string;
+  timestamp_ns: number;
+  graph: GraphData;                // 提取时即解析（loadDatabase 关闭 db 后无法再懒加载）
+  metrics: GraphMetrics | null;
+}

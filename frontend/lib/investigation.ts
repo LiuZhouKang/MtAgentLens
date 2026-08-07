@@ -49,6 +49,7 @@ function getActiveGraph(alert: ResponsibilityAlert, fallbackGraph: GraphData): G
 export function collectAlertEvidenceRefs(
   alert: ResponsibilityAlert,
   fallbackGraph: GraphData = { nodes: [], edges: [] },
+  opts?: { skipAllEdgesFallback?: boolean },
 ): string[] {
   // Store alerts (db import / sample / demo) carry no graph_snapshot — the full
   // graph lives in the store. Derive evidence refs from the same effective graph
@@ -62,6 +63,9 @@ export function collectAlertEvidenceRefs(
   }
 
   for (const edge of graph.edges ?? []) {
+    // 严格模式：相关边集为空时不回退收集全图边（默认回退是证据面板的 store 告警
+    // 联动所需；分面过桥必须只采纳告警自身证据，否则任何图边证据都会虚高命中）。
+    if (opts?.skipAllEdgesFallback && relevantEdgeIds.size === 0) break;
     if (relevantEdgeIds.size > 0 && !relevantEdgeIds.has(edge.edge_id)) continue;
     for (const ref of edge.evidence_refs ?? []) {
       refs.add(ref);

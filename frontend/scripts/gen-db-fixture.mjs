@@ -190,6 +190,31 @@ async function main() {
     CREATE TABLE tls_sessions (
       tls_session_id TEXT, pid INTEGER, start_time_ns INTEGER, timestamp_ns INTEGER, run_id TEXT
     );
+    CREATE TABLE process_events (
+      process_event_id INTEGER PRIMARY KEY AUTOINCREMENT, pid INTEGER, start_time_ns INTEGER,
+      parent_pid INTEGER, parent_start_time_ns INTEGER, comm TEXT, timestamp_ns INTEGER, run_id TEXT
+    );
+    CREATE TABLE provisional_identities (
+      agent_id TEXT PRIMARY KEY, process_ids_json TEXT, primary_signal TEXT,
+      confidence REAL, run_id TEXT
+    );
+    CREATE TABLE agent_identities (
+      agent_id TEXT PRIMARY KEY, process_ids_json TEXT, message_ids_json TEXT,
+      tls_sessions_json TEXT, confidence TEXT, provisional_refs_json TEXT, run_id TEXT
+    );
+    CREATE TABLE identity_process_map (
+      agent_id TEXT, pid INTEGER, start_time_ns INTEGER, run_id TEXT, PRIMARY KEY(pid, start_time_ns)
+    );
+    CREATE TABLE subagent_boundaries (
+      boundary_id TEXT PRIMARY KEY, parent_agent_id TEXT, child_agent_id TEXT,
+      parent_pid INTEGER, parent_start_time_ns INTEGER, child_pid INTEGER,
+      child_start_time_ns INTEGER, reason TEXT, run_id TEXT
+    );
+    CREATE TABLE delegation_records (
+      delegation_id TEXT PRIMARY KEY, from_agent_id TEXT, to_agent_id TEXT,
+      parent_pid INTEGER, parent_start_time_ns INTEGER, child_pid INTEGER,
+      child_start_time_ns INTEGER, timestamp_ns INTEGER, confidence REAL, run_id TEXT
+    );
   `);
 
   // Run metadata — a single row with run_id populated, rest NULL.
@@ -338,14 +363,19 @@ async function main() {
       row[0], row[1], null, row[2], 1000, 'run-1',
     ]);
   }
-  // context_pollution_events：2 行，detected_at_ns 为时间列
-  for (const [pid, source, artifact, ts] of [
-    [1, 'agent-a', '/tmp/leaked.txt', 1000],
-    [2, 'agent-b', '/tmp/context.json', 1100],
+  // 追加第 4 行（AmbiguousMatch，关联 int-2）
+  db.run('INSERT INTO non_link_diagnostics VALUES (?,?,?,?,?,?)', [
+    'nld-4', 'int-2', null, 'AmbiguousMatch', 1100, 'run-1',
+  ]);
+  // context_pollution_events：3 行，第 3 行 propagation_path 覆盖 ≥2 hop
+  for (const [pid, source, artifact, path, ts] of [
+    [1, 'agent-a', '/tmp/leaked.txt', [], 1000],
+    [2, 'agent-b', '/tmp/context.json', [], 1100],
+    [3, 'agent-a', '/tmp/script.sh', ['agent-a', 'agent-b', 'agent-c'], 1300],
   ]) {
     db.run(
       'INSERT INTO context_pollution_events VALUES (?,?,?,?,?,?)',
-      [pid, source, artifact, JSON.stringify([]), ts, 'run-1'],
+      [pid, source, artifact, JSON.stringify(path), ts, 'run-1'],
     );
   }
   // policy_evaluations：3 行，其中 1 条 judgment_json.result=Violation
@@ -355,22 +385,95 @@ async function main() {
     ['pol-1', 'Capability', 'agent-a', 'Violation'],
     ['pol-2', 'Capability', 'agent-a', 'Compliant'],
     ['pol-3', 'Capability', 'agent-b', 'Compliant'],
+    ['pol-4', 'Capability', 'agent-b', 'Compliant'],
+    ['pol-5', 'DataFlow', 'agent-a', 'Allow'],
+    ['pol-6', 'DataFlow', 'agent-c', 'Compliant'],
   ]) {
     db.run(
       'INSERT INTO policy_evaluations VALUES (?,?,?,?,?,?,?,?,?)',
       [policyId, boundary, judgment(result), subject, null, '[]', 0.85, '', 'run-1'],
     );
   }
-  // tls_sessions：4 行跨 2 个时间桶（桶宽 60s = 60_000_000_000 ns）
-  for (const [sid, pid, ts] of [
-    ['s-1', 42, 1000],
-    ['s-2', 42, 5000],
-    ['s-3', 43, 61_000_000_000],
-    ['s-4', 43, 61_005_000_000],
+  // tls_sessions：6 行跨 2 个时间桶（桶宽 60s = 60_000_000_000 ns），
+  // s-5/s-6 用未映射 pid 44，trend 桶为 [3,3]
+  for (const [sid, pid, st, ts] of [
+    ['s-1', 42, 1000, 1000],
+    ['s-2', 42, 1000, 5000],
+    ['s-3', 43, 1000, 61_000_000_000],
+    ['s-4', 43, 1000, 61_005_000_000],
+    ['s-5', 44, 1000, 1200],
+    ['s-6', 44, 1000, 61_010_000_000],
   ]) {
     db.run(
       'INSERT INTO tls_sessions VALUES (?,?,?,?,?)',
-      [sid, pid, 1000, ts, 'run-1'],
+      [sid, pid, st, ts, 'run-1'],
+    );
+  }
+
+  // ── M0 新增：进程/身份三表（2 组父子链 + 1 未识别孤儿 + 1 orphanPid）──
+  // process_events：树 A agent-a（42→102→103），树 B agent-b（43→202→203），未识别 300
+  for (const [peid, pid, st, pp, pst, comm, ts] of [
+    [1, 42, 1000, null, null, 'claude', 1000],
+    [2, 102, 1000, 42, 1000, 'bash', 1001],
+    [3, 103, 1000, 102, 1000, 'sh', 1002],
+    [4, 43, 1000, null, null, 'claude', 1000],
+    [5, 202, 1000, 43, 1000, 'node', 2000],
+    [6, 203, 1000, 202, 1000, 'script', 2001],
+    [7, 300, 4000, null, null, 'orphan-tool', 4000],
+  ]) {
+    db.run(
+      'INSERT INTO process_events (process_event_id, pid, start_time_ns, parent_pid, parent_start_time_ns, comm, timestamp_ns, run_id) VALUES (?,?,?,?,?,?,?,?)',
+      [peid, pid, st, pp, pst, comm, ts, 'run-1'],
+    );
+  }
+  // identity_process_map：agent-a 含 orphan pid 99（无 process_events 记录）
+  for (const [agent, pid, st] of [
+    ['agent-a', 42, 1000], ['agent-a', 102, 1000], ['agent-a', 103, 1000],
+    ['agent-a', 99, 900],
+    ['agent-b', 43, 1000], ['agent-b', 202, 1000], ['agent-b', 203, 1000],
+  ]) {
+    db.run('INSERT INTO identity_process_map VALUES (?,?,?,?)', [agent, pid, st, 'run-1']);
+  }
+  // provisional_identities：3 行；agent-a 与 agent_identities 交集（升级），agent-c 仅 provisional
+  const procIds = (pids) => JSON.stringify(pids.map((pid) => ({ pid, start_time_ns: 1000 })));
+  for (const [agent, pids, signal, conf] of [
+    ['agent-a', [42, 102, 103], 'TlsSessionNew', 0.92],
+    ['agent-b', [43, 202, 203], 'ProcessEvent', 0.85],
+    ['agent-c', [400], 'TlsSessionNew', 0.6],
+  ]) {
+    db.run(
+      'INSERT INTO provisional_identities VALUES (?,?,?,?,?)',
+      [agent, procIds(pids), signal, conf, 'run-1'],
+    );
+  }
+  // agent_identities：2 行；agent-a 已升级（交集），agent-d 仅正式表
+  for (const [agent, pids, msgs, sessions, conf, prov] of [
+    ['agent-a', [42, 102, 103], ['msg-1'], ['s-1'], 'Authoritative', ['agent-a']],
+    ['agent-d', [500], ['msg-9'], ['s-9'], 'Authoritative', ['agent-d']],
+  ]) {
+    db.run(
+      'INSERT INTO agent_identities VALUES (?,?,?,?,?,?,?)',
+      [agent, procIds(pids), JSON.stringify(msgs), JSON.stringify(sessions), conf, JSON.stringify(prov), 'run-1'],
+    );
+  }
+  // subagent_boundaries：2 行（委派树 agent-a→agent-b→agent-c）
+  for (const [bid, parent, child, pp, pst, cp, cst, reason] of [
+    ['bnd-1', 'agent-a', 'agent-b', 42, 1000, 43, 1000, 'delegation'],
+    ['bnd-2', 'agent-b', 'agent-c', 43, 1000, 400, 5000, 'subagent spawn'],
+  ]) {
+    db.run(
+      'INSERT INTO subagent_boundaries VALUES (?,?,?,?,?,?,?,?,?)',
+      [bid, parent, child, pp, pst, cp, cst, reason, 'run-1'],
+    );
+  }
+  // delegation_records：2 行（带 timestamp_ns 供诞生时序）
+  for (const [did, from, to, pp, pst, cp, cst, ts, conf] of [
+    ['del-1', 'agent-a', 'agent-b', 42, 1000, 43, 1000, 1100, 0.85],
+    ['del-2', 'agent-b', 'agent-c', 43, 1000, 400, 5000, 2100, 0.9],
+  ]) {
+    db.run(
+      'INSERT INTO delegation_records VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [did, from, to, pp, pst, cp, cst, ts, conf, 'run-1'],
     );
   }
 

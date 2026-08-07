@@ -75,6 +75,7 @@ beforeEach(() => {
     intents: [],
     actions: [],
     overview: null,
+    monitoring: null,
     errorMessage: null,
   });
 });
@@ -165,5 +166,46 @@ describe('store — SQLite db data source', () => {
     const s = useAppStore.getState();
     expect(s.appState).toBe('error');
     expect(s.errorMessage).toBeTruthy();
+  });
+
+  test('loadDatabase 派生并写入 monitoring（含 6 视角 health）', async () => {
+    const dbImport = await loadDatabaseFromBytes(new Uint8Array(fixtureBytes()), 'run-42.db');
+    useAppStore.getState().loadDatabase(dbImport);
+
+    const m = useAppStore.getState().monitoring;
+    expect(m).not.toBeNull();
+    expect(m?.sourceLabel).toBe('run-42.db');
+    expect(typeof m?.derivedAtMs).toBe('number');
+    expect(m?.health.topologyDrift.status).toBe('warning'); // fixture 漂移 0.5
+    expect(m?.health.policyCompliance.available).toBe(true);
+    expect(m?.topologyDrift?.frames).toHaveLength(3);
+  });
+
+  test('loadRun 走 db 分支同样写入 monitoring', async () => {
+    vi.mocked(api.getRunDb).mockResolvedValueOnce(fixtureBytes());
+    await useAppStore.getState().loadRun('run-1');
+    expect(useAppStore.getState().monitoring?.sourceLabel).toBe('run-1');
+  });
+
+  test('loadRun API 回退分支置 monitoring 为 null', async () => {
+    vi.mocked(api.getRunDb).mockRejectedValueOnce(new Error('HTTP 404'));
+    vi.mocked(api.getGraph).mockResolvedValueOnce(graph);
+    vi.mocked(api.getAlerts).mockResolvedValueOnce([alert] as never);
+    // 先注入 db，再走 API 回退，验证残留被清空
+    const dbImport = await loadDatabaseFromBytes(new Uint8Array(fixtureBytes()), 'run-42.db');
+    useAppStore.getState().loadDatabase(dbImport);
+    expect(useAppStore.getState().monitoring).not.toBeNull();
+
+    await useAppStore.getState().loadRun('run-1');
+    expect(useAppStore.getState().monitoring).toBeNull();
+  });
+
+  test('db 导入后切 demo 清空 monitoring 防残留', async () => {
+    const dbImport = await loadDatabaseFromBytes(new Uint8Array(fixtureBytes()), 'run-42.db');
+    useAppStore.getState().loadDatabase(dbImport);
+    expect(useAppStore.getState().monitoring).not.toBeNull();
+
+    useAppStore.getState().loadDemo();
+    expect(useAppStore.getState().monitoring).toBeNull();
   });
 });

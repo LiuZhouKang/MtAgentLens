@@ -27,6 +27,8 @@ import type {
   TlsExtract,
 } from './monitoring/monitoring-types';
 import { deriveGraphMetrics } from './graph-metrics';
+import { deriveMonitoringState } from './monitoring/derive-monitoring';
+import type { MonitoringState } from './monitoring/monitoring-types';
 
 /**
  * SQLite (`.db`) import — the counterpart to `snapshot-import.ts` for the
@@ -59,6 +61,8 @@ export type DbImport = {
   intents: Intent[];
   actions: Action[];
   overview: DatasetOverview;
+  /** 运行监控派生结果（Task 3 deriveMonitoringState 产出）。 */
+  monitoring: MonitoringState;
   metrics: GraphMetrics;
   nodeCount: number;
   edgeCount: number;
@@ -824,6 +828,19 @@ export async function loadDatabase(bytes: Uint8Array, fileName: string): Promise
     const counts = extractCountsFromDb(db);
     const resolvedMetrics = metrics ?? deriveGraphMetrics(graph);
 
+    const monitoring = deriveMonitoringState({
+      sourceLabel: label,
+      derivedAtMs: Date.now(),
+      snapshots: extractSnapshotMetricsFromDb(db),
+      alerts,
+      pollution: extractPollutionAggregateFromDb(db),
+      mismatch: extractMismatchAggregateFromDb(db),
+      policy: extractPolicyComplianceFromDb(db),
+      tls: extractTlsSessionAggregateFromDb(db),
+      intents,
+      actions,
+    });
+
     return {
       id: `db:${label}`,
       label,
@@ -835,6 +852,7 @@ export async function loadDatabase(bytes: Uint8Array, fileName: string): Promise
       intents,
       actions,
       overview,
+      monitoring,
       metrics: resolvedMetrics,
       nodeCount: graph.nodes.length,
       edgeCount: graph.edges.length,

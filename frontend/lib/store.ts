@@ -18,6 +18,7 @@ import { loadSampleData } from './load-sample-data';
 import { deriveGraphMetrics } from './graph-metrics';
 import type { SnapshotImport } from './snapshot-import';
 import { loadDatabase as loadDatabaseFromBytes, type DbImport } from './db-import';
+import type { MonitoringState } from './monitoring/monitoring-types';
 import {
   DEFAULT_INVESTIGATION_CONTEXT,
   buildInvestigationContextFromAlert,
@@ -74,6 +75,7 @@ interface AppStore {
   intents: Intent[];
   actions: Action[];
   overview: DatasetOverview | null;
+  monitoring: MonitoringState | null;
   timelinePosition: number;
   investigationContext: InvestigationContext;
   errorMessage: string | null;
@@ -150,6 +152,7 @@ function applySnapshot(
     intents: [],
     actions: [],
     overview: null,
+    monitoring: null,
     dataSource: opts.source,
     activeRunId: null,
     selectedNodeId: null,
@@ -178,6 +181,7 @@ function applyDbImport(
     intents: dbImport.intents,
     actions: dbImport.actions,
     overview: dbImport.overview,
+    monitoring: dbImport.monitoring,
     dataSource: source,
     activeRunId: source.runId ?? null,
     selectedNodeId: null,
@@ -211,6 +215,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   intents: [],
   actions: [],
   overview: null,
+  monitoring: null,
   timelinePosition: 0,
   investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
   errorMessage: null,
@@ -295,6 +300,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         intents: [],
         actions: [],
         overview: null,
+        monitoring: null,
         selectedNodeId: null,
       });
     } catch (error) {
@@ -416,6 +422,7 @@ async function initData() {
         graph: data.graph,
         alerts: leanAlerts,
         graphMetrics: data.metrics,
+        monitoring: null,
         dataSource: { kind: 'sample', label: '样例运行' },
       });
       return;
@@ -430,6 +437,7 @@ async function initData() {
     graph: demoGraph,
     alerts: demoAlerts,
     graphMetrics: deriveGraphMetrics(demoGraph),
+    monitoring: null,
     dataSource: { kind: 'demo', label: '演示数据' },
   });
 }

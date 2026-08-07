@@ -1,20 +1,18 @@
 'use client'
 
-import type { ReactNode } from 'react'
 import type { PerspectiveKey, MonitoringState } from '@/lib/monitoring/monitoring-types'
 import { PERSPECTIVE_META } from './perspective-config'
+import { renderPerspectiveView } from './perspective-views'
 
 type Props = {
   perspectiveKey: PerspectiveKey
   monitoring: MonitoringState
   onBack: () => void
   onFocusAgent: (agentId: string) => void
-  children?: ReactNode
 }
 
 /** 详情工作台统一外壳：面包屑 + 标题/描述 + 摘要统计行 + 视图内容。 */
-// 注：onFocusAgent 本任务未使用（Task 7 视图经 renderPerspectiveView 使用），故不在此解构，仅留在 Props 类型约定里。
-export function PerspectiveDetailShell({ perspectiveKey, monitoring, onBack, children }: Props) {
+export function PerspectiveDetailShell({ perspectiveKey, monitoring, onBack, onFocusAgent }: Props) {
   const meta = PERSPECTIVE_META[perspectiveKey]
   const h = monitoring.health[perspectiveKey]
 
@@ -40,7 +38,7 @@ export function PerspectiveDetailShell({ perspectiveKey, monitoring, onBack, chi
           无此表（旧版数据）——本视角无可用信号
         </div>
       )}
-      {children}
+      {renderPerspectiveView(perspectiveKey, monitoring, onFocusAgent)}
     </div>
   )
 }

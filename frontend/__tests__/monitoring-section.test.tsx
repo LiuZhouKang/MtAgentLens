@@ -49,7 +49,7 @@ afterEach(() => {
 });
 
 describe('MonitoringSection', () => {
-  it('渲染区块头、6 个健康格、实时占位行与 tab', () => {
+  it('渲染区块头、6 视角卡网格、聚合健康横条与 tab', () => {
     useAppStore.setState({ monitoring: makeMonitoring() });
     render(<MonitoringSection />);
     expect(screen.getByText('运行监控')).toBeTruthy();
@@ -61,11 +61,12 @@ describe('MonitoringSection', () => {
       '工具足迹',
       '网络会话',
     ]) {
-      // 每视角出现在健康格 + tab + 卡片各一次
+      // 每视角出现在 tab + 卡片
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
-    expect(screen.getByText(/实时视角 · 阶段二/)).toBeTruthy();
-    expect(screen.getByText('LLM API 追踪')).toBeTruthy();
+    // 聚合健康横条（替代冗余 6 按钮总览条）：总览状态 + 视角可用计数
+    expect(screen.getByText(/总览/)).toBeTruthy();
+    expect(screen.getByText(/视角可用/)).toBeTruthy();
     expect(screen.getByRole('button', { name: '全部' })).toBeTruthy();
   });
 

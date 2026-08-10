@@ -249,7 +249,7 @@ function RustConsole({ lines }: { lines: string[] }) {
 function ObserveConsole({ lines }: { lines: string[] }) {
   return (
     <div className="landing-pipeline__console--observe">
-      {lines.map((l, i) => (
+      {lines.map((l) => (
         <div key={l} className="landing-pipeline__observe-card">
           <span className="landing-pipeline__observe-dot" aria-hidden="true" />
           <span>{l}</span>

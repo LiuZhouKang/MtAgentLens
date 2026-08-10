@@ -6,8 +6,8 @@ import Link from 'next/link';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { MetricCard } from '@/components/ui/linear/metric-card';
 import { SectionPanel } from '@/components/ui/linear/section-panel';
+import { LiveRunningBadge } from '@/components/live/live-running-badge';
 import { StatusBadge, type StatusTone } from '@/components/ui/linear/status-badge';
 import OverviewDatasetPanel from '@/components/overview/dataset-overview-panel';
 import MonitoringSection from '@/components/overview/monitoring/monitoring-section';
@@ -16,6 +16,8 @@ import AgentFamilyTree from '@/components/overview/agent-family-tree';
 import { TrendChart } from '@/components/ui/linear/trend-chart';
 import LoadingScreen from '@/components/ui/loading-screen';
 import NetworkLoading from '@/components/ui/network-loading';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
+import { MetricCard } from '@/components/ui/linear/metric-card';
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
@@ -42,6 +44,11 @@ import {
 } from '@/lib/overview-focus-route';
 import type { GraphData, ResponsibilityAlert } from '@/lib/types';
 import { useRunEvidence } from '@/lib/use-run-evidence';
+import {
+  deriveEvidenceStats,
+  deriveSeverityBreakdown,
+  deriveTopologyTrend,
+} from '@/lib/overview-metrics';
 
 function formatCompactNumber(value: number) {
   if (value >= 1000) {
@@ -90,6 +97,7 @@ export default function OverviewPageClient() {
   const setInvestigationContext = useAppStore((state) => state.setInvestigationContext);
   const overview = useAppStore((state) => state.overview);
   const dbAssets = useAppStore((state) => state.dbAssets);
+  const liveSnapshotFrames = useAppStore((state) => state.liveSnapshotFrames);
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [selectedSigmaNodeId, setSelectedSigmaNodeId] = useState<string | null>(null);
 
@@ -107,15 +115,21 @@ export default function OverviewPageClient() {
 
   const leadCluster = clusterModels[0] ?? null;
   const criticalClusters = clusterModels.filter((model) => model.highestSeverity === 'Critical');
-  const totalBoundaryCrossings = clusterModels.reduce(
-    (sum, model) => sum + model.boundaryCrossingCount,
-    0,
+
+  // ── 真实数据派生（铁律：算不出的诚实空态，不造数）──
+  // 快照帧 = live 实时帧优先，回退 db 导入帧
+  const snapshotFrames = useMemo(
+    () => (liveSnapshotFrames.length > 0 ? liveSnapshotFrames : (dbAssets?.snapshotFrames ?? [])),
+    [liveSnapshotFrames, dbAssets],
   );
-  const totalEvidence = clusterModels.reduce((sum, model) => sum + model.linkedEvidence.length, 0);
-  const _totalDelegations = graph.edges.filter(
-    (edge) => edge.edge_type === 'AgentDelegatesTo',
-  ).length;
-  const totalCriticalAlerts = alerts.filter((alert) => alert.severity === 'Critical').length;
+  const topologyTrend = useMemo(() => deriveTopologyTrend(snapshotFrames), [snapshotFrames]);
+  const severityBreakdown = useMemo(() => deriveSeverityBreakdown(alerts), [alerts]);
+  const evidenceStats = useMemo(() => deriveEvidenceStats(clusterModels), [clusterModels]);
+  // 真实 KPI sparkline：有快照帧时按帧节点/agent 数派生；无帧诚实不画（顶级规范允许
+  // 卡内一个 sparkline，但绝不用伪造曲线）。
+  const nodeSpark = topologyTrend.length > 0 ? topologyTrend.map((p) => p.nodes) : undefined;
+  const agentSpark = topologyTrend.length > 0 ? topologyTrend.map((p) => p.agents) : undefined;
+
   const alertModels = useMemo(
     () =>
       deferredAlerts
@@ -149,52 +163,53 @@ export default function OverviewPageClient() {
     );
   }, [clusterModels, leadCluster, selectedAlert]);
 
+  // KPI stat 卡（顶级规范：大数字 28-32px + 一个对比 + 一个真实 sparkline）。
+  // 与运行监控「丰富健康卡」的区分在于密度：KPI 卡是 stat（干净数字+spark），
+  // 监控卡是 detail（状态色条+评分+趋势+信号），同 chrome、不同层级。
   const graphStats = [
     {
       label: 'Active Agents',
       value: countNodeType(graph, 'Agent'),
-      delta: `+${Math.max(1, criticalClusters.length)}`,
+      delta: `${countNodeType(graph, 'Agent')} 个主体`,
       tone: 'success' as StatusTone,
-      spark: [2, 3, 2, 4, 3, 5, 4, 6],
+      spark: agentSpark,
     },
     {
       label: 'Graph Nodes',
       value: overview ? overview.graph.nodes : graph.nodes.length,
-      delta: overview ? `${overview.graph.edges} edges` : `+${graph.edges.length}`,
+      delta: overview ? `${overview.graph.edges} 条边` : `${graph.edges.length} 条边`,
       tone: 'info' as StatusTone,
-      spark: [18, 22, 20, 26, 24, 30, 28, 34],
+      spark: nodeSpark,
     },
     {
       label: 'Critical Claims',
-      value: overview ? (overview.claims.by_severity.Critical ?? 0) : 0,
-      delta: overview ? `of ${overview.claims.count} claims` : '—',
-      tone: (overview && (overview.claims.by_severity.Critical ?? 0) > 0
-        ? 'danger'
-        : 'info') as StatusTone,
-      spark: [4, 3, 5, 2, 4, 3, 2, 1],
+      value: overview ? (overview.claims.by_severity.Critical ?? 0) : severityBreakdown.critical,
+      delta: overview ? `共 ${overview.claims.count} 声明` : `${alerts.length} 告警`,
+      tone:
+        (overview && (overview.claims.by_severity.Critical ?? 0) > 0) ||
+        severityBreakdown.critical > 0
+          ? ('danger' as StatusTone)
+          : ('info' as StatusTone),
     },
     {
       label: 'Evidence',
-      value: overview ? overview.evidence.count : totalEvidence,
+      value: overview ? overview.evidence.count : evidenceStats.total,
       delta: overview
         ? `L5 ${overview.evidence.by_match_level.L5Substring ?? 0}`
-        : `${totalEvidence} linked`,
+        : `${evidenceStats.total} 条关联`,
       tone: 'success' as StatusTone,
-      spark: [30, 38, 44, 50, 55, 62, 68, 74],
     },
     {
       label: 'Intents',
       value: overview ? overview.intents.count : 0,
-      delta: overview ? `actions ${overview.actions.count}` : '—',
+      delta: overview ? `${overview.actions.count} 动作` : '—',
       tone: 'info' as StatusTone,
-      spark: [10, 14, 12, 18, 16, 22, 20, 26],
     },
     {
       label: 'Critical Alerts',
-      value: totalCriticalAlerts,
-      delta: `↓ ${Math.max(1, alerts.length - totalCriticalAlerts)}`,
-      tone: 'danger' as StatusTone,
-      spark: [4, 3, 5, 2, 4, 3, 2, 1],
+      value: severityBreakdown.critical,
+      delta: `共 ${alerts.length} 告警`,
+      tone: severityBreakdown.critical > 0 ? ('danger' as StatusTone) : ('info' as StatusTone),
     },
   ];
 
@@ -268,27 +283,7 @@ export default function OverviewPageClient() {
     [clusterModels],
   );
 
-  const evidenceBar = useMemo(
-    () =>
-      clusterModels.slice(0, 8).map((m) => ({
-        name: m.clusterId.length > 12 ? `${m.clusterId.slice(0, 12)}…` : m.clusterId,
-        value: m.linkedEvidence.length,
-      })),
-    [clusterModels],
-  );
-
-  const driftArea = useMemo(() => {
-    const points = Array.from({ length: 10 }, (_, i) => {
-      const slice = clusterModels.filter((_, j) => j % 10 === i);
-      const base = slice.reduce((s, m) => s + m.boundaryCrossingCount, 0);
-      const wave = Math.round(Math.sin(i / 1.6) * 2 + base * 0.7);
-      return {
-        name: `T-${9 - i}`,
-        drift: Math.max(0, wave + i * 0.6),
-      };
-    });
-    return points;
-  }, [clusterModels]);
+  // 拓扑演化趋势已由真实快照帧派生（topologyTrend）；伪造的 Math.sin driftArea / 假 Coverage 已移除。
 
   const focusCluster = selectedCluster ?? leadCluster;
 
@@ -324,7 +319,10 @@ export default function OverviewPageClient() {
         delay: 0.4,
       });
 
-      // 3. Chart sections — ScrollTrigger fade-up on scroll
+      // 3. Chart sections — ScrollTrigger fade-up on scroll.
+      // scroller 指向页面自滚动容器（ln-page__inner）：页面在 div 内滚动而非 window，
+      // 默认 scroller 会让下方面板的 once 揭示永不触发（保持 opacity:0 不可见）。
+      const scroller = pageRef.current;
       const chartPanels = gsap.utils.toArray<HTMLElement>('.ln-stage + div > .ln-panel');
       chartPanels.forEach((panel) => {
         gsap.from(panel, {
@@ -332,7 +330,7 @@ export default function OverviewPageClient() {
           y: 20,
           duration: 0.55,
           ease: 'power3.out',
-          scrollTrigger: { trigger: panel, start: 'top 85%', once: true },
+          scrollTrigger: { trigger: panel, start: 'top 85%', once: true, scroller },
         });
       });
 
@@ -344,7 +342,7 @@ export default function OverviewPageClient() {
           y: 16,
           duration: 0.5,
           ease: 'power3.out',
-          scrollTrigger: { trigger: panel, start: 'top 88%', once: true },
+          scrollTrigger: { trigger: panel, start: 'top 88%', once: true, scroller },
         });
       });
 
@@ -356,6 +354,18 @@ export default function OverviewPageClient() {
         });
         card.addEventListener('mouseleave', () => {
           gsap.to(card, { y: 0, duration: 0.3, ease: 'power2.out' });
+        });
+      });
+
+      // 6. 监控/深链分节 — 滚动渐入（scroller = 页面自滚动容器），错峰揭示
+      const belowPanels = gsap.utils.toArray<HTMLElement>('.ln-main > .ln-panel');
+      belowPanels.forEach((panel) => {
+        gsap.from(panel, {
+          opacity: 0,
+          y: 24,
+          duration: 0.55,
+          ease: 'power3.out',
+          scrollTrigger: { trigger: panel, start: 'top 90%', once: true, scroller },
         });
       });
     },
@@ -375,8 +385,12 @@ export default function OverviewPageClient() {
     : null;
 
   return (
-    <div className="ln-page__inner" ref={pageRef}>
-      {/* ── KPI strip (the hero IS the data) ── */}
+    <div className="ln-page__inner" ref={pageRef} style={{ position: 'relative' }}>
+      {/* ── 实时运行徽章（直播中显示，空态不占布局） ── */}
+      <div style={{ position: 'absolute', top: 0, right: 0, zIndex: 5 }}>
+        <LiveRunningBadge />
+      </div>
+      {/* ── KPI stat 卡（大数字 + 真实 sparkline + delta；与监控丰富健康卡同 chrome 不同密度） ── */}
       <div className="ln-kpi-strip" style={{ marginTop: 4 }}>
         {graphStats.map((item) => (
           <MetricCard
@@ -519,77 +533,100 @@ export default function OverviewPageClient() {
               gap: 12,
             }}
           >
+            {/* 拓扑演化趋势 —— 真实快照帧派生；无帧诚实空态（不造曲线） */}
             <SectionPanel
-              eyebrow="Policy Drift"
-              title="边界穿越趋势"
-              meta="7D"
+              eyebrow="Topology"
+              title="拓扑演化趋势"
+              meta={snapshotFrames.length > 0 ? `${snapshotFrames.length} 帧` : '实时' }
               bodyClassName="ln-panel-body"
             >
-              <TrendChart type="area" data={driftArea} xKey="name" seriesKey="drift" height={160} />
-              <div style={{ display: 'flex', gap: 24, marginTop: 12 }}>
-                <div>
-                  <span className="ln-metric__label">Drift Score</span>
-                  <div className="ln-metric__value" style={{ fontSize: 18 }}>
-                    {(totalBoundaryCrossings / Math.max(clusterModels.length, 1) + 0.27).toFixed(2)}
+              {topologyTrend.length >= 2 ? (
+                <>
+                  <TrendChart
+                    type="area"
+                    data={topologyTrend}
+                    xKey="name"
+                    seriesKey="nodes"
+                    height={160}
+                  />
+                  <div style={{ display: 'flex', gap: 24, marginTop: 12 }}>
+                    <div>
+                      <span className="ln-metric__label">节点</span>
+                      <div className="ln-metric__value" style={{ fontSize: 18 }}>
+                        {topologyTrend[topologyTrend.length - 1].nodes}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="ln-metric__label">边</span>
+                      <div className="ln-metric__value" style={{ fontSize: 18 }}>
+                        {topologyTrend[topologyTrend.length - 1].edges}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="ln-metric__label">Δ节点</span>
+                      <div
+                        className="ln-metric__delta"
+                        data-tone={
+                          topologyTrend[topologyTrend.length - 1].nodes -
+                            topologyTrend[0].nodes >=
+                          0
+                            ? 'success'
+                            : 'warning'
+                        }
+                      >
+                        {topologyTrend[topologyTrend.length - 1].nodes -
+                          topologyTrend[0].nodes >=
+                        0
+                          ? '+'
+                          : ''}
+                        {topologyTrend[topologyTrend.length - 1].nodes -
+                          topologyTrend[0].nodes}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <span className="ln-metric__label">Violations</span>
-                  <div className="ln-metric__value" style={{ fontSize: 18 }}>
-                    {totalCriticalAlerts + criticalClusters.length}
-                  </div>
-                </div>
-              </div>
+                </>
+              ) : (
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--ln-text-muted)',
+                    padding: '28px 0',
+                    textAlign: 'center',
+                  }}
+                >
+                  暂无演化帧——直播或导入含快照帧的 run 后展示真实拓扑演化
+                </p>
+              )}
             </SectionPanel>
 
+            {/* 证据分布 —— 真实关联证据按集群 */}
             <SectionPanel
               eyebrow="Evidence"
-              title="证据覆盖"
-              meta="Retention"
+              title="证据分布"
+              meta={`${evidenceStats.total} 条`}
               bodyClassName="ln-panel-body"
             >
               <TrendChart
                 type="bar"
-                data={evidenceBar}
+                data={evidenceStats.byCluster}
                 xKey="name"
                 seriesKey="value"
                 colors={CHART_COLORS}
                 height={160}
               />
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span className="ln-metric__label">Coverage</span>
-                    <span className="ln-metric__delta" data-tone="success">
-                      {Math.min(99.6, 72 + totalEvidence * 4.3).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      height: 4,
-                      borderRadius: 999,
-                      background: 'var(--ln-surface-3)',
-                      marginTop: 6,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: '100%',
-                        width: `${Math.min(99.6, 72 + totalEvidence * 4.3)}%`,
-                        background: 'var(--ln-success)',
-                        borderRadius: 999,
-                      }}
-                    />
-                  </div>
-                </div>
+                <span className="ln-metric__label">关联证据</span>
+                <strong className="ln-metric__value" style={{ fontSize: 18, marginLeft: 'auto' }}>
+                  {evidenceStats.total}
+                </strong>
               </div>
             </SectionPanel>
 
+            {/* 集群分布 —— 真实告警集群 */}
             <SectionPanel
               eyebrow="Clusters"
               title="集群分布"
-              meta={`${clusterModels.length} entries`}
+              meta={`${clusterModels.length} 集群`}
               bodyClassName="ln-panel-body"
             >
               <TrendChart
@@ -600,22 +637,44 @@ export default function OverviewPageClient() {
                 colors={CHART_COLORS}
                 height={160}
               />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
+                <span className="ln-metric__label">严重集群</span>
+                <strong
+                  className="ln-metric__delta"
+                  data-tone={criticalClusters.length > 0 ? 'danger' : 'success'}
+                  style={{ marginLeft: 'auto', fontSize: 13 }}
+                >
+                  {criticalClusters.length}
+                </strong>
+              </div>
             </SectionPanel>
           </div>
           <MonitoringSection />
-          <AgentProcessTree
-            provisionalIdentities={dbAssets?.provisionalIdentities ?? []}
-            agentIdentities={dbAssets?.agentIdentities ?? []}
-            identityProcessMap={dbAssets?.identityProcessMap ?? []}
-            processEvents={dbAssets?.processEvents ?? []}
-            processEventCount={dbAssets?.processEventCount}
-            processEventTruncated={dbAssets?.processEventTruncated}
-          />
-          <AgentFamilyTree subagentBoundaries={dbAssets?.subagentBoundaries ?? []} />
-          {overview && (
-            <div style={{ marginTop: 12 }}>
-              <OverviewDatasetPanel overview={overview} />
+
+          {/* 身份血缘 —— 进程树 + 委派树（折叠分节，默认收起，首屏不信息过载） */}
+          <CollapsibleSection eyebrow="深度调查" title="身份血缘" meta="进程树 · 委派树">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <AgentProcessTree
+                provisionalIdentities={dbAssets?.provisionalIdentities ?? []}
+                agentIdentities={dbAssets?.agentIdentities ?? []}
+                identityProcessMap={dbAssets?.identityProcessMap ?? []}
+                processEvents={dbAssets?.processEvents ?? []}
+                processEventCount={dbAssets?.processEventCount}
+                processEventTruncated={dbAssets?.processEventTruncated}
+              />
+              <AgentFamilyTree subagentBoundaries={dbAssets?.subagentBoundaries ?? []} />
             </div>
+          </CollapsibleSection>
+
+          {/* 数据集概览（折叠分节） */}
+          {overview && (
+            <CollapsibleSection
+              eyebrow="数据资产"
+              title="数据集概览"
+              meta={`${overview.graph.nodes} 节点 · ${overview.graph.edges} 边`}
+            >
+              <OverviewDatasetPanel overview={overview} />
+            </CollapsibleSection>
           )}
         </main>
 

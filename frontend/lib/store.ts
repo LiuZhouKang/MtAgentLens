@@ -7,6 +7,7 @@ import type {
   DatasetOverview,
   GraphData,
   GraphMetrics,
+  GraphSnapshot,
   Intent,
   ResponsibilityAlert,
   ResponsibilityClaim,
@@ -25,6 +26,13 @@ import {
   mergeInvestigationContext,
   type InvestigationContext,
 } from './investigation-context';
+import {
+  DEFAULT_LIVE_STATE,
+  type LiveConnectionStatus,
+  type LiveRunMeta,
+  type LiveState,
+  type LiveStats,
+} from './live/live-types';
 
 interface EngineAPI {
   setVisualizationMode(mode: 'globe' | 'graph3d' | 'graph2d' | 'map' | 'hero' | 'focus'): void;
@@ -113,6 +121,18 @@ interface AppStore {
   loadDatabase: (dbImport: DbImport) => void;
   onAlertReceived: (alert: ResponsibilityAlert) => void;
   onRunActiveChanged: (active: boolean) => void;
+  /** 实时层切片（LiveSession 驱动；高频原始事件不入 store，走 LiveSession 缓冲）。 */
+  live: LiveState;
+  setLiveStatus: (status: LiveConnectionStatus) => void;
+  setLiveRun: (run: LiveRunMeta) => void;
+  setLiveStats: (patch: Partial<LiveStats>) => void;
+  /** run 结束：live 态转回 replay（LiveSession 检测 active→null 时调用）。 */
+  markRunEnded: () => void;
+  /** 运行监控派生结果（直播中周期重派生覆盖；导入/回放时 db 派生写入）。 */
+  setMonitoring: (monitoring: MonitoringState | null) => void;
+  /** 图时间演化实时帧（直播中由 LiveSession 周期拉取 append；db 导入时用 dbAssets.snapshotFrames）。 */
+  liveSnapshotFrames: GraphSnapshot[];
+  setLiveSnapshotFrames: (frames: GraphSnapshot[]) => void;
 }
 
 // ── Live-stream coalescing ──
@@ -132,7 +152,12 @@ function flushAlertBuffer(get: () => AppStore, set: (partial: Partial<AppStore>)
   const existing = new Set(state.alerts.map((a) => a.alert_id));
   const fresh = batch.filter((a) => !existing.has(a.alert_id));
   if (fresh.length === 0) return;
-  set({ alerts: [...fresh, ...state.alerts].slice(0, 200) });
+  // LOW-8：同帧突发多告警时按时间降序前插，最新置顶（前端 list 约定最新在前）
+  const sorted = [...fresh].sort((a, b) => b.timestamp_ns - a.timestamp_ns);
+  // 剥离 graph_snapshot 后再入 alerts——图已同步应用到 graph（onAlertReceived），
+  // 驻留完整图快照浪费内存（审查 LOW-10），与 db 导入路径一致。
+  const lean = sorted.map(({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest);
+  set({ alerts: [...lean, ...state.alerts].slice(0, 200) });
   fresh.forEach((a) => state.engineRef.current?.showAlertPulse(a));
 }
 
@@ -165,6 +190,7 @@ function applySnapshot(
     selectedNodeId: null,
     appState: 'replay',
     errorMessage: null,
+    liveSnapshotFrames: [], // 直播帧仅在 live 会话期间有效
   });
 }
 
@@ -198,6 +224,8 @@ function applyDbImport(
     selectedNodeId: null,
     appState: 'replay',
     errorMessage: null,
+    // 直播帧随 run 结束/导入清空，防陈旧帧遮蔽导入的时间演化帧（审查 MEDIUM-3）
+    liveSnapshotFrames: [],
   });
 }
 
@@ -233,6 +261,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
   errorMessage: null,
   engineRef: { current: null },
+  live: DEFAULT_LIVE_STATE,
 
   setAppState: (s) => set({ appState: s }),
   setActiveRunId: (runId) => set({ activeRunId: runId }),
@@ -323,11 +352,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
         dbAssets: null,
         snapshotFrameIndex: 0,
         selectedNodeId: null,
+        liveSnapshotFrames: [],
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       // 数据源不可用也清空 monitoring，防错误态残留上一次导入的运行监控信号
-      set({ errorMessage: message, appState: 'error', monitoring: null });
+      set({ errorMessage: message, appState: 'error', monitoring: null, liveSnapshotFrames: [] });
     }
   },
 
@@ -372,6 +402,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       selectedNodeId: null,
       appState: 'replay',
       errorMessage: null,
+      // MEDIUM-3：样例加载同样清空直播帧（此前唯一漏清的 loader，陈旧帧遮蔽样例图）
+      liveSnapshotFrames: [],
     });
   },
   loadDemo: () => {
@@ -424,9 +456,35 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
   },
   onRunActiveChanged: (active) => {
-    if (!active && get().appState === 'live') {
-      set({ appState: 'replay' });
-    }
+    // 活跃 run 进入实时态（徽章/事件流自动打开依赖 appState==='live'）
+    if (active && get().appState !== 'live') set({ appState: 'live' });
+    if (!active && get().appState === 'live') set({ appState: 'replay' });
+  },
+  setLiveStatus: (status) => set((s) => ({ live: { ...s.live, status } })),
+  setLiveRun: (run) => set((s) => ({ live: { ...s.live, run } })),
+  setLiveStats: (patch) =>
+    set((s) => ({ live: { ...s.live, stats: { ...s.live.stats, ...patch } } })),
+  markRunEnded: () => {
+    if (get().appState === 'live') set({ appState: 'replay' });
+  },
+  setMonitoring: (monitoring) => set({ monitoring }),
+  liveSnapshotFrames: [],
+  setLiveSnapshotFrames: (frames) => {
+    // 按 snapshot_id 去重 + 时间正序合并；默认指向最新帧（时间轴直播推进）。
+    // 容量封顶 200 帧——长直播防无界内存（审查 MEDIUM-3）。
+    const seen = new Set<string>();
+    const merged = [...get().liveSnapshotFrames, ...frames].filter((f) => {
+      if (seen.has(f.snapshot_id)) return false;
+      seen.add(f.snapshot_id);
+      return true;
+    });
+    const capped = merged.slice(-200);
+    // LOW-5：无新帧（合并后数量不变）时不重置 index——不覆盖用户手动拖动的时间轴位置
+    const added = capped.length !== get().liveSnapshotFrames.length;
+    set({
+      liveSnapshotFrames: capped,
+      ...(added ? { snapshotFrameIndex: Math.max(0, capped.length - 1) } : {}),
+    });
   },
 }));
 

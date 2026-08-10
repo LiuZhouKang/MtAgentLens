@@ -37,15 +37,3 @@ export const PERSPECTIVE_ORDER: PerspectiveKey[] = [
   'toolFootprint',
   'networkSessions',
 ];
-
-/** 阶段二实时视角（SSE 占位）——静态文案，不接入数据。 */
-export const PHASE2_PILLS = [
-  'LLM API 追踪',
-  'LLM API 异常',
-  '数据外泄',
-  'Agent 循环',
-  '会话健康（实时五维）',
-  'SSE 内容扫描',
-  '去重诊断',
-  '分析器流水线',
-];

@@ -8,6 +8,7 @@ import InvestigationWorkbench from './investigation-workbench';
 import AlertEmptyState from './alert-empty-state';
 import WhyAttribution, { WhyFacetEmptyState } from './why-attribution';
 import LoadingIndicator from '@/components/ui/loading-indicator';
+import { LiveRunningBadge } from '@/components/live/live-running-badge';
 import { useAppStore } from '@/lib/store';
 import { useAlertModels } from '@/lib/use-alert-models';
 import {
@@ -120,8 +121,11 @@ export default function InvestigationsPageClient() {
     <div
       className="ln-page__inner"
       ref={pageRef}
-      style={{ maxWidth: 1300, margin: '0 auto', padding: '12px 14px' }}
+      style={{ maxWidth: 1300, margin: '0 auto', padding: '12px 14px', position: 'relative' }}
     >
+      <div style={{ position: 'absolute', top: 10, right: 12, zIndex: 5 }}>
+        <LiveRunningBadge />
+      </div>
       <div style={{ marginBottom: 12 }}>
         <WhyAttribution
           why={why}

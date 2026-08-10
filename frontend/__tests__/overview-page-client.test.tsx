@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import OverviewPageClient from '@/components/overview/overview-page-client';
 import { useAppStore } from '@/lib/store';
@@ -63,8 +63,12 @@ describe('OverviewPageClient', () => {
   });
 
   it('dbAssets 为空时进程谱系面板显示空态而非报错', () => {
-    // 前提：store 未导入 db（dbAssets=null）→ 进程谱系/委派树显示空态而非伪造
+    // 前提：store 未导入 db（dbAssets=null）→ 进程谱系/委派树显示空态而非伪造。
+    // 身份血缘现为折叠分节（默认收起）——先展开再断言内部空态。
     render(<OverviewPageClient />, { wrapper: createWrapper() });
+
+    expect(screen.getByText('身份血缘')).toBeTruthy();
+    fireEvent.click(screen.getByText('身份血缘'));
 
     expect(screen.getByText(/进程谱系/i)).toBeTruthy();
     expect(screen.getByText(/导入含进程表的 \.db 后此处有数据/i)).toBeTruthy();
@@ -101,6 +105,8 @@ describe('OverviewPageClient', () => {
       },
     });
     render(<OverviewPageClient />, { wrapper: createWrapper() });
+    // 数据集概览为折叠分节（默认收起）——先展开再断言
+    fireEvent.click(screen.getByText('数据集概览'));
     expect(screen.getByText('数据源详情')).toBeDefined();
   });
 });

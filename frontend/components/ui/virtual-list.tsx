@@ -1,5 +1,5 @@
 'use client';
-import { useRef, type ReactNode } from 'react';
+import { useRef, type ReactNode, type RefObject } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
 /**
@@ -9,7 +9,8 @@ import { useVirtualizer } from '@tanstack/react-virtual';
  * timeline steps / alerts / evidence rows never create thousands of DOM nodes.
  */
 type Props<T> = {
-  items: T[];
+  /** 只读数组亦可（uSES 快照天然 readonly）。 */
+  items: readonly T[];
   estimateSize?: number;
   overscan?: number;
   /** True when rows have variable heights — enables per-row measurement. */
@@ -19,6 +20,8 @@ type Props<T> = {
   emptyLabel?: string;
   /** 近底增量加载等场景：滚动容器事件（VirtualList 内部滚动 div）。 */
   onScroll?: (e: React.UIEvent<HTMLDivElement>) => void;
+  /** 外部访问滚动容器（live-tail 自动跟随等场景）。 */
+  scrollRef?: RefObject<HTMLDivElement | null>;
 };
 
 export default function VirtualList<T>({
@@ -30,6 +33,7 @@ export default function VirtualList<T>({
   className,
   emptyLabel = '暂无数据',
   onScroll,
+  scrollRef,
 }: Props<T>) {
   const ref = useRef<HTMLDivElement>(null);
   // TanStack Virtual's `useVirtualizer` returns functions that can't be memoized
@@ -60,7 +64,10 @@ export default function VirtualList<T>({
 
   return (
     <div
-      ref={ref}
+      ref={(el) => {
+        ref.current = el;
+        if (scrollRef) scrollRef.current = el;
+      }}
       className={className}
       onScroll={onScroll}
       style={{ overflow: 'auto', height: '100%' }}

@@ -11,6 +11,9 @@ import type {
 
 const BASE = '';
 
+/** 统一实时 SSE 端点（后端 record/trace 直播流：告警 + 原始事件 + 心跳）。 */
+export const LIVE_EVENTS_URL = '/api/live/events';
+
 // Bounded fetch — a dead or slow backend must never hang the dashboard's data
 // loading indefinitely. On timeout it throws and callers (store.initData) fall
 // back to the bundled sample data.
@@ -74,6 +77,9 @@ export const api = {
   getRunDb: (id: string) => fetchBuffer(`/api/runs/${id}/db`, 30_000),
 
   getAlerts: (id: string) => fetchJson<ResponsibilityAlert[]>(`/api/runs/${id}/alerts?lean=1`),
+
+  /** 全量告警（含 graph_snapshot）——实时模式断线重连的快照 resync 用。 */
+  getAlertsFull: (id: string) => fetchJson<ResponsibilityAlert[]>(`/api/runs/${id}/alerts`),
 
   getEvidence: (id: string) =>
     fetchJson<{

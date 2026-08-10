@@ -14,11 +14,14 @@ use crate::responsibility::claims::accountability_evidence::accountability_evide
 use crate::responsibility::evidence::{CorrelationEvidence, root_cause};
 use crate::responsibility::graph::graph_simplifier;
 use crate::responsibility::persistence::schema::open_db_read_only;
+use crate::responsibility::types::alert_types::ResponsibilityAlert;
 use crate::server::api_types::{
     HEALTH_SCHEMA_VERSION, HealthResponse, HealthStatus, StageMetricsSnapshot,
 };
 use crate::server::assets::FrontendAssets;
-use http_body_util::Full;
+use http_body_util::combinators::BoxBody;
+use http_body_util::{BodyExt, Full, StreamBody};
+use hyper::body::Frame;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode, body::Bytes};
@@ -64,6 +67,9 @@ pub struct WebServer {
     assets: Arc<FrontendAssets>,
     event_sender: broadcast::Sender<Event>,
     log_file: Option<String>,
+    /// 责任告警广播发送端（record/trace 实时流接入）；None 时 `/api/live/events`
+    /// 只推原始事件。每个 SSE 连接独立 subscribe。
+    alert_sender: Option<broadcast::Sender<ResponsibilityAlert>>,
     /// Shared health state for GET /health, /live, /ready probes.
     /// In Phase A/B, this is populated with stage metrics but the pipeline
     /// orchestrator integration comes in Phase C.
@@ -75,12 +81,23 @@ impl WebServer {
         event_sender: broadcast::Sender<Event>,
         log_file: Option<&str>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        Self::with_channels(event_sender, log_file, None, None)
+    }
+
+    /// 创建带责任告警通道的 WebServer（record/trace 实时流）。
+    pub fn with_channels(
+        event_sender: broadcast::Sender<Event>,
+        log_file: Option<&str>,
+        alert_sender: Option<broadcast::Sender<ResponsibilityAlert>>,
+        health_state: Option<Arc<Mutex<HealthState>>>,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let assets = FrontendAssets::new()?;
         Ok(Self {
             assets: Arc::new(assets),
             event_sender,
             log_file: log_file.map(|s| s.to_string()),
-            health_state: None,
+            alert_sender,
+            health_state,
         })
     }
 
@@ -94,13 +111,7 @@ impl WebServer {
         log_file: Option<&str>,
         health_state: Arc<Mutex<HealthState>>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let assets = FrontendAssets::new()?;
-        Ok(Self {
-            assets: Arc::new(assets),
-            event_sender,
-            log_file: log_file.map(|s| s.to_string()),
-            health_state: Some(health_state),
-        })
+        Self::with_channels(event_sender, log_file, None, Some(health_state))
     }
 
     pub async fn start(
@@ -126,6 +137,7 @@ impl WebServer {
         }
 
         let health_state = self.health_state.clone();
+        let alert_sender = self.alert_sender.clone();
 
         loop {
             let (stream, _) = listener
@@ -136,17 +148,28 @@ impl WebServer {
             let event_sender = self.event_sender.clone();
             let log_file = self.log_file.clone();
             let hs = health_state.clone();
+            let alert_sender = alert_sender.clone();
 
             tokio::spawn(async move {
                 let io = TokioIo::new(stream);
                 let service = service_fn(move |req| {
-                    handle_request(
-                        req,
-                        assets.clone(),
-                        event_sender.clone(),
-                        log_file.clone(),
-                        hs.clone(),
-                    )
+                    // 实时 SSE 走独立的流式服务；其余请求保持原样（Full body 收口 boxed）。
+                    // service_fn 是 FnMut，必须在闭包内 clone 捕获值，再移入 async 块。
+                    let is_live_events = req.uri().path() == "/api/live/events";
+                    let assets = assets.clone();
+                    let event_sender = event_sender.clone();
+                    let log_file = log_file.clone();
+                    let hs = hs.clone();
+                    let alert_sender = alert_sender.clone();
+                    async move {
+                        if is_live_events {
+                            serve_live_events_api(event_sender, alert_sender).await
+                        } else {
+                            handle_request(req, assets, event_sender, log_file, hs)
+                                .await
+                                .map(boxed_full)
+                        }
+                    }
                 });
 
                 if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
@@ -155,6 +178,49 @@ impl WebServer {
             });
         }
     }
+}
+
+/// 把 `Full<Bytes>` 响应包装为 `BoxBody<Bytes, hyper::Error>`。
+///
+/// 统一 service_fn 的响应体类型，使常规 REST（Full）与实时 SSE（流式）共存于同一连接。
+fn boxed_full(resp: Response<Full<Bytes>>) -> Response<BoxBody<Bytes, hyper::Error>> {
+    let (parts, body) = resp.into_parts();
+    let boxed = BodyExt::boxed(body.map_err(|never: std::convert::Infallible| match never {}));
+    Response::from_parts(parts, boxed)
+}
+
+/// GET /api/live/events — 统一实时 SSE：原始事件 + 可选责任告警 + 30s 心跳。
+///
+/// 直播（record/trace）中后端把 alert_tx（责任告警，含图快照）与 event_sender
+/// （原始框架事件）实时推送前端。legacy `/api/events` 保持日志回放语义不动。
+async fn serve_live_events_api(
+    event_sender: broadcast::Sender<Event>,
+    alert_sender: Option<broadcast::Sender<ResponsibilityAlert>>,
+) -> std::result::Result<Response<BoxBody<Bytes, hyper::Error>>, Infallible> {
+    use tokio_stream::StreamExt as _;
+
+    let stream = crate::server::live_sse::live_event_stream(
+        event_sender.subscribe(),
+        alert_sender.map(|s| s.subscribe()),
+    )
+    .map(|e| {
+        let text = e.to_frame();
+        let payload = format!("{text}\n");
+        Ok::<Frame<Bytes>, hyper::Error>(Frame::data(Bytes::from(payload)))
+    });
+
+    let body = BodyExt::boxed(StreamBody::new(stream));
+
+    let mut resp = Response::builder()
+        .status(hyper::StatusCode::OK)
+        .header(hyper::header::CONTENT_TYPE, "text/event-stream")
+        .header("cache-control", "no-cache")
+        .header("x-accel-buffering", "no")
+        .body(body)
+        .unwrap();
+    // 安全：实时流含解密明文，绝不加 `Access-Control-Allow-Origin: *`——
+    // 前端同源嵌入访问无需 CORS；`*` 会让任意恶意网页经 CORS 读取明文（审查 HIGH-2）。
+    Ok(resp)
 }
 
 async fn handle_request(
@@ -188,9 +254,10 @@ async fn handle_request(
         if path == "/api/runs/active" {
             let response = match resolve_active_run_dir() {
                 Ok(Some((run_id, run_dir))) => serve_run_summary_api(&run_dir, &run_id).await,
-                Ok(None) => Ok(not_found_json(
-                    serde_json::json!({ "code": "no_active_run" }),
-                )),
+                // 无活跃 run 返回 200 {data:null}（而非 404）——前端 fetchJson 解析为
+                // null，LiveSession 据此判定「run 结束」转回放。404 会被 fetchJson 抛错，
+                // 导致生命周期死路径（审查 HIGH-1）。
+                Ok(None) => Ok(json_response(serde_json::json!({ "data": null }))),
                 Err(err) => Ok(internal_error_json(format!(
                     "failed to resolve active run: {err}"
                 ))),
@@ -3580,9 +3647,9 @@ mod tests {
     use super::{
         handle_request, match_run_route, resolve_responsibility_db_path, resolve_run_dir,
         serve_alerts_api, serve_correlation_evidence_api, serve_events_api,
-        serve_run_agent_snapshot_chain_api, serve_run_agent_snapshots_api, serve_run_db_api,
-        serve_run_evaluation_api, serve_run_events_api, serve_run_graph_analysis_api,
-        serve_run_snapshot_by_id_api, serve_run_snapshot_chain_api,
+        serve_live_events_api, serve_run_agent_snapshot_chain_api, serve_run_agent_snapshots_api,
+        serve_run_db_api, serve_run_evaluation_api, serve_run_events_api,
+        serve_run_graph_analysis_api, serve_run_snapshot_by_id_api, serve_run_snapshot_chain_api,
         serve_run_snapshot_cross_diff_api, serve_run_snapshot_diff_api, serve_run_snapshots_api,
         serve_run_summary_api, serve_runs_index_api,
     };
@@ -3598,6 +3665,56 @@ mod tests {
     use tempfile::{NamedTempFile, TempDir};
     use tokio::io::duplex;
     use tokio::sync::broadcast;
+
+    #[tokio::test]
+    async fn serve_live_events_api_streams_raw_event_frames() {
+        use crate::framework::core::Event;
+        // http_body::Body 经 hyper::body::Body re-export
+        use hyper::body::Body as _;
+
+        let (event_tx, _event_rx) = broadcast::channel::<Event>(16);
+        let (alert_tx, _alert_rx) =
+            broadcast::channel::<crate::responsibility::types::alert_types::ResponsibilityAlert>(
+                16,
+            );
+        let resp = serve_live_events_api(event_tx.clone(), Some(alert_tx)).await.unwrap();
+
+        // SSE 响应头：text/event-stream + 禁缓冲；绝不带 `*` CORS（明文泄漏向量）
+        assert_eq!(
+            resp.headers().get(hyper::header::CONTENT_TYPE).unwrap(),
+            "text/event-stream"
+        );
+        assert_eq!(resp.headers().get("x-accel-buffering").unwrap(), "no");
+        assert!(resp.headers().get("Access-Control-Allow-Origin").is_none());
+
+        // subscribe 之后发送原始事件 → 流应承载 `event: event` 帧
+        // （心跳首 tick 立即触发，故读若干帧直到命中原始事件）
+        event_tx
+            .send(Event::new_with_timestamp(
+                1,
+                "tls_capture".into(),
+                8120,
+                "claude".into(),
+                serde_json::json!({ "len": 1200 }),
+            ))
+            .unwrap();
+
+        let mut body = resp.into_body();
+        let mut found_raw = false;
+        for _ in 0..10 {
+            if let Some(Ok(frame)) = body.frame().await {
+                if let Ok(bytes) = frame.into_data() {
+                    let text = String::from_utf8(bytes.to_vec()).unwrap_or_default();
+                    if text.contains("event: event") {
+                        assert!(text.contains("\"source\":\"tls_capture\""));
+                        found_raw = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assert!(found_raw, "应能从 /api/live/events 读到原始事件帧");
+    }
 
     #[tokio::test]
     async fn serve_events_api_marks_log_backed_responses_as_legacy_and_non_authoritative() {
@@ -4122,16 +4239,11 @@ mod tests {
         let _guard = fixture.enter_repo_root();
 
         let response = issue_get("/api/runs/active").await;
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
-        assert_eq!(
-            response.headers().get("content-type").unwrap(),
-            "application/json"
-        );
+        // 契约：无活跃 run → 200 {data:null}（前端据此判定 run 结束，转回放）
+        assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
             read_json_body(response).await,
-            json!({
-                "code": "no_active_run"
-            })
+            json!({ "data": null })
         );
     }
 

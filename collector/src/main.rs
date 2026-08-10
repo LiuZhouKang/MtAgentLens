@@ -831,6 +831,7 @@ async fn run_raw_ssl(
         server_port,
         Some(log_file),
         event_sender.clone(),
+        None,
     )
     .await
     .map_err(|e| RunnerError::from(format!("Failed to start server: {}", e)))?;
@@ -905,6 +906,7 @@ async fn run_raw_process(
         server_port,
         Some(log_file),
         event_sender.clone(),
+        None,
     )
     .await
     .map_err(|e| RunnerError::from(format!("Failed to start server: {}", e)))?;
@@ -1004,6 +1006,7 @@ async fn run_raw_stdio(
         server_port,
         Some(log_file),
         event_sender.clone(),
+        None,
     )
     .await
     .map_err(|e| RunnerError::from(format!("Failed to start server: {}", e)))?;
@@ -1326,8 +1329,9 @@ async fn run_trace(
     };
     runtime_config.classifier = classifier;
 
+    // 克隆给 runtime（广播发送端）；原 alert_tx 供实时 SSE 服务器使用。
     let runtime =
-        ResponsibilityRuntime::new(runtime_config, persistence_writer, alert_tx, observer);
+        ResponsibilityRuntime::new(runtime_config, persistence_writer, alert_tx.clone(), observer);
     agent = agent.add_global_analyzer(Box::new(runtime));
     println!("✓ Responsibility runtime enabled (Phase 1 streaming + Phase 2 batch)");
 
@@ -1389,6 +1393,7 @@ async fn run_trace(
         server_port,
         Some(log_file),
         event_sender.clone(),
+        Some(alert_tx.clone()),
     )
     .await
     .map_err(|e| RunnerError::from(format!("Failed to start server: {}", e)))?;
@@ -1492,6 +1497,7 @@ async fn run_system(
         server_port,
         Some(log_file),
         event_sender.clone(),
+        None,
     )
     .await
     .map_err(|e| RunnerError::from(format!("Failed to start server: {}", e)))?;
@@ -1526,6 +1532,7 @@ async fn start_web_server_if_enabled(
     port: u16,
     log_file: Option<&str>,
     event_sender: broadcast::Sender<crate::framework::core::Event>,
+    alert_tx: Option<broadcast::Sender<crate::responsibility::types::alert_types::ResponsibilityAlert>>,
 ) -> Result<Option<tokio::task::JoinHandle<()>>, Box<dyn std::error::Error>> {
     if !enable_server {
         return Ok(None);
@@ -1535,7 +1542,8 @@ async fn start_web_server_if_enabled(
         .parse()
         .map_err(|e| format!("Invalid server address: {}", e))?;
 
-    let web_server = WebServer::new(event_sender, log_file)
+    // alert_tx：record/trace 实时责任告警通道；None 时 `/api/live/events` 只推原始事件。
+    let web_server = WebServer::with_channels(event_sender, log_file, alert_tx, None)
         .map_err(|e| format!("Failed to create web server: {}", e))?;
 
     println!("🌐 Starting web server on http://{}", addr);

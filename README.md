@@ -188,10 +188,13 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |  /traces     追踪 · trace workbench and replay timeline           |
   |  (agent/cluster deep links land on /overview#agentId=/#clusterId=) |
   |  db 深链四件套 · 取证链 / 身份血缘 / 原始事件流 / 图时间演化        |
-  |  /api/events legacy log-backed event stream                      |
+  |  /api/live/events  统一实时 SSE（告警 + 原始事件 + 心跳，record 直播）|
   |  /api/runs/{id}/{alerts,correlation-evidence,events,diff,...}    |
+  |  /api/events legacy log-backed event stream（已废弃）              |
   +-----------------------------------------------------------------+
 ```
+
+**实时模式**：`record`/`trace` 直播中，前端自动跟随活跃 run——SSE 推送告警（含图快照 → 态势图实时演化）与原始事件（环形缓冲 + 虚拟化 live-tail），运行监控派生视角与图时间演化时间轴周期刷新；run 结束自动转回放深度调查。后端由 `start_web_server_if_enabled` 把 `alert_tx` 接入 `/api/live/events`（`server/live_sse.rs`）。
 
 ---
 

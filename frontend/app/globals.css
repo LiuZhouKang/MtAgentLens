@@ -25350,7 +25350,7 @@ html:not(.dark) .investigation-empty-shell {
 }
 
 .ln-metric__value {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 600;
   letter-spacing: -0.03em;
   color: var(--ln-text);
@@ -25527,6 +25527,13 @@ html:not(.dark) .investigation-empty-shell {
   max-width: 1400px;
   margin: 0 auto;
   padding: 20px;
+  /* 主页面自滚动容器（同 Landing 的 .landing-root 模式）：
+     html/body/#app-main overflow:hidden 使文档不可滚，页面自身定高 overflow 才能滚动。
+     此前缺失此层 → 仪表盘/追踪/告警页内容超出视口被裁剪、无法下滑（审查发现的全局 bug）。 */
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 
 .ln-grid {

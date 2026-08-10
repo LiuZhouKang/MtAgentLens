@@ -18,6 +18,8 @@ import { CommandPalette } from '@/components/system/command-palette';
 import RunSelector from '@/components/system/run-selector';
 import LoadingIndicator from '@/components/ui/loading-indicator';
 import LoadingScreen from '@/components/ui/loading-screen';
+import { LiveSessionMount } from '@/components/live/live-session-mount';
+import { LiveStatusBar } from '@/components/live/live-status-bar';
 import { MtlLogo } from '@/components/ui/mtl-logo';
 import { useAlertModels } from '@/lib/use-alert-models';
 import { useAppStore } from '@/lib/store';
@@ -55,6 +57,7 @@ function PageTab({ href, label, active }: { href: string; label: string; active:
   return (
     <Link
       href={href}
+      aria-current={active ? 'page' : undefined}
       style={{
         padding: '3px 10px',
         borderRadius: 5,
@@ -256,6 +259,8 @@ function MainShell({ children }: { children: React.ReactNode }) {
       className="linear-root ln-page"
       style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}
     >
+      {/* 实时会话常驻挂载（渲染 null）：轮询活跃 run + 连接实时 SSE */}
+      <LiveSessionMount />
       {/* Top bar — brand logo + page tabs + ⌘K */}
       <div
         style={{
@@ -300,9 +305,12 @@ function MainShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
+        <LiveStatusBar />
         <RunSelector />
         <button
           type="button"
+          aria-label="打开命令面板 (Ctrl+K)"
+          title="打开命令面板 (Ctrl+K)"
           onClick={() => setPaletteOpen(true)}
           style={{
             padding: '0 5px',

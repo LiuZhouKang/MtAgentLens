@@ -6,6 +6,8 @@ import gsap from 'gsap';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import LoadingIndicator from '@/components/ui/loading-indicator';
+import { LiveEventTail } from '@/components/live/live-event-tail';
+import { LiveRunningBadge } from '@/components/live/live-running-badge';
 import {
   ArrowRight,
   CheckCircle2,
@@ -251,7 +253,11 @@ function SpanRow({
         aria-expanded={expanded}
         onClick={onToggle}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') onToggle();
+          // WAI-ARIA 按钮：Enter + Space 均可激活（审查 H2）
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+            e.preventDefault();
+            onToggle();
+          }
         }}
         style={{
           display: 'flex',
@@ -661,6 +667,7 @@ function SpanRow({
 export default function TracesPageClient() {
   const sp = useSearchParams();
   const storeAlerts = useAppStore((s) => s.alerts);
+  const isLive = useAppStore((s) => s.appState === 'live');
   const { selectedValue: routeAlertId, setRouteValue: setHashAlertId } = useHashRouteState({
     searchParams: sp,
     parseValue: parseTraceAlertId,
@@ -837,8 +844,17 @@ export default function TracesPageClient() {
     <div
       className="ln-page__inner"
       ref={pageRef}
-      style={{ maxWidth: 1500, margin: '0 auto', padding: `${S.lg}px ${S.sm + 6}px` }}
+      style={{ maxWidth: 1500, margin: '0 auto', padding: `${S.lg}px ${S.sm + 6}px`, position: 'relative' }}
     >
+      <div style={{ position: 'absolute', top: S.sm, right: S.sm, zIndex: 5 }}>
+        <LiveRunningBadge />
+      </div>
+      {/* 实时原始事件流入口（直播中自动跟随） */}
+      {isLive && (
+        <div style={{ height: 220, marginBottom: S.lg, overflow: 'hidden' }}>
+          <LiveEventTail />
+        </div>
+      )}
       <div className="ln-kpi-strip" style={{ marginBottom: S.lg }}>
         {kpi.map((i) => (
           <div key={i.label} className="ln-panel ln-metric">
@@ -919,6 +935,9 @@ export default function TracesPageClient() {
           {Array.from(new Set(spansWithDepth.map((s) => s.groupActor))).map((actor) => (
             <div key={actor} style={{ fontSize: T.xs }}>
               <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={treeExp.has(actor)}
                 onClick={() =>
                   setTreeExp((p) => {
                     const n = new Set(p);
@@ -927,6 +946,17 @@ export default function TracesPageClient() {
                     return n;
                   })
                 }
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                    e.preventDefault();
+                    setTreeExp((p) => {
+                      const n = new Set(p);
+                      if (n.has(actor)) n.delete(actor);
+                      else n.add(actor);
+                      return n;
+                    });
+                  }
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

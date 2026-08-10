@@ -8,6 +8,7 @@
 
 pub mod api_types;
 pub mod assets;
+pub mod live_sse;
 pub mod web;
 
 // #[cfg(test)]

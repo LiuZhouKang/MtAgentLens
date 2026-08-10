@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
 import { useAppStore } from '@/lib/store';
 import type {
   PerspectiveKey,
@@ -9,7 +11,7 @@ import type {
 } from '@/lib/monitoring/monitoring-types';
 import { SectionPanel } from '@/components/ui/linear/section-panel';
 import { StatusBadge } from '@/components/ui/linear/status-badge';
-import { PERSPECTIVE_META, PERSPECTIVE_ORDER, PHASE2_PILLS } from './perspective-config';
+import { PERSPECTIVE_META, PERSPECTIVE_ORDER } from './perspective-config';
 import { MonitoringCard } from './monitoring-card';
 import { PerspectiveDetailShell } from './perspective-detail-shell';
 
@@ -33,14 +35,45 @@ const STATUS_LABEL: Record<MonitoringStatus, string> = {
   normal: '正常',
 };
 
+const HEALTH_CHIP: Record<MonitoringStatus, string> = {
+  critical: '#f87171',
+  warning: '#fbbf24',
+  normal: '#4ade80',
+};
+
 export default function MonitoringSection() {
   const monitoring = useAppStore((s) => s.monitoring);
   const [selected, setSelected] = useState<PerspectiveKey | null>(null);
   const [focusHint, setFocusHint] = useState<string | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  // 卡片错峰入场（顶级滚动/入场动效）；切视角重排时重新揭示
+  useGSAP(
+    () => {
+      const cards = gridRef.current?.querySelectorAll('.monitoring-card');
+      if (!cards || cards.length === 0) return;
+      gsap.from(cards, {
+        opacity: 0,
+        y: 18,
+        duration: 0.5,
+        stagger: 0.06,
+        ease: 'power3.out',
+        delay: 0.08,
+        clearProps: 'transform',
+      });
+    },
+    { scope: gridRef, dependencies: [monitoring, selected] },
+  );
 
   if (!monitoring) return null;
 
   const overall = aggregateHealth(monitoring.health);
+  const counts = { critical: 0, warning: 0, normal: 0 };
+  for (const key of PERSPECTIVE_ORDER) {
+    const h = monitoring.health[key];
+    if (h && h.available) counts[h.status] += 1;
+  }
+  const availableCount = counts.critical + counts.warning + counts.normal;
   const timeStr =
     monitoring.derivedAtMs > 0
       ? new Date(monitoring.derivedAtMs).toLocaleTimeString('zh-CN', {
@@ -67,157 +100,103 @@ export default function MonitoringSection() {
       meta={`${monitoring.sourceLabel}${timeStr ? ` · ${timeStr}` : ''}`}
       bodyClassName="ln-panel-body"
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+      {/* 聚合健康横条（替代冗余的 6 按钮总览条）：总览状态 + 严重/关注/正常计数 */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          flexWrap: 'wrap',
+          marginBottom: 12,
+        }}
+      >
         <StatusBadge
           tone={overall === 'critical' ? 'danger' : overall === 'warning' ? 'warning' : 'success'}
         >
           总览 {STATUS_LABEL[overall]}
         </StatusBadge>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+          {(Object.keys(counts) as MonitoringStatus[]).map((status) =>
+            counts[status] > 0 ? (
+              <span
+                key={status}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontSize: 11,
+                  fontFamily: 'var(--ln-mono, monospace)',
+                  color: HEALTH_CHIP[status],
+                }}
+              >
+                <span aria-hidden style={{ width: 6, height: 6, borderRadius: '50%', background: HEALTH_CHIP[status] }} />
+                {STATUS_LABEL[status]} {counts[status]}
+              </span>
+            ) : null,
+          )}
+          <span style={{ fontSize: 11, color: 'var(--ln-text-muted)' }}>
+            {availableCount} 视角可用
+          </span>
+        </div>
         {focusHint ? (
-          <span className="ln-metric__label" style={{ fontSize: 11 }}>
+          <span className="ln-metric__label" style={{ fontSize: 11, width: '100%' }}>
             {focusHint}
           </span>
         ) : null}
       </div>
 
-      <div
-        style={{
-          maxHeight: 520,
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-        }}
-      >
-        {/* 健康总览条：6 个可用派生视角（缺表灰态不并入聚合） */}
-        <div
-          role="group"
-          aria-label="监控健康总览"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            gap: 8,
-          }}
+      {/* 视角 tab */}
+      <nav aria-label="监控视角切换" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+        <button
+          type="button"
+          onClick={() => setSelected(null)}
+          aria-current={selected === null ? 'page' : undefined}
+          className="ln-btn"
         >
-          {PERSPECTIVE_ORDER.map((key) => {
-            const h = monitoring.health[key];
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setSelected(key)}
-                aria-pressed={selected === key}
-                className="ln-panel"
-                style={{
-                  textAlign: 'left',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 6,
-                  padding: 12,
-                  cursor: 'pointer',
-                }}
-              >
-                <StatusBadge
-                  tone={
-                    h.available
-                      ? h.status === 'critical'
-                        ? 'danger'
-                        : h.status === 'warning'
-                          ? 'warning'
-                          : 'success'
-                      : 'muted'
-                  }
-                >
-                  {h.available ? STATUS_LABEL[h.status] : '无此表'}
-                </StatusBadge>
-                <span style={{ fontWeight: 600, fontSize: 12 }}>{PERSPECTIVE_META[key].label}</span>
-                <span className="ln-metric__label" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  {h.score != null ? h.score : '—'}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* 实时视角行（阶段二 SSE 占位，不与派生视角混入聚合） */}
-        <div
-          role="group"
-          aria-label="实时视角（阶段二）"
-          style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}
-        >
-          <span className="ln-eyebrow">实时视角 · 阶段二 SSE</span>
-          {PHASE2_PILLS.map((p) => (
-            <span
-              key={p}
-              aria-disabled="true"
-              title="阶段二经 SSE 接入"
-              style={{
-                opacity: 0.45,
-                fontSize: 12,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <span aria-hidden="true" style={{ fontSize: 8, color: 'var(--ln-warning)' }}>
-                ●
-              </span>
-              {p}
-            </span>
-          ))}
-        </div>
-
-        {/* 视角 tab */}
-        <nav aria-label="监控视角切换" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          全部
+        </button>
+        {PERSPECTIVE_ORDER.map((key) => (
           <button
+            key={key}
             type="button"
-            onClick={() => setSelected(null)}
-            aria-current={selected === null ? 'page' : undefined}
+            onClick={() => setSelected(key)}
+            aria-current={selected === key ? 'page' : undefined}
             className="ln-btn"
           >
-            全部
+            {PERSPECTIVE_META[key].label}
           </button>
-          {PERSPECTIVE_ORDER.map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setSelected(key)}
-              aria-current={selected === key ? 'page' : undefined}
-              className="ln-btn"
-            >
-              {PERSPECTIVE_META[key].label}
-            </button>
-          ))}
-        </nav>
+        ))}
+      </nav>
 
-        {/* 主体：全部 → 卡片网格；单选 → 详情工作台 */}
-        {selected === null ? (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-              gap: 10,
-            }}
-          >
-            {PERSPECTIVE_ORDER.map((key) => (
+      {/* 主体：全部 → 卡片网格（GSAP 错峰入场）；单选 → 详情工作台 */}
+      {selected === null ? (
+        <div
+          ref={gridRef}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: 10,
+          }}
+        >
+          {PERSPECTIVE_ORDER.map((key) => (
+            <div key={key} className="monitoring-card" style={{ minWidth: 0 }}>
               <MonitoringCard
-                key={key}
                 perspectiveKey={key}
                 health={monitoring.health[key]}
                 monitoring={monitoring}
                 onOpen={() => setSelected(key)}
               />
-            ))}
-          </div>
-        ) : (
-          <PerspectiveDetailShell
-            perspectiveKey={selected}
-            monitoring={monitoring}
-            onBack={() => setSelected(null)}
-            onFocusAgent={focusAgent}
-          />
-        )}
-      </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <PerspectiveDetailShell
+          perspectiveKey={selected}
+          monitoring={monitoring}
+          onBack={() => setSelected(null)}
+          onFocusAgent={focusAgent}
+        />
+      )}
     </SectionPanel>
   );
 }

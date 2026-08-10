@@ -93,7 +93,7 @@ impl SSEProcessor {
     }
 
     /// Parse SSE events from a single chunk - matches ssl_log_analyzer.py parse_sse_events_from_chunk
-    pub fn parse_sse_events_from_chunk(chunk_content: &str) -> Vec<SSEEvent> {
+    pub(crate) fn parse_sse_events_from_chunk(chunk_content: &str) -> Vec<SSEEvent> {
         let mut events = Vec::new();
 
         // Split by double newlines to separate events - matches Python: re.split(r'\n\s*\n', chunk_content)
@@ -148,7 +148,7 @@ impl SSEProcessor {
     }
 
     /// Parse SSE events from raw SSL data
-    pub fn parse_sse_events(data: &str) -> Vec<SSEEvent> {
+    pub(crate) fn parse_sse_events(data: &str) -> Vec<SSEEvent> {
         // Clean up chunked encoding first
         let clean_data = Self::clean_chunked_content(data);
 
@@ -217,18 +217,14 @@ impl SSEProcessor {
     /// Extract message ID from SSE events - matches ssl_log_analyzer.py logic
     fn extract_message_id(events: &[SSEEvent]) -> Option<String> {
         for event in events {
-            if let Some(event_type) = &event.event {
-                if event_type == "message_start" {
-                    if let Some(parsed_data) = &event.parsed_data {
-                        if let Some(message) = parsed_data.get("message") {
-                            if let Some(id) = message.get("id") {
-                                if let Some(id_str) = id.as_str() {
-                                    return Some(id_str.to_string());
-                                }
-                            }
-                        }
-                    }
-                }
+            if let Some(event_type) = &event.event
+                && event_type == "message_start"
+                && let Some(parsed_data) = &event.parsed_data
+                && let Some(message) = parsed_data.get("message")
+                && let Some(id) = message.get("id")
+                && let Some(id_str) = id.as_str()
+            {
+                return Some(id_str.to_string());
             }
         }
         None
@@ -336,7 +332,8 @@ impl SSEProcessor {
                         accumulator.has_message_start = true;
                         // Extract message ID
                         if accumulator.message_id.is_none() {
-                            accumulator.message_id = Self::extract_message_id(&[event.clone()]);
+                            accumulator.message_id =
+                                Self::extract_message_id(std::slice::from_ref(event));
                         }
                         if debug {
                             eprintln!("[DEBUG]     Found message_start, has_message_start=true");
@@ -344,12 +341,12 @@ impl SSEProcessor {
                     }
                     "content_block_start" => {
                         // Track the content block index for per-block JSON accumulation
-                        if let Some(parsed_data) = &event.parsed_data {
-                            if let Some(index) = parsed_data.get("index").and_then(|v| v.as_u64()) {
-                                accumulator.current_block_index = Some(index as usize);
-                                if debug {
-                                    eprintln!("[DEBUG]     content_block_start index={}", index);
-                                }
+                        if let Some(parsed_data) = &event.parsed_data
+                            && let Some(index) = parsed_data.get("index").and_then(|v| v.as_u64())
+                        {
+                            accumulator.current_block_index = Some(index as usize);
+                            if debug {
+                                eprintln!("[DEBUG]     content_block_start index={}", index);
                             }
                         }
                     }
@@ -385,17 +382,15 @@ impl SSEProcessor {
                                 // Handle thinking delta
                                 else if delta.get("type").and_then(|v| v.as_str())
                                     == Some("thinking_delta")
-                                {
-                                    if let Some(thinking_value) =
+                                    && let Some(thinking_value) =
                                         delta.get("thinking").and_then(|v| v.as_str())
-                                    {
-                                        text = thinking_value.to_string();
-                                        if debug {
-                                            eprintln!(
-                                                "[DEBUG]     Extracted thinking_delta: '{}'",
-                                                text
-                                            );
-                                        }
+                                {
+                                    text = thinking_value.to_string();
+                                    if debug {
+                                        eprintln!(
+                                            "[DEBUG]     Extracted thinking_delta: '{}'",
+                                            text
+                                        );
                                     }
                                 }
 

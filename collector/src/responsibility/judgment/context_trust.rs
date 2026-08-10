@@ -7,8 +7,7 @@
 // authorized to share context.
 
 use crate::responsibility::types::{
-    AgentId, BoundaryId, EvidenceId, PolicyBoundary, PolicyId, PolicyJudgment,
-    PolicyJudgmentResult, SubagentBoundary,
+    AgentId, BoundaryId, PolicyId, PolicyJudgment, PolicyJudgmentResult, SubagentBoundary,
 };
 
 /// Context trust evaluation windows (in nanoseconds).
@@ -214,9 +213,8 @@ mod tests {
     #[test]
     fn same_agent_allowed() {
         let a = make_agent("agent-1");
-        let result = ContextTrustEvaluator::evaluate_artifact(
-            &a, &a, "/tmp/data.txt", 1000, 2000, &[],
-        );
+        let result =
+            ContextTrustEvaluator::evaluate_artifact(&a, &a, "/tmp/data.txt", 1000, 2000, &[]);
         assert_eq!(result.result, PolicyJudgmentResult::Allowed);
         assert!(result.reason.contains("same-agent"));
     }
@@ -229,7 +227,12 @@ mod tests {
 
         // Parent wrote, child read — authorized.
         let result = ContextTrustEvaluator::evaluate_artifact(
-            &child, &parent, "/tmp/handoff.md", 1000, 2000, &boundaries,
+            &child,
+            &parent,
+            "/tmp/handoff.md",
+            1000,
+            2000,
+            &boundaries,
         );
         assert_eq!(result.result, PolicyJudgmentResult::Allowed);
         assert!(result.reason.contains("authorized subagent boundary"));
@@ -243,7 +246,12 @@ mod tests {
 
         // Child wrote, parent read — also authorized (symmetric check).
         let result = ContextTrustEvaluator::evaluate_artifact(
-            &parent, &child, "/tmp/result.txt", 1000, 2000, &boundaries,
+            &parent,
+            &child,
+            "/tmp/result.txt",
+            1000,
+            2000,
+            &boundaries,
         );
         assert_eq!(result.result, PolicyJudgmentResult::Allowed);
     }
@@ -253,7 +261,12 @@ mod tests {
         let a = make_agent("agent-a");
         let b = make_agent("agent-b");
         let result = ContextTrustEvaluator::evaluate_artifact(
-            &b, &a, "/tmp/shared.txt", 1000, 1000 + 30_000_000_000, &[],
+            &b,
+            &a,
+            "/tmp/shared.txt",
+            1000,
+            1000 + 30_000_000_000,
+            &[],
         );
         assert_eq!(result.result, PolicyJudgmentResult::Violation);
         assert!(result.reason.contains("cross-agent"));
@@ -264,7 +277,12 @@ mod tests {
         let a = make_agent("agent-a");
         let b = make_agent("agent-b");
         let result = ContextTrustEvaluator::evaluate_artifact(
-            &b, &a, "/tmp/shared.txt", 1000, 1000 + 65_000_000_000, &[],
+            &b,
+            &a,
+            "/tmp/shared.txt",
+            1000,
+            1000 + 65_000_000_000,
+            &[],
         );
         assert_eq!(result.result, PolicyJudgmentResult::Ambiguous);
     }
@@ -274,7 +292,12 @@ mod tests {
         let a = make_agent("agent-a");
         let b = make_agent("agent-b");
         let result = ContextTrustEvaluator::evaluate_artifact(
-            &b, &a, "/tmp/shared.txt", 1000, 1000 + 350_000_000_000, &[],
+            &b,
+            &a,
+            "/tmp/shared.txt",
+            1000,
+            1000 + 350_000_000_000,
+            &[],
         );
         assert_eq!(result.result, PolicyJudgmentResult::Unproven);
         assert!(result.reason.contains("outside window"));
@@ -284,9 +307,7 @@ mod tests {
     fn trivial_path_allowed() {
         let a = make_agent("agent-a");
         let b = make_agent("agent-b");
-        let result = ContextTrustEvaluator::evaluate_artifact(
-            &b, &a, "/dev/null", 1000, 2000, &[],
-        );
+        let result = ContextTrustEvaluator::evaluate_artifact(&b, &a, "/dev/null", 1000, 2000, &[]);
         assert_eq!(result.result, PolicyJudgmentResult::Allowed);
         assert!(result.reason.contains("trivial artifact"));
     }
@@ -295,9 +316,7 @@ mod tests {
     fn empty_path_allowed() {
         let a = make_agent("agent-a");
         let b = make_agent("agent-b");
-        let result = ContextTrustEvaluator::evaluate_artifact(
-            &b, &a, "", 1000, 2000, &[],
-        );
+        let result = ContextTrustEvaluator::evaluate_artifact(&b, &a, "", 1000, 2000, &[]);
         assert_eq!(result.result, PolicyJudgmentResult::Allowed);
     }
 
@@ -306,9 +325,8 @@ mod tests {
         let a = make_agent("agent-a");
         let b = make_agent("agent-b");
         // read_ts < write_ts is impossible.
-        let result = ContextTrustEvaluator::evaluate_artifact(
-            &b, &a, "/tmp/data.txt", 2000, 1000, &[],
-        );
+        let result =
+            ContextTrustEvaluator::evaluate_artifact(&b, &a, "/tmp/data.txt", 2000, 1000, &[]);
         assert_eq!(result.result, PolicyJudgmentResult::Unproven);
         assert!(result.reason.contains("temporal ordering violated"));
     }
@@ -322,7 +340,12 @@ mod tests {
 
         // "other-agent" is not in any boundary — should fall through to violation.
         let result = ContextTrustEvaluator::evaluate_artifact(
-            &other, &parent, "/tmp/data.txt", 1000, 2000, &boundaries,
+            &other,
+            &parent,
+            "/tmp/data.txt",
+            1000,
+            2000,
+            &boundaries,
         );
         // parent→other is NOT in boundaries, other→parent is NOT in boundaries.
         // So it's cross-agent without authorization, dt=1000ns < 60s → Violation.
@@ -335,7 +358,12 @@ mod tests {
         let b = make_agent("agent-b");
         // dt = 59_999_999_999 ns (just under 60s).
         let result = ContextTrustEvaluator::evaluate_artifact(
-            &b, &a, "/tmp/data.txt", 1, 60_000_000_000, &[],
+            &b,
+            &a,
+            "/tmp/data.txt",
+            1,
+            60_000_000_000,
+            &[],
         );
         // 60_000_000_000 - 1 = 59_999_999_999 < 60_000_000_000 → Violation.
         assert_eq!(result.result, PolicyJudgmentResult::Violation);
@@ -347,7 +375,12 @@ mod tests {
         let b = make_agent("agent-b");
         // dt = 60_000_000_000 ns (exactly 60s).
         let result = ContextTrustEvaluator::evaluate_artifact(
-            &b, &a, "/tmp/data.txt", 0, 60_000_000_000, &[],
+            &b,
+            &a,
+            "/tmp/data.txt",
+            0,
+            60_000_000_000,
+            &[],
         );
         // 60_000_000_000 is NOT < 60_000_000_000 → falls to Ambiguous check.
         // 60_000_000_000 < 300_000_000_000 → Ambiguous.

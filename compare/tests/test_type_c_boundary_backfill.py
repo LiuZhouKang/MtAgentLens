@@ -17,13 +17,13 @@ SPEC.loader.exec_module(backfill_type_c_boundaries)
 def test_backfills_sibling_agents_under_non_agent_runner(tmp_path: Path):
     dataset = _dataset_root(tmp_path)
     _write_manifest(dataset)
-    _write_db(dataset / "traces" / "agent_teams" / "role-hijack" / "responsibility.db")
+    _write_db(dataset / "traces" / "multi_agent_attack" / "role-hijack" / "responsibility.db")
 
     report = backfill_type_c_boundaries.backfill_dataset(dataset)
 
     assert report["summary"]["updated_dbs"] == 1
     assert report["summary"]["inserted_boundaries"] == 2
-    con = sqlite3.connect(dataset / "traces" / "agent_teams" / "role-hijack" / "responsibility.db")
+    con = sqlite3.connect(dataset / "traces" / "multi_agent_attack" / "role-hijack" / "responsibility.db")
     try:
         rows = con.execute(
             "select parent_agent_id, child_agent_id, reason from subagent_boundaries order by child_pid"
@@ -39,12 +39,12 @@ def test_backfills_sibling_agents_under_non_agent_runner(tmp_path: Path):
 def test_dry_run_does_not_write_boundaries(tmp_path: Path):
     dataset = _dataset_root(tmp_path)
     _write_manifest(dataset)
-    _write_db(dataset / "traces" / "agent_teams" / "role-hijack" / "responsibility.db")
+    _write_db(dataset / "traces" / "multi_agent_attack" / "role-hijack" / "responsibility.db")
 
     report = backfill_type_c_boundaries.backfill_dataset(dataset, dry_run=True)
 
     assert report["summary"]["inserted_boundaries"] == 2
-    con = sqlite3.connect(dataset / "traces" / "agent_teams" / "role-hijack" / "responsibility.db")
+    con = sqlite3.connect(dataset / "traces" / "multi_agent_attack" / "role-hijack" / "responsibility.db")
     try:
         assert con.execute("select count(*) from subagent_boundaries").fetchone()[0] == 0
     finally:
@@ -54,7 +54,7 @@ def test_dry_run_does_not_write_boundaries(tmp_path: Path):
 def _dataset_root(tmp_path: Path) -> Path:
     dataset = tmp_path / "FuxiBench"
     (dataset / "quality").mkdir(parents=True)
-    (dataset / "traces" / "agent_teams" / "role-hijack").mkdir(parents=True)
+    (dataset / "traces" / "multi_agent_attack" / "role-hijack").mkdir(parents=True)
     return dataset
 
 
@@ -65,9 +65,9 @@ def _write_manifest(dataset: Path) -> None:
                 "samples": [
                     {
                         "scenario_id": "role-hijack",
-                        "category": "agent_teams",
+                        "category": "multi_agent_attack",
                         "paths": {
-                            "responsibility_db": "traces/agent_teams/role-hijack/responsibility.db"
+                            "responsibility_db": "traces/multi_agent_attack/role-hijack/responsibility.db"
                         },
                         "ground_truth_summary": {"attack_type": "C"},
                     }

@@ -2,8 +2,9 @@ use std::collections::HashSet;
 
 use crate::responsibility::judgment::delegation::DelegationRecord;
 use crate::responsibility::types::ids::{BoundaryId, EvidenceId, PolicyId, ProcessId};
-use crate::responsibility::types::policy_types::{EvidenceRef, PolicyEvaluationResult, ResponsibilityClaimState};
-use crate::responsibility::types::signal_types::{DETECTION_CONFIDENCE_POLICY, MatchLayer};
+use crate::responsibility::types::policy_types::{
+    EvidenceRef, PolicyEvaluationResult, ResponsibilityClaimState,
+};
 use crate::responsibility::types::support_types::ResourceId;
 
 /// Default propagation window: 30 seconds.
@@ -85,7 +86,6 @@ pub fn evaluate_capability_boundary(
                     claim_state: ResponsibilityClaimState::Observed,
                     matched: true,
                     reason: format!("sensitive file access: {}", canonical_path),
-
                 }
             } else {
                 PolicyEvaluationResult {
@@ -94,7 +94,6 @@ pub fn evaluate_capability_boundary(
                     claim_state: ResponsibilityClaimState::Inferred,
                     matched: true,
                     reason: format!("file access within capability bounds: {}", canonical_path),
-
                 }
             }
         }
@@ -110,7 +109,6 @@ pub fn evaluate_capability_boundary(
                     claim_state: ResponsibilityClaimState::Observed,
                     matched: true,
                     reason: format!("suspicious network target: {}:{}", host, port),
-
                 }
             } else {
                 PolicyEvaluationResult {
@@ -119,7 +117,6 @@ pub fn evaluate_capability_boundary(
                     claim_state: ResponsibilityClaimState::Inferred,
                     matched: true,
                     reason: format!("network access within capability bounds: {}:{}", host, port),
-
                 }
             }
         }
@@ -132,7 +129,6 @@ pub fn evaluate_capability_boundary(
                 "process exec capability check: pid={} start_time={}",
                 process_id.pid, process_id.start_time_ns
             ),
-
         },
         ResourceId::LlmConversation {
             provider,
@@ -161,7 +157,6 @@ pub fn evaluate_capability_boundary(
                     claim_state: ResponsibilityClaimState::Observed,
                     matched: true,
                     reason: format!("orchestration tool {} may indicate delegation", tool_name),
-
                 }
             } else {
                 PolicyEvaluationResult {
@@ -170,7 +165,6 @@ pub fn evaluate_capability_boundary(
                     claim_state: ResponsibilityClaimState::Inferred,
                     matched: true,
                     reason: format!("tool use within capability bounds: {}", tool_name),
-
                 }
             }
         }
@@ -195,7 +189,6 @@ pub fn evaluate_context_trust_boundary(
             claim_state: ResponsibilityClaimState::Unproven,
             matched: false,
             reason: "same-agent access: no cross-agent trust boundary".to_string(),
-
         };
     }
 
@@ -206,7 +199,6 @@ pub fn evaluate_context_trust_boundary(
             claim_state: ResponsibilityClaimState::Unproven,
             matched: false,
             reason: "trivial path: no meaningful shared artifact".to_string(),
-
         };
     }
 
@@ -217,7 +209,6 @@ pub fn evaluate_context_trust_boundary(
             claim_state: ResponsibilityClaimState::Unproven,
             matched: false,
             reason: "read before write: temporal ordering violated".to_string(),
-
         };
     }
 
@@ -232,7 +223,6 @@ pub fn evaluate_context_trust_boundary(
                 "propagation window exceeded: dt={}ns > threshold={}ns",
                 dt_ns, CONTEXT_PROPAGATION_WINDOW_NS
             ),
-
         };
     }
 
@@ -251,7 +241,6 @@ pub fn evaluate_context_trust_boundary(
             "cross-agent artifact propagation: {} -> {} via {} (dt={}ns)",
             writer_agent_id, reader_agent_id, shared_path, dt_ns
         ),
-
     }
 }
 
@@ -278,7 +267,6 @@ pub fn evaluate_taint_boundary(
                 "taint boundary violated: known-contaminated path {} was accessed",
                 p
             ),
-
         },
         Some(p) => PolicyEvaluationResult {
             policy_id: Some(PolicyId("policy.taint".to_string())),
@@ -286,7 +274,6 @@ pub fn evaluate_taint_boundary(
             claim_state: ResponsibilityClaimState::Unproven,
             matched: false,
             reason: format!("path {} is not in the known-tainted set", p),
-
         },
         None => PolicyEvaluationResult {
             policy_id: Some(PolicyId("policy.taint".to_string())),
@@ -294,7 +281,6 @@ pub fn evaluate_taint_boundary(
             claim_state: ResponsibilityClaimState::Unproven,
             matched: false,
             reason: "non-file resource: taint boundary not applicable".to_string(),
-
         },
     }
 }
@@ -313,7 +299,6 @@ pub fn evaluate_accountability_policy(
         delegation_records,
         known_tainted_paths,
     )
-
 }
 
 /// Evaluate all applicable boundaries for a resource access.
@@ -339,20 +324,20 @@ pub fn evaluate_boundary_policy_with_resource(
     }
 
     // Check delegation boundary for orchestration tool calls
-    if let ResourceId::ToolCall { tool_name, .. } = resource {
-        if matches!(tool_name.as_str(), "TaskCreate" | "Agent" | "SendMessage") {
-            // If we have delegation records, check them
-            if !delegation_records.is_empty() {
-                for record in delegation_records {
-                    if record.from_agent_id == agent_id {
-                        let delegation = evaluate_delegation_boundary(
-                            &record.from_agent_id,
-                            &record.to_agent_id,
-                            delegation_records,
-                        );
-                        if delegation.matched {
-                            return delegation;
-                        }
+    if let ResourceId::ToolCall { tool_name, .. } = resource
+        && matches!(tool_name.as_str(), "TaskCreate" | "Agent" | "SendMessage")
+    {
+        // If we have delegation records, check them
+        if !delegation_records.is_empty() {
+            for record in delegation_records {
+                if record.from_agent_id == agent_id {
+                    let delegation = evaluate_delegation_boundary(
+                        &record.from_agent_id,
+                        &record.to_agent_id,
+                        delegation_records,
+                    );
+                    if delegation.matched {
+                        return delegation;
                     }
                 }
             }
@@ -360,7 +345,6 @@ pub fn evaluate_boundary_policy_with_resource(
     }
 
     capability
-
 }
 
 // ── Legacy compatibility wrapper ────────────────────────────────────────
@@ -412,7 +396,6 @@ pub fn evaluate_boundary_policy(
             "no matching phase1b policy for candidate_type={:?} target={:?}",
             candidate_type, target
         ),
-
     }
 }
 

@@ -41,23 +41,12 @@ pub struct DelegationNode {
 }
 
 /// Idle time attribution per lifecycle phase.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct IdleTimeBreakdown {
     pub queued_awaiting_dispatch_ms: u64,
     pub context_injection_io_ms: u64,
     pub model_inference_queueing_ms: u64,
     pub tool_call_round_trip_ms: u64,
-}
-
-impl Default for IdleTimeBreakdown {
-    fn default() -> Self {
-        Self {
-            queued_awaiting_dispatch_ms: 0,
-            context_injection_io_ms: 0,
-            model_inference_queueing_ms: 0,
-            tool_call_round_trip_ms: 0,
-        }
-    }
 }
 
 /// Aggregated handoff observability metrics.
@@ -166,6 +155,12 @@ pub struct HandoffStoreData {
     max_events: usize,
 }
 
+impl Default for HandoffStoreData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HandoffStoreData {
     pub fn new() -> Self {
         Self {
@@ -193,12 +188,11 @@ impl HandoffStoreData {
         }
 
         // Maintain child_ids consistency on parent
-        if let Some(ref pid) = parent_id {
-            if let Some(parent) = self.nodes.get_mut(pid) {
-                if !parent.child_ids.contains(&node_id) {
-                    parent.child_ids.push(node_id.clone());
-                }
-            }
+        if let Some(ref pid) = parent_id
+            && let Some(parent) = self.nodes.get_mut(pid)
+            && !parent.child_ids.contains(&node_id)
+        {
+            parent.child_ids.push(node_id.clone());
         }
 
         self.rebuild_tree();
@@ -305,10 +299,7 @@ impl HandoffStoreData {
                     }
                 }
                 if let Some(st) = sub_type {
-                    let evt_sub_type = evt
-                        .get("sub_type")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
+                    let evt_sub_type = evt.get("sub_type").and_then(|v| v.as_str()).unwrap_or("");
                     if evt_sub_type != st {
                         return false;
                     }
@@ -319,11 +310,7 @@ impl HandoffStoreData {
 
         let total = filtered.len();
         let has_more = total > limit;
-        let events: Vec<serde_json::Value> = filtered
-            .into_iter()
-            .take(limit)
-            .cloned()
-            .collect();
+        let events: Vec<serde_json::Value> = filtered.into_iter().take(limit).cloned().collect();
 
         HandoffEventsResponse {
             events,
@@ -333,15 +320,18 @@ impl HandoffStoreData {
     }
 
     pub fn get_event_by_id(&self, event_id: &str) -> Option<serde_json::Value> {
-        self.events.iter().find(|evt| {
-            evt.get("spawn_id")
-                .or_else(|| evt.get("alert_id"))
-                .or_else(|| evt.get("access_id"))
-                .or_else(|| evt.get("correlation_id"))
-                .or_else(|| evt.get("denial_id"))
-                .and_then(|v| v.as_str())
-                == Some(event_id)
-        }).cloned()
+        self.events
+            .iter()
+            .find(|evt| {
+                evt.get("spawn_id")
+                    .or_else(|| evt.get("alert_id"))
+                    .or_else(|| evt.get("access_id"))
+                    .or_else(|| evt.get("correlation_id"))
+                    .or_else(|| evt.get("denial_id"))
+                    .and_then(|v| v.as_str())
+                    == Some(event_id)
+            })
+            .cloned()
     }
 
     pub fn get_dependency_edges(&self) -> DependencyEdgesResponse {
@@ -453,7 +443,7 @@ impl HandoffStoreData {
             child_ids: vec![],
         };
 
-        for node in vec![root, planner, auditor, writer, tester] {
+        for node in [root, planner, auditor, writer, tester] {
             self.upsert_node(node);
         }
     }
@@ -483,11 +473,7 @@ fn compute_metrics(
         .filter(|n| n.completed_at_ms.is_some())
         .count() as u64;
     let active_count = total_spawned.saturating_sub(total_completed);
-    let max_chain_depth = nodes
-        .values()
-        .map(|n| n.chain_depth)
-        .max()
-        .unwrap_or(0) as u64;
+    let max_chain_depth = nodes.values().map(|n| n.chain_depth).max().unwrap_or(0) as u64;
     let fan_out_ratio = if total_completed > 0 {
         total_spawned as f64 / total_completed as f64
     } else {
@@ -524,14 +510,13 @@ pub type SharedHandoffStore = Arc<RwLock<HandoffStoreData>>;
 /// When `seed_demo` is true, data is written via `blocking_write()`. Call
 /// this only from synchronous contexts or at startup before the runtime spins up.
 pub fn create_handoff_store(seed_demo: bool) -> SharedHandoffStore {
-    let store = if seed_demo {
+    if seed_demo {
         let mut data = HandoffStoreData::new();
         data.seed_demo_data();
         Arc::new(RwLock::new(data))
     } else {
         Arc::new(RwLock::new(HandoffStoreData::new()))
-    };
-    store
+    }
 }
 
 #[cfg(test)]

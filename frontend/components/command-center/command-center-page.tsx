@@ -9,10 +9,9 @@ import LoadingScreen from '@/components/ui/loading-screen';
 import GraphTimeScrubber from '@/components/graph/graph-time-scrubber';
 import NodeDetailPanel from './node-detail-panel';
 
-const MtAgentLensGraphStage = dynamic(
-  () => import('@/components/ui/mtagentlens-graph-stage'),
-  { ssr: false },
-);
+const MtAgentLensGraphStage = dynamic(() => import('@/components/ui/mtagentlens-graph-stage'), {
+  ssr: false,
+});
 
 type SelectedNodeData = {
   id: string;
@@ -38,13 +37,17 @@ export default function CommandCenterPage() {
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<SelectedNodeData | null>(null);
 
-  const handleNodeClick = useCallback((info: { id: string; node_type: string; agent_id: string; desc: string }) => {
-    const rawNodes = graph.nodes.filter((n) =>
-      info.id === n.node_id ||
-      (n.node_type === 'PolicyBoundary' && info.desc.includes(n.node_id.slice(0, 8)))
-    );
-    setSelectedNode({ ...info, rawNodes });
-  }, [graph.nodes]);
+  const handleNodeClick = useCallback(
+    (info: { id: string; node_type: string; agent_id: string; desc: string }) => {
+      const rawNodes = graph.nodes.filter(
+        (n) =>
+          info.id === n.node_id ||
+          (n.node_type === 'PolicyBoundary' && info.desc.includes(n.node_id.slice(0, 8))),
+      );
+      setSelectedNode({ ...info, rawNodes });
+    },
+    [graph.nodes],
+  );
 
   const handleBackgroundClick = useCallback(() => {
     setSelectedNode(null);
@@ -89,7 +92,11 @@ export default function CommandCenterPage() {
 
   if (!hasData) {
     return (
-      <section className="command-center" aria-busy="true" style={{ height: '100%', minHeight: 0, position: 'relative' }}>
+      <section
+        className="command-center"
+        aria-busy="true"
+        style={{ height: '100%', minHeight: 0, position: 'relative' }}
+      >
         <LoadingScreen show />
       </section>
     );

@@ -37,10 +37,10 @@ pub mod sse;
 use crate::responsibility::persistence::reader::PersistenceReader;
 use crate::responsibility::server::handoff_store::SharedHandoffStore;
 use crate::responsibility::types::alert_types::ResponsibilityAlert;
+use http_body_util::{BodyExt, Full, combinators::BoxBody};
 use hyper::{Request, Response, body::Bytes};
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use http_body_util::{BodyExt, Full, combinators::BoxBody};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Composed request handler
@@ -120,7 +120,9 @@ pub async fn serve_request(
     // NOTE: req.collect() consumes the request body, so this MUST be checked
     // before /api/runs/ which also requires the full request.
     if let Some(sub) = uri_path.strip_prefix("/api/handoff") {
-        let body = req.collect().await
+        let body = req
+            .collect()
+            .await
             .map(|collected| collected.to_bytes())
             .unwrap_or_default();
         let resp = routes::handoff::route_handoff_request(
@@ -136,12 +138,7 @@ pub async fn serve_request(
 
     // All /api/runs/* routes.
     if let Some(sub) = uri_path.strip_prefix("/api/runs") {
-        let resp = routes::route_run_request(
-            req,
-            &state.reader,
-            sub,
-            query.as_deref(),
-        );
+        let resp = routes::route_run_request(req, &state.reader, sub, query.as_deref());
         return Ok(to_boxed(resp));
     }
 
@@ -200,11 +197,10 @@ fn handle_unified_sse(
     alert_rx: broadcast::Receiver<ResponsibilityAlert>,
     handoff_rx: broadcast::Receiver<serde_json::Value>,
 ) -> Response<BoxBody<Bytes, hyper::Error>> {
-    use futures::StreamExt;
     use http_body_util::StreamBody;
     use hyper::body::Frame;
+
     use tokio_stream::wrappers::BroadcastStream;
-    use tokio_stream::StreamExt as _;
 
     // Convert alert stream to handoff-style events (wrapped in stream_type envelope)
     let alert_stream = sse::alert_event_stream(alert_rx);
@@ -212,28 +208,26 @@ fn handle_unified_sse(
     // Convert handoff event stream to SseEvent items (sync filter_map)
     let handoff_stream = tokio_stream::StreamExt::filter_map(
         BroadcastStream::new(handoff_rx),
-        |result| {
-            match result {
-                Ok(value) => {
-                    let data = serde_json::to_string(&serde_json::json!({
-                        "stream_type": "handoff_observability",
-                        "data": value,
-                    }))
-                    .unwrap_or_else(|_| r#"{"stream_type":"handoff_observability","data":{}}"#.into());
-                    Some(sse::SseEvent::handoff(data))
-                }
-                Err(tokio_stream::wrappers::errors::BroadcastStreamRecvError::Lagged(n)) => {
-                    log::warn!("Handoff SSE channel lagged, dropped {n} events");
-                    let data = serde_json::to_string(&serde_json::json!({
-                        "stream_type": "handoff_observability",
-                        "data": {
-                            "sub_type": "LAGGED",
-                            "dropped": n,
-                        }
-                    }))
-                    .unwrap_or_default();
-                    Some(sse::SseEvent::handoff(data))
-                }
+        |result| match result {
+            Ok(value) => {
+                let data = serde_json::to_string(&serde_json::json!({
+                    "stream_type": "handoff_observability",
+                    "data": value,
+                }))
+                .unwrap_or_else(|_| r#"{"stream_type":"handoff_observability","data":{}}"#.into());
+                Some(sse::SseEvent::handoff(data))
+            }
+            Err(tokio_stream::wrappers::errors::BroadcastStreamRecvError::Lagged(n)) => {
+                log::warn!("Handoff SSE channel lagged, dropped {n} events");
+                let data = serde_json::to_string(&serde_json::json!({
+                    "stream_type": "handoff_observability",
+                    "data": {
+                        "sub_type": "LAGGED",
+                        "dropped": n,
+                    }
+                }))
+                .unwrap_or_default();
+                Some(sse::SseEvent::handoff(data))
             }
         },
     );
@@ -290,7 +284,9 @@ mod tests {
             alert_tx: tx,
             db_healthy: true,
             db_status: Some("ok".into()),
-            handoff_store: crate::responsibility::server::handoff_store::create_handoff_store(false),
+            handoff_store: crate::responsibility::server::handoff_store::create_handoff_store(
+                false,
+            ),
             handoff_event_tx: handoff_tx,
         })
     }
@@ -310,9 +306,7 @@ mod tests {
         let resp = cors::handle_preflight(&req);
         assert_eq!(resp.status(), hyper::StatusCode::OK);
         assert_eq!(
-            resp.headers()
-                .get("access-control-allow-origin")
-                .unwrap(),
+            resp.headers().get("access-control-allow-origin").unwrap(),
             "*"
         );
     }
@@ -347,8 +341,7 @@ mod tests {
 
     #[test]
     fn test_no_active_run_sentinel() {
-        let resp =
-            api::ApiError::no_active_run().into_response(hyper::StatusCode::NOT_FOUND);
+        let resp = api::ApiError::no_active_run().into_response(hyper::StatusCode::NOT_FOUND);
         assert_eq!(resp.status(), hyper::StatusCode::NOT_FOUND);
         let body = String::from_utf8(resp.body().to_vec()).unwrap();
         assert!(body.contains("no_active_run"));

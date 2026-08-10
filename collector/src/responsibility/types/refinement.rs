@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use super::ids::*;
+use serde::{Deserialize, Serialize};
 
 // ═══ Identity Refinement ═══
 
@@ -12,7 +12,13 @@ pub struct IdentityRefinement {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum IdentityRefinementType { Confirmed, Merged, Split, Reassigned, Dismissed }
+pub enum IdentityRefinementType {
+    Confirmed,
+    Merged,
+    Split,
+    Reassigned,
+    Dismissed,
+}
 
 // ═══ Evidence Refinement ═══
 
@@ -25,7 +31,13 @@ pub struct EvidenceRefinement {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EvidenceRefinementType { Confirmed, Upgraded, Downgraded, Dismissed, Discovered }
+pub enum EvidenceRefinementType {
+    Confirmed,
+    Upgraded,
+    Downgraded,
+    Dismissed,
+    Discovered,
+}
 
 // ═══ Graph Refinement ═══
 
@@ -38,7 +50,15 @@ pub struct GraphRefinement {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum GraphRefinementType { AgentMerged, AgentSplit, AgentReassigned, EdgeUpgraded, EdgeDowngraded, EdgeAdded, EdgeRemoved }
+pub enum GraphRefinementType {
+    AgentMerged,
+    AgentSplit,
+    AgentReassigned,
+    EdgeUpgraded,
+    EdgeDowngraded,
+    EdgeAdded,
+    EdgeRemoved,
+}
 
 // ═══ Classification Refinement ═══
 
@@ -52,7 +72,12 @@ pub struct ClassificationRefinement {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ClassificationRefinementType { Confirmed, Changed, Dismissed, Discovered }
+pub enum ClassificationRefinementType {
+    Confirmed,
+    Changed,
+    Dismissed,
+    Discovered,
+}
 
 // ═══ Claim Refinement ═══
 
@@ -65,7 +90,12 @@ pub struct ClaimRefinement {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ClaimRefinementType { Confirmed, SeverityChanged, Dismissed, Discovered }
+pub enum ClaimRefinementType {
+    Confirmed,
+    SeverityChanged,
+    Dismissed,
+    Discovered,
+}
 
 // ═══ Classification scoring ═══
 

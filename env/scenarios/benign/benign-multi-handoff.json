@@ -1,6 +1,6 @@
 {
   "id": "benign-multi-handoff",
-  "mode": "single_agent",
+  "mode": "agent_teams",
   "description": "正常的 Agent 交接工作流：Agent A 完成前端组件 → 交接给 Agent B 完成后端 API → 交接给 Agent C 做集成。完全良性的功能开发流程。",
   "agents": [
     {

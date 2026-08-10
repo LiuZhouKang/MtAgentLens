@@ -10,14 +10,13 @@ use crate::responsibility::classification::types::{
 };
 use crate::responsibility::graph::ResponsibilityGraph;
 use crate::responsibility::types::{
-    AgentId, AgentRef, AlertAuthority, AlertDecision, AlertId, AlertSeverity,
-    BehaviorTimeline, DisplayProfile, EngineSection, GraphSnapshot, PatternVerdict,
-    PhaseIndicator, ResponsibilityAlert, ResponsibilityClaim, RuleVerdict, ScoreBreakdown,
-    ResponsibilityNodeType,
+    AgentId, AgentRef, AlertAuthority, AlertDecision, AlertId, AlertSeverity, BehaviorTimeline,
+    DisplayProfile, EngineSection, GraphSnapshot, PatternVerdict, PhaseIndicator,
+    ResponsibilityAlert, ResponsibilityClaim, ResponsibilityNodeType, RuleVerdict, ScoreBreakdown,
 };
 
-use crate::responsibility::scoring::risk_factors::{RiskFactorConfig, compute_risk_score};
 use super::text::AlertBuilderText;
+use crate::responsibility::scoring::risk_factors::{RiskFactorConfig, compute_risk_score};
 
 // ═════════════════════════════════════════════════════════════════════════════
 // AlertBuilder
@@ -232,7 +231,9 @@ fn resolve_alert_judgment(
                 match out.severity {
                     crate::responsibility::claims::ClaimSeverity::Info => AlertSeverity::Info,
                     crate::responsibility::claims::ClaimSeverity::Warning => AlertSeverity::Warning,
-                    crate::responsibility::claims::ClaimSeverity::Critical => AlertSeverity::Critical,
+                    crate::responsibility::claims::ClaimSeverity::Critical => {
+                        AlertSeverity::Critical
+                    }
                 },
                 out.confidence,
                 auth,
@@ -250,11 +251,11 @@ fn resolve_alert_judgment(
             // ── Compute entity risk factors ─────────────────────────
             let risk_cfg = RiskFactorConfig::default();
             let risk_factors = risk_cfg.compute_factors(
-                false,       // is_admin_process (unknown at this level)
-                false,       // is_repeated
-                false,       // is_critical_target
-                false,       // is_multi_agent
-                false,       // is_privileged_context
+                false, // is_admin_process (unknown at this level)
+                false, // is_repeated
+                false, // is_critical_target
+                false, // is_multi_agent
+                false, // is_privileged_context
             );
             let risk_score = compute_risk_score(classification_result.score as f64, &risk_factors);
 
@@ -400,10 +401,7 @@ fn build_engine_section(
 // Agent collection
 // ═════════════════════════════════════════════════════════════════════════════
 
-fn collect_involved_agents(
-    graph: &ResponsibilityGraph,
-    primary: &AgentId,
-) -> Vec<AgentRef> {
+fn collect_involved_agents(graph: &ResponsibilityGraph, primary: &AgentId) -> Vec<AgentRef> {
     let mut seen: HashSet<AgentId> = HashSet::new();
 
     graph
@@ -452,13 +450,12 @@ mod tests {
     use crate::responsibility::claims::ClaimSeverity;
     use crate::responsibility::classification::types::{
         AlertAuthority as ClassAlertAuthority, CacheTTL, ObserverDecision, ObserverOutput,
-        RuleVerdict as ClassRuleVerdict, PatternVerdict as ClassPatternVerdict,
+        PatternVerdict as ClassPatternVerdict, RuleVerdict as ClassRuleVerdict,
         ScoreBreakdown as ClassScoreBreakdown,
     };
     use crate::responsibility::types::{
-        AgentId, AlertSeverity, BoundaryId, ClaimId, PhaseIndicator, PolicyId,
-        ResponsibilityClaim, ResponsibilityClaimState, ResponsibilityClaimType,
-        BehaviorTimelineEntry,
+        AgentId, AlertSeverity, BehaviorTimelineEntry, BoundaryId, ClaimId, PhaseIndicator,
+        PolicyId, ResponsibilityClaim, ResponsibilityClaimState, ResponsibilityClaimType,
     };
 
     fn make_classification_result(score: f32, route: &str) -> ClassificationResult {
@@ -567,11 +564,8 @@ mod tests {
             0.80,
         )];
         let class_result = make_classification_result(0.75, "observer");
-        let observer = make_observer_output(
-            ObserverDecision::Unsafe,
-            ClaimSeverity::Critical,
-            0.90,
-        );
+        let observer =
+            make_observer_output(ObserverDecision::Unsafe, ClaimSeverity::Critical, 0.90);
         let timeline = make_timeline();
 
         let alert =

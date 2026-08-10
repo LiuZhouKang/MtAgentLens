@@ -7,7 +7,13 @@ import RawEventBrowser from '@/components/command-center/raw-event-browser';
 describe('RawEventBrowser drawer', () => {
   it('空数据源渲染空态而非报错', () => {
     render(
-      <RawEventBrowser processEvents={[]} tlsSessions={[]} intents={[]} actions={[]} onClose={() => {}} />,
+      <RawEventBrowser
+        processEvents={[]}
+        tlsSessions={[]}
+        intents={[]}
+        actions={[]}
+        onClose={() => {}}
+      />,
     );
     expect(screen.getByText(/原始事件流/i)).toBeTruthy();
     expect(screen.getByText(/暂无事件/i)).toBeTruthy();
@@ -17,7 +23,16 @@ describe('RawEventBrowser drawer', () => {
     render(
       <RawEventBrowser
         processEvents={[
-          { process_event_id: 1, pid: 42, start_time_ns: 1000, parent_pid: null, parent_start_time_ns: null, comm: 'claude', timestamp_ns: 1000, agent_id: null },
+          {
+            process_event_id: 1,
+            pid: 42,
+            start_time_ns: 1000,
+            parent_pid: null,
+            parent_start_time_ns: null,
+            comm: 'claude',
+            timestamp_ns: 1000,
+            agent_id: null,
+          },
         ]}
         tlsSessions={[]}
         intents={[]}

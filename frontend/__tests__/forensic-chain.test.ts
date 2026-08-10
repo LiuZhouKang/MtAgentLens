@@ -8,64 +8,117 @@ import type {
   ResponsibilityClaim,
 } from '@/lib/types';
 
-const baseAlert = (over: Partial<ResponsibilityAlert> = {}): ResponsibilityAlert =>
-  ({
-    alert_id: 'alert-1',
-    timestamp_ns: 1100,
-    display_profile: 'UnsafeByEngine',
-    decision: 'Unsafe',
-    severity: 'Warning',
-    confidence: 0.85,
-    authority: 'Authoritative',
-    reasoning: 'r',
-    title: 't',
-    summary: 's',
-    action_hint: null,
-    primary_agent: { agent_id: 'agent-a', claimed_role: null },
-    involved_agents: [
-      { agent_id: 'agent-a', claimed_role: null },
-      { agent_id: 'agent-b', claimed_role: null },
+const baseAlert = (over: Partial<ResponsibilityAlert> = {}): ResponsibilityAlert => ({
+  alert_id: 'alert-1',
+  timestamp_ns: 1100,
+  display_profile: 'UnsafeByEngine',
+  decision: 'Unsafe',
+  severity: 'Warning',
+  confidence: 0.85,
+  authority: 'Authoritative',
+  reasoning: 'r',
+  title: 't',
+  summary: 's',
+  action_hint: null,
+  primary_agent: { agent_id: 'agent-a', claimed_role: null },
+  involved_agents: [
+    { agent_id: 'agent-a', claimed_role: null },
+    { agent_id: 'agent-b', claimed_role: null },
+  ],
+  engine: {
+    rule_verdicts: [
+      {
+        rule_id: 'R-BOUNDARY-1',
+        description: 'Boundary crossing',
+        matched_resource: '/tmp/x.sh',
+        llm_agreed: null,
+        llm_comment: null,
+      },
     ],
-    engine: {
-      rule_verdicts: [
-        { rule_id: 'R-BOUNDARY-1', description: 'Boundary crossing', matched_resource: '/tmp/x.sh', llm_agreed: null, llm_comment: null },
-      ],
-      pattern_verdicts: [
-        { template_id: 'PT-DELEG', match_confidence: 0.8, llm_agreed: null, llm_comment: null },
-      ],
-      classification_score: 0.9,
-      classification_route: 'engine_unsafe',
-      score_breakdown: { rule_score: 1, pattern_score: 0, boundary_score: 0.9, evidence_score: 0.8, role_score: 0, repetition_score: 0, total: 0.9 },
+    pattern_verdicts: [
+      { template_id: 'PT-DELEG', match_confidence: 0.8, llm_agreed: null, llm_comment: null },
+    ],
+    classification_score: 0.9,
+    classification_route: 'engine_unsafe',
+    score_breakdown: {
+      rule_score: 1,
+      pattern_score: 0,
+      boundary_score: 0.9,
+      evidence_score: 0.8,
+      role_score: 0,
+      repetition_score: 0,
+      total: 0.9,
     },
-    timeline: { steps: [], total_duration_ms: 0 },
-    graph_snapshot: { snapshot_id: '', timestamp_ns: 0, nodes: [], edges: [], metrics: { node_counts: {}, edge_counts: {}, agent_count: 0, cross_agent_edges: 0, delegation_depth: 0, taint_chains: 0, avg_confidence: 0 } },
-    phase: { Provisional: { timestamp_ns: 1100 } },
-    provisional_ref: null,
-    ...over,
-  });
+  },
+  timeline: { steps: [], total_duration_ms: 0 },
+  graph_snapshot: {
+    snapshot_id: '',
+    timestamp_ns: 0,
+    nodes: [],
+    edges: [],
+    metrics: {
+      node_counts: {},
+      edge_counts: {},
+      agent_count: 0,
+      cross_agent_edges: 0,
+      delegation_depth: 0,
+      taint_chains: 0,
+      avg_confidence: 0,
+    },
+  },
+  phase: { Provisional: { timestamp_ns: 1100 } },
+  provisional_ref: null,
+  ...over,
+});
 
 const pollution = (over: Partial<ContextPollutionEvent>): ContextPollutionEvent => ({
-  pollution_id: 1, source_agent_id: 'agent-a', contaminated_artifact: '/tmp/leaked.txt',
-  propagation_path: [], detected_at_ns: 1000, run_id: 'run-1', ...over,
+  pollution_id: 1,
+  source_agent_id: 'agent-a',
+  contaminated_artifact: '/tmp/leaked.txt',
+  propagation_path: [],
+  detected_at_ns: 1000,
+  run_id: 'run-1',
+  ...over,
 });
 
 const policy = (over: Partial<PolicyEvaluation>): PolicyEvaluation => ({
-  policy_id: 'pol-1', boundary: 'Capability', subject_agent_id: 'agent-a',
-  judgment: { result: 'Violation' }, resource: null, evidence_refs: ['ev-1'],
-  confidence: 0.85, reason: '', run_id: 'run-1', ...over,
+  policy_id: 'pol-1',
+  boundary: 'Capability',
+  subject_agent_id: 'agent-a',
+  judgment: { result: 'Violation' },
+  resource: null,
+  evidence_refs: ['ev-1'],
+  confidence: 0.85,
+  reason: '',
+  run_id: 'run-1',
+  ...over,
 });
 
 const diag = (over: Partial<NonLinkDiagnostic>): NonLinkDiagnostic => ({
-  diagnostic_id: 'nld-1', intent_id: 'int-1', action_id: null,
-  reason: 'BelowConfidenceCutoff', timestamp_ns: 1000, run_id: 'run-1', ...over,
+  diagnostic_id: 'nld-1',
+  intent_id: 'int-1',
+  action_id: null,
+  reason: 'BelowConfidenceCutoff',
+  timestamp_ns: 1000,
+  run_id: 'run-1',
+  ...over,
 });
 
 const claim = (over: Partial<ResponsibilityClaim> = {}): ResponsibilityClaim => ({
-  claim_id: 'claim-1', claim_type: 'TaintedContextUse', subject_agent_id: 'agent-a',
-  policy_id: 'POLICY-1', boundary_id: 'BOUNDARY-1', claim_state: 'Inferred',
-  severity: 'Critical', confidence: 0.9, evidence_refs: ['ev-1', 'ev-2'],
-  competing_explanations: [], traceback_ref: null,
-  phase: { Provisional: { timestamp_ns: 1000 } }, timestamp_ns: 1000, ...over,
+  claim_id: 'claim-1',
+  claim_type: 'TaintedContextUse',
+  subject_agent_id: 'agent-a',
+  policy_id: 'POLICY-1',
+  boundary_id: 'BOUNDARY-1',
+  claim_state: 'Inferred',
+  severity: 'Critical',
+  confidence: 0.9,
+  evidence_refs: ['ev-1', 'ev-2'],
+  competing_explanations: [],
+  traceback_ref: null,
+  phase: { Provisional: { timestamp_ns: 1000 } },
+  timestamp_ns: 1000,
+  ...over,
 });
 
 describe('buildForensicChain', () => {
@@ -83,11 +136,18 @@ describe('buildForensicChain', () => {
     // 判定：rule 用 matched_resource 作 targets，reason=description；pattern 无 reason/targets
     expect(chain.verdicts).toHaveLength(2);
     expect(chain.verdicts[0]).toEqual({
-      kind: 'rule', id: 'R-BOUNDARY-1', score: 1,
-      reason: 'Boundary crossing', targets: ['/tmp/x.sh'],
+      kind: 'rule',
+      id: 'R-BOUNDARY-1',
+      score: 1,
+      reason: 'Boundary crossing',
+      targets: ['/tmp/x.sh'],
     });
     expect(chain.verdicts[1]).toEqual({
-      kind: 'pattern', id: 'PT-DELEG', score: 0.8, reason: '', targets: [],
+      kind: 'pattern',
+      id: 'PT-DELEG',
+      score: 0.8,
+      reason: '',
+      targets: [],
     });
 
     // 污染：仅 involved_agents 交集内的 source 命中
@@ -118,10 +178,7 @@ describe('buildForensicChain', () => {
     const chain = buildForensicChain({
       alert: baseAlert(),
       // 同 agent 同 artifact 污染两次（真实 db：agent 多次访问同一路径）→ (source, artifact) 组合 key 会碰撞
-      pollutionEvents: [
-        pollution({ pollution_id: 7 }),
-        pollution({ pollution_id: 42 }),
-      ],
+      pollutionEvents: [pollution({ pollution_id: 7 }), pollution({ pollution_id: 42 })],
       policyEvaluations: [],
       nonLinkDiagnostics: [],
       claims: [],
@@ -166,12 +223,24 @@ describe('buildForensicChain', () => {
       alert: baseAlert({
         engine: {
           ...baseAlert().engine,
-          rule_verdicts: [{ rule_id: 'R-X', description: '', matched_resource: '', llm_agreed: null, llm_comment: null }],
+          rule_verdicts: [
+            {
+              rule_id: 'R-X',
+              description: '',
+              matched_resource: '',
+              llm_agreed: null,
+              llm_comment: null,
+            },
+          ],
           pattern_verdicts: [],
         },
       }),
-      pollutionEvents: [], policyEvaluations: [], nonLinkDiagnostics: [], claims: [],
-      intentIds: [], alertEvidenceRefs: [],
+      pollutionEvents: [],
+      policyEvaluations: [],
+      nonLinkDiagnostics: [],
+      claims: [],
+      intentIds: [],
+      alertEvidenceRefs: [],
     });
     expect(chain.verdicts[0].targets).toEqual([]);
   });

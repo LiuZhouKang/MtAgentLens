@@ -42,9 +42,7 @@ export function resolveOverviewFocus(
   clusterModels: FocusClusterLike[],
 ): string | null {
   if (focus.agentId) {
-    const match = alertModels.find(
-      (item) => item.alert.primary_agent.agent_id === focus.agentId,
-    );
+    const match = alertModels.find((item) => item.alert.primary_agent.agent_id === focus.agentId);
     return match?.alert.alert_id ?? null;
   }
 

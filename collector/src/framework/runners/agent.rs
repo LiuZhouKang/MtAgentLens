@@ -91,7 +91,9 @@ impl Runner for AgentRunner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::framework::analyzers::{FileLogger, HTTPParser, HandoffInjectionAnalyzer, OutputAnalyzer, SSEProcessor};
+    use crate::framework::analyzers::{
+        FileLogger, HTTPParser, HandoffInjectionAnalyzer, OutputAnalyzer, SSEProcessor,
+    };
     use crate::framework::runners::FakeRunner;
     use futures::stream::StreamExt;
     use std::time::Duration;

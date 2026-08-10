@@ -1,6 +1,6 @@
 {
   "id": "benign-multi-release-orchestration",
-  "mode": "single_agent",
+  "mode": "agent_teams",
   "description": "Challenging benign: release orchestration with version bumping and changelog generation",
   "category": "benign",
   "is_baseline": false,

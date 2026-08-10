@@ -7,9 +7,9 @@ use std::collections::HashSet;
 
 use crate::responsibility::graph::ResponsibilityGraph;
 use crate::responsibility::types::{
-    AgentId, AlertSeverity, BoundaryId, ClaimId, CompetingExplanation,
-    EdgeId, PolicyId, ResponsibilityClaim, ResponsibilityClaimState,
-    ResponsibilityClaimType, ResponsibilityEdge, ResponsibilityEdgeType,
+    AgentId, AlertSeverity, BoundaryId, ClaimId, CompetingExplanation, EdgeId, PolicyId,
+    ResponsibilityClaim, ResponsibilityClaimState, ResponsibilityClaimType, ResponsibilityEdge,
+    ResponsibilityEdgeType,
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -78,7 +78,7 @@ impl ClaimBuilder {
                 subject.as_str(),
                 policy_id.as_str(),
                 boundary_id.as_str(),
-                &format!("{:?}", &claim_type),
+                &format!("{:?}", claim_type),
             ]);
 
             let claim = ResponsibilityClaim {
@@ -142,7 +142,8 @@ fn coalesce_claims(claims: &mut Vec<ResponsibilityClaim>) {
                     AlertSeverity::Info => 1,
                 };
                 if claim.confidence > *best_conf
-                    || (claim.confidence == *best_conf && sev_rank(&claim.severity) > sev_rank(best_sev))
+                    || (claim.confidence == *best_conf
+                        && sev_rank(&claim.severity) > sev_rank(best_sev))
                 {
                     *best_idx = i;
                     *best_conf = claim.confidence;
@@ -212,11 +213,7 @@ fn classify_claim_type(
     let has_delegation = graph
         .edges_of_type(&ResponsibilityEdgeType::AgentDelegatesTo)
         .iter()
-        .any(|eid| {
-            graph
-                .get_edge(eid)
-                .map_or(false, |e| e.source == edge.source)
-        });
+        .any(|eid| graph.get_edge(eid).is_some_and(|e| e.source == edge.source));
 
     if has_delegation {
         return ResponsibilityClaimType::SuspiciousDelegation;
@@ -228,9 +225,9 @@ fn classify_claim_type(
         .edges_of_type(&ResponsibilityEdgeType::IntentCausesAction)
         .iter()
         .any(|eid| {
-            graph.get_edge(eid).map_or(false, |e| {
-                e.source == edge.source && e.target == edge.target
-            })
+            graph
+                .get_edge(eid)
+                .is_some_and(|e| e.source == edge.source && e.target == edge.target)
         });
 
     if has_capability_use {
@@ -254,7 +251,7 @@ fn any_edge_touching(
     node_b: &crate::responsibility::types::NodeId,
 ) -> bool {
     graph.edges_of_type(edge_type).iter().any(|eid| {
-        graph.get_edge(eid).map_or(false, |e| {
+        graph.get_edge(eid).is_some_and(|e| {
             (e.source == *node_a || e.target == *node_a)
                 || (e.source == *node_b || e.target == *node_b)
         })
@@ -282,10 +279,7 @@ fn confidence_to_claim_state(confidence: f32) -> ResponsibilityClaimState {
 // Severity derivation
 // ═════════════════════════════════════════════════════════════════════════════
 
-fn severity_for_claim_type(
-    claim_type: &ResponsibilityClaimType,
-    confidence: f32,
-) -> AlertSeverity {
+fn severity_for_claim_type(claim_type: &ResponsibilityClaimType, confidence: f32) -> AlertSeverity {
     match claim_type {
         ResponsibilityClaimType::PolicyViolation => {
             if confidence > 0.80 {
@@ -334,24 +328,24 @@ fn find_competing_explanations(
 
     // 1. Explicit CompetingExplanation edges pointing to the same target.
     for comp_eid in graph.edges_of_type(&ResponsibilityEdgeType::CompetingExplanation) {
-        if let Some(comp_edge) = graph.get_edge(comp_eid) {
-            if comp_edge.target == edge.target {
-                let src_label = graph
-                    .get_node(&comp_edge.source)
-                    .and_then(|n| n.agent_id.as_ref())
-                    .map(|a| a.to_string())
-                    .unwrap_or_else(|| comp_edge.source.to_string());
+        if let Some(comp_edge) = graph.get_edge(comp_eid)
+            && comp_edge.target == edge.target
+        {
+            let src_label = graph
+                .get_node(&comp_edge.source)
+                .and_then(|n| n.agent_id.as_ref())
+                .map(|a| a.to_string())
+                .unwrap_or_else(|| comp_edge.source.to_string());
 
-                explanations.push(CompetingExplanation {
-                    label: format!("Competing: {}", src_label),
-                    evidence_refs: comp_edge.evidence_refs.clone(),
-                    rule_id: Some("rule.competing_explanation".into()),
-                    rationale: format!(
-                        "Alternative explanation from {} (confidence {:.2})",
-                        src_label, comp_edge.confidence
-                    ),
-                });
-            }
+            explanations.push(CompetingExplanation {
+                label: format!("Competing: {}", src_label),
+                evidence_refs: comp_edge.evidence_refs.clone(),
+                rule_id: Some("rule.competing_explanation".into()),
+                rationale: format!(
+                    "Alternative explanation from {} (confidence {:.2})",
+                    src_label, comp_edge.confidence
+                ),
+            });
         }
     }
 
@@ -359,30 +353,30 @@ fn find_competing_explanations(
     //    boundary crossing as inherited context rather than direct violation.
     if explanations.is_empty() {
         for cf_eid in graph.edges_of_type(&ResponsibilityEdgeType::ContextFlowsFrom) {
-            if let Some(cf_edge) = graph.get_edge(cf_eid) {
-                if cf_edge.target == edge.source || cf_edge.source == edge.source {
-                    let other = graph
-                        .get_node(if cf_edge.target == edge.source {
-                            &cf_edge.source
-                        } else {
-                            &cf_edge.target
-                        })
-                        .and_then(|n| n.agent_id.as_ref())
-                        .map(|a| a.to_string())
-                        .unwrap_or_default();
+            if let Some(cf_edge) = graph.get_edge(cf_eid)
+                && (cf_edge.target == edge.source || cf_edge.source == edge.source)
+            {
+                let other = graph
+                    .get_node(if cf_edge.target == edge.source {
+                        &cf_edge.source
+                    } else {
+                        &cf_edge.target
+                    })
+                    .and_then(|n| n.agent_id.as_ref())
+                    .map(|a| a.to_string())
+                    .unwrap_or_default();
 
-                    if !other.is_empty() {
-                        explanations.push(CompetingExplanation {
-                            label: format!("Context flow from {}", other),
-                            evidence_refs: cf_edge.evidence_refs.clone(),
-                            rule_id: Some("rule.context_flow".into()),
-                            rationale: format!(
-                                "Boundary crossing may be explained by context inherited from agent {}",
-                                other
-                            ),
-                        });
-                        break;
-                    }
+                if !other.is_empty() {
+                    explanations.push(CompetingExplanation {
+                        label: format!("Context flow from {}", other),
+                        evidence_refs: cf_edge.evidence_refs.clone(),
+                        rule_id: Some("rule.context_flow".into()),
+                        rationale: format!(
+                            "Boundary crossing may be explained by context inherited from agent {}",
+                            other
+                        ),
+                    });
+                    break;
                 }
             }
         }
@@ -400,13 +394,13 @@ fn derive_policy_ids(
     edge: &ResponsibilityEdge,
 ) -> (PolicyId, BoundaryId) {
     // Derive from the target node's resource type.
-    if let Some(target_node) = graph.get_node(&edge.target) {
-        if let Some(ref resource) = target_node.resource {
-            let (category, detail) = resource_summary(resource);
-            let policy_id = PolicyId::from(format!("policy.{}.access", category));
-            let boundary_id = BoundaryId::from(format!("boundary.{}.{}", category, detail));
-            return (policy_id, boundary_id);
-        }
+    if let Some(target_node) = graph.get_node(&edge.target)
+        && let Some(ref resource) = target_node.resource
+    {
+        let (category, detail) = resource_summary(resource);
+        let policy_id = PolicyId::from(format!("policy.{}.access", category));
+        let boundary_id = BoundaryId::from(format!("boundary.{}.{}", category, detail));
+        return (policy_id, boundary_id);
     }
 
     // Fallback: use the edge ID for derivation.
@@ -418,14 +412,22 @@ fn derive_policy_ids(
 }
 
 /// Lightweight resource summary for policy naming.
-fn resource_summary(resource: &crate::responsibility::types::NormalizedResource) -> (&'static str, String) {
+fn resource_summary(
+    resource: &crate::responsibility::types::NormalizedResource,
+) -> (&'static str, String) {
     match resource {
         crate::responsibility::types::NormalizedResource::File { canonical_path } => {
             // Show last 2 path components for readability (dir/filename)
             let p = std::path::Path::new(canonical_path);
-            let parent = p.parent().and_then(|d| d.file_name())
-                .and_then(|n| n.to_str()).unwrap_or("");
-            let fname = p.file_name().and_then(|n| n.to_str()).unwrap_or(canonical_path);
+            let parent = p
+                .parent()
+                .and_then(|d| d.file_name())
+                .and_then(|n| n.to_str())
+                .unwrap_or("");
+            let fname = p
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(canonical_path);
             let detail = if parent.is_empty() || parent == "/" {
                 fname.to_string()
             } else {
@@ -464,7 +466,10 @@ mod tests {
     use crate::responsibility::graph::ResponsibilityGraph;
     use crate::responsibility::types::PhaseIndicator;
 
-    fn make_agent_node(id: &str, agent_id: &str) -> crate::responsibility::types::ResponsibilityNode {
+    fn make_agent_node(
+        id: &str,
+        agent_id: &str,
+    ) -> crate::responsibility::types::ResponsibilityNode {
         crate::responsibility::types::ResponsibilityNode {
             node_id: crate::responsibility::types::NodeId::from(id),
             node_type: crate::responsibility::types::ResponsibilityNodeType::Agent,

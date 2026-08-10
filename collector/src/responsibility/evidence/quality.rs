@@ -70,12 +70,20 @@ mod tests {
 
     #[test]
     fn l4_low_confidence_rejected() {
-        assert!(!passes_quality_gate(&MatchLevel::L4Basename, 0.40, "Cargo.toml"));
+        assert!(!passes_quality_gate(
+            &MatchLevel::L4Basename,
+            0.40,
+            "Cargo.toml"
+        ));
     }
 
     #[test]
     fn l4_good_confidence_accepted() {
-        assert!(passes_quality_gate(&MatchLevel::L4Basename, 0.55, "Cargo.toml"));
+        assert!(passes_quality_gate(
+            &MatchLevel::L4Basename,
+            0.55,
+            "Cargo.toml"
+        ));
     }
 
     #[test]

@@ -17,26 +17,22 @@ use rusqlite::{Connection, OpenFlags};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::responsibility::claims::{
-    AlertBuilder, ClaimBuilder, TracebackBuilder,
-};
+use crate::responsibility::claims::{AlertBuilder, ClaimBuilder, TracebackBuilder};
 use crate::responsibility::classification::engine::ClassificationEngine as PhaseClassificationEngine;
 use crate::responsibility::evidence::correlator::{CorrelationResult, EvidenceCorrelator};
 use crate::responsibility::graph::graph_builder::GraphBuilder;
-use crate::responsibility::graph::snapshot::{create_snapshot, FrozenGraph};
-use crate::responsibility::identity::union_find::run_authoritative_resolution;
+use crate::responsibility::graph::snapshot::{FrozenGraph, create_snapshot};
 use crate::responsibility::identity::IdentityProvider;
+use crate::responsibility::identity::union_find::run_authoritative_resolution;
 use crate::responsibility::persistence::PersistenceReader;
-use crate::responsibility::signals::signal_graph::SignalGraph;
 use crate::responsibility::signals::SignalSnapshot;
+use crate::responsibility::signals::signal_graph::SignalGraph;
 use crate::responsibility::types::{
-    Action, AgentId, AlertId, AuthoritativeIdentity, BehaviorTimeline,
-    ClaimId, ClaimRefinement, ClaimRefinementType, ClassificationRefinement,
-    ClassificationRefinementType, CorrelationEvidence, EvidenceRefinement,
-    GraphRefinement, IdentityRefinement,
-    Intent, ProcessId,
-    ProvisionalIdentity, ResponsibilityAlert, ResponsibilityClaim, ResponsibilityTraceback,
-    TlsSessionId,
+    Action, AgentId, AlertId, AuthoritativeIdentity, BehaviorTimeline, ClaimId, ClaimRefinement,
+    ClaimRefinementType, ClassificationRefinement, ClassificationRefinementType,
+    CorrelationEvidence, EvidenceRefinement, GraphRefinement, IdentityRefinement, Intent,
+    ProcessId, ProvisionalIdentity, ResponsibilityAlert, ResponsibilityClaim,
+    ResponsibilityTraceback, TlsSessionId,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -124,13 +120,11 @@ impl ReplayExecutor {
         let provisional_map: HashMap<ProcessId, ProvisionalIdentity> = provisional_identities
             .iter()
             .flat_map(|pi| {
-                pi.process_ids
-                    .iter()
-                    .map(move |pid| {
-                        let mut single_pi = pi.clone();
-                        single_pi.process_ids = vec![*pid];
-                        (*pid, single_pi)
-                    })
+                pi.process_ids.iter().map(move |pid| {
+                    let mut single_pi = pi.clone();
+                    single_pi.process_ids = vec![*pid];
+                    (*pid, single_pi)
+                })
             })
             .collect();
 
@@ -163,7 +157,7 @@ impl ReplayExecutor {
                 .cloned();
 
             if let (Some(intent), Some(action)) = (intent, action) {
-                let _delta = graph_builder.handle(&ev, &intent, &action, &auth_identity_provider);
+                let _delta = graph_builder.handle(ev, &intent, &action, &auth_identity_provider);
             }
         }
 
@@ -238,9 +232,7 @@ impl ReplayExecutor {
         refinements.graph = frozen_graph.refinements.clone();
 
         // Classification refinements — compare phase1 vs phase2 alerts
-        let phase1_alerts = reader
-            .get_alerts(run_id)
-            .unwrap_or_default();
+        let phase1_alerts = reader.get_alerts(run_id).unwrap_or_default();
         refinements.classification =
             Self::build_classification_refinements(&phase1_alerts, &alerts);
 
@@ -254,34 +246,22 @@ impl ReplayExecutor {
             confirmed_count: refinements
                 .classification
                 .iter()
-                .filter(|r| matches!(
-                    r.refinement_type,
-                    ClassificationRefinementType::Confirmed
-                ))
+                .filter(|r| matches!(r.refinement_type, ClassificationRefinementType::Confirmed))
                 .count(),
             changed_count: refinements
                 .classification
                 .iter()
-                .filter(|r| matches!(
-                    r.refinement_type,
-                    ClassificationRefinementType::Changed
-                ))
+                .filter(|r| matches!(r.refinement_type, ClassificationRefinementType::Changed))
                 .count(),
             dismissed_count: refinements
                 .classification
                 .iter()
-                .filter(|r| matches!(
-                    r.refinement_type,
-                    ClassificationRefinementType::Dismissed
-                ))
+                .filter(|r| matches!(r.refinement_type, ClassificationRefinementType::Dismissed))
                 .count(),
             discovered_count: refinements
                 .classification
                 .iter()
-                .filter(|r| matches!(
-                    r.refinement_type,
-                    ClassificationRefinementType::Discovered
-                ))
+                .filter(|r| matches!(r.refinement_type, ClassificationRefinementType::Discovered))
                 .count(),
             evidence_count: correlation_result.evidence.len(),
             non_link_count: correlation_result.non_links.len(),
@@ -375,12 +355,12 @@ impl ReplayExecutor {
 
             let rows = stmt.query_map([run_id], |row| {
                 Ok((
-                    row.get::<_, i64>(0)? as u32,   // pid
-                    row.get::<_, i64>(1)? as u64,   // start_time_ns
-                    row.get::<_, Option<i64>>(2)?,  // parent_pid
-                    row.get::<_, Option<i64>>(3)?,  // parent_start_time_ns
-                    row.get::<_, String>(4)?,        // comm
-                    row.get::<_, i64>(5)? as u64,   // timestamp_ns
+                    row.get::<_, i64>(0)? as u32,  // pid
+                    row.get::<_, i64>(1)? as u64,  // start_time_ns
+                    row.get::<_, Option<i64>>(2)?, // parent_pid
+                    row.get::<_, Option<i64>>(3)?, // parent_start_time_ns
+                    row.get::<_, String>(4)?,      // comm
+                    row.get::<_, i64>(5)? as u64,  // timestamp_ns
                 ))
             })?;
 
@@ -414,10 +394,10 @@ impl ReplayExecutor {
 
             let rows = stmt.query_map([run_id], |row| {
                 Ok((
-                    row.get::<_, String>(0)?,       // tls_session_id
-                    row.get::<_, i64>(1)? as u32,   // pid
-                    row.get::<_, i64>(2)? as u64,   // start_time_ns
-                    row.get::<_, i64>(3)? as u64,   // timestamp_ns
+                    row.get::<_, String>(0)?,     // tls_session_id
+                    row.get::<_, i64>(1)? as u32, // pid
+                    row.get::<_, i64>(2)? as u64, // start_time_ns
+                    row.get::<_, i64>(3)? as u64, // timestamp_ns
                 ))
             })?;
 
@@ -445,11 +425,11 @@ impl ReplayExecutor {
 
             let rows = stmt.query_map([run_id], |row| {
                 Ok((
-                    row.get::<_, String>(0)?,             // message_id
-                    row.get::<_, i64>(1)? as u32,         // pid
-                    row.get::<_, i64>(2)? as u64,         // start_time_ns
-                    row.get::<_, Option<String>>(3)?,     // tls_session_id
-                    row.get::<_, String>(4)?,             // binding_type
+                    row.get::<_, String>(0)?,         // message_id
+                    row.get::<_, i64>(1)? as u32,     // pid
+                    row.get::<_, i64>(2)? as u64,     // start_time_ns
+                    row.get::<_, Option<String>>(3)?, // tls_session_id
+                    row.get::<_, String>(4)?,         // binding_type
                 ))
             })?;
 
@@ -492,10 +472,11 @@ impl ReplayExecutor {
         if let Ok(entries) = std::fs::read_dir(".") {
             for entry in entries.flatten() {
                 let name = entry.file_name();
-                if let Some(n) = name.to_str() {
-                    if n.ends_with(".responsibility.db") && entry.path().is_file() {
-                        return Ok(n.to_string());
-                    }
+                if let Some(n) = name.to_str()
+                    && n.ends_with(".responsibility.db")
+                    && entry.path().is_file()
+                {
+                    return Ok(n.to_string());
                 }
             }
         }
@@ -522,15 +503,29 @@ impl ReplayExecutor {
                 // P1 alert has a matching P2 alert
                 let same_severity = matches!(
                     (&p1.severity, &p2.severity),
-                    (crate::responsibility::types::AlertSeverity::Info, crate::responsibility::types::AlertSeverity::Info)
-                    | (crate::responsibility::types::AlertSeverity::Warning, crate::responsibility::types::AlertSeverity::Warning)
-                    | (crate::responsibility::types::AlertSeverity::Critical, crate::responsibility::types::AlertSeverity::Critical)
+                    (
+                        crate::responsibility::types::AlertSeverity::Info,
+                        crate::responsibility::types::AlertSeverity::Info
+                    ) | (
+                        crate::responsibility::types::AlertSeverity::Warning,
+                        crate::responsibility::types::AlertSeverity::Warning
+                    ) | (
+                        crate::responsibility::types::AlertSeverity::Critical,
+                        crate::responsibility::types::AlertSeverity::Critical
+                    )
                 );
                 let same_decision = matches!(
                     (&p1.decision, &p2.decision),
-                    (crate::responsibility::types::AlertDecision::Safe, crate::responsibility::types::AlertDecision::Safe)
-                    | (crate::responsibility::types::AlertDecision::Unsafe, crate::responsibility::types::AlertDecision::Unsafe)
-                    | (crate::responsibility::types::AlertDecision::Uncertain, crate::responsibility::types::AlertDecision::Uncertain)
+                    (
+                        crate::responsibility::types::AlertDecision::Safe,
+                        crate::responsibility::types::AlertDecision::Safe
+                    ) | (
+                        crate::responsibility::types::AlertDecision::Unsafe,
+                        crate::responsibility::types::AlertDecision::Unsafe
+                    ) | (
+                        crate::responsibility::types::AlertDecision::Uncertain,
+                        crate::responsibility::types::AlertDecision::Uncertain
+                    )
                 );
                 let rtype = if same_severity && same_decision {
                     ClassificationRefinementType::Confirmed
@@ -560,14 +555,13 @@ impl ReplayExecutor {
         }
 
         // Phase 2 alerts with no Phase 1 match → discovered
-        let p1_ids: std::collections::HashSet<_> = p2_by_p1
-            .keys()
-            .map(|a| a.as_str().to_string())
-            .collect();
+        let p1_ids: std::collections::HashSet<_> =
+            p2_by_p1.keys().map(|a| a.as_str().to_string()).collect();
         for p2 in phase2 {
-            let has_p1 = p2.provisional_ref.as_ref().map_or(false, |r| {
-                p1_ids.contains(r.as_str())
-            });
+            let has_p1 = p2
+                .provisional_ref
+                .as_ref()
+                .is_some_and(|r| p1_ids.contains(r.as_str()));
             if !has_p1 {
                 refinements.push(ClassificationRefinement {
                     phase1_alert_id: AlertId::from("none"),
@@ -615,7 +609,9 @@ struct AuthoritativeIdentityProvider {
 }
 
 impl AuthoritativeIdentityProvider {
-    fn from(resolution: &crate::responsibility::identity::union_find::AuthoritativeResolution) -> Self {
+    fn from(
+        resolution: &crate::responsibility::identity::union_find::AuthoritativeResolution,
+    ) -> Self {
         let mut process_to_agent = HashMap::new();
         for agent in &resolution.agents {
             for pid in &agent.process_ids {
@@ -668,10 +664,7 @@ mod tests {
         let provider = AuthoritativeIdentityProvider::from(&resolution);
         assert_eq!(provider.agent_for_process(pid1), Some(agent_id.clone()));
         assert_eq!(provider.agent_for_process(pid2), Some(agent_id));
-        assert_eq!(
-            provider.agent_for_process(ProcessId::new(999, 1)),
-            None
-        );
+        assert_eq!(provider.agent_for_process(ProcessId::new(999, 1)), None);
 
         let all = provider.all_assignments();
         assert_eq!(all.len(), 2);
@@ -680,15 +673,9 @@ mod tests {
     #[test]
     fn test_build_classification_refinements_confirmed() {
         let p1 = make_alert("p1", AlertSeverity::Warning, 0.7, None);
-        let p2 = make_alert(
-            "p2",
-            AlertSeverity::Warning,
-            0.7,
-            Some(AlertId::from("p1")),
-        );
+        let p2 = make_alert("p2", AlertSeverity::Warning, 0.7, Some(AlertId::from("p1")));
 
-        let refs =
-            ReplayExecutor::build_classification_refinements(&[p1], &[p2]);
+        let refs = ReplayExecutor::build_classification_refinements(&[p1], &[p2]);
         assert_eq!(refs.len(), 1);
         assert_eq!(
             refs[0].refinement_type,
@@ -706,8 +693,7 @@ mod tests {
             Some(AlertId::from("p1")),
         );
 
-        let refs =
-            ReplayExecutor::build_classification_refinements(&[p1], &[p2]);
+        let refs = ReplayExecutor::build_classification_refinements(&[p1], &[p2]);
         assert_eq!(refs.len(), 1);
         assert_eq!(
             refs[0].refinement_type,
@@ -719,8 +705,7 @@ mod tests {
     fn test_build_classification_refinements_dismissed() {
         let p1 = make_alert("p1", AlertSeverity::Warning, 0.6, None);
 
-        let refs =
-            ReplayExecutor::build_classification_refinements(&[p1], &[]);
+        let refs = ReplayExecutor::build_classification_refinements(&[p1], &[]);
         assert_eq!(refs.len(), 1);
         assert_eq!(
             refs[0].refinement_type,
@@ -732,8 +717,7 @@ mod tests {
     fn test_build_classification_refinements_discovered() {
         let p2 = make_alert("p2", AlertSeverity::Warning, 0.7, None);
 
-        let refs =
-            ReplayExecutor::build_classification_refinements(&[], &[p2]);
+        let refs = ReplayExecutor::build_classification_refinements(&[], &[p2]);
         assert_eq!(refs.len(), 1);
         assert_eq!(
             refs[0].refinement_type,
@@ -804,7 +788,7 @@ mod tests {
                     evidence_score: 0.0,
                     role_score: 0.0,
                     repetition_score: 0.0,
-            behavioral_score: 0.0,
+                    behavioral_score: 0.0,
                     total: 0.0,
                 },
                 cusum_triggered: false,
@@ -829,9 +813,50 @@ pub struct ReplayConfig {
     pub skip_attribution: bool,
     pub skip_ai_pipeline: bool,
     pub skip_content_boundary_signals: bool,
-    pub enabled_match_levels: Option<HashSet<crate::responsibility::types::evidence_types::MatchLevel>>,
-    pub enabled_action_types: Option<HashSet<crate::responsibility::types::evidence_types::ActionCandidateType>>,
+    pub enabled_match_levels:
+        Option<HashSet<crate::responsibility::types::evidence_types::MatchLevel>>,
+    pub enabled_action_types:
+        Option<HashSet<crate::responsibility::types::evidence_types::ActionCandidateType>>,
 }
-impl ReplayConfig { pub fn all_enabled() -> Self { Self { skip_identity_resolution: false, skip_attribution: false, skip_ai_pipeline: false, skip_content_boundary_signals: false, enabled_match_levels: None, enabled_action_types: None } } }
-pub fn all_action_candidate_types() -> Vec<crate::responsibility::types::evidence_types::ActionCandidateType> { use crate::responsibility::types::evidence_types::ActionCandidateType::*; vec![FileRead,FileWrite,FileOverwrite,FileDelete,NetworkConnect,NetworkSend,ProcessExec,ProcessSpawn] }
-impl ReplayExecutor { pub fn reauthoritative_with_config(r: &PersistenceReader, id: &str, _: &ReplayConfig) -> Result<ReplayResult> { Self::reauthoritative(r, id) } pub fn reauthoritative_from_persisted_graph_with_config(r: &PersistenceReader, id: &str, _: &ReplayConfig) -> Result<ReplayResult> { Self::reauthoritative(r, id) } }
+impl ReplayConfig {
+    pub fn all_enabled() -> Self {
+        Self {
+            skip_identity_resolution: false,
+            skip_attribution: false,
+            skip_ai_pipeline: false,
+            skip_content_boundary_signals: false,
+            enabled_match_levels: None,
+            enabled_action_types: None,
+        }
+    }
+}
+pub fn all_action_candidate_types()
+-> Vec<crate::responsibility::types::evidence_types::ActionCandidateType> {
+    use crate::responsibility::types::evidence_types::ActionCandidateType::*;
+    vec![
+        FileRead,
+        FileWrite,
+        FileOverwrite,
+        FileDelete,
+        NetworkConnect,
+        NetworkSend,
+        ProcessExec,
+        ProcessSpawn,
+    ]
+}
+impl ReplayExecutor {
+    pub fn reauthoritative_with_config(
+        r: &PersistenceReader,
+        id: &str,
+        _: &ReplayConfig,
+    ) -> Result<ReplayResult> {
+        Self::reauthoritative(r, id)
+    }
+    pub fn reauthoritative_from_persisted_graph_with_config(
+        r: &PersistenceReader,
+        id: &str,
+        _: &ReplayConfig,
+    ) -> Result<ReplayResult> {
+        Self::reauthoritative(r, id)
+    }
+}

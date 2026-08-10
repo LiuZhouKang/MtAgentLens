@@ -311,7 +311,11 @@ describe('db-import — SQLite query layer', () => {
     expect(overview.graph).toEqual({ nodes: 0, edges: 0 }); // fixture 无 graph_nodes 表 → 0
     expect(overview.alerts.count).toBe(2);
     expect(overview.evidence.count).toBe(3);
-    expect(overview.evidence.by_match_level).toEqual({ L1Exact: 1, L3Containment: 1, L5Substring: 1 });
+    expect(overview.evidence.by_match_level).toEqual({
+      L1Exact: 1,
+      L3Containment: 1,
+      L5Substring: 1,
+    });
     expect(overview.claims.count).toBe(2);
     expect(overview.claims.by_type).toEqual({ TaintedContextUse: 1, PolicyViolation: 1 });
     expect(overview.claims.by_severity).toEqual({ Critical: 1, Warning: 1 });
@@ -329,7 +333,13 @@ describe('db-import — SQLite query layer', () => {
     expect(overview.agent_identities.count).toBe(2);
     expect(overview.delegation_records.count).toBe(2);
     expect(overview.subagent_boundaries.count).toBe(2);
-    expect(overview.refinements).toEqual({ claim: 0, classification: 0, evidence: 0, graph: 0, identity: 0 });
+    expect(overview.refinements).toEqual({
+      claim: 0,
+      classification: 0,
+      evidence: 0,
+      graph: 0,
+      identity: 0,
+    });
     expect(overview.non_link_diagnostics.count).toBe(4);
   });
 });
@@ -358,7 +368,9 @@ describe('parsePhaseIndicator', () => {
 describe('parseMatchedFields', () => {
   it('parses a full fields object', () => {
     expect(
-      parseMatchedFields('{"canonical_path":"/x","host":null,"port":null,"command":"ls","raw_args":["-l"]}'),
+      parseMatchedFields(
+        '{"canonical_path":"/x","host":null,"port":null,"command":"ls","raw_args":["-l"]}',
+      ),
     ).toEqual({
       canonical_path: '/x',
       host: null,
@@ -483,15 +495,25 @@ describe('db-import — process/tls 全行 + JOIN 标注 + cap 优先', () => {
     const db = await openDatabase(fixtureBytes());
     // fixture 已含这两表，先 DROP 换为合成数据（cap 优先逻辑只针对合成行）
     db.run('DROP TABLE IF EXISTS process_events');
-    db.run('CREATE TABLE process_events (process_event_id INTEGER PRIMARY KEY AUTOINCREMENT, pid INTEGER NOT NULL, start_time_ns INTEGER NOT NULL, parent_pid INTEGER, parent_start_time_ns INTEGER, comm TEXT NOT NULL, timestamp_ns INTEGER NOT NULL, run_id TEXT NOT NULL)');
+    db.run(
+      'CREATE TABLE process_events (process_event_id INTEGER PRIMARY KEY AUTOINCREMENT, pid INTEGER NOT NULL, start_time_ns INTEGER NOT NULL, parent_pid INTEGER, parent_start_time_ns INTEGER, comm TEXT NOT NULL, timestamp_ns INTEGER NOT NULL, run_id TEXT NOT NULL)',
+    );
     db.run('DROP TABLE IF EXISTS identity_process_map');
-    db.run('CREATE TABLE identity_process_map (agent_id TEXT NOT NULL, pid INTEGER NOT NULL, start_time_ns INTEGER NOT NULL, run_id TEXT NOT NULL, PRIMARY KEY(pid, start_time_ns))');
+    db.run(
+      'CREATE TABLE identity_process_map (agent_id TEXT NOT NULL, pid INTEGER NOT NULL, start_time_ns INTEGER NOT NULL, run_id TEXT NOT NULL, PRIMARY KEY(pid, start_time_ns))',
+    );
     // 3 条未识别（时间靠前）+ 2 条已识别（时间靠后）
     for (const pid of [1, 2, 3]) {
-      db.run('INSERT INTO process_events (pid, start_time_ns, parent_pid, parent_start_time_ns, comm, timestamp_ns, run_id) VALUES (?,?,?,?,?,?,?)', [pid, 1000, null, null, 'u' + pid, 1000 + pid, 'run-x']);
+      db.run(
+        'INSERT INTO process_events (pid, start_time_ns, parent_pid, parent_start_time_ns, comm, timestamp_ns, run_id) VALUES (?,?,?,?,?,?,?)',
+        [pid, 1000, null, null, 'u' + pid, 1000 + pid, 'run-x'],
+      );
     }
     for (const pid of [9, 10]) {
-      db.run('INSERT INTO process_events (pid, start_time_ns, parent_pid, parent_start_time_ns, comm, timestamp_ns, run_id) VALUES (?,?,?,?,?,?,?)', [pid, 1000, null, null, 'x' + pid, 2000 + pid, 'run-x']);
+      db.run(
+        'INSERT INTO process_events (pid, start_time_ns, parent_pid, parent_start_time_ns, comm, timestamp_ns, run_id) VALUES (?,?,?,?,?,?,?)',
+        [pid, 1000, null, null, 'x' + pid, 2000 + pid, 'run-x'],
+      );
       db.run('INSERT INTO identity_process_map VALUES (?,?,?,?)', ['agent-x', pid, 1000, 'run-x']);
     }
     const { items, total, truncated } = extractProcessEventsFromDb(db, 3);
@@ -522,9 +544,23 @@ describe('db-import — snapshot 演化帧（去重 + 降采样 + 提取即解�
   it('连续相同 metrics 帧被去重（合成 db）', async () => {
     const db = await openDatabase(fixtureBytes());
     db.run('DROP TABLE graph_snapshots');
-    db.run('CREATE TABLE graph_snapshots (snapshot_id TEXT, timestamp_ns INTEGER, nodes_json TEXT, edges_json TEXT, metrics_json TEXT, run_id TEXT)');
-    const m = JSON.stringify({ node_counts: { Agent: 1 }, edge_counts: {}, agent_count: 1, cross_agent_edges: 0, delegation_depth: 0, taint_chains: 0, avg_confidence: 0.5 });
-    for (const [sid, ts] of [['a', 1], ['b', 2], ['c', 3]]) {
+    db.run(
+      'CREATE TABLE graph_snapshots (snapshot_id TEXT, timestamp_ns INTEGER, nodes_json TEXT, edges_json TEXT, metrics_json TEXT, run_id TEXT)',
+    );
+    const m = JSON.stringify({
+      node_counts: { Agent: 1 },
+      edge_counts: {},
+      agent_count: 1,
+      cross_agent_edges: 0,
+      delegation_depth: 0,
+      taint_chains: 0,
+      avg_confidence: 0.5,
+    });
+    for (const [sid, ts] of [
+      ['a', 1],
+      ['b', 2],
+      ['c', 3],
+    ]) {
       db.run('INSERT INTO graph_snapshots VALUES (?,?,?,?,?,?)', [sid, ts, '[]', '[]', m, 'run-x']);
     }
     const frames = extractSnapshotFramesFromDb(db);
@@ -535,10 +571,28 @@ describe('db-import — snapshot 演化帧（去重 + 降采样 + 提取即解�
   it('超过 maxFrames 均匀降采样，首尾恒保留', async () => {
     const db = await openDatabase(fixtureBytes());
     db.run('DROP TABLE graph_snapshots');
-    db.run('CREATE TABLE graph_snapshots (snapshot_id TEXT, timestamp_ns INTEGER, nodes_json TEXT, edges_json TEXT, metrics_json TEXT, run_id TEXT)');
-    const metrics = (n: number) => JSON.stringify({ node_counts: { Agent: n }, edge_counts: {}, agent_count: n, cross_agent_edges: 0, delegation_depth: 0, taint_chains: 0, avg_confidence: 0.5 });
+    db.run(
+      'CREATE TABLE graph_snapshots (snapshot_id TEXT, timestamp_ns INTEGER, nodes_json TEXT, edges_json TEXT, metrics_json TEXT, run_id TEXT)',
+    );
+    const metrics = (n: number) =>
+      JSON.stringify({
+        node_counts: { Agent: n },
+        edge_counts: {},
+        agent_count: n,
+        cross_agent_edges: 0,
+        delegation_depth: 0,
+        taint_chains: 0,
+        avg_confidence: 0.5,
+      });
     for (let i = 1; i <= 10; i += 1) {
-      db.run('INSERT INTO graph_snapshots VALUES (?,?,?,?,?,?)', ['f' + i, i, '[]', '[]', metrics(i), 'run-x']);
+      db.run('INSERT INTO graph_snapshots VALUES (?,?,?,?,?,?)', [
+        'f' + i,
+        i,
+        '[]',
+        '[]',
+        metrics(i),
+        'run-x',
+      ]);
     }
     const frames = extractSnapshotFramesFromDb(db, 4);
     db.close();
@@ -552,8 +606,17 @@ describe('db-import — snapshot 演化帧（去重 + 降采样 + 提取即解�
   it('坏 nodes_json 帧 → 空图（不抛错）', async () => {
     const db = await openDatabase(fixtureBytes());
     db.run('DROP TABLE graph_snapshots');
-    db.run('CREATE TABLE graph_snapshots (snapshot_id TEXT, timestamp_ns INTEGER, nodes_json TEXT, edges_json TEXT, metrics_json TEXT, run_id TEXT)');
-    db.run('INSERT INTO graph_snapshots VALUES (?,?,?,?,?,?)', ['bad', 1, '{broken', '[]', null, 'run-x']);
+    db.run(
+      'CREATE TABLE graph_snapshots (snapshot_id TEXT, timestamp_ns INTEGER, nodes_json TEXT, edges_json TEXT, metrics_json TEXT, run_id TEXT)',
+    );
+    db.run('INSERT INTO graph_snapshots VALUES (?,?,?,?,?,?)', [
+      'bad',
+      1,
+      '{broken',
+      '[]',
+      null,
+      'run-x',
+    ]);
     const frames = extractSnapshotFramesFromDb(db);
     db.close();
     expect(frames).toHaveLength(1);

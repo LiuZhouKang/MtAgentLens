@@ -374,7 +374,10 @@ mod tests {
         tracker.mark_contaminated(a.clone(), "/tmp/shared.txt", 2000);
         tracker.mark_contaminated(b.clone(), "/tmp/shared.txt", 1000);
 
-        let record = tracker.contaminated_artifacts().get("/tmp/shared.txt").unwrap();
+        let record = tracker
+            .contaminated_artifacts()
+            .get("/tmp/shared.txt")
+            .unwrap();
         // Earliest timestamp (1000) should win.
         assert_eq!(record.timestamp_ns, 1000);
         assert_eq!(record.source_agent, b);

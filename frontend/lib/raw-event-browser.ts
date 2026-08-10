@@ -54,9 +54,7 @@ export function buildRawEventRows(input: RawEventInput): RawEventRow[] {
       kind: 'process' as const,
       timestampNs: pe.timestamp_ns,
       title: pe.comm,
-      detail: pe.parent_pid != null
-        ? `pid ${pe.pid} ← parent ${pe.parent_pid}`
-        : `pid ${pe.pid}`,
+      detail: pe.parent_pid != null ? `pid ${pe.pid} ← parent ${pe.parent_pid}` : `pid ${pe.pid}`,
       agentId: pe.agent_id,
       raw: pe,
     })),
@@ -120,7 +118,10 @@ export function summarizeRawEvents(rows: RawEventRow[]): Record<RawEventKind, nu
 const KIND_ORDER: RawEventKind[] = ['process', 'tls', 'intent', 'action'];
 
 /** 指定 agent 实际拥有的 kind 集合（级联收窄；agentId=null 视为不限 agent）。 */
-export function availableKindsForAgent(rows: RawEventRow[], agentId: string | null): RawEventKind[] {
+export function availableKindsForAgent(
+  rows: RawEventRow[],
+  agentId: string | null,
+): RawEventKind[] {
   const present = new Set<RawEventKind>();
   for (const row of rows) {
     if (agentId != null && row.agentId !== agentId) continue;

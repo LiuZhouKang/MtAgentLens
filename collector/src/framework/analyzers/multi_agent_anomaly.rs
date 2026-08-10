@@ -434,18 +434,16 @@ impl DetectionState {
                 if matches!(
                     summary_type,
                     "FILE_DELETE" | "FILE_TRUNCATE" | "SIGNAL_SEND" | "PROC_FORK"
+                ) && let Some(correlation) = self.try_prompt_correlation(
+                    event,
+                    summary_type,
+                    json!({
+                        "count": count,
+                        "detail": event.data.get("detail").cloned().unwrap_or(Value::Null),
+                        "extra": event.data.get("extra").cloned().unwrap_or(Value::Null),
+                    }),
                 ) {
-                    if let Some(correlation) = self.try_prompt_correlation(
-                        event,
-                        summary_type,
-                        json!({
-                            "count": count,
-                            "detail": event.data.get("detail").cloned().unwrap_or(Value::Null),
-                            "extra": event.data.get("extra").cloned().unwrap_or(Value::Null),
-                        }),
-                    ) {
-                        alerts.push(correlation);
-                    }
+                    alerts.push(correlation);
                 }
             }
             "FILE_OPEN" => {

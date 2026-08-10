@@ -18,11 +18,11 @@ export interface ProcessTreeNode {
 
 export interface AgentProcessTree {
   agentId: string;
-  primarySignal: string | null;    // provisional.primary_signal
-  confidence: number | null;       // provisional.confidence
+  primarySignal: string | null; // provisional.primary_signal
+  confidence: number | null; // provisional.confidence
   status: 'provisional' | 'authoritative'; // 是否出现在 agent_identities
-  roots: ProcessTreeNode[];        // 该 agent 的进程树
-  orphanPids: number[];            // identity_map 有但 process_events 无记录的 pid
+  roots: ProcessTreeNode[]; // 该 agent 的进程树
+  orphanPids: number[]; // identity_map 有但 process_events 无记录的 pid
 }
 
 export interface AgentFamilyNode {
@@ -79,7 +79,8 @@ export function buildAgentProcessTrees(input: {
         orphanPids.push(m.pid); // identity_map 有、process_events 无 → orphan
         continue;
       }
-      const parentKey = ev.parent_pid != null ? processKey(ev.parent_pid, ev.parent_start_time_ns ?? 0) : null;
+      const parentKey =
+        ev.parent_pid != null ? processKey(ev.parent_pid, ev.parent_start_time_ns ?? 0) : null;
       // 父进程不在该 agent 的 identity_map（跨 agent / 无归属）→ 本进程作根
       if (parentKey == null || !ownedKeys.has(parentKey)) rootKeys.add(key);
     }
@@ -127,14 +128,17 @@ export function buildAgentProcessTrees(input: {
   return trees;
 }
 
-export function buildAgentFamilyTree(subagentBoundaries: SubagentBoundary[]): Map<string, AgentFamilyNode> {
+export function buildAgentFamilyTree(
+  subagentBoundaries: SubagentBoundary[],
+): Map<string, AgentFamilyNode> {
   const tree = new Map<string, AgentFamilyNode>();
   for (const b of subagentBoundaries) {
     const node = tree.get(b.parent_agent_id) ?? { agentId: b.parent_agent_id, children: [] };
     node.children.push({ childAgentId: b.child_agent_id, reason: b.reason, childPid: b.child_pid });
     tree.set(b.parent_agent_id, node);
     // 无子节点的子 agent 也登记为空节点（渲染时可展开显示「无委派」）
-    if (!tree.has(b.child_agent_id)) tree.set(b.child_agent_id, { agentId: b.child_agent_id, children: [] });
+    if (!tree.has(b.child_agent_id))
+      tree.set(b.child_agent_id, { agentId: b.child_agent_id, children: [] });
   }
   return tree;
 }

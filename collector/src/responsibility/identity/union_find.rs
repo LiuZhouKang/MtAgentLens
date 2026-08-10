@@ -17,8 +17,8 @@
 use crate::responsibility::signals::SignalSnapshot;
 use crate::responsibility::types::{
     AgentConfidence, AgentId, AuthoritativeIdentity, IdentityRefinement, IdentityRefinementType,
-    MessageId, ProcessId, ProvisionalIdentity, SubagentBoundary,
-    SubagentBoundaryReason, TlsSessionId, UnresolvedDiagnostic, UnresolvedReason,
+    MessageId, ProcessId, ProvisionalIdentity, SubagentBoundary, SubagentBoundaryReason,
+    TlsSessionId, UnresolvedDiagnostic, UnresolvedReason,
 };
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -111,9 +111,7 @@ pub fn is_subagent_boundary(
     }
 
     let parent_tls = snapshot.tls_sessions_for_process(parent);
-    let shared = child_tls
-        .iter()
-        .any(|t| parent_tls.contains(t));
+    let shared = child_tls.iter().any(|t| parent_tls.contains(t));
     if shared {
         return false; // Shared TLS → same agent
     }
@@ -213,7 +211,7 @@ pub fn run_authoritative_resolution(
     }
 
     // Union all seeds that share at least one TLS session.
-    for (_tls, indices) in &tls_to_seeds {
+    for indices in tls_to_seeds.values() {
         if indices.len() >= 2 {
             let root = indices[0];
             for &idx in &indices[1..] {
@@ -454,10 +452,10 @@ pub fn run_authoritative_resolution(
         let mut provisional_refs: Vec<AgentId> = Vec::new();
         let mut seen_prov: HashSet<String> = HashSet::new();
         for pid in comp {
-            if let Some(prov) = provisional_map.get(pid) {
-                if seen_prov.insert(prov.agent_id.as_str().to_string()) {
-                    provisional_refs.push(prov.agent_id.clone());
-                }
+            if let Some(prov) = provisional_map.get(pid)
+                && seen_prov.insert(prov.agent_id.as_str().to_string())
+            {
+                provisional_refs.push(prov.agent_id.clone());
             }
         }
 
@@ -618,7 +616,11 @@ mod tests {
         assignments.insert(a, 0);
         assignments.insert(b, 1);
 
-        assert!(has_children_in_multiple_components(shell, &snap, &assignments));
+        assert!(has_children_in_multiple_components(
+            shell,
+            &snap,
+            &assignments
+        ));
     }
 
     #[test]
@@ -636,7 +638,11 @@ mod tests {
         assignments.insert(a, 0);
         assignments.insert(b, 0); // Same component
 
-        assert!(!has_children_in_multiple_components(parent, &snap, &assignments));
+        assert!(!has_children_in_multiple_components(
+            parent,
+            &snap,
+            &assignments
+        ));
     }
 
     #[test]
@@ -756,8 +762,9 @@ mod tests {
         // Noise has no TLS/messages → NoPositiveSignal
         assert_eq!(result.agents.len(), 0);
         assert!(!result.unresolved.is_empty());
-        assert!(result.unresolved.iter().any(|u| u.process_id == noise
-            && matches!(u.reason, UnresolvedReason::NoPositiveSignal)));
+        assert!(result.unresolved.iter().any(
+            |u| u.process_id == noise && matches!(u.reason, UnresolvedReason::NoPositiveSignal)
+        ));
     }
 
     #[test]

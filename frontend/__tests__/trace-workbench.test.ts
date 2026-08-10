@@ -112,7 +112,7 @@ describe('LLM observer events', () => {
         ],
         pattern_verdicts: [],
       },
-    } as typeof demoAlerts[0];
+    } as (typeof demoAlerts)[0];
     const model = buildTraceRunModel(withFailed, demoEvidence);
     expect(model.timeline.filter((e) => e.kind === 'llm')).toHaveLength(0);
   });
@@ -133,16 +133,54 @@ describe('signal event collapsing', () => {
         ...base.timeline,
         steps: [
           ...base.timeline.steps,
-          { timestamp_ns: lastNs + 1000, event_type: 'signal', description: 'signal: ssl (pid=111)', resource: null, evidence_ref: null, agent_id: null, operation: null, evidence_level: null, triggering_rule_ids: [], triggering_pattern_id: null, source_event_id: null },
-          { timestamp_ns: lastNs + 2000, event_type: 'signal', description: 'signal: ssl (pid=111)', resource: null, evidence_ref: null, agent_id: null, operation: null, evidence_level: null, triggering_rule_ids: [], triggering_pattern_id: null, source_event_id: null },
-          { timestamp_ns: lastNs + 3000, event_type: 'signal', description: 'signal: ssl (pid=222)', resource: null, evidence_ref: null, agent_id: null, operation: null, evidence_level: null, triggering_rule_ids: [], triggering_pattern_id: null, source_event_id: null },
+          {
+            timestamp_ns: lastNs + 1000,
+            event_type: 'signal',
+            description: 'signal: ssl (pid=111)',
+            resource: null,
+            evidence_ref: null,
+            agent_id: null,
+            operation: null,
+            evidence_level: null,
+            triggering_rule_ids: [],
+            triggering_pattern_id: null,
+            source_event_id: null,
+          },
+          {
+            timestamp_ns: lastNs + 2000,
+            event_type: 'signal',
+            description: 'signal: ssl (pid=111)',
+            resource: null,
+            evidence_ref: null,
+            agent_id: null,
+            operation: null,
+            evidence_level: null,
+            triggering_rule_ids: [],
+            triggering_pattern_id: null,
+            source_event_id: null,
+          },
+          {
+            timestamp_ns: lastNs + 3000,
+            event_type: 'signal',
+            description: 'signal: ssl (pid=222)',
+            resource: null,
+            evidence_ref: null,
+            agent_id: null,
+            operation: null,
+            evidence_level: null,
+            triggering_rule_ids: [],
+            triggering_pattern_id: null,
+            source_event_id: null,
+          },
         ],
       },
-    } as typeof demoAlerts[0];
+    } as (typeof demoAlerts)[0];
 
     const model = buildTraceRunModel(withSignals, demoEvidence);
     // exactly ONE collapsed aggregate (demo also has a native network_connect step)
-    const aggregates = model.timeline.filter((e) => e.kind === 'network' && e.title.startsWith('SSL/TLS 连接'));
+    const aggregates = model.timeline.filter(
+      (e) => e.kind === 'network' && e.title.startsWith('SSL/TLS 连接'),
+    );
     expect(aggregates).toHaveLength(1);
     expect(aggregates[0].title).toMatch(/SSL|连接|signal/);
     expect(model.kindCounts.network).toBe(2); // native network_connect + collapsed aggregate

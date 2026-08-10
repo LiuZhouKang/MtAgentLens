@@ -14,11 +14,7 @@ pub struct HealthResponse {
 }
 
 /// GET /health — full health check including DB connectivity.
-pub fn health<B>(
-    _req: Request<B>,
-    db_healthy: bool,
-    db_status: Option<String>,
-) -> Response<Bytes> {
+pub fn health<B>(_req: Request<B>, db_healthy: bool, db_status: Option<String>) -> Response<Bytes> {
     let body = serde_json::to_vec(&HealthResponse {
         healthy: db_healthy,
         ready: db_healthy,
@@ -54,10 +50,7 @@ pub fn live<B>(_req: Request<B>) -> Response<Bytes> {
 }
 
 /// GET /ready — readiness probe (DB connection must be alive).
-pub fn ready<B>(
-    _req: Request<B>,
-    db_healthy: bool,
-) -> Response<Bytes> {
+pub fn ready<B>(_req: Request<B>, db_healthy: bool) -> Response<Bytes> {
     let body = serde_json::to_vec(&serde_json::json!({"ready": db_healthy})).unwrap_or_default();
     let mut resp = Response::builder()
         .status(if db_healthy {

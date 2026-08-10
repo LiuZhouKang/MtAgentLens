@@ -19,8 +19,8 @@ use anyhow::{Context, Result, anyhow};
 use rusqlite::Connection;
 
 use crate::responsibility::types::support_types::{
-    AccountabilityAuditSummary, ResponsibilityClaimState, AccountabilityTracebackReplay, AlertId,
-    EvidenceId, NodeId, TracebackId,
+    AccountabilityAuditSummary, AccountabilityTracebackReplay, AlertId, EvidenceId, NodeId,
+    ResponsibilityClaimState, TracebackId,
 };
 
 // ── Public API ──────────────────────────────────────────────────────────
@@ -160,7 +160,7 @@ pub fn count_tracebacks_by_claim_state(
     let conn = Connection::open(db_path).context("open accountability db for claim-state stats")?;
 
     let has_column = {
-        let mut stmt = conn
+        let stmt = conn
             .prepare("SELECT claim_state FROM policy_evaluations LIMIT 0")
             .ok();
         stmt.is_some()

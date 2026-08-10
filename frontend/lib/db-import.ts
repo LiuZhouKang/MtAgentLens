@@ -100,14 +100,14 @@ export interface DbAssets {
   agentIdentities: AgentIdentity[];
   provisionalIdentities: ProvisionalIdentity[];
   identityProcessMap: IdentityProcessMapEntry[];
-  processEvents: ProcessEvent[];           // 已 cap
-  processEventCount: number;               // totalCount
+  processEvents: ProcessEvent[]; // 已 cap
+  processEventCount: number; // totalCount
   processEventTruncated: boolean;
-  tlsSessions: TlsSession[];               // 已 cap
+  tlsSessions: TlsSession[]; // 已 cap
   tlsSessionCount: number;
   tlsSessionTruncated: boolean;
   subagentBoundaries: SubagentBoundary[];
-  snapshotFrames: GraphSnapshotFrame[];    // 去重 + 降采样
+  snapshotFrames: GraphSnapshotFrame[]; // 去重 + 降采样
 }
 
 const EMPTY_METRICS: GraphMetrics = {
@@ -342,10 +342,9 @@ export function extractClaimsFromDb(db: Database): ResponsibilityClaim[] {
       severity: (r.severity as AlertSeverity) ?? 'Warning',
       confidence: Number(r.confidence ?? 0),
       evidence_refs: parseJsonArray<string>(r.evidence_refs_json),
-      competing_explanations:
-        parseJsonArray<ResponsibilityClaim['competing_explanations'][number]>(
-          r.competing_explanations_json,
-        ),
+      competing_explanations: parseJsonArray<ResponsibilityClaim['competing_explanations'][number]>(
+        r.competing_explanations_json,
+      ),
       traceback_ref: r.traceback_ref ? String(r.traceback_ref) : null,
       phase,
       timestamp_ns: phaseTimestampNs(phase),
@@ -539,9 +538,11 @@ const EMPTY_GRAPH: { graph: GraphData; metrics: null; runId: null } = {
 };
 
 /** Load the latest graph snapshot (nodes + edges + metrics) from graph_snapshots. */
-export function extractGraphFromDb(
-  db: Database,
-): { graph: GraphData; metrics: GraphMetrics | null; runId: string | null } {
+export function extractGraphFromDb(db: Database): {
+  graph: GraphData;
+  metrics: GraphMetrics | null;
+  runId: string | null;
+} {
   let rows: Record<string, unknown>[];
   try {
     rows = queryRows(
@@ -587,7 +588,10 @@ export function extractGraphFromDb(
 export function extractPollutionEventsFromDb(db: Database): ContextPollutionEvent[] {
   let rows: Record<string, unknown>[];
   try {
-    rows = queryRows(db, 'SELECT pollution_id, source_agent_id, contaminated_artifact, propagation_path_json, detected_at_ns, run_id FROM context_pollution_events');
+    rows = queryRows(
+      db,
+      'SELECT pollution_id, source_agent_id, contaminated_artifact, propagation_path_json, detected_at_ns, run_id FROM context_pollution_events',
+    );
   } catch {
     return []; // Table absent.
   }
@@ -605,7 +609,10 @@ export function extractPollutionEventsFromDb(db: Database): ContextPollutionEven
 export function extractPolicyEvaluationsFromDb(db: Database): PolicyEvaluation[] {
   let rows: Record<string, unknown>[];
   try {
-    rows = queryRows(db, 'SELECT policy_id, boundary, judgment_json, subject_agent_id, resource_json, evidence_refs_json, confidence, reason, run_id FROM policy_evaluations');
+    rows = queryRows(
+      db,
+      'SELECT policy_id, boundary, judgment_json, subject_agent_id, resource_json, evidence_refs_json, confidence, reason, run_id FROM policy_evaluations',
+    );
   } catch {
     return []; // Table absent.
   }
@@ -626,7 +633,10 @@ export function extractPolicyEvaluationsFromDb(db: Database): PolicyEvaluation[]
 export function extractNonLinkDiagnosticsFromDb(db: Database): NonLinkDiagnostic[] {
   let rows: Record<string, unknown>[];
   try {
-    rows = queryRows(db, 'SELECT diagnostic_id, intent_id, action_id, reason, timestamp_ns, run_id FROM non_link_diagnostics');
+    rows = queryRows(
+      db,
+      'SELECT diagnostic_id, intent_id, action_id, reason, timestamp_ns, run_id FROM non_link_diagnostics',
+    );
   } catch {
     return []; // Table absent.
   }
@@ -644,7 +654,10 @@ export function extractNonLinkDiagnosticsFromDb(db: Database): NonLinkDiagnostic
 export function extractAgentIdentitiesFromDb(db: Database): AgentIdentity[] {
   let rows: Record<string, unknown>[];
   try {
-    rows = queryRows(db, 'SELECT agent_id, process_ids_json, message_ids_json, tls_sessions_json, confidence, provisional_refs_json, run_id FROM agent_identities');
+    rows = queryRows(
+      db,
+      'SELECT agent_id, process_ids_json, message_ids_json, tls_sessions_json, confidence, provisional_refs_json, run_id FROM agent_identities',
+    );
   } catch {
     return []; // Table absent.
   }
@@ -663,7 +676,10 @@ export function extractAgentIdentitiesFromDb(db: Database): AgentIdentity[] {
 export function extractProvisionalIdentitiesFromDb(db: Database): ProvisionalIdentity[] {
   let rows: Record<string, unknown>[];
   try {
-    rows = queryRows(db, 'SELECT agent_id, process_ids_json, primary_signal, confidence, run_id FROM provisional_identities');
+    rows = queryRows(
+      db,
+      'SELECT agent_id, process_ids_json, primary_signal, confidence, run_id FROM provisional_identities',
+    );
   } catch {
     return []; // Table absent.
   }
@@ -778,7 +794,10 @@ export function extractTlsSessionsFromDb(db: Database, cap = 25000): CappedExtra
 export function extractSubagentBoundariesFromDb(db: Database): SubagentBoundary[] {
   let rows: Record<string, unknown>[];
   try {
-    rows = queryRows(db, 'SELECT boundary_id, parent_agent_id, child_agent_id, parent_pid, parent_start_time_ns, child_pid, child_start_time_ns, reason, run_id FROM subagent_boundaries');
+    rows = queryRows(
+      db,
+      'SELECT boundary_id, parent_agent_id, child_agent_id, parent_pid, parent_start_time_ns, child_pid, child_start_time_ns, reason, run_id FROM subagent_boundaries',
+    );
   } catch {
     return []; // Table absent.
   }
@@ -884,7 +903,8 @@ function mapAlertRow(r: Record<string, unknown>): ResponsibilityAlert {
   return {
     alert_id: String(r.alert_id ?? ''),
     timestamp_ns: ts,
-    display_profile: (r.display_profile as ResponsibilityAlert['display_profile']) ?? 'UnsafeByEngine',
+    display_profile:
+      (r.display_profile as ResponsibilityAlert['display_profile']) ?? 'UnsafeByEngine',
     decision: (r.decision as ResponsibilityAlert['decision']) ?? 'Uncertain',
     severity: (r.severity as ResponsibilityAlert['severity']) ?? 'Warning',
     confidence: Number(r.confidence ?? 0),
@@ -944,7 +964,9 @@ export function extractEvidenceFromDb(db: Database): CorrelationEvidence[] {
     confidence: Number(r.confidence ?? 0),
     matched_fields: parseMatchedFields(r.matched_fields_json),
     derivation_mode: String(r.derivation_mode ?? ''),
-    phase: parsePhaseIndicator(r.phase) ?? { Provisional: { timestamp_ns: Number(r.timestamp_ns ?? 0) } },
+    phase: parsePhaseIndicator(r.phase) ?? {
+      Provisional: { timestamp_ns: Number(r.timestamp_ns ?? 0) },
+    },
     timestamp_ns: Number(r.timestamp_ns ?? 0),
   }));
 }
@@ -953,9 +975,7 @@ const sumValues = (record: Record<string, number>): number =>
   Object.values(record).reduce((sum, n) => sum + n, 0);
 
 /** 快照帧：仅读 metrics_json（绝不解析 nodes/edges_json）。null metrics 行跳过。 */
-export function extractSnapshotMetricsFromDb(
-  db: Database,
-): SnapshotMetricsExtract {
+export function extractSnapshotMetricsFromDb(db: Database): SnapshotMetricsExtract {
   let rows: Record<string, unknown>[];
   try {
     rows = queryRows(
@@ -1096,9 +1116,12 @@ export function extractTlsSessionAggregateFromDb(db: Database): TlsExtract {
   return { available: true, total, byPid, trend };
 }
 
-export function extractCountsFromDb(
-  db: Database,
-): { tracebackCount: number; claimCount: number; intentCount: number; actionCount: number } {
+export function extractCountsFromDb(db: Database): {
+  tracebackCount: number;
+  claimCount: number;
+  intentCount: number;
+  actionCount: number;
+} {
   const count = (table: string): number => {
     try {
       const rows = queryRows(db, `SELECT COUNT(*) AS n FROM ${table}`);

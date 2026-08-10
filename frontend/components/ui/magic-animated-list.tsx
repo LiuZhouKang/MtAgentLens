@@ -23,18 +23,13 @@ export const AnimatedList = React.memo(
       }
     }, [index, childrenArray.length, delay]);
 
-    const itemsToShow = useMemo(
-      () => childrenArray.slice(0, index + 1),
-      [index, childrenArray],
-    );
+    const itemsToShow = useMemo(() => childrenArray.slice(0, index + 1), [index, childrenArray]);
 
     return (
-      <div className={`flex flex-col gap-3 w-full min-w-0 ${className || ''}`}>
+      <div className={`flex w-full min-w-0 flex-col gap-3 ${className || ''}`}>
         <AnimatePresence mode="popLayout">
           {itemsToShow.map((item) => (
-            <AnimatedListItem key={(item as ReactElement).key}>
-              {item}
-            </AnimatedListItem>
+            <AnimatedListItem key={(item as ReactElement).key}>{item}</AnimatedListItem>
           ))}
         </AnimatePresence>
       </div>

@@ -32,11 +32,14 @@ async function importSampleDb(page: import('@playwright/test').Page): Promise<vo
  * Playwright strict mode 不容重复匹配。
  */
 function attributionPanel(page: import('@playwright/test').Page, title: string | RegExp) {
-  return page.locator('section.ln-panel').filter({
-    has: page.getByText('全局归因'),
-  }).filter({
-    has: page.getByRole('heading', { name: title }),
-  });
+  return page
+    .locator('section.ln-panel')
+    .filter({
+      has: page.getByText('全局归因'),
+    })
+    .filter({
+      has: page.getByRole('heading', { name: title }),
+    });
 }
 
 test.describe('M5 为什么告警分面 + 全局归因', () => {
@@ -72,7 +75,10 @@ test.describe('M5 为什么告警分面 + 全局归因', () => {
     // 注意面板数为「事件数」而非 chip 的「告警数」：污染列 total=3（3 条传播事件），
     // 标题「2 污染」是命中分面的告警数 —— 二者单位不同，按 spec 设计。
     await panel.getByRole('button', { name: /归因/ }).click();
-    await expect(panel.getByRole('button', { name: /归因/ })).toHaveAttribute('aria-expanded', 'true');
+    await expect(panel.getByRole('button', { name: /归因/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
     await expect(panel.getByText('3 链 · 多跳 1 · 最长 3 · 平均 1')).toBeVisible();
     await expect(panel.getByText('6 判定 · 违规 1（17%）')).toBeVisible();
     await expect(panel.getByText('4 诊断 · 涉及 3 意图')).toBeVisible();
@@ -86,7 +92,9 @@ test.describe('M5 为什么告警分面 + 全局归因', () => {
     await expect(pollutionCol).toContainText('agent-b');
   });
 
-  test('分面交互：点污染 → URL ?facet=pollution、chip 生效、刷新深链保持、重新导入恢复', async ({ page }) => {
+  test('分面交互：点污染 → URL ?facet=pollution、chip 生效、刷新深链保持、重新导入恢复', async ({
+    page,
+  }) => {
     await page.goto('/investigations', { waitUntil: 'domcontentloaded' });
     await importSampleDb(page);
 
@@ -112,13 +120,20 @@ test.describe('M5 为什么告警分面 + 全局归因', () => {
     // 重新导入 db → 深链分面自动恢复生效（URL 是唯一权威，db 就绪即恢复）
     await importSampleDb(page);
     const restoredPanel = attributionPanel(page, '2 条告警 · 2 污染 / 2 违规 / 0 失配');
-    await expect(restoredPanel.getByRole('button', { name: /污染 2/ })).toHaveAttribute('aria-pressed', 'true', {
-      timeout: 15000,
-    });
+    await expect(restoredPanel.getByRole('button', { name: /污染 2/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+      {
+        timeout: 15000,
+      },
+    );
 
     // 清除分面 → URL 移除 facet 参数，回到全部
     await restoredPanel.getByRole('button', { name: /清除分面/ }).click();
     await expect(page).not.toHaveURL(/facet=pollution/);
-    await expect(restoredPanel.getByRole('button', { name: /污染 2/ })).toHaveAttribute('aria-pressed', 'false');
+    await expect(restoredPanel.getByRole('button', { name: /污染 2/ })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
   });
 });

@@ -10,36 +10,36 @@ import type {
 
 export interface EngineVerdict {
   kind: 'rule' | 'pattern';
-  id: string;                // rule_id / template_id
+  id: string; // rule_id / template_id
   score: number;
-  reason: string;            // 从 verdict 结构尽力提取；无 → ''
-  targets: string[];         // rule 的 matched_resource；PatternVerdict 无此字段 → 恒 []
+  reason: string; // 从 verdict 结构尽力提取；无 → ''
+  targets: string[]; // rule 的 matched_resource；PatternVerdict 无此字段 → 恒 []
 }
 
 export interface PollutionChain {
-  pollution_id: number;      // 渲染层 React key（同 agent 可多次污染同 artifact，(source, artifact) 不可作 key）
+  pollution_id: number; // 渲染层 React key（同 agent 可多次污染同 artifact，(source, artifact) 不可作 key）
   source_agent_id: string;
   contaminated_artifact: string;
-  hops: string[];            // propagation_path；写者 → 中间 → 读者
+  hops: string[]; // propagation_path；写者 → 中间 → 读者
   detected_at_ns: number;
   /** 表无逐 hop 时间戳，时延不可算 → 恒 null（不幻觉）。 */
   dt_ns: number | null;
 }
 
 export interface PolicyVerdictRow {
-  policy_id: string;         // 渲染层 React key（boundary 可重复，不能作 key）
+  policy_id: string; // 渲染层 React key（boundary 可重复，不能作 key）
   boundary: string;
-  result: string | null;     // 'Violation' | 'Allow' | judgment 缺省 → null
+  result: string | null; // 'Violation' | 'Allow' | judgment 缺省 → null
   confidence: number;
   reason: string;
 }
 
 export interface ForensicChain {
-  verdicts: EngineVerdict[];             // alert.engine.rule_verdicts + pattern_verdicts
-  pollutionChains: PollutionChain[];     // 按 involved_agents ∩ source_agent_id
-  policyRows: PolicyVerdictRow[];        // 按 subject_agent_id ∈ involved_agents
-  diagnostics: NonLinkDiagnostic[];      // 按 intent_id ∈ intentIds
-  claimRefs: string[];                   // claims evidence_refs ∩ alertEvidenceRefs
+  verdicts: EngineVerdict[]; // alert.engine.rule_verdicts + pattern_verdicts
+  pollutionChains: PollutionChain[]; // 按 involved_agents ∩ source_agent_id
+  policyRows: PolicyVerdictRow[]; // 按 subject_agent_id ∈ involved_agents
+  diagnostics: NonLinkDiagnostic[]; // 按 intent_id ∈ intentIds
+  claimRefs: string[]; // claims evidence_refs ∩ alertEvidenceRefs
 }
 
 /** involved_agents 的 agent_id 集合（含 primary）。弱关联匹配用。 */
@@ -63,7 +63,15 @@ export function buildForensicChain(input: {
   /** alert 证据引用（组件层 collectAlertEvidenceRefs 计算）。 */
   alertEvidenceRefs: string[];
 }): ForensicChain {
-  const { alert, pollutionEvents, policyEvaluations, nonLinkDiagnostics, claims, intentIds, alertEvidenceRefs } = input;
+  const {
+    alert,
+    pollutionEvents,
+    policyEvaluations,
+    nonLinkDiagnostics,
+    claims,
+    intentIds,
+    alertEvidenceRefs,
+  } = input;
   const involved = involvedAgentSet(alert);
   const intentIdSet = new Set(intentIds);
   const evidenceRefSet = new Set(alertEvidenceRefs);
@@ -106,7 +114,9 @@ export function buildForensicChain(input: {
       reason: p.reason,
     }));
 
-  const diagnostics = nonLinkDiagnostics.filter((d) => d.intent_id != null && intentIdSet.has(d.intent_id));
+  const diagnostics = nonLinkDiagnostics.filter(
+    (d) => d.intent_id != null && intentIdSet.has(d.intent_id),
+  );
 
   const claimRefSet = new Set<string>();
   for (const c of claims) {

@@ -45,7 +45,7 @@
 //!    safe because the stream is immediately ready (from a Vec), and the method runs
 //!    within a tokio runtime context.
 
-use super::{Analyzer, AnalyzerError};
+use super::Analyzer;
 use crate::framework::analyzers::pipeline_contract::{
     PipelineBuildError, PipelineBuilder, PipelineOrchestrator, PipelineOrchestratorState,
     PipelineStage, SharedStateStore, StageContract, StageMetrics, StageStatus,
@@ -156,8 +156,7 @@ impl PipelineOrchestratorImpl {
             // SAFETY: We're running in a tokio context. The stream is immediately ready
             // (pinned from a Vec), so block_on returns instantly without blocking the
             // runtime for any significant duration.
-            let result = tokio::runtime::Handle::current()
-                .block_on(analyzer.process(input_stream));
+            let result = tokio::runtime::Handle::current().block_on(analyzer.process(input_stream));
             match result {
                 Ok(output_stream) => {
                     // Collect the output stream (also immediately ready)
@@ -496,9 +495,7 @@ impl PipelineBuilder for PipelineBuilderImpl {
             let upstream = &contracts[i - 1];
             let downstream = &contracts[i];
 
-            if downstream.stage != PipelineStage::Output
-                && !upstream.satisfies(downstream)
-            {
+            if downstream.stage != PipelineStage::Output && !upstream.satisfies(downstream) {
                 unsatisfied.push((upstream.stage, downstream.stage));
             }
         }
@@ -546,7 +543,7 @@ impl PipelineBuilder for PipelineBuilderImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::framework::analyzers::Analyzer;
+    use crate::framework::analyzers::{Analyzer, AnalyzerError};
     use crate::framework::core::Event;
     use async_trait::async_trait;
     use serde_json::json;
@@ -576,15 +573,9 @@ mod tests {
             let tag = self.stage_tag;
             let mapped = stream.map(move |mut event| {
                 // Add a tag to the event data to indicate which stage processed it
-                event
-                    .data
-                    .as_object_mut()
-                    .map(|obj| {
-                        obj.insert(
-                            format!("processed_by_{}", tag),
-                            json!(true),
-                        );
-                    });
+                event.data.as_object_mut().map(|obj| {
+                    obj.insert(format!("processed_by_{}", tag), json!(true));
+                });
                 event
             });
             Ok(Box::pin(mapped))

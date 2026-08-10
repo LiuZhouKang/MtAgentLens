@@ -8,7 +8,9 @@ vi.mock('@/lib/api', () => ({
     getActiveRun: vi.fn().mockResolvedValue(null),
     getGraph: vi.fn().mockResolvedValue({ nodes: [], edges: [] }),
     getAlerts: vi.fn().mockResolvedValue([]),
-    getEvidence: vi.fn().mockResolvedValue({ evidence: [], intents: [], actions: [], non_links: [] }),
+    getEvidence: vi
+      .fn()
+      .mockResolvedValue({ evidence: [], intents: [], actions: [], non_links: [] }),
     getRunDb: vi.fn().mockRejectedValue(new Error('no db endpoint')),
   },
 }));

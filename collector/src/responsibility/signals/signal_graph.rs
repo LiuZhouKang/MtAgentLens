@@ -4,13 +4,13 @@
 // Maintains the process tree, TLS-to-message two-hop bindings, thread tracking,
 // and orphan buffers. Produces immutable Arc<SignalSnapshot> on demand.
 
-use crate::responsibility::types::{
-    MessageId, ProcessId, ResponsibilityError, TlsSessionId,
-};
+use crate::responsibility::types::{MessageId, ProcessId, ResponsibilityError, TlsSessionId};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use super::signal_snapshot::{OrphanMessage, OrphanTls, ProcessMetadata, SignalSnapshot, TlsCollision};
+use super::signal_snapshot::{
+    OrphanMessage, OrphanTls, ProcessMetadata, SignalSnapshot, TlsCollision,
+};
 
 // ─── Capacity constants ───────────────────────────────────────────────
 
@@ -169,7 +169,10 @@ impl SignalGraph {
 
             if ppid != 1 && ppid != 0 {
                 self.parent_map.insert(process_id, parent_id);
-                self.child_map.entry(parent_id).or_default().push(process_id);
+                self.child_map
+                    .entry(parent_id)
+                    .or_default()
+                    .push(process_id);
             }
         }
     }
@@ -221,16 +224,18 @@ impl SignalGraph {
 
         // Upsert parent metadata (lazily discovered)
         if parent.pid != 0 {
-            self.processes.entry(parent).or_insert_with(|| ProcessMetadata {
-                process_id: parent,
-                comm: String::new(),
-                pgid: None,
-                first_seen_ns: ts,
-                last_seen_ns: ts,
-                exit_time_ns: None,
-                exit_code: None,
-                is_alive: true,
-            });
+            self.processes
+                .entry(parent)
+                .or_insert_with(|| ProcessMetadata {
+                    process_id: parent,
+                    comm: String::new(),
+                    pgid: None,
+                    first_seen_ns: ts,
+                    last_seen_ns: ts,
+                    exit_time_ns: None,
+                    exit_code: None,
+                    is_alive: true,
+                });
         }
 
         // Parent-child link (skip PID 1 / init / PID 0)
@@ -238,10 +243,10 @@ impl SignalGraph {
             let existing_parent = self.parent_map.get(&child).copied();
             if existing_parent != Some(parent) {
                 // Remove from old parent's child list
-                if let Some(old_parent) = existing_parent {
-                    if let Some(siblings) = self.child_map.get_mut(&old_parent) {
-                        siblings.retain(|c| *c != child);
-                    }
+                if let Some(old_parent) = existing_parent
+                    && let Some(siblings) = self.child_map.get_mut(&old_parent)
+                {
+                    siblings.retain(|c| *c != child);
                 }
                 self.parent_map.insert(child, parent);
                 self.child_map.entry(parent).or_default().push(child);
@@ -267,22 +272,17 @@ impl SignalGraph {
     /// Binds the TLS session to the owning process. If the session was already
     /// bound to a different process, a collision diagnostic is recorded.
     /// Resolves any orphan messages waiting for this TLS session.
-    pub fn observe_tls(
-        &mut self,
-        process_id: ProcessId,
-        tls_session: TlsSessionId,
-        ts: u64,
-    ) {
+    pub fn observe_tls(&mut self, process_id: ProcessId, tls_session: TlsSessionId, ts: u64) {
         // Collision detection
-        if let Some(&existing) = self.tls_to_process.get(&tls_session) {
-            if existing != process_id {
-                self.tls_collisions.push(TlsCollision {
-                    tls_session: tls_session.clone(),
-                    process_a: existing,
-                    process_b: process_id,
-                });
-                // Overwrite with new binding (latest wins)
-            }
+        if let Some(&existing) = self.tls_to_process.get(&tls_session)
+            && existing != process_id
+        {
+            self.tls_collisions.push(TlsCollision {
+                tls_session: tls_session.clone(),
+                process_a: existing,
+                process_b: process_id,
+            });
+            // Overwrite with new binding (latest wins)
         }
 
         self.tls_to_process.insert(tls_session.clone(), process_id);
@@ -306,11 +306,7 @@ impl SignalGraph {
     /// If the TLS session is already bound to a process, the message is
     /// added directly. Otherwise it is buffered as an orphan until the
     /// TLS binding arrives.
-    pub fn observe_message_via_tls(
-        &mut self,
-        tls_session: TlsSessionId,
-        msg_id: MessageId,
-    ) {
+    pub fn observe_message_via_tls(&mut self, tls_session: TlsSessionId, msg_id: MessageId) {
         // Always record in tls_to_messages
         self.tls_to_messages
             .entry(tls_session.clone())
@@ -353,10 +349,10 @@ impl SignalGraph {
                 if meta.is_alive {
                     return false;
                 }
-                if let Some(exit_ns) = meta.exit_time_ns {
-                    if now_ns.saturating_sub(exit_ns) < PROCESS_TTL_NS {
-                        return false;
-                    }
+                if let Some(exit_ns) = meta.exit_time_ns
+                    && now_ns.saturating_sub(exit_ns) < PROCESS_TTL_NS
+                {
+                    return false;
                 }
                 true
             })
@@ -370,12 +366,9 @@ impl SignalGraph {
                 self.child_map
                     .get(pid)
                     .map(|children| {
-                        !children.iter().any(|c| {
-                            self.processes
-                                .get(c)
-                                .map(|m| m.is_alive)
-                                .unwrap_or(false)
-                        })
+                        !children
+                            .iter()
+                            .any(|c| self.processes.get(c).map(|m| m.is_alive).unwrap_or(false))
                     })
                     .unwrap_or(true) // no children → safe to remove
             })
@@ -430,7 +423,9 @@ impl SignalGraph {
     ///
     /// Reads the process tree, TLS bindings, and message bindings from
     /// the persistence layer.
-    pub fn from_persistence(_conn: &rusqlite::Connection) -> Result<SignalGraph, ResponsibilityError> {
+    pub fn from_persistence(
+        _conn: &rusqlite::Connection,
+    ) -> Result<SignalGraph, ResponsibilityError> {
         Err(ResponsibilityError {
             code: "FROM_PERSISTENCE_UNIMPLEMENTED".into(),
             message: "SignalGraph::from_persistence is not yet implemented — pending persistence schema redesign (27 tables)".into(),
@@ -465,10 +460,7 @@ impl SignalGraph {
 
         // Add resolved messages to the direct map for fast queries
         if !resolved.is_empty() {
-            let entry = self
-                .direct_process_messages
-                .entry(process_id)
-                .or_default();
+            let entry = self.direct_process_messages.entry(process_id).or_default();
             for msg in resolved {
                 if !entry.contains(&msg) {
                     entry.push(msg);
@@ -499,12 +491,7 @@ impl SignalGraph {
             .processes
             .iter()
             .filter(|(id, meta)| {
-                !meta.is_alive
-                    && self
-                        .child_map
-                        .get(id)
-                        .map(|c| c.is_empty())
-                        .unwrap_or(true)
+                !meta.is_alive && self.child_map.get(id).map(|c| c.is_empty()).unwrap_or(true)
             })
             .min_by_key(|(_id, meta)| meta.last_seen_ns);
 

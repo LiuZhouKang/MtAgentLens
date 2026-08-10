@@ -1,22 +1,16 @@
-use crate::responsibility::classification::pattern_matcher::{
-    GraphPatternMatch, GraphPatternMatcher, default_templates,
-};
-use crate::responsibility::classification::rule_engine::RuleEngine;
+use crate::responsibility::claims::ClaimSeverity;
+use crate::responsibility::classification::pattern_matcher::GraphPatternMatch;
 use crate::responsibility::classification::rules::{RuleDecision, RuleHit};
 use crate::responsibility::classification::types::{
-    AlertAuthority, CacheTTL, ClassificationConfig, ClassificationResult,
-    CorrelationSignal, EvidenceSignature, GraphSignature,
-    ObserverDecision, ObserverOutput, ObserverSignature, PatternSignal,
-    ResourceSignal, RoleSignal, RuleHitSignal,
+    AlertAuthority, CacheTTL, ClassificationConfig, ClassificationResult, CorrelationSignal,
+    EvidenceSignature, GraphSignature, ObserverDecision, ObserverOutput, ObserverSignature,
+    PatternSignal, ResourceSignal, RoleSignal, RuleHitSignal,
 };
-use crate::responsibility::claims::ClaimSeverity;
+use crate::responsibility::graph::ResponsibilityGraph;
+use crate::responsibility::types::evidence_types::{CorrelationEvidence, MatchLevel};
 use crate::responsibility::types::{
     NormalizedResource, ResponsibilityEdgeType, ResponsibilityNodeType, ScoreBreakdown,
 };
-use crate::responsibility::graph::ResponsibilityGraph;
-use crate::responsibility::evidence::EvidenceRecordNew;
-use crate::responsibility::types::evidence_types::{CorrelationEvidence, MatchLevel};
-
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Standalone scoring functions per spec §11.1
@@ -80,10 +74,11 @@ pub fn compute_score(
     // and does not discriminate attack from benign. The correct path to lower FPR
     // is Observer LLM semantic analysis, not additional statistical proxies.
     let has_unsafe_rules = rule_hits.iter().any(|h| h.decision == RuleDecision::Unsafe);
-    let actual_pbc = graph.all_edges()
+    let actual_pbc = graph
+        .all_edges()
         .filter(|e| e.edge_type == ResponsibilityEdgeType::PolicyBoundaryCrossing)
         .count();
-    let gate_factor = 1.0 / (1.0 + ((-(actual_pbc as f64 - 10.0) / 0.5)).exp());
+    let gate_factor = 1.0 / (1.0 + (-(actual_pbc as f64 - 10.0) / 0.5).exp());
     let effective_gate = if has_unsafe_rules {
         gate_factor.max(0.3)
     } else {
@@ -198,10 +193,22 @@ fn sub_score_boundary(graph: &ResponsibilityGraph) -> f32 {
 
 /// evidence score: match-level-weighted (v14). L5=0.02, L1=1.0, L3=0.7.
 fn sub_score_evidence(evidence_records: &[CorrelationEvidence]) -> f32 {
-    const MIN: f32 = 0.45; let mut wc: f32=0.0; let mut tw: f32=0.0;
-    for e in evidence_records { if e.confidence < MIN { continue; }
-        let w = match e.match_level { MatchLevel::L1Exact=>1.0, MatchLevel::L2Normalized=>0.85, MatchLevel::L3Containment=>0.7, MatchLevel::L4Basename=>0.15, MatchLevel::L5Substring=>0.02 };
-        wc += e.confidence * w; tw += w;
+    const MIN: f32 = 0.45;
+    let mut wc: f32 = 0.0;
+    let mut tw: f32 = 0.0;
+    for e in evidence_records {
+        if e.confidence < MIN {
+            continue;
+        }
+        let w = match e.match_level {
+            MatchLevel::L1Exact => 1.0,
+            MatchLevel::L2Normalized => 0.85,
+            MatchLevel::L3Containment => 0.7,
+            MatchLevel::L4Basename => 0.15,
+            MatchLevel::L5Substring => 0.02,
+        };
+        wc += e.confidence * w;
+        tw += w;
     }
     if tw < 1e-9 { 0.0 } else { wc / tw }
 }
@@ -217,7 +224,11 @@ fn sub_score_evidence(evidence_records: &[CorrelationEvidence]) -> f32 {
 /// tool calls (ratio=1-3). Multiplied by evidence quality (L1+L3 ratio)
 /// for corroboration — benign tasks produce mostly low-quality L5 evidence.
 /// Falls back to PBC/agent sigmoid when intent_count is unavailable.
-fn sub_score_role(graph: &ResponsibilityGraph, evidence_records: &[CorrelationEvidence], intent_count: u32) -> f32 {
+fn sub_score_role(
+    graph: &ResponsibilityGraph,
+    evidence_records: &[CorrelationEvidence],
+    intent_count: u32,
+) -> f32 {
     let agent_count = graph
         .all_nodes()
         .filter(|n| n.node_type == ResponsibilityNodeType::Agent)
@@ -234,9 +245,15 @@ fn sub_score_role(graph: &ResponsibilityGraph, evidence_records: &[CorrelationEv
     }
 
     // Compute evidence quality: fraction of L1+L3 evidence (v14)
-    let l1_l3 = evidence_records.iter().filter(|e| {
-        matches!(e.match_level, MatchLevel::L1Exact | MatchLevel::L3Containment)
-    }).count() as f32;
+    let l1_l3 = evidence_records
+        .iter()
+        .filter(|e| {
+            matches!(
+                e.match_level,
+                MatchLevel::L1Exact | MatchLevel::L3Containment
+            )
+        })
+        .count() as f32;
     let ev_total = evidence_records.len().max(1) as f32;
     let evidence_quality = l1_l3 / ev_total;
 
@@ -250,7 +267,7 @@ fn sub_score_role(graph: &ResponsibilityGraph, evidence_records: &[CorrelationEv
     // Fallback: PBC/agent sigmoid
     let center = 100.0 * agent_count;
     let scale = 20.0 * agent_count;
-    (1.0 / (1.0 + (-(pbc_count - center) / scale).exp())) as f32
+    1.0 / (1.0 + (-(pbc_count - center) / scale).exp())
 }
 
 /// repetition score: min(rep_count/10, 1.0)
@@ -321,7 +338,14 @@ pub fn compute_score_breakdown(
         role_score,
         repetition_score,
         behavioral_score,
-        total: compute_score(rule_hits, patterns, graph, evidence_records, repetition_count, intent_count),
+        total: compute_score(
+            rule_hits,
+            patterns,
+            graph,
+            evidence_records,
+            repetition_count,
+            intent_count,
+        ),
     }
 }
 
@@ -348,7 +372,10 @@ pub fn build_observer_signature(
 
     let evidence_sig = {
         let total = evidence_records.len();
-        let direct = evidence_records.iter().filter(|e| e.match_level >= MatchLevel::L3Containment).count();
+        let direct = evidence_records
+            .iter()
+            .filter(|e| e.match_level >= MatchLevel::L3Containment)
+            .count();
         let inferred = total.saturating_sub(direct);
         let avg_conf = if total > 0 {
             evidence_records.iter().map(|e| e.confidence).sum::<f32>() / total as f32
@@ -443,10 +470,9 @@ pub fn build_observer_signature(
                     Some(NormalizedResource::File { canonical_path }) => {
                         ("file", canonical_path.clone())
                     }
-                    Some(NormalizedResource::Network { host, port, scheme }) => (
-                        "network",
-                        format!("{}://{}:{}", scheme, host, port),
-                    ),
+                    Some(NormalizedResource::Network { host, port, scheme }) => {
+                        ("network", format!("{}://{}:{}", scheme, host, port))
+                    }
                     Some(NormalizedResource::Context { context_id }) => {
                         ("context", context_id.clone())
                     }
@@ -518,13 +544,13 @@ pub fn build_observer_signature(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::responsibility::graph::{GraphConfig, ResponsibilityGraph};
+    use crate::responsibility::types::evidence_types::{CorrelationEvidence, MatchLevel};
     use crate::responsibility::types::{
         ActionId, AgentId, EdgeId, EvidenceId, IntentId, NodeId, NormalizedResource,
         PhaseIndicator, ResponsibilityEdgeType as NewEdgeType,
         ResponsibilityNodeType as NewNodeType,
     };
-    use crate::responsibility::graph::{GraphConfig, ResponsibilityGraph};
-    use crate::responsibility::types::evidence_types::{CorrelationEvidence, MatchLevel};
 
     fn make_node(
         id: &str,
@@ -575,7 +601,8 @@ mod tests {
                 command: None,
                 raw_args: vec![],
             },
-            derivation_mode: crate::responsibility::types::evidence_types::CandidateDerivationMode::Direct,
+            derivation_mode:
+                crate::responsibility::types::evidence_types::CandidateDerivationMode::Direct,
             timestamp_ns: 1000,
             phase: PhaseIndicator::Provisional { timestamp_ns: 1000 },
         }
@@ -588,13 +615,11 @@ mod tests {
 
     #[test]
     fn test_sub_score_rule_all_safe() {
-        let hits = vec![
-            RuleHit {
-                rule_id: "safe.a".into(),
-                decision: RuleDecision::Safe,
-                matched_resource: "/tmp/a".into(),
-            },
-        ];
+        let hits = vec![RuleHit {
+            rule_id: "safe.a".into(),
+            decision: RuleDecision::Safe,
+            matched_resource: "/tmp/a".into(),
+        }];
         assert_eq!(sub_score_rule(&hits), 0.0);
     }
 
@@ -719,12 +744,7 @@ mod tests {
                 canonical_path: "/home/lzk/mtagentlens/src/main.rs".into(),
             }),
         ));
-        g.add_edge(make_edge(
-            "e1",
-            NewEdgeType::IntentCausesAction,
-            "a1",
-            "r1",
-        ));
+        g.add_edge(make_edge("e1", NewEdgeType::IntentCausesAction, "a1", "r1"));
 
         let rule_hits = vec![RuleHit {
             rule_id: "safe.project_read".into(),

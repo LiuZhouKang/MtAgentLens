@@ -11,8 +11,8 @@
 
 use crate::responsibility::evidence::args::extract_intent_args;
 use crate::responsibility::types::{
-    Intent, IntentAuthoritySource, IntentClass, IntentId, IntentParseState, MessageId, NormalizedArg,
-    ProcessId,
+    Intent, IntentAuthoritySource, IntentClass, IntentId, IntentParseState, MessageId,
+    NormalizedArg, ProcessId,
 };
 use regex_lite::Regex;
 
@@ -31,12 +31,12 @@ const MAX_JSON_PARSE_BYTES: usize = 2 * 1024 * 1024;
 /// Returns a slice pointing into `raw` (zero-copy).
 pub fn strip_http_framing(raw: &str) -> &str {
     // HTTP/1.1 200 OK\r\nHeader: value\r\n\r\n{json body}
-    if raw.starts_with("HTTP/") {
-        if let Some(pos) = raw.find("\r\n\r\n") {
-            return &raw[pos + 4..];
-        }
-        // Malformed: no double-CRLF found — return as-is
+    if raw.starts_with("HTTP/")
+        && let Some(pos) = raw.find("\r\n\r\n")
+    {
+        return &raw[pos + 4..];
     }
+    // Malformed: no double-CRLF found — return as-is
 
     // HTTP request: POST /v1/messages HTTP/1.1\r\n...\r\n\r\n{json body}
     if let Some(pos) = raw.find("\r\n\r\n") {
@@ -253,11 +253,18 @@ impl IntentExtractor {
         // guarantee that content_block_start/delta/stop sequences are
         // correctly accumulated into complete tool_use intents.
         if looks_like_sse(body) {
-            let sse = Self::extract_from_sse(body, source, process_id, message_id.clone(), timestamp_ns);
+            let sse =
+                Self::extract_from_sse(body, source, process_id, message_id.clone(), timestamp_ns);
             if !sse.is_empty() {
                 return sse;
             }
-            let sse = Self::extract_from_openai_sse(body, source, process_id, message_id.clone(), timestamp_ns);
+            let sse = Self::extract_from_openai_sse(
+                body,
+                source,
+                process_id,
+                message_id.clone(),
+                timestamp_ns,
+            );
             if !sse.is_empty() {
                 return sse;
             }
@@ -265,7 +272,13 @@ impl IntentExtractor {
 
         // Step 1: Raw buffer scan — handles buffers that start at arbitrary offsets.
         if body.len() > 64 {
-            let intents = Self::extract_from_raw_buffer(body, source, process_id, message_id.clone(), timestamp_ns);
+            let intents = Self::extract_from_raw_buffer(
+                body,
+                source,
+                process_id,
+                message_id.clone(),
+                timestamp_ns,
+            );
             if !intents.is_empty() {
                 return intents;
             }
@@ -273,32 +286,40 @@ impl IntentExtractor {
 
         // Step 1: Strip HTTP framing + de-chunk transfer encoding
         let clean = strip_http_framing(body);
-        let dechunked = dechunk_body(&clean);
+        let dechunked = dechunk_body(clean);
         let payload: &str = &dechunked;
 
         // Step 1a: Request body with messages array — extract user messages
         // BEFORE tool_use extraction, because assistant messages in the
         // conversation history contain tool_use blocks that would return
         // early from Steps 2-6.
-        if payload.len() <= MAX_JSON_PARSE_BYTES && looks_like_json(payload) {
-            if let Ok(root) = serde_json::from_str::<serde_json::Value>(payload) {
-                if let Some(messages) = root.get("messages").and_then(|m| m.as_array()).cloned() {
-                    if !messages.is_empty() {
-                        let messages_str = serde_json::to_string(&messages).unwrap_or_default();
-                        let request_intents = Self::extract_from_request(
-                            &messages_str, process_id, message_id.clone(), timestamp_ns,
-                        );
-                        if !request_intents.is_empty() {
-                            return request_intents;
-                        }
-                    }
-                }
+        if payload.len() <= MAX_JSON_PARSE_BYTES
+            && looks_like_json(payload)
+            && let Ok(root) = serde_json::from_str::<serde_json::Value>(payload)
+            && let Some(messages) = root.get("messages").and_then(|m| m.as_array()).cloned()
+            && !messages.is_empty()
+        {
+            let messages_str = serde_json::to_string(&messages).unwrap_or_default();
+            let request_intents = Self::extract_from_request(
+                &messages_str,
+                process_id,
+                message_id.clone(),
+                timestamp_ns,
+            );
+            if !request_intents.is_empty() {
+                return request_intents;
             }
         }
 
         // Step 2: Anthropic structured JSON (content blocks)
         if payload.len() <= MAX_JSON_PARSE_BYTES && looks_like_json(payload) {
-            let intents = Self::extract_from_json(payload, source, process_id, message_id.clone(), timestamp_ns);
+            let intents = Self::extract_from_json(
+                payload,
+                source,
+                process_id,
+                message_id.clone(),
+                timestamp_ns,
+            );
             if !intents.is_empty() {
                 return intents;
             }
@@ -306,7 +327,13 @@ impl IntentExtractor {
 
         // Step 3: OpenAI structured JSON
         if payload.len() <= MAX_JSON_PARSE_BYTES && looks_like_json(payload) {
-            let intents = Self::extract_from_openai_json(payload, source, process_id, message_id.clone(), timestamp_ns);
+            let intents = Self::extract_from_openai_json(
+                payload,
+                source,
+                process_id,
+                message_id.clone(),
+                timestamp_ns,
+            );
             if !intents.is_empty() {
                 return intents;
             }
@@ -314,7 +341,13 @@ impl IntentExtractor {
 
         // Step 4: Generic JSON tree scan (catch-all for unknown formats)
         if payload.len() <= MAX_JSON_PARSE_BYTES && looks_like_json(payload) {
-            let intents = Self::extract_generic_json(payload, source, process_id, message_id.clone(), timestamp_ns);
+            let intents = Self::extract_generic_json(
+                payload,
+                source,
+                process_id,
+                message_id.clone(),
+                timestamp_ns,
+            );
             if !intents.is_empty() {
                 return intents;
             }
@@ -322,11 +355,23 @@ impl IntentExtractor {
 
         // Step 5: Anthropic SSE + OpenAI SSE
         if looks_like_sse(payload) {
-            let sse = Self::extract_from_sse(payload, source, process_id, message_id.clone(), timestamp_ns);
+            let sse = Self::extract_from_sse(
+                payload,
+                source,
+                process_id,
+                message_id.clone(),
+                timestamp_ns,
+            );
             if !sse.is_empty() {
                 return sse;
             }
-            let sse = Self::extract_from_openai_sse(payload, source, process_id, message_id.clone(), timestamp_ns);
+            let sse = Self::extract_from_openai_sse(
+                payload,
+                source,
+                process_id,
+                message_id.clone(),
+                timestamp_ns,
+            );
             if !sse.is_empty() {
                 return sse;
             }
@@ -335,14 +380,26 @@ impl IntentExtractor {
         // Step 6: If we haven't already tried the raw body with raw buffer scan,
         // and it's different from the payload version, try generic JSON on it.
         if payload.as_ptr() != body.as_ptr() && body.len() <= MAX_JSON_PARSE_BYTES {
-            let intents = Self::extract_generic_json(body, source, process_id, message_id.clone(), timestamp_ns);
+            let intents = Self::extract_generic_json(
+                body,
+                source,
+                process_id,
+                message_id.clone(),
+                timestamp_ns,
+            );
             if !intents.is_empty() {
                 return intents;
             }
         }
 
         // Step 7: Regex fallback (always runs last, on de-chunked payload)
-        let regex_intents = Self::extract_regex_fallback(payload, source, process_id, message_id.clone(), timestamp_ns);
+        let regex_intents = Self::extract_regex_fallback(
+            payload,
+            source,
+            process_id,
+            message_id.clone(),
+            timestamp_ns,
+        );
         if !regex_intents.is_empty() {
             return regex_intents;
         }
@@ -375,18 +432,19 @@ impl IntentExtractor {
                 // patterns in the initial task prompt.
                 let user_text = match msg.get("content") {
                     Some(serde_json::Value::String(s)) => s.clone(),
-                    Some(serde_json::Value::Array(arr)) => {
-                        arr.iter()
-                            .filter_map(|b| {
-                                if b.get("type").and_then(|t| t.as_str()) == Some("text") {
-                                    b.get("text").and_then(|t| t.as_str()).map(|s| s.to_string())
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect::<Vec<_>>()
-                            .join("\n")
-                    }
+                    Some(serde_json::Value::Array(arr)) => arr
+                        .iter()
+                        .filter_map(|b| {
+                            if b.get("type").and_then(|t| t.as_str()) == Some("text") {
+                                b.get("text")
+                                    .and_then(|t| t.as_str())
+                                    .map(|s| s.to_string())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n"),
                     _ => continue,
                 };
                 if !user_text.is_empty() {
@@ -416,16 +474,16 @@ impl IntentExtractor {
             };
 
             for block in content {
-                if block.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
-                    if let Some(intent) = Self::block_to_intent(
+                if block.get("type").and_then(|t| t.as_str()) == Some("tool_use")
+                    && let Some(intent) = Self::block_to_intent(
                         block,
                         IntentAuthoritySource::RequestHistoryAssistantToolUse,
                         process_id,
                         message_id.clone(),
                         timestamp_ns,
-                    ) {
-                        intents.push(intent);
-                    }
+                    )
+                {
+                    intents.push(intent);
                 }
             }
         }
@@ -455,32 +513,27 @@ impl IntentExtractor {
         // Case A: Full response message with content array
         if let Some(content) = value.get("content").and_then(|c| c.as_array()) {
             for block in content {
-                if block.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
-                    if let Some(intent) = Self::block_to_intent(
+                if block.get("type").and_then(|t| t.as_str()) == Some("tool_use")
+                    && let Some(intent) = Self::block_to_intent(
                         block,
                         source,
                         process_id,
                         message_id.clone(),
                         timestamp_ns,
-                    ) {
-                        intents.push(intent);
-                    }
+                    )
+                {
+                    intents.push(intent);
                 }
             }
             return intents;
         }
 
         // Case B: Single content block (e.g., from extracted delta)
-        if value.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
-            if let Some(intent) = Self::block_to_intent(
-                &value,
-                source,
-                process_id,
-                message_id,
-                timestamp_ns,
-            ) {
-                intents.push(intent);
-            }
+        if value.get("type").and_then(|t| t.as_str()) == Some("tool_use")
+            && let Some(intent) =
+                Self::block_to_intent(&value, source, process_id, message_id, timestamp_ns)
+        {
+            intents.push(intent);
         }
 
         intents
@@ -540,8 +593,12 @@ impl IntentExtractor {
                     Some(n) => n.to_string(),
                     None => continue,
                 };
-                let args_str = function.get("arguments").and_then(|a| a.as_str()).unwrap_or("{}");
-                let input: serde_json::Value = serde_json::from_str(args_str).unwrap_or(serde_json::Value::Null);
+                let args_str = function
+                    .get("arguments")
+                    .and_then(|a| a.as_str())
+                    .unwrap_or("{}");
+                let input: serde_json::Value =
+                    serde_json::from_str(args_str).unwrap_or(serde_json::Value::Null);
 
                 let tool_args = extract_intent_args(&tool_name, &input);
                 let intent_class = classify_intent_class(&tool_name);
@@ -580,7 +637,8 @@ impl IntentExtractor {
     ) -> Vec<Intent> {
         let mut intents = Vec::new();
         // Accumulate partial tool_calls: index → (name, arguments_string)
-        let mut accum: std::collections::HashMap<i64, (String, String)> = std::collections::HashMap::new();
+        let mut accum: std::collections::HashMap<i64, (String, String)> =
+            std::collections::HashMap::new();
 
         for line in body.lines() {
             let data = if let Some(d) = line.strip_prefix("data: ") {
@@ -623,14 +681,16 @@ impl IntentExtractor {
 
                     // Accumulate name if present
                     if let Some(name) = function.get("name").and_then(|n| n.as_str()) {
-                        accum.entry(index)
+                        accum
+                            .entry(index)
                             .and_modify(|(n, _)| *n = name.to_string())
                             .or_insert((name.to_string(), String::new()));
                     }
 
                     // Accumulate arguments fragment
                     if let Some(args) = function.get("arguments").and_then(|a| a.as_str()) {
-                        accum.entry(index)
+                        accum
+                            .entry(index)
                             .and_modify(|(_, a)| a.push_str(args))
                             .or_insert((String::new(), args.to_string()));
                     }
@@ -639,7 +699,7 @@ impl IntentExtractor {
         }
 
         // Emit completed accumulations
-        for (_index, (tool_name, args_str)) in &accum {
+        for (tool_name, args_str) in accum.values() {
             if tool_name.is_empty() {
                 continue;
             }
@@ -693,7 +753,14 @@ impl IntentExtractor {
         };
 
         let mut intents = Vec::new();
-        Self::scan_json_for_tools(&value, source, process_id, &message_id, timestamp_ns, &mut intents);
+        Self::scan_json_for_tools(
+            &value,
+            source,
+            process_id,
+            &message_id,
+            timestamp_ns,
+            &mut intents,
+        );
         intents
     }
 
@@ -709,56 +776,57 @@ impl IntentExtractor {
         match value {
             serde_json::Value::Object(obj) => {
                 // Pattern A: Anthropic tool_use block → type="tool_use" + name
-                if obj.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
-                    if let Some(name) = obj.get("name").and_then(|n| n.as_str()) {
-                        let input = obj.get("input").unwrap_or(&serde_json::Value::Null);
-                        let tool_name = name.to_string();
-                        let tool_args = extract_intent_args(&tool_name, input);
-                        let intent_class = classify_intent_class(&tool_name);
-                        let parse_state = classify_parse_state(&tool_name, input);
+                if obj.get("type").and_then(|t| t.as_str()) == Some("tool_use")
+                    && let Some(name) = obj.get("name").and_then(|n| n.as_str())
+                {
+                    let input = obj.get("input").unwrap_or(&serde_json::Value::Null);
+                    let tool_name = name.to_string();
+                    let tool_args = extract_intent_args(&tool_name, input);
+                    let intent_class = classify_intent_class(&tool_name);
+                    let parse_state = classify_parse_state(&tool_name, input);
 
-                        out.push(Intent {
-                            intent_id: IntentId::new(),
-                            process_id,
-                            message_id: message_id.clone(),
-                            tool_name,
-                            tool_args,
-                            intent_class,
-                            parse_state,
-                            primary_matching_eligible: true,
-                            authority_source: source,
-                            timestamp_ns,
-                        });
-                        return; // Don't recurse into the tool_use block
-                    }
+                    out.push(Intent {
+                        intent_id: IntentId::new(),
+                        process_id,
+                        message_id: message_id.clone(),
+                        tool_name,
+                        tool_args,
+                        intent_class,
+                        parse_state,
+                        primary_matching_eligible: true,
+                        authority_source: source,
+                        timestamp_ns,
+                    });
+                    return; // Don't recurse into the tool_use block
                 }
 
                 // Pattern B: OpenAI function call → has function.name
-                if let Some(function) = obj.get("function") {
-                    if let Some(name) = function.get("name").and_then(|n| n.as_str()) {
-                        let args_str = function.get("arguments")
-                            .and_then(|a| a.as_str())
-                            .unwrap_or("{}");
-                        let input: serde_json::Value =
-                            serde_json::from_str(args_str).unwrap_or(serde_json::Value::Null);
-                        let tool_name = name.to_string();
-                        let tool_args = extract_intent_args(&tool_name, &input);
-                        let intent_class = classify_intent_class(&tool_name);
-                        let parse_state = classify_parse_state(&tool_name, &input);
+                if let Some(function) = obj.get("function")
+                    && let Some(name) = function.get("name").and_then(|n| n.as_str())
+                {
+                    let args_str = function
+                        .get("arguments")
+                        .and_then(|a| a.as_str())
+                        .unwrap_or("{}");
+                    let input: serde_json::Value =
+                        serde_json::from_str(args_str).unwrap_or(serde_json::Value::Null);
+                    let tool_name = name.to_string();
+                    let tool_args = extract_intent_args(&tool_name, &input);
+                    let intent_class = classify_intent_class(&tool_name);
+                    let parse_state = classify_parse_state(&tool_name, &input);
 
-                        out.push(Intent {
-                            intent_id: IntentId::new(),
-                            process_id,
-                            message_id: message_id.clone(),
-                            tool_name,
-                            tool_args,
-                            intent_class,
-                            parse_state,
-                            primary_matching_eligible: true,
-                            authority_source: source,
-                            timestamp_ns,
-                        });
-                    }
+                    out.push(Intent {
+                        intent_id: IntentId::new(),
+                        process_id,
+                        message_id: message_id.clone(),
+                        tool_name,
+                        tool_args,
+                        intent_class,
+                        parse_state,
+                        primary_matching_eligible: true,
+                        authority_source: source,
+                        timestamp_ns,
+                    });
                 }
 
                 // Recurse into all values
@@ -850,7 +918,10 @@ impl IntentExtractor {
             }
 
             // Try each parser on this chunk
-            let tries: [(&str, fn(&str, IntentAuthoritySource, ProcessId, MessageId, u64) -> Vec<Intent>); 3] = [
+            let tries: [(
+                &str,
+                fn(&str, IntentAuthoritySource, ProcessId, MessageId, u64) -> Vec<Intent>,
+            ); 3] = [
                 ("anthropic_json", IntentExtractor::extract_from_json),
                 ("openai_json", IntentExtractor::extract_from_openai_json),
                 ("generic_json", IntentExtractor::extract_generic_json),
@@ -869,7 +940,13 @@ impl IntentExtractor {
             if !found {
                 // Also try SSE extraction if the chunk looks like SSE
                 if looks_like_sse(chunk) {
-                    let sse = IntentExtractor::extract_from_sse(chunk, source, process_id, message_id.clone(), timestamp_ns);
+                    let sse = IntentExtractor::extract_from_sse(
+                        chunk,
+                        source,
+                        process_id,
+                        message_id.clone(),
+                        timestamp_ns,
+                    );
                     if !sse.is_empty() {
                         intents.extend(sse);
                     }
@@ -898,7 +975,8 @@ impl IntentExtractor {
         let mut intents = Vec::new();
         // Accumulate partial tool_use definitions across SSE events.
         // Keyed by content block index; stores (tool_name, accumulated_input_json).
-        let mut accum: std::collections::HashMap<u64, (String, String)> = std::collections::HashMap::new();
+        let mut accum: std::collections::HashMap<u64, (String, String)> =
+            std::collections::HashMap::new();
 
         for line in body.lines() {
             let data = if let Some(d) = line.strip_prefix("data: ") {
@@ -958,25 +1036,25 @@ impl IntentExtractor {
 
                 "content_block_stop" => {
                     let index = event.get("index").and_then(|i| i.as_u64()).unwrap_or(0);
-                    if let Some((tool_name, input_json)) = accum.remove(&index) {
-                        if let Ok(input) = serde_json::from_str::<serde_json::Value>(&input_json) {
-                            let tool_args = extract_intent_args(&tool_name, &input);
-                            let intent_class = classify_intent_class(&tool_name);
-                            let parse_state = classify_parse_state(&tool_name, &input);
+                    if let Some((tool_name, input_json)) = accum.remove(&index)
+                        && let Ok(input) = serde_json::from_str::<serde_json::Value>(&input_json)
+                    {
+                        let tool_args = extract_intent_args(&tool_name, &input);
+                        let intent_class = classify_intent_class(&tool_name);
+                        let parse_state = classify_parse_state(&tool_name, &input);
 
-                            intents.push(Intent {
-                                intent_id: IntentId::new(),
-                                process_id,
-                                message_id: message_id.clone(),
-                                tool_name,
-                                tool_args,
-                                intent_class,
-                                parse_state,
-                                primary_matching_eligible: true,
-                                authority_source: source,
-                                timestamp_ns,
-                            });
-                        }
+                        intents.push(Intent {
+                            intent_id: IntentId::new(),
+                            process_id,
+                            message_id: message_id.clone(),
+                            tool_name,
+                            tool_args,
+                            intent_class,
+                            parse_state,
+                            primary_matching_eligible: true,
+                            authority_source: source,
+                            timestamp_ns,
+                        });
                     }
                 }
 
@@ -986,7 +1064,8 @@ impl IntentExtractor {
 
         // Emit any incomplete accumulations as partial intents
         for (_index, (tool_name, input_json)) in accum {
-            let input: serde_json::Value = serde_json::from_str(&input_json).unwrap_or(serde_json::Value::Null);
+            let input: serde_json::Value =
+                serde_json::from_str(&input_json).unwrap_or(serde_json::Value::Null);
             let tool_args = extract_intent_args(&tool_name, &input);
             let intent_class = classify_intent_class(&tool_name);
             let parse_state = if input_json.is_empty() {
@@ -1023,7 +1102,7 @@ impl IntentExtractor {
     /// - Tool invocation patterns: "Tool: Bash" followed by JSON args
     fn extract_regex_fallback(
         body: &str,
-        source: IntentAuthoritySource,
+        _source: IntentAuthoritySource,
         process_id: ProcessId,
         message_id: MessageId,
         timestamp_ns: u64,
@@ -1032,9 +1111,11 @@ impl IntentExtractor {
 
         // Pattern 1: JSON tool_use blocks inline
         let tool_use_re = Regex::new(
-            r#""type"\s*:\s*"tool_use"[^}]*"name"\s*:\s*"([^"]+)"[^}]*"input"\s*:\s*(\{[^}]+\})"#
-        ).unwrap();
-        for caps in tool_use_re.captures_iter(body) {
+            r#""type"\s*:\s*"tool_use"[^}]*"name"\s*:\s*"([^"]+)"[^}]*"input"\s*:\s*(\{[^}]+\})"#,
+        )
+        .unwrap();
+        // captures() returns only the first match — same as captures_iter + break.
+        if let Some(caps) = tool_use_re.captures(body) {
             let tool_name = caps.get(1).unwrap().as_str().to_string();
             let input_str = caps.get(2).unwrap().as_str();
             if let Ok(input) = serde_json::from_str::<serde_json::Value>(input_str) {
@@ -1054,13 +1135,11 @@ impl IntentExtractor {
                     timestamp_ns,
                 });
             }
-            break; // Only first match for now — prevent over-matching
         }
 
         // Pattern 2: Bash code fences
         if intents.is_empty() {
-            let bash_re =
-                Regex::new(r"```(?:bash|shell|sh)\s*\n([\s\S]*?)```").unwrap();
+            let bash_re = Regex::new(r"```(?:bash|shell|sh)\s*\n([\s\S]*?)```").unwrap();
             for caps in bash_re.captures_iter(body) {
                 let command = caps.get(1).unwrap().as_str().trim().to_string();
                 if command.len() < 3 {
@@ -1084,10 +1163,9 @@ impl IntentExtractor {
 
         // Pattern 3: Write/Edit patterns (file_path + content)
         if intents.is_empty() {
-            let write_re = Regex::new(
-                r"(?i)(write|edit|create)\s+(?:file\s+)?(\S+\.\w+)"
-            ).unwrap();
-            for caps in write_re.captures_iter(body) {
+            let write_re = Regex::new(r"(?i)(write|edit|create)\s+(?:file\s+)?(\S+\.\w+)").unwrap();
+            // First match only, consistent with Pattern 1.
+            if let Some(caps) = write_re.captures(body) {
                 let file_path = caps.get(1).unwrap().as_str().to_string();
                 let input = serde_json::json!({"file_path": file_path, "content": ""});
                 let tool_name = "Write".to_string();
@@ -1103,7 +1181,6 @@ impl IntentExtractor {
                     authority_source: IntentAuthoritySource::TextFallback,
                     timestamp_ns,
                 });
-                break;
             }
         }
 
@@ -1286,7 +1363,10 @@ data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_
         let intent = &intents[0];
         assert_eq!(intent.tool_name, "Read");
         assert!(
-            matches!(intent.parse_state, IntentParseState::Malformed | IntentParseState::Partial),
+            matches!(
+                intent.parse_state,
+                IntentParseState::Malformed | IntentParseState::Partial
+            ),
             "expected Malformed or Partial, got {:?}",
             intent.parse_state,
         );
@@ -1303,15 +1383,16 @@ data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_
             ]}
         ]"#;
 
-        let intents =
-            IntentExtractor::extract_from_request(messages, pid(), msg_id(), 1000);
+        let intents = IntentExtractor::extract_from_request(messages, pid(), msg_id(), 1000);
 
         // 1 UserPrompt (from user message) + 1 Bash (from assistant tool_use)
         assert_eq!(intents.len(), 2);
         assert!(intents.iter().any(|i| i.tool_name == "Bash"));
         assert!(intents.iter().any(|i| i.tool_name == "UserPrompt"));
         assert!(
-            intents.iter().any(|i| i.authority_source == IntentAuthoritySource::RequestHistoryAssistantToolUse)
+            intents.iter().any(
+                |i| i.authority_source == IntentAuthoritySource::RequestHistoryAssistantToolUse
+            )
         );
     }
 
@@ -1321,8 +1402,7 @@ data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_
             {"role": "user", "content": "hello"}
         ]"#;
 
-        let intents =
-            IntentExtractor::extract_from_request(messages, pid(), msg_id(), 1000);
+        let intents = IntentExtractor::extract_from_request(messages, pid(), msg_id(), 1000);
         // User message content is now extracted as a UserPrompt intent
         assert_eq!(intents.len(), 1);
         assert_eq!(intents[0].tool_name, "UserPrompt");
@@ -1401,24 +1481,12 @@ data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_
     #[test]
     fn test_intent_class_classification() {
         // Orchestration
-        assert_eq!(
-            classify_intent_class("Bash"),
-            IntentClass::Orchestration
-        );
-        assert_eq!(
-            classify_intent_class("Task"),
-            IntentClass::Orchestration
-        );
+        assert_eq!(classify_intent_class("Bash"), IntentClass::Orchestration);
+        assert_eq!(classify_intent_class("Task"), IntentClass::Orchestration);
 
         // Side effect
-        assert_eq!(
-            classify_intent_class("Write"),
-            IntentClass::SideEffect
-        );
-        assert_eq!(
-            classify_intent_class("Read"),
-            IntentClass::SideEffect
-        );
+        assert_eq!(classify_intent_class("Write"), IntentClass::SideEffect);
+        assert_eq!(classify_intent_class("Read"), IntentClass::SideEffect);
 
         // Unknown
         assert_eq!(

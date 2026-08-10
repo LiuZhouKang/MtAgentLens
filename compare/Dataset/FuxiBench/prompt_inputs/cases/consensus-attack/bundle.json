@@ -18,7 +18,7 @@
     }
   ],
   "attack_type": "C",
-  "category": "consensus_attack",
+  "category": "multi_agent_attack",
   "fixture": {
     "files": [
       {
@@ -61,5 +61,5 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "consensus-attack",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "env/scenarios/backups/consensus-attack.json"
+  "source_scenario_path": "env/scenarios/multi_agent_attack/agent_teams/consensus-attack.json"
 }

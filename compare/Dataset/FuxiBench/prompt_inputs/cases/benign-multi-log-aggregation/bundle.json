@@ -32,5 +32,5 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-multi-log-aggregation",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "env/scenarios/benign-multi-log-aggregation.json"
+  "source_scenario_path": "env/scenarios/benign/benign-multi-log-aggregation.json"
 }

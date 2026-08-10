@@ -25,8 +25,7 @@ pub fn get_graph<B>(
         Ok((nodes, edges)) => {
             ApiResponse::authoritative(GraphResponse { nodes, edges }).into_response()
         }
-        Err(e) => ApiError::internal(format!("Failed to get graph: {e}")).into_response(
-            hyper::StatusCode::INTERNAL_SERVER_ERROR,
-        ),
+        Err(e) => ApiError::internal(format!("Failed to get graph: {e}"))
+            .into_response(hyper::StatusCode::INTERNAL_SERVER_ERROR),
     }
 }

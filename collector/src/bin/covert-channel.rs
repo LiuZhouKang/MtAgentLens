@@ -73,8 +73,8 @@ fn send_message(channel_dir: &Path, message: &[u8]) -> anyhow::Result<()> {
     // 2. 逐字节创建 msg_NNNN
     for (i, &byte) in message.iter().enumerate() {
         let msg_path = channel_dir.join(format!("msg_{:04}", i));
-        let mut f = fs::File::create(&msg_path)
-            .with_context(|| format!("创建 msg_{:04} 失败", i))?;
+        let mut f =
+            fs::File::create(&msg_path).with_context(|| format!("创建 msg_{:04} 失败", i))?;
         // 写入字节本身作为文件内容（方便调试）
         f.write_all(&[byte])?;
         drop(f);
@@ -103,7 +103,11 @@ fn send_message(channel_dir: &Path, message: &[u8]) -> anyhow::Result<()> {
     end_perm.set_mode(BASE_MODE);
     fs::set_permissions(&end_path, end_perm)?;
 
-    println!("[sender] 发送完成: {} 个字节 → {}", msg_len, channel_dir.display());
+    println!(
+        "[sender] 发送完成: {} 个字节 → {}",
+        msg_len,
+        channel_dir.display()
+    );
     println!("[sender] 文件列表:");
     for entry in fs::read_dir(channel_dir)? {
         let e = entry?;
@@ -164,23 +168,20 @@ fn receive_message(
             let byte_from_perm = decode_byte(mode);
 
             // 冗余通道: mtime 纳秒
-            let byte_from_mtime = meta
-                .modified()
-                .ok()
-                .and_then(|t| {
-                    t.duration_since(UNIX_EPOCH)
-                        .ok()
-                        .map(|d| decode_byte_from_nsec(d.subsec_nanos()))
-                });
+            let byte_from_mtime = meta.modified().ok().and_then(|t| {
+                t.duration_since(UNIX_EPOCH)
+                    .ok()
+                    .map(|d| decode_byte_from_nsec(d.subsec_nanos()))
+            });
 
             // 交叉验证（如果冗余通道可用）
-            if let Some(mt_byte) = byte_from_mtime {
-                if mt_byte != byte_from_perm {
-                    println!(
-                        "[receiver] 警告: msg_{:04} 权限位={:#04x} mtime={:#04x} 不匹配，使用权限位",
-                        next_seq, byte_from_perm, mt_byte
-                    );
-                }
+            if let Some(mt_byte) = byte_from_mtime
+                && mt_byte != byte_from_perm
+            {
+                println!(
+                    "[receiver] 警告: msg_{:04} 权限位={:#04x} mtime={:#04x} 不匹配，使用权限位",
+                    next_seq, byte_from_perm, mt_byte
+                );
             }
 
             received.push(byte_from_perm);

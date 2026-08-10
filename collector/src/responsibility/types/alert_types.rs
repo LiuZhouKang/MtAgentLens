@@ -1,20 +1,36 @@
-use serde::{Deserialize, Serialize};
 use super::ids::*;
 use super::phase::PhaseIndicator;
+use serde::{Deserialize, Serialize};
 
 // ═══ Alert severity and decision ═══
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum AlertSeverity { Info, Warning, Critical }
+pub enum AlertSeverity {
+    Info,
+    Warning,
+    Critical,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum AlertDecision { Safe, Unsafe, Uncertain }
+pub enum AlertDecision {
+    Safe,
+    Unsafe,
+    Uncertain,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum AlertAuthority { Authoritative, Supporting, Unavailable }
+pub enum AlertAuthority {
+    Authoritative,
+    Supporting,
+    Unavailable,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DisplayProfile { SafeBaseline, UnsafeByEngine, ObserverJudged }
+pub enum DisplayProfile {
+    SafeBaseline,
+    UnsafeByEngine,
+    ObserverJudged,
+}
 
 // ═══ ResponsibilityAlert ═══
 
@@ -143,7 +159,12 @@ pub enum ResponsibilityClaimType {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResponsibilityClaimState {
-    Observed, Inferred, Ambiguous, Unproven, Confirmed, BlockedAttempt,
+    Observed,
+    Inferred,
+    Ambiguous,
+    Unproven,
+    Confirmed,
+    BlockedAttempt,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

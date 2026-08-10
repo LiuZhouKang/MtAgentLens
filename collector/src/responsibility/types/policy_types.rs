@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use super::ids::*;
+use serde::{Deserialize, Serialize};
 
 // ═══ Accountability Claim State (shared by judgment + graph) ═══
 
@@ -40,7 +40,12 @@ pub struct PolicyEvaluation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum PolicyBoundary { Delegation, Capability, ContextTrust, Taint }
+pub enum PolicyBoundary {
+    Delegation,
+    Capability,
+    ContextTrust,
+    Taint,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolicyJudgment {
@@ -56,7 +61,13 @@ pub struct PolicyJudgment {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PolicyJudgmentResult { Allowed, Violation, Ambiguous, Unproven, BlockedAttempt }
+pub enum PolicyJudgmentResult {
+    Allowed,
+    Violation,
+    Ambiguous,
+    Unproven,
+    BlockedAttempt,
+}
 
 // ═══ Policy Rule ═══
 
@@ -94,9 +105,14 @@ pub enum ActionSelector {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum OperationCategory {
-    FileRead, FileWrite, FileExec,
-    NetworkConnect, NetworkSend,
-    ProcessEnum, CredentialAccess, ResourceHog,
+    FileRead,
+    FileWrite,
+    FileExec,
+    NetworkConnect,
+    NetworkSend,
+    ProcessEnum,
+    CredentialAccess,
+    ResourceHog,
 }
 
 // ═══ Delegation ═══

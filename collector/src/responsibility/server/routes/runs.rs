@@ -7,25 +7,18 @@ use hyper::{Request, Response, body::Bytes};
 use std::sync::Arc;
 
 /// GET /api/runs — list all runs in descending start-time order.
-pub fn list_runs<B>(
-    _req: Request<B>,
-    reader: &Arc<PersistenceReader>,
-) -> Response<Bytes> {
+pub fn list_runs<B>(_req: Request<B>, reader: &Arc<PersistenceReader>) -> Response<Bytes> {
     match reader.list_runs() {
         Ok(runs) => ApiResponse::authoritative(runs).into_response(),
-        Err(e) => ApiError::internal(format!("Failed to list runs: {e}")).into_response(
-            hyper::StatusCode::INTERNAL_SERVER_ERROR,
-        ),
+        Err(e) => ApiError::internal(format!("Failed to list runs: {e}"))
+            .into_response(hyper::StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
 /// GET /api/runs/active — return the currently active run (ended_at_ns IS NULL).
 ///
 /// Returns the sentinel `404 {code: "no_active_run"}` when no run is active.
-pub fn get_active_run<B>(
-    _req: Request<B>,
-    reader: &Arc<PersistenceReader>,
-) -> Response<Bytes> {
+pub fn get_active_run<B>(_req: Request<B>, reader: &Arc<PersistenceReader>) -> Response<Bytes> {
     match reader.list_runs() {
         Ok(runs) => {
             // The active run is the one with no ended_at_ns. If multiple, pick
@@ -33,14 +26,11 @@ pub fn get_active_run<B>(
             let active = runs.iter().find(|r| r.ended_at_ns.is_none());
             match active {
                 Some(run) => ApiResponse::provisional(run.clone()).into_response(),
-                None => {
-                    ApiError::no_active_run().into_response(hyper::StatusCode::NOT_FOUND)
-                }
+                None => ApiError::no_active_run().into_response(hyper::StatusCode::NOT_FOUND),
             }
         }
-        Err(e) => ApiError::internal(format!("Failed to query active run: {e}")).into_response(
-            hyper::StatusCode::INTERNAL_SERVER_ERROR,
-        ),
+        Err(e) => ApiError::internal(format!("Failed to query active run: {e}"))
+            .into_response(hyper::StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -52,17 +42,14 @@ pub fn get_run<B>(
 ) -> Response<Bytes> {
     match reader.get_run(run_id) {
         Ok(Some(run)) => ApiResponse::authoritative(run).into_response(),
-        Ok(None) => {
-            ApiError::not_found("run").into_response(hyper::StatusCode::NOT_FOUND)
-        }
-        Err(e) => ApiError::internal(format!("Failed to get run: {e}")).into_response(
-            hyper::StatusCode::INTERNAL_SERVER_ERROR,
-        ),
+        Ok(None) => ApiError::not_found("run").into_response(hyper::StatusCode::NOT_FOUND),
+        Err(e) => ApiError::internal(format!("Failed to get run: {e}"))
+            .into_response(hyper::StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
 /// Helper: extract a path segment at position `idx` (0-indexed).
-pub(crate) fn path_segment<'a>(path: &'a str, idx: usize) -> Option<&'a str> {
+pub(crate) fn path_segment(path: &str, idx: usize) -> Option<&str> {
     path.split('/').filter(|s| !s.is_empty()).nth(idx)
 }
 
@@ -105,9 +92,8 @@ pub fn route_run_request<B>(
         Some("evidence") => super::evidence::get_evidence(req, reader, run_id),
         Some("evaluation") => super::evaluation::get_evaluation(req, reader, run_id),
         Some("diff") => super::diff::get_diff(req, reader, run_id, query),
-        Some(other) => ApiError::not_found(&format!("resource {other}")).into_response(
-            hyper::StatusCode::NOT_FOUND,
-        ),
+        Some(other) => ApiError::not_found(&format!("resource {other}"))
+            .into_response(hyper::StatusCode::NOT_FOUND),
     }
 }
 

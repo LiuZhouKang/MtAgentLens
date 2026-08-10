@@ -5,8 +5,8 @@
 // values and formats each as a single-line SSE event.
 
 use crate::responsibility::types::alert_types::ResponsibilityAlert;
-use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
+use tokio_stream::wrappers::BroadcastStream;
 
 /// A single SSE event frame.
 #[derive(Debug, Clone)]
@@ -108,8 +108,8 @@ pub fn alert_event_stream(
 mod tests {
     use super::*;
     use crate::responsibility::types::alert_types::{
-        AgentRef, AlertAuthority, AlertDecision, AlertSeverity, DisplayProfile, EngineSection,
-        ResponsibilityAlert, BehaviorTimeline,
+        AgentRef, AlertAuthority, AlertDecision, AlertSeverity, BehaviorTimeline, DisplayProfile,
+        EngineSection, ResponsibilityAlert,
     };
     use crate::responsibility::types::graph_types::GraphSnapshot;
     use crate::responsibility::types::ids::AlertId;
@@ -146,7 +146,7 @@ mod tests {
                     evidence_score: 0.0,
                     role_score: 0.0,
                     repetition_score: 0.0,
-            behavioral_score: 0.0,
+                    behavioral_score: 0.0,
                     total: 0.0,
                 },
                 cusum_triggered: false,

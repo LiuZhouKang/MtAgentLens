@@ -4,28 +4,30 @@
 // Ablation replay tool: re-run Correlator on existing SQLite DB with signals disabled.
 // Usage: cargo run --bin replay -- --sqlite <path> [--disable-signal argument_matching|process_lineage|temporal_proximity]
 
-use mtagentlens::responsibility::graph::graph_pattern_matcher::{PatternMatcher, default_templates};
+use clap::Parser;
+use futures::StreamExt;
+use futures::stream;
+use mtagentlens::framework::analyzers::{Analyzer, SSEProcessor};
+use mtagentlens::framework::replay::load_replayable_trace_events;
+use mtagentlens::framework::runners::EventStream;
+use mtagentlens::responsibility::graph::graph_pattern_matcher::{
+    PatternMatcher, default_templates,
+};
 use mtagentlens::responsibility::{
+    SignalGraph,
     evidence::{
         ActionCandidate, ActionCandidateType, CandidateDerivationMode, CorrelationEvidence,
         EvidenceCorrelator, Lossiness, MatchLevel, NonLinkDiagnostic, NonLinkReason, SignalClass,
     },
-    SignalGraph,
     judgment::evaluate_accountability_policy,
     persistence::{SqliteWriter, open_causal_db, open_db, open_db_read_only},
     types::support_types::{
-        ClaimState, SnapshotData, TracebackData, ActionEvent,
-        AgentInstance, AlertId, BoundaryId, EventId, EvidenceDirectness, EvidenceId,
-        EvidenceRecord, IntentAuthoritySource, IntentClass, IntentEvent, IntentParseState, NodeId,
-        PolicyEvaluationResult, ProcessId, ResourceId, TracebackId, ViolationPatternMatchRecord,
+        ActionEvent, AgentInstance, AlertId, BoundaryId, ClaimState, EventId, EvidenceDirectness,
+        EvidenceId, EvidenceRecord, IntentAuthoritySource, IntentClass, IntentEvent,
+        IntentParseState, NodeId, PolicyEvaluationResult, ProcessId, ResourceId, SnapshotData,
+        TracebackData, TracebackId, ViolationPatternMatchRecord,
     },
 };
-use mtagentlens::framework::analyzers::{Analyzer, SSEProcessor};
-use mtagentlens::framework::replay::load_replayable_trace_events;
-use mtagentlens::framework::runners::EventStream;
-use clap::Parser;
-use futures::StreamExt;
-use futures::stream;
 use rusqlite::{Connection, Row, types::Type};
 use std::fs::File;
 use std::io::BufReader;
@@ -264,9 +266,12 @@ fn resolve_alerts_db_path(run_dir: &Path) -> Option<PathBuf> {
         Ok(entries) => entries
             .filter_map(|e| e.ok())
             .map(|e| e.path())
-            .filter(|p| p.extension().map_or(false, |ext| ext == "db"))
-            .filter(|p| !p.file_name().and_then(|n| n.to_str())
-                .map_or(true, |n| n.contains("alerts")))
+            .filter(|p| p.extension().is_some_and(|ext| ext == "db"))
+            .filter(|p| {
+                !p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_none_or(|n| n.contains("alerts"))
+            })
             .collect(),
         Err(_) => return None,
     };
@@ -279,7 +284,11 @@ fn resolve_causal_db_path(run_dir: &Path) -> Option<PathBuf> {
         return Some(path);
     }
     // Try old name first, then new responsibility architecture name
-    for name in &["trace.log.causal.db", "trace.log.responsibility.db", "responsibility.db"] {
+    for name in &[
+        "trace.log.causal.db",
+        "trace.log.responsibility.db",
+        "responsibility.db",
+    ] {
         let path = run_dir.join(name);
         if path.exists() {
             return Some(path);
@@ -294,7 +303,9 @@ fn resolve_causal_db_path(run_dir: &Path) -> Option<PathBuf> {
         .filter(|path| {
             path.file_name()
                 .and_then(|name| name.to_str())
-                .is_some_and(|name| name.ends_with(".responsibility.db") || name.ends_with(".causal.db"))
+                .is_some_and(|name| {
+                    name.ends_with(".responsibility.db") || name.ends_with(".causal.db")
+                })
         })
         .collect::<Vec<_>>();
     candidates.sort();
@@ -311,10 +322,13 @@ fn replay_via_persistence_reader(
     let reader = PersistenceReader::open(db_path)
         .map_err(|e| format!("failed to open persistence reader: {e}"))?;
 
-    let runs = reader.list_runs()
+    let runs = reader
+        .list_runs()
         .map_err(|e| format!("failed to list runs: {e}"))?;
-    let run = runs.first()
-        .ok_or_else(|| "no runs found in database".to_string())?.clone();
+    let run = runs
+        .first()
+        .ok_or_else(|| "no runs found in database".to_string())?
+        .clone();
 
     let config = replay_config_from_disable_signal(disable_signal);
     let result = if persisted_graph_replay {
@@ -375,10 +389,9 @@ fn replay_via_persistence_reader(
 fn replay_config_from_disable_signal(
     disable_signal: &[String],
 ) -> mtagentlens::responsibility::replay::ReplayConfig {
-    use mtagentlens::responsibility::replay::{all_action_candidate_types, ReplayConfig};
+    use mtagentlens::responsibility::replay::{ReplayConfig, all_action_candidate_types};
     use mtagentlens::responsibility::types::{
-        ActionCandidateType as ReplayActionCandidateType,
-        MatchLevel as ReplayMatchLevel,
+        ActionCandidateType as ReplayActionCandidateType, MatchLevel as ReplayMatchLevel,
     };
 
     let mut config = ReplayConfig::all_enabled();
@@ -511,9 +524,9 @@ fn replayed_resource_id(candidate: &ActionCandidate) -> Option<ResourceId> {
     }
 }
 
-fn build_replayed_evidence_records<'a>(
+fn build_replayed_evidence_records(
     replayed_links: &[CorrelationEvidence],
-    candidate_lookup: &std::collections::HashMap<String, &'a ActionCandidate>,
+    candidate_lookup: &std::collections::HashMap<String, &ActionCandidate>,
 ) -> Vec<EvidenceRecord> {
     replayed_links
         .iter()
@@ -1079,7 +1092,9 @@ fn replay_sqlite(sqlite_path: &str, disable_signal: &[String]) {
             ii += 1;
         } else {
             let links = match &replay_inputs.inputs[ri] {
-                ReplayInput::Candidate(candidate) => correlator.on_candidate(candidate.clone(), &graph),
+                ReplayInput::Candidate(candidate) => {
+                    correlator.on_candidate(candidate.clone(), &graph)
+                }
             };
             link_count += links.len();
             replayed_links.extend(links.iter().cloned());
@@ -2566,12 +2581,11 @@ fn summarize_noise(
 
     for diagnostic in persisted_non_link_diagnostics {
         *reasons.entry(diagnostic.reason.to_string()).or_insert(0) += 1;
-        if diagnostic.reason == NonLinkReason::NoArgumentMatch {
-            if let Some(intent_id) = diagnostic.intent_id.as_deref() {
-                if linked_intent_ids.contains(intent_id) {
-                    linked_intents_with_no_argument_match.insert(intent_id.to_string());
-                }
-            }
+        if diagnostic.reason == NonLinkReason::NoArgumentMatch
+            && let Some(intent_id) = diagnostic.intent_id.as_deref()
+            && linked_intent_ids.contains(intent_id)
+        {
+            linked_intents_with_no_argument_match.insert(intent_id.to_string());
         }
     }
 
@@ -4241,7 +4255,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_replay_run_dir_reports_link_comparison_section_and_parity_gap_when_links_differ() {
+    async fn test_replay_run_dir_reports_link_comparison_section_and_parity_gap_when_links_differ()
+    {
         let tempdir = tempfile::tempdir().unwrap();
         let run_dir = tempdir.path();
         let db_path = run_dir.join("trace.log.causal.db");
@@ -4845,21 +4860,12 @@ mod tests {
             "disable_file_write_actions".to_string(),
         ]);
 
-        assert!(
-            config
-                .enabled_match_levels
-                .as_ref()
-                .is_some_and(|levels| {
-                    levels.contains(&mtagentlens::responsibility::types::MatchLevel::L1Exact)
-                        && !levels.contains(
-                            &mtagentlens::responsibility::types::MatchLevel::L2Normalized,
-                        )
-                        && !levels.contains(
-                            &mtagentlens::responsibility::types::MatchLevel::L3Containment,
-                        )
-                        && levels.len() == 3
-                })
-        );
+        assert!(config.enabled_match_levels.as_ref().is_some_and(|levels| {
+            levels.contains(&mtagentlens::responsibility::types::MatchLevel::L1Exact)
+                && !levels.contains(&mtagentlens::responsibility::types::MatchLevel::L2Normalized)
+                && !levels.contains(&mtagentlens::responsibility::types::MatchLevel::L3Containment)
+                && levels.len() == 3
+        }));
         assert!(
             config
                 .enabled_action_types
@@ -4893,13 +4899,12 @@ mod tests {
             exact_only
                 .enabled_match_levels
                 .as_ref()
-                .is_some_and(|levels| levels.contains(
-                    &mtagentlens::responsibility::types::MatchLevel::L1Exact,
-                ) && levels.len() == 1)
+                .is_some_and(|levels| levels
+                    .contains(&mtagentlens::responsibility::types::MatchLevel::L1Exact,)
+                    && levels.len() == 1)
         );
 
-        let file_actions =
-            replay_config_from_disable_signal(&["disable_file_actions".to_string()]);
+        let file_actions = replay_config_from_disable_signal(&["disable_file_actions".to_string()]);
         assert!(
             file_actions
                 .enabled_action_types
@@ -4999,10 +5004,15 @@ mod tests {
              (snapshot_id, timestamp_ns, agent_id, nodes_json, edges_json, diagnostics_json)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
-                "snapshot-1", 1100i64, "agent-1", "[\"evidence:link-1\"]",
-                "[\"link-1\"]", "[]"
+                "snapshot-1",
+                1100i64,
+                "agent-1",
+                "[\"evidence:link-1\"]",
+                "[\"link-1\"]",
+                "[]"
             ],
-        ).unwrap();
+        )
+        .unwrap();
         drop(conn);
 
         std::fs::write(run_dir.join("trace.log"), "{}\n").unwrap();
@@ -5024,7 +5034,9 @@ mod tests {
         assert_eq!(report_json["snapshot_comparison"]["replayed_count"], 0);
         let gap_sections = report_json["gap_sections"].as_array().unwrap();
         assert!(
-            gap_sections.iter().any(|value| value == "snapshot_comparison"),
+            gap_sections
+                .iter()
+                .any(|value| value == "snapshot_comparison"),
             "snapshot comparison should be called out as a parity gap section"
         );
     }

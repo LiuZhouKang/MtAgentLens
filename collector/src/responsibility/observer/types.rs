@@ -6,10 +6,9 @@
 // classification/types.rs re-exports from here for backward compatibility.
 // Do NOT duplicate observer types in other modules.
 
-use serde::{Deserialize, Serialize};
 use crate::responsibility::claims::ClaimSeverity;
-use crate::responsibility::types::alert_types::AlertSeverity;
 pub use crate::responsibility::types::refinement::ScoreBreakdown;
+use serde::{Deserialize, Serialize};
 
 // ── Observer Decision ───────────────────────────────────────────────────
 

@@ -235,8 +235,7 @@ mod tests {
     fn analyse_from_graph_returns_root_causes() {
         use crate::responsibility::graph::config::GraphConfig;
         use crate::responsibility::types::{
-            AgentId, EdgeId, NodeId, PhaseIndicator,
-            ResponsibilityEdge, ResponsibilityEdgeType,
+            AgentId, EdgeId, NodeId, PhaseIndicator, ResponsibilityEdge, ResponsibilityEdgeType,
             ResponsibilityNode, ResponsibilityNodeType,
         };
 
@@ -273,12 +272,15 @@ mod tests {
             evidence_refs: vec![],
             confidence: 0.9,
             phase: PhaseIndicator::Provisional { timestamp_ns: 1100 },
-        signal: None,
+            signal: None,
         };
         graph.add_edge(edge);
 
         let results = analyse_from_graph(&graph, &agent_id, 1);
-        assert!(!results.is_empty(), "should have at least one root cause result");
+        assert!(
+            !results.is_empty(),
+            "should have at least one root cause result"
+        );
     }
 
     #[test]

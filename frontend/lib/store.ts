@@ -177,7 +177,9 @@ function applyDbImport(
   dbImport: DbImport,
   source: Extract<DataSourceMeta, { kind: 'db' }>,
 ): void {
-  const leanAlerts = dbImport.alerts.map(({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest);
+  const leanAlerts = dbImport.alerts.map(
+    ({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest,
+  );
   set({
     graph: dbImport.graph,
     alerts: leanAlerts,
@@ -279,7 +281,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
   clearHighlights: () => get().engineRef.current?.clearHighlights(),
   loadRun: async (runId) => {
     if (!runId) return;
-    set({ activeRunId: runId, dataSource: { kind: 'run', runId }, appState: 'replay', errorMessage: null });
+    set({
+      activeRunId: runId,
+      dataSource: { kind: 'run', runId },
+      appState: 'replay',
+      errorMessage: null,
+    });
 
     // The real run artifacts live in collector/collector.responsibility.db, so
     // the preferred path downloads the raw db and consumes it with sql.js (the
@@ -327,11 +334,44 @@ export const useAppStore = create<AppStore>((set, get) => ({
   loadSample: async () => {
     const data = await loadSampleData();
     if (!data) throw new Error('样例数据不可用（sample-run.json 未找到）');
-    applySnapshot(set, {
+
+    // 内置样例 db：让「样例运行」同时携带 db 资产（dbAssets/actions/intents/evidence 等），
+    // 使 db 驱动视图（仪表盘/告警/追踪等）开箱可见。加载失败静默降级为纯图快照（与旧行为一致）。
+    let dbImport: DbImport | null = null;
+    try {
+      const res = await fetch('/data/db-sample.sqlite');
+      if (res.ok) {
+        const parsed = await loadDatabaseFromBytes(
+          new Uint8Array(await res.arrayBuffer()),
+          '样例运行.db',
+        );
+        if (parsed.hasConsumableData) dbImport = parsed;
+      }
+    } catch {
+      dbImport = null;
+    }
+
+    // 样例 = 态势演示图快照（sample-run.json）+ 内置真实 db 资产（db 驱动视图）。
+    // 两者 agent 命名空间互不相交（UUID vs agent-a…d），why facets 不会跨 run 错配。
+    const leanAlerts = data.alerts.map(({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest);
+    set({
       graph: data.graph,
-      alerts: data.alerts,
-      metrics: data.metrics,
-      source: { kind: 'sample', label: '样例运行' },
+      alerts: leanAlerts,
+      graphMetrics: data.metrics,
+      evidence: dbImport?.evidence ?? [],
+      claims: dbImport?.claims ?? [],
+      tracebacks: dbImport?.tracebacks ?? [],
+      intents: dbImport?.intents ?? [],
+      actions: dbImport?.actions ?? [],
+      overview: dbImport?.overview ?? null,
+      monitoring: dbImport?.monitoring ?? null,
+      dbAssets: dbImport?.dbAssets ?? null,
+      snapshotFrameIndex: dbImport ? Math.max(0, dbImport.dbAssets.snapshotFrames.length - 1) : 0,
+      dataSource: { kind: 'sample', label: '样例运行' },
+      activeRunId: null,
+      selectedNodeId: null,
+      appState: 'replay',
+      errorMessage: null,
     });
   },
   loadDemo: () => {
@@ -416,7 +456,7 @@ async function initData() {
       if (state.graph.nodes.length > 0 || state.alerts.length > 0) {
         console.log(
           `[MtAgentLens] Loaded run ${firstWithData.run_id}: ${state.graph.nodes.length} nodes, ` +
-            `${state.graph.edges.length} edges, ${state.alerts.length} alerts (${state.dataSource?.kind})`
+            `${state.graph.edges.length} edges, ${state.alerts.length} alerts (${state.dataSource?.kind})`,
         );
         return;
       }
@@ -429,9 +469,11 @@ async function initData() {
   try {
     const data = await loadSampleData();
     if (data) {
-      const leanAlerts = data.alerts.map(({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest);
+      const leanAlerts = data.alerts.map(
+        ({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest,
+      );
       console.log(
-        `[MtAgentLens] Sample data: ${data.graph.nodes.length} nodes, ${data.graph.edges.length} edges, ${leanAlerts.length} alerts`
+        `[MtAgentLens] Sample data: ${data.graph.nodes.length} nodes, ${data.graph.edges.length} edges, ${leanAlerts.length} alerts`,
       );
       useAppStore.setState({
         graph: data.graph,

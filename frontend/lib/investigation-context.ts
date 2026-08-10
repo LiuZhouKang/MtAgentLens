@@ -56,9 +56,7 @@ export function buildInvestigationContextFromAlert(
     return { ...DEFAULT_INVESTIGATION_CONTEXT };
   }
   const highlightedPathEdgeIds = snapshot.edges.map((edge) => edge.edge_id);
-  const primaryNode = snapshot.nodes.find(
-    (node) => node.agent_id === alert.primary_agent.agent_id,
-  );
+  const primaryNode = snapshot.nodes.find((node) => node.agent_id === alert.primary_agent.agent_id);
 
   return {
     ...DEFAULT_INVESTIGATION_CONTEXT,

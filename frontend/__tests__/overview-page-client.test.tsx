@@ -6,7 +6,6 @@ import OverviewPageClient from '@/components/overview/overview-page-client';
 import { useAppStore } from '@/lib/store';
 import { demoAlerts, demoGraph } from '@/lib/demo-data';
 
-
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: {

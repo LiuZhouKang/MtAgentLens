@@ -208,9 +208,7 @@ pub enum TeamRoleVerificationVerdict {
     /// Not enough evidence to verify (insufficient artifact reads).
     InsufficientEvidence,
     /// Authorized drill: benign scenario used for testing.
-    AuthorizedDrill {
-        probe_path: String,
-    },
+    AuthorizedDrill { probe_path: String },
 }
 
 impl TeamRoleVerificationVerdict {
@@ -351,16 +349,20 @@ mod tests {
     fn test_blocking_verdicts() {
         assert!(TeamRoleVerificationVerdict::ActingRoleNotPermitted.is_blocking());
         assert!(TeamRoleVerificationVerdict::UnauthorizedRole.is_blocking());
-        assert!(TeamRoleVerificationVerdict::TeamPropagationDetected {
-            propagation_count: 3,
-            unverified_count: 2,
-        }
-        .is_blocking());
+        assert!(
+            TeamRoleVerificationVerdict::TeamPropagationDetected {
+                propagation_count: 3,
+                unverified_count: 2,
+            }
+            .is_blocking()
+        );
         assert!(!TeamRoleVerificationVerdict::Verified.is_blocking());
-        assert!(!TeamRoleVerificationVerdict::AuthorizedDrill {
-            probe_path: "p".into(),
-        }
-        .is_blocking());
+        assert!(
+            !TeamRoleVerificationVerdict::AuthorizedDrill {
+                probe_path: "p".into(),
+            }
+            .is_blocking()
+        );
     }
 
     #[test]
@@ -370,6 +372,10 @@ mod tests {
         assert!(config.require_identity_verification);
         assert!(config.recognize_drills);
         assert_eq!(config.min_team_propagation, 2);
-        assert!(config.drill_probe_paths.contains(&"approval_probe.txt".to_string()));
+        assert!(
+            config
+                .drill_probe_paths
+                .contains(&"approval_probe.txt".to_string())
+        );
     }
 }

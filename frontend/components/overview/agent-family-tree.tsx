@@ -17,23 +17,53 @@ function FamilyNode({ node, tree }: { node: AgentFamilyNode; tree: Map<string, A
         type="button"
         onClick={() => hasChildren && setExpanded(!expanded)}
         style={{
-          display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none',
-          cursor: hasChildren ? 'pointer' : 'default', padding: '3px 0', color: 'var(--ln-text)',
-          fontSize: T.sm, textAlign: 'left',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'none',
+          border: 'none',
+          cursor: hasChildren ? 'pointer' : 'default',
+          padding: '3px 0',
+          color: 'var(--ln-text)',
+          fontSize: T.sm,
+          textAlign: 'left',
         }}
       >
-        <span style={{ color: 'var(--ln-text-muted)', width: 12 }}>{hasChildren ? (expanded ? '▾' : '▸') : '·'}</span>
+        <span style={{ color: 'var(--ln-text-muted)', width: 12 }}>
+          {hasChildren ? (expanded ? '▾' : '▸') : '·'}
+        </span>
         <span style={{ fontFamily: 'var(--ln-mono)', fontWeight: 600 }}>{node.agentId}</span>
-        {!hasChildren && <span style={{ fontSize: T.xs, color: 'var(--ln-text-muted)' }}>无委派</span>}
+        {!hasChildren && (
+          <span style={{ fontSize: T.xs, color: 'var(--ln-text-muted)' }}>无委派</span>
+        )}
       </button>
       {expanded && hasChildren && (
-        <div style={{ marginLeft: 18, borderLeft: '1px solid var(--ln-border)', paddingLeft: 10, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div
+          style={{
+            marginLeft: 18,
+            borderLeft: '1px solid var(--ln-border)',
+            paddingLeft: 10,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+          }}
+        >
           {node.children.map((child) => {
             const childNode = tree.get(child.childAgentId);
             return (
-              <div key={child.childAgentId} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              <div
+                key={child.childAgentId}
+                style={{ display: 'flex', flexDirection: 'column', gap: 0 }}
+              >
                 {childNode && <FamilyNode node={childNode} tree={tree} />}
-                <span style={{ fontSize: 9, color: 'var(--ln-text-muted)', marginLeft: 22, fontFamily: 'var(--ln-mono)' }}>
+                <span
+                  style={{
+                    fontSize: 9,
+                    color: 'var(--ln-text-muted)',
+                    marginLeft: 22,
+                    fontFamily: 'var(--ln-mono)',
+                  }}
+                >
                   {child.reason} · pid {child.childPid}
                 </span>
               </div>
@@ -56,7 +86,9 @@ export default function AgentFamilyTree({ subagentBoundaries }: AgentFamilyTreeP
   const tree = useMemo(() => buildAgentFamilyTree(subagentBoundaries), [subagentBoundaries]);
   const roots = useMemo(() => {
     const childSet = new Set(subagentBoundaries.map((b) => b.child_agent_id));
-    return Array.from(tree.keys()).filter((id) => !childSet.has(id)).sort();
+    return Array.from(tree.keys())
+      .filter((id) => !childSet.has(id))
+      .sort();
   }, [tree, subagentBoundaries]);
 
   return (

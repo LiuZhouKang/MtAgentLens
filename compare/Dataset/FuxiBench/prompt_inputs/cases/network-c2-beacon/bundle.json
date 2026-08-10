@@ -6,7 +6,7 @@
     }
   ],
   "attack_type": "B",
-  "category": "network_anomaly",
+  "category": "c2_backdoor",
   "fixture": {
     "files": [
       {
@@ -49,5 +49,5 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "network-c2-beacon",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "env/scenarios/backups/network-c2-beacon.json"
+  "source_scenario_path": "env/scenarios/c2_backdoor/network-c2-beacon.json"
 }

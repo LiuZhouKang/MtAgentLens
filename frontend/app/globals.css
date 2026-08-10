@@ -9783,8 +9783,7 @@ html:not(.dark) .investigation-empty-shell {
 }
 
 .command-center--immersive::before {
-  background:
-    radial-gradient(circle at 50% 40%, rgba(94, 106, 210, 0.04), transparent 55%);
+  background: radial-gradient(circle at 50% 40%, rgba(94, 106, 210, 0.04), transparent 55%);
 }
 
 .command-immersive {
@@ -10118,7 +10117,7 @@ html:not(.dark) .investigation-empty-shell {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 40%, rgba(94,106,210,0.04), transparent 55%);
+  background: radial-gradient(circle at 50% 40%, rgba(94, 106, 210, 0.04), transparent 55%);
 }
 
 .command-theater__right-rail,
@@ -12808,7 +12807,6 @@ html:not(.dark) .investigation-empty-shell {
 .incident-rail__tool-list {
   gap: 4px;
 }
-
 
 .incident-rail__tool {
   width: 40px;
@@ -16806,8 +16804,7 @@ html:not(.dark) .investigation-empty-shell {
 .incident-rail[data-layout='theater'] .incident-rail__dock-shell {
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background:
-    linear-gradient(180deg, rgba(55, 63, 75, 0.72), rgba(32, 37, 47, 0.7));
+  background: linear-gradient(180deg, rgba(55, 63, 75, 0.72), rgba(32, 37, 47, 0.7));
   box-shadow:
     0 20px 38px rgba(0, 0, 0, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.14);
@@ -17613,14 +17610,13 @@ html:not(.dark) .investigation-empty-shell {
   inset: 1px;
   border-radius: inherit;
   pointer-events: none;
-  background:
-    linear-gradient(
-      180deg,
-      oklch(1 0 0 / 0.14),
-      transparent 26%,
-      transparent 72%,
-      oklch(1 0 0 / 0.04)
-    );
+  background: linear-gradient(
+    180deg,
+    oklch(1 0 0 / 0.14),
+    transparent 26%,
+    transparent 72%,
+    oklch(1 0 0 / 0.04)
+  );
   opacity: 0.9;
 }
 
@@ -17645,8 +17641,7 @@ html:not(.dark) .investigation-empty-shell {
 :where(.incident-rail[data-layout='theater'], .runtime-sidebar--command-rail .incident-rail)
   .incident-rail__dock-shell
   > .liquid-glass-tint {
-  background:
-    linear-gradient(180deg, oklch(0.33 0.012 236 / 0.24), oklch(0.16 0.01 242 / 0.18));
+  background: linear-gradient(180deg, oklch(0.33 0.012 236 / 0.24), oklch(0.16 0.01 242 / 0.18));
 }
 
 :where(.incident-rail[data-layout='theater'], .runtime-sidebar--command-rail .incident-rail)
@@ -17690,14 +17685,13 @@ html:not(.dark) .investigation-empty-shell {
   inset: 1px;
   border-radius: inherit;
   pointer-events: none;
-  background:
-    linear-gradient(
-      180deg,
-      oklch(1 0 0 / 0.14),
-      transparent 24%,
-      transparent 72%,
-      oklch(1 0 0 / 0.03)
-    );
+  background: linear-gradient(
+    180deg,
+    oklch(1 0 0 / 0.14),
+    transparent 24%,
+    transparent 72%,
+    oklch(1 0 0 / 0.03)
+  );
 }
 
 :where(.incident-rail[data-layout='theater'], .runtime-sidebar--command-rail .incident-rail)
@@ -17924,14 +17918,13 @@ html:not(.dark) .investigation-empty-shell {
   .incident-rail__dock-shell[data-glass-engine='refraction']::before {
   inset: 1px;
   border-radius: inherit;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.14),
-      transparent 22%,
-      transparent 76%,
-      rgba(255, 255, 255, 0.03)
-    );
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.14),
+    transparent 22%,
+    transparent 76%,
+    rgba(255, 255, 255, 0.03)
+  );
 }
 
 .incident-rail[data-layout='theater']
@@ -18127,14 +18120,13 @@ html:not(.dark) .investigation-empty-shell {
   .incident-rail__dock-shell::before {
   inset: 1px;
   border-radius: inherit;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.14),
-      transparent 22%,
-      transparent 76%,
-      rgba(255, 255, 255, 0.03)
-    );
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.14),
+    transparent 22%,
+    transparent 76%,
+    rgba(255, 255, 255, 0.03)
+  );
 }
 
 :where(.incident-rail[data-layout='theater'], .runtime-sidebar--command-rail .incident-rail)
@@ -20716,12 +20708,7 @@ html:not(.dark) .investigation-empty-shell {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    transparent 16%,
-    transparent 84%,
-    rgba(255, 255, 255, 0.008)
-  );
+  background: linear-gradient(180deg, transparent 16%, transparent 84%, rgba(255, 255, 255, 0.008));
 }
 
 .incident-rail[data-layout='theater'][data-finish='control-deck-v4']
@@ -23156,7 +23143,7 @@ html:not(.dark) .investigation-empty-shell {
  * VOLTAGENT THEME OVERRIDES (Top-Tier Professional Frontend Design)
  * -------------------------------------------------------------------------
  */
- 
+
 /* High specificity selector */
 :root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-rail__panel {
   background: #101010 !important;
@@ -23176,7 +23163,9 @@ html:not(.dark) .investigation-empty-shell {
   color: #8b949e !important;
   border-radius: 6px !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-rail__navitem[data-selected='true'] {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-rail__navitem[data-selected='true'] {
   border-color: #00d992 !important;
   color: #f2f2f2 !important;
   background: rgba(0, 217, 146, 0.05) !important;
@@ -23213,12 +23202,18 @@ html:not(.dark) .investigation-empty-shell {
   align-items: center !important;
   gap: 8px !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-rail__panel-heading strong {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-rail__panel-heading
+  strong {
   font-size: 14px !important;
   color: #ffffff !important;
   font-weight: 600 !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-rail__panel-heading small {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-rail__panel-heading
+  small {
   font-size: 12px !important;
   color: #8b949e !important;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
@@ -23228,7 +23223,10 @@ html:not(.dark) .investigation-empty-shell {
   gap: 8px !important;
   margin-top: 0 !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-rail__panel-meta span {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-rail__panel-meta
+  span {
   padding: 4px 8px !important;
   border-radius: 9999px !important;
   border: 1px solid #3d3a39 !important;
@@ -23237,7 +23235,10 @@ html:not(.dark) .investigation-empty-shell {
   font-size: 11px !important;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-rail__panel-meta span[data-tone='danger'] {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-rail__panel-meta
+  span[data-tone='danger'] {
   color: #00d992 !important;
   border-color: rgba(0, 217, 146, 0.3) !important;
   background: rgba(0, 217, 146, 0.05) !important;
@@ -23268,7 +23269,9 @@ html:not(.dark) .investigation-empty-shell {
 :root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-path-preview,
 :root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-next-action,
 :root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-evidence-kpis,
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-evidence-ribbon__primary,
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-evidence-ribbon__primary,
 :root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-evidence-ribbon__pair,
 :root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-evidence-structure,
 :root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-inspector-block,
@@ -23289,7 +23292,10 @@ html:not(.dark) .investigation-empty-shell {
   gap: 8px !important;
 }
 
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-boundary-anchor strong,
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-boundary-anchor
+  strong,
 :root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-path-preview strong {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
   font-size: 13px !important;
@@ -23328,7 +23334,10 @@ html:not(.dark) .investigation-empty-shell {
   text-transform: uppercase !important;
   letter-spacing: 0.1em !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-fact-list__row strong {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-fact-list__row
+  strong {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
   font-size: 14px !important;
   color: #f2f2f2 !important;
@@ -23361,7 +23370,10 @@ html:not(.dark) .investigation-empty-shell {
 :root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-action-links a:hover {
   opacity: 0.9 !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-action-links a:last-child {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-action-links
+  a:last-child {
   background: transparent !important;
   color: #f2f2f2 !important;
   border: 1px solid #3d3a39 !important;
@@ -23372,18 +23384,34 @@ html:not(.dark) .investigation-empty-shell {
   background: transparent !important;
 }
 :root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-evidence-stage__hero,
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-evidence-stage__status,
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-evidence-ribbon__primary,
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-evidence-ribbon__secondary,
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-evidence-stage__status,
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-evidence-ribbon__primary,
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-evidence-ribbon__secondary,
 :root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-evidence-structure {
   background: #1a1a1a !important;
   border: 1px solid #3d3a39 !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-evidence-stage__hero::before,
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-evidence-stage__status::before,
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-evidence-ribbon__primary::before,
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-evidence-ribbon__secondary::before,
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-evidence-structure::before {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-evidence-stage__hero::before,
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-evidence-stage__status::before,
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-evidence-ribbon__primary::before,
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-evidence-ribbon__secondary::before,
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-evidence-structure::before {
   display: none !important;
 }
 
@@ -23392,10 +23420,16 @@ html:not(.dark) .investigation-empty-shell {
   border-bottom: 1px solid #3d3a39 !important;
   background: transparent !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-signal-row:last-child {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-signal-row:last-child {
   border-bottom: none !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-signal-row span strong {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-signal-row
+  span
+  strong {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
   color: #f2f2f2 !important;
 }
@@ -23410,7 +23444,9 @@ html:not(.dark) .investigation-empty-shell {
   border-radius: 8px !important;
   margin-bottom: 8px !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-queue-row[data-selected='true'] {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-queue-row[data-selected='true'] {
   border-color: #00d992 !important;
   box-shadow: none !important;
   background: rgba(0, 217, 146, 0.05) !important;
@@ -23444,7 +23480,10 @@ html:not(.dark) .investigation-empty-shell {
   gap: 12px !important;
   align-items: center !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-brief__statusline span {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-brief__statusline
+  span {
   font-family: Inter, system-ui, sans-serif !important;
   font-size: 14px !important;
   font-weight: 600 !important;
@@ -23500,7 +23539,10 @@ html:not(.dark) .investigation-empty-shell {
   overflow: hidden !important;
   margin-top: 8px !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-panel-signal__meter i {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-panel-signal__meter
+  i {
   background: #00d992 !important;
 }
 
@@ -23529,7 +23571,9 @@ html:not(.dark) .investigation-empty-shell {
   gap: 6px !important;
   text-decoration: none !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-rail__collapse-button {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-rail__collapse-button {
   background: transparent !important;
   border: 1px solid #3d3a39 !important;
   color: #8b949e !important;
@@ -23540,7 +23584,9 @@ html:not(.dark) .investigation-empty-shell {
   justify-content: center !important;
   cursor: pointer !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-rail__collapse-button:hover {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-rail__collapse-button:hover {
   background: #1a1a1a !important;
   color: #f2f2f2 !important;
 }
@@ -23552,7 +23598,10 @@ html:not(.dark) .investigation-empty-shell {
   border: 1px solid #3d3a39 !important;
   border-radius: 8px !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-story-rail__head span {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-story-rail__head
+  span {
   font-size: 12px !important;
   color: #8b949e !important;
   text-transform: uppercase !important;
@@ -23564,15 +23613,20 @@ html:not(.dark) .investigation-empty-shell {
   border-radius: 6px !important;
   padding: 8px 12px !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-story-rail__node strong {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-story-rail__node
+  strong {
   color: #f2f2f2 !important;
   font-size: 13px !important;
 }
-:root .incident-rail[data-theme='voltagent'][data-layout='theater'] .incident-story-rail__node small {
+:root
+  .incident-rail[data-theme='voltagent'][data-layout='theater']
+  .incident-story-rail__node
+  small {
   color: #00d992 !important;
   font-size: 11px !important;
 }
-
 
 :root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-queue-row__head {
   display: flex !important;
@@ -23580,7 +23634,10 @@ html:not(.dark) .investigation-empty-shell {
   align-items: center !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-queue-row__content strong {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-queue-row__content
+  strong {
   font-size: 15px !important;
   font-weight: 600 !important;
   color: var(--apple-text-primary) !important;
@@ -23588,7 +23645,10 @@ html:not(.dark) .investigation-empty-shell {
   margin-bottom: 4px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-queue-row__content small {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-queue-row__content
+  small {
   font-size: 13px !important;
   color: var(--apple-text-secondary) !important;
 }
@@ -23598,7 +23658,10 @@ html:not(.dark) .investigation-empty-shell {
   padding: 20px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-story-rail__head span {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-story-rail__head
+  span {
   font-size: 13px !important;
   font-weight: 500 !important;
   color: var(--apple-text-secondary) !important;
@@ -23611,20 +23674,28 @@ html:not(.dark) .investigation-empty-shell {
   padding: 10px 14px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-story-rail__node strong {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-story-rail__node
+  strong {
   color: var(--apple-text-primary) !important;
   font-size: 14px !important;
   font-family: var(--apple-font-mono) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-story-rail__node small {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-story-rail__node
+  small {
   color: var(--apple-text-secondary) !important;
   font-size: 12px !important;
 }
 
 /* Top Action Bar / Header overrides */
 :root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-command,
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__collapse-button {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__collapse-button {
   background: var(--apple-bg-element) !important;
   border: 1px solid var(--apple-border-soft) !important;
   color: var(--apple-text-primary) !important;
@@ -23633,11 +23704,14 @@ html:not(.dark) .investigation-empty-shell {
   transition: all 0.2s ease !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-command:hover,
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__collapse-button:hover {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-command:hover,
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__collapse-button:hover {
   background: rgba(255, 255, 255, 0.15) !important;
 }
-
 
 /* ==========================================================================
    APPLE PRO DESIGN SYSTEM OVERRIDES (High-End Dark Mode)
@@ -23651,16 +23725,16 @@ html:not(.dark) .investigation-empty-shell {
   --apple-border-soft: rgba(255, 255, 255, 0.05);
   --apple-text-primary: rgba(255, 255, 255, 0.95);
   --apple-text-secondary: rgba(235, 235, 245, 0.6);
-  --apple-accent: #FFFFFF;
+  --apple-accent: #ffffff;
   --apple-radius-xl: 18px;
   --apple-radius-lg: 14px;
   --apple-radius-md: 10px;
   --apple-radius-sm: 6px;
-  --apple-font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --apple-font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
   --apple-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] *:not([class*="codicon"]) {
+:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] *:not([class*='codicon']) {
   font-family: var(--apple-font-sans) !important;
 }
 
@@ -23725,7 +23799,10 @@ html:not(.dark) .investigation-empty-shell {
   align-items: center !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-brief__statusline span,
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-brief__statusline
+  span,
 :root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-brief__statusline i {
   display: flex !important;
   align-items: center !important;
@@ -23780,8 +23857,11 @@ html:not(.dark) .investigation-empty-shell {
   margin-top: 12px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-panel-signal__meter i {
-  background: linear-gradient(90deg, rgba(255,255,255,0.4), #FFFFFF) !important;
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-panel-signal__meter
+  i {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.4), #ffffff) !important;
   border-radius: 3px !important;
 }
 
@@ -23811,7 +23891,10 @@ html:not(.dark) .investigation-empty-shell {
   color: var(--apple-text-secondary) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-fact-list__row strong {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-fact-list__row
+  strong {
   font-family: var(--apple-font-mono) !important;
   font-size: 14px !important;
   font-weight: 500 !important;
@@ -23842,7 +23925,10 @@ html:not(.dark) .investigation-empty-shell {
   gap: 6px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-boundary-anchor strong,
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-boundary-anchor
+  strong,
 :root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-path-preview strong {
   font-family: var(--apple-font-mono) !important;
   font-size: 14px !important;
@@ -23905,12 +23991,18 @@ html:not(.dark) .investigation-empty-shell {
 }
 
 :root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-action-links a:hover,
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-action-links button:hover {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-action-links
+  button:hover {
   transform: scale(0.98) !important;
   opacity: 0.9 !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-action-links a:last-child {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-action-links
+  a:last-child {
   background: var(--apple-bg-element) !important;
   color: var(--apple-text-primary) !important;
   box-shadow: none !important;
@@ -23946,7 +24038,10 @@ html:not(.dark) .investigation-empty-shell {
   align-items: center !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-queue-row__content strong {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-queue-row__content
+  strong {
   font-size: 15px !important;
   font-weight: 600 !important;
   color: var(--apple-text-primary) !important;
@@ -23954,7 +24049,10 @@ html:not(.dark) .investigation-empty-shell {
   margin-bottom: 4px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-queue-row__content small {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-queue-row__content
+  small {
   font-size: 13px !important;
   color: var(--apple-text-secondary) !important;
 }
@@ -23964,7 +24062,10 @@ html:not(.dark) .investigation-empty-shell {
   padding: 20px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-story-rail__head span {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-story-rail__head
+  span {
   font-size: 13px !important;
   font-weight: 500 !important;
   color: var(--apple-text-secondary) !important;
@@ -23977,20 +24078,28 @@ html:not(.dark) .investigation-empty-shell {
   padding: 10px 14px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-story-rail__node strong {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-story-rail__node
+  strong {
   color: var(--apple-text-primary) !important;
   font-size: 14px !important;
   font-family: var(--apple-font-mono) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-story-rail__node small {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-story-rail__node
+  small {
   color: var(--apple-text-secondary) !important;
   font-size: 12px !important;
 }
 
 /* Top Action Bar / Header overrides */
 :root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-command,
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__collapse-button {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__collapse-button {
   background: var(--apple-bg-element) !important;
   border: 1px solid var(--apple-border-soft) !important;
   color: var(--apple-text-primary) !important;
@@ -23999,14 +24108,14 @@ html:not(.dark) .investigation-empty-shell {
   transition: all 0.2s ease !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-command:hover,
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__collapse-button:hover {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-command:hover,
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__collapse-button:hover {
   background: rgba(255, 255, 255, 0.15) !important;
 }
-
-
-
-
 
 /* Specific fix for Queue Row */
 :root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-queue-row__meta {
@@ -24029,7 +24138,10 @@ html:not(.dark) .investigation-empty-shell {
   gap: 6px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-queue-row__meta em::before {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-queue-row__meta
+  em::before {
   content: '' !important;
   display: block !important;
   width: 6px !important;
@@ -24042,7 +24154,7 @@ html:not(.dark) .investigation-empty-shell {
   display: inline-flex !important;
   align-items: center !important;
   padding: 4px 10px !important;
-  background: rgba(255,255,255,0.08) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
   border-radius: 100px !important;
   font-family: var(--apple-font-mono) !important;
   font-size: 12px !important;
@@ -24050,7 +24162,9 @@ html:not(.dark) .investigation-empty-shell {
   margin-top: 12px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-queue-row[data-selected='true'] {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-queue-row[data-selected='true'] {
   background: rgba(255, 255, 255, 0.1) !important;
   border-color: rgba(255, 255, 255, 0.2) !important;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
@@ -24112,13 +24226,19 @@ html:not(.dark) .investigation-empty-shell {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-heading > div {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-heading
+  > div {
   display: flex !important;
   flex-direction: column !important;
   gap: 4px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-heading strong {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-heading
+  strong {
   font-family: var(--apple-font-sans) !important;
   font-size: 22px !important;
   font-weight: 600 !important;
@@ -24127,7 +24247,10 @@ html:not(.dark) .investigation-empty-shell {
   line-height: 1.2 !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-heading small {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-heading
+  small {
   font-family: var(--apple-font-sans) !important;
   font-size: 14px !important;
   font-weight: 400 !important;
@@ -24142,7 +24265,10 @@ html:not(.dark) .investigation-empty-shell {
   flex-wrap: wrap !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-meta span {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-meta
+  span {
   display: inline-flex !important;
   align-items: center !important;
   padding: 4px 12px !important;
@@ -24157,15 +24283,21 @@ html:not(.dark) .investigation-empty-shell {
 }
 
 /* Special colored pills in header */
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-meta span[data-tone='danger'] {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-meta
+  span[data-tone='danger'] {
   background: rgba(255, 69, 58, 0.15) !important;
-  color: #FF453A !important;
+  color: #ff453a !important;
   border-color: rgba(255, 69, 58, 0.3) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-meta span[data-tone='warning'] {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-meta
+  span[data-tone='warning'] {
   background: rgba(255, 159, 10, 0.15) !important;
-  color: #FF9F0A !important;
+  color: #ff9f0a !important;
   border-color: rgba(255, 159, 10, 0.3) !important;
 }
 
@@ -24192,12 +24324,16 @@ html:not(.dark) .investigation-empty-shell {
   transition: all 0.2s ease !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-command:hover {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-command:hover {
   background: rgba(255, 255, 255, 0.15) !important;
   transform: scale(0.97) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__collapse-button {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__collapse-button {
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
@@ -24211,7 +24347,9 @@ html:not(.dark) .investigation-empty-shell {
   transition: all 0.2s ease !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__collapse-button:hover {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__collapse-button:hover {
   background: rgba(255, 255, 255, 0.15) !important;
   color: var(--apple-text-primary) !important;
   transform: scale(0.92) !important;
@@ -24244,10 +24382,18 @@ html:not(.dark) .investigation-empty-shell {
 }
 
 /* Remove any pseudo-elements that might cause random lines */
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-hero::before,
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-hero::after,
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-header::before,
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-header::after {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-hero::before,
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-hero::after,
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-header::before,
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-header::after {
   display: none !important;
 }
 
@@ -24288,13 +24434,19 @@ html:not(.dark) .investigation-empty-shell {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-heading > div {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-heading
+  > div {
   display: flex !important;
   flex-direction: column !important;
   gap: 2px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-heading strong {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-heading
+  strong {
   font-family: var(--apple-font-sans) !important;
   font-size: 24px !important;
   font-weight: 600 !important;
@@ -24303,7 +24455,10 @@ html:not(.dark) .investigation-empty-shell {
   line-height: 1.2 !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-heading small {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-heading
+  small {
   font-family: var(--apple-font-sans) !important;
   font-size: 14px !important;
   font-weight: 400 !important;
@@ -24319,7 +24474,10 @@ html:not(.dark) .investigation-empty-shell {
   margin-top: 4px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-meta span {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-meta
+  span {
   display: inline-flex !important;
   align-items: center !important;
   padding: 4px 10px !important;
@@ -24332,15 +24490,21 @@ html:not(.dark) .investigation-empty-shell {
   color: var(--apple-text-primary) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-meta span[data-tone='danger'] {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-meta
+  span[data-tone='danger'] {
   background: rgba(255, 69, 58, 0.15) !important;
-  color: #FF453A !important;
+  color: #ff453a !important;
   border-color: rgba(255, 69, 58, 0.3) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-meta span[data-tone='warning'] {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-meta
+  span[data-tone='warning'] {
   background: rgba(255, 159, 10, 0.15) !important;
-  color: #FF9F0A !important;
+  color: #ff9f0a !important;
   border-color: rgba(255, 159, 10, 0.3) !important;
 }
 
@@ -24372,12 +24536,16 @@ html:not(.dark) .investigation-empty-shell {
   min-height: auto !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-command:hover {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-command:hover {
   background: rgba(255, 255, 255, 0.2) !important;
   transform: scale(0.97) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__collapse-button {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__collapse-button {
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
@@ -24393,14 +24561,20 @@ html:not(.dark) .investigation-empty-shell {
   min-height: auto !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__collapse-button:hover {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__collapse-button:hover {
   background: rgba(255, 255, 255, 0.15) !important;
   color: var(--apple-text-primary) !important;
   transform: scale(0.92) !important;
 }
 /* Fix: Limit data-tone colors ONLY to pills, not the whole summary panel */
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-panel-summary[data-tone],
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-icon[data-tone],
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-panel-summary[data-tone],
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-icon[data-tone],
 :root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-queue-row[data-tone] {
   color: inherit !important;
   border-color: var(--apple-border) !important;
@@ -24420,19 +24594,43 @@ html:not(.dark) .investigation-empty-shell {
 }
 
 /* The true pills/statusline elements should get the colors */
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-brief__statusline span[data-tone='danger'],
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-brief__statusline i[data-tone='danger'],
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-meta span[data-tone='danger'],
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-queue-row__meta em[data-tone='danger'] {
-  color: #FF453A !important;
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-brief__statusline
+  span[data-tone='danger'],
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-brief__statusline
+  i[data-tone='danger'],
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-meta
+  span[data-tone='danger'],
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-queue-row__meta
+  em[data-tone='danger'] {
+  color: #ff453a !important;
   border-color: rgba(255, 69, 58, 0.3) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-brief__statusline span[data-tone='warning'],
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-brief__statusline i[data-tone='warning'],
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-meta span[data-tone='warning'],
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-queue-row__meta em[data-tone='warning'] {
-  color: #FF9F0A !important;
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-brief__statusline
+  span[data-tone='warning'],
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-brief__statusline
+  i[data-tone='warning'],
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-meta
+  span[data-tone='warning'],
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-queue-row__meta
+  em[data-tone='warning'] {
+  color: #ff9f0a !important;
   border-color: rgba(255, 159, 10, 0.3) !important;
 }
 /* ==========================================================================
@@ -24442,10 +24640,18 @@ html:not(.dark) .investigation-empty-shell {
 /* 1. Remove all old pseudo-element lines that ruined the design */
 :root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel::after,
 :root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel::before,
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-header::after,
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-header::before,
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-hero::after,
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-hero::before {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-header::after,
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-header::before,
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-hero::after,
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-hero::before {
   display: none !important;
 }
 
@@ -24514,21 +24720,33 @@ html:not(.dark) .investigation-empty-shell {
   align-items: center !important;
   width: 36px !important;
   height: 36px !important;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%) !important;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.04) 100%
+  ) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: 8px !important;
   color: rgba(255, 255, 255, 0.9) !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
 
 /* Heading Text */
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-heading > div {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-heading
+  > div {
   display: flex !important;
   flex-direction: column !important;
   gap: 2px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-heading strong {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-heading
+  strong {
   font-family: var(--apple-font-sans, system-ui, -apple-system, sans-serif) !important;
   font-size: 20px !important;
   font-weight: 600 !important;
@@ -24537,7 +24755,10 @@ html:not(.dark) .investigation-empty-shell {
   line-height: 1.2 !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-heading small {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-heading
+  small {
   font-family: var(--apple-font-sans, system-ui, -apple-system, sans-serif) !important;
   font-size: 13px !important;
   font-weight: 400 !important;
@@ -24554,7 +24775,10 @@ html:not(.dark) .investigation-empty-shell {
   margin-top: 4px !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-meta span {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-meta
+  span {
   display: inline-flex !important;
   align-items: center !important;
   padding: 3px 10px !important;
@@ -24570,15 +24794,21 @@ html:not(.dark) .investigation-empty-shell {
 }
 
 /* Status colors (Danger/Warning) */
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-meta span[data-tone='danger'] {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-meta
+  span[data-tone='danger'] {
   background: rgba(255, 69, 58, 0.1) !important;
-  color: #FF453A !important;
+  color: #ff453a !important;
   border-color: rgba(255, 69, 58, 0.25) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-meta span[data-tone='warning'] {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-meta
+  span[data-tone='warning'] {
   background: rgba(255, 159, 10, 0.1) !important;
-  color: #FF9F0A !important;
+  color: #ff9f0a !important;
   border-color: rgba(255, 159, 10, 0.25) !important;
 }
 
@@ -24606,20 +24836,28 @@ html:not(.dark) .investigation-empty-shell {
   color: rgba(255, 255, 255, 0.85) !important;
   text-decoration: none !important;
   transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1) !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-command:hover {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-command:hover {
   background: rgba(255, 255, 255, 0.12) !important;
   color: #fff !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__panel-command:active {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__panel-command:active {
   background: rgba(255, 255, 255, 0.08) !important;
   transform: scale(0.96) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__collapse-button {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__collapse-button {
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
@@ -24632,15 +24870,21 @@ html:not(.dark) .investigation-empty-shell {
   color: rgba(255, 255, 255, 0.6) !important;
   cursor: pointer !important;
   transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1) !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__collapse-button:hover {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__collapse-button:hover {
   background: rgba(255, 255, 255, 0.12) !important;
   color: rgba(255, 255, 255, 0.95) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__collapse-button:active {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__collapse-button:active {
   background: rgba(255, 255, 255, 0.08) !important;
   transform: scale(0.92) !important;
 }
@@ -24659,7 +24903,7 @@ html:not(.dark) .investigation-empty-shell {
   backdrop-filter: blur(24px) saturate(1.5) !important;
   -webkit-backdrop-filter: blur(24px) saturate(1.5) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 
+  box-shadow:
     0 32px 64px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
@@ -24668,7 +24912,7 @@ html:not(.dark) .investigation-empty-shell {
 .incident-rail__ambient--fluid {
   border-radius: inherit;
   /* Add a subtle vignette over the fluid to focus on the center */
-  box-shadow: inset 0 0 100px 20px rgba(0,0,0,0.8);
+  box-shadow: inset 0 0 100px 20px rgba(0, 0, 0, 0.8);
 }
 
 /* Ensure body doesn't have an opaque background that blocks the fluid */
@@ -24683,7 +24927,7 @@ html:not(.dark) .investigation-empty-shell {
   border: 1px solid rgba(255, 255, 255, 0.06) !important;
   backdrop-filter: blur(12px) !important;
   border-radius: 12px !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
 }
 
 /* Enhance the dock to be floating glass */
@@ -24696,13 +24940,19 @@ html:not(.dark) .investigation-empty-shell {
 }
 
 /* Hide the old legacy dock backgrounds */
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__navitem[data-selected="true"] {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__navitem[data-selected='true'] {
   background: rgba(255, 255, 255, 0.1) !important;
   border-color: rgba(255, 255, 255, 0.15) !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
 
-:root .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__navitem:hover:not([data-selected="true"]) {
+:root
+  .incident-rail[data-theme='apple-pro'][data-layout='theater']
+  .incident-rail__navitem:hover:not([data-selected='true']) {
   background: rgba(255, 255, 255, 0.05) !important;
 }
 
@@ -24853,48 +25103,100 @@ html:not(.dark) .investigation-empty-shell {
    ═══════════════════════════════════════════════════════════ */
 
 @keyframes mtl-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
-.mtl-spinner { animation: mtl-spin 0.8s linear infinite; }
+.mtl-spinner {
+  animation: mtl-spin 0.8s linear infinite;
+}
 
 /* Compositor-thread loader — transform/opacity only, never blocks on main thread */
 @keyframes mtl-ring-rotate {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 @keyframes mtl-core-pulse {
-  0%, 100% { transform: scale(0.75); opacity: 0.5; }
-  50%      { transform: scale(1.4); opacity: 1; }
+  0%,
+  100% {
+    transform: scale(0.75);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 1;
+  }
 }
 @keyframes mtl-pulse-spread {
-  0%   { transform: scale(0.4); opacity: 0.6; }
-  100% { transform: scale(1.7); opacity: 0; }
+  0% {
+    transform: scale(0.4);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
 }
-.mtl-load-pulse { animation: mtl-pulse-spread 2.2s ease-out infinite; }
+.mtl-load-pulse {
+  animation: mtl-pulse-spread 2.2s ease-out infinite;
+}
 
 @keyframes mtl-word-breathe {
-  0%, 100% { opacity: 0.55; }
-  50%      { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
 }
-.mtl-load-word { animation: mtl-word-breathe 2.2s ease-in-out infinite; }
+.mtl-load-word {
+  animation: mtl-word-breathe 2.2s ease-in-out infinite;
+}
 
 /* Network-embryo keyframes — compositor thread only */
 @keyframes mtl-node-fade {
-  0%, 100% { transform: scale(0.6); opacity: 0.3; }
-  50%      { transform: scale(1.2); opacity: 1; }
+  0%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
 }
 @keyframes mtl-edge-fill {
-  0%, 100% { opacity: 0.12; }
-  50%      { opacity: 0.35; }
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 
 @keyframes mtl-page-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes mtl-load-pulse {
-  0%   { transform: scale(0.3); opacity: 0.6; }
-  100% { transform: scale(2.2); opacity: 0; }
+  0% {
+    transform: scale(0.3);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
 }
 
 .incident-rail__sash {
@@ -24958,7 +25260,9 @@ html:not(.dark) .investigation-empty-shell {
 }
 
 .ln-panel--hoverable {
-  transition: border-color 150ms ease, background 150ms ease;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
 }
 
 .ln-panel--hoverable:hover {
@@ -25063,10 +25367,18 @@ html:not(.dark) .investigation-empty-shell {
   font-variant-numeric: tabular-nums;
 }
 
-.ln-metric__delta[data-tone='success'] { color: var(--ln-success); }
-.ln-metric__delta[data-tone='danger'] { color: var(--ln-danger); }
-.ln-metric__delta[data-tone='warning'] { color: var(--ln-warning); }
-.ln-metric__delta[data-tone='info'] { color: var(--ln-info); }
+.ln-metric__delta[data-tone='success'] {
+  color: var(--ln-success);
+}
+.ln-metric__delta[data-tone='danger'] {
+  color: var(--ln-danger);
+}
+.ln-metric__delta[data-tone='warning'] {
+  color: var(--ln-warning);
+}
+.ln-metric__delta[data-tone='info'] {
+  color: var(--ln-info);
+}
 
 /* ── Linear status badge ── */
 .ln-badge {
@@ -25123,7 +25435,10 @@ html:not(.dark) .investigation-empty-shell {
   background: transparent;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+  transition:
+    color 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease;
   text-decoration: none;
 }
 
@@ -25141,6 +25456,11 @@ html:not(.dark) .investigation-empty-shell {
 .ln-btn--primary:hover {
   background: #4f5bd0;
   color: #fff;
+}
+/* CTA giant 按钮同时带 --primary + --giant：保证滚动hover 时琥珀渐变不被 primary 的 hover 蓝顶掉 */
+.ln-btn--primary.ln-btn--giant:hover {
+  background: linear-gradient(120deg, var(--land-amber), var(--land-amber-2));
+  color: #1a1206;
 }
 
 /* ── Linear top bar ── */
@@ -25181,7 +25501,9 @@ html:not(.dark) .investigation-empty-shell {
   font-weight: 500;
   color: var(--ln-text-secondary);
   text-decoration: none;
-  transition: color 120ms ease, background 120ms ease;
+  transition:
+    color 120ms ease,
+    background 120ms ease;
 }
 
 .ln-topbar__nav a:hover {
@@ -25339,13 +25661,1439 @@ html:not(.dark) .investigation-empty-shell {
 }
 
 /* ── Code block scrollbar ── */
-.trace-code-block::-webkit-scrollbar { width: 4px; }
-.trace-code-block::-webkit-scrollbar-track { background: transparent; }
-.trace-code-block::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+.trace-code-block::-webkit-scrollbar {
+  width: 4px;
+}
+.trace-code-block::-webkit-scrollbar-track {
+  background: transparent;
+}
+.trace-code-block::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+}
 
 /* ── Rail push inner — GPU-composited transform container ── */
 .rail-push-inner {
   width: 100%;
   height: 100%;
   will-change: transform;
+}
+
+/* ═══ MtAgentLens Landing (M7) — 根路径初始进入页 / ═════════════════════════════════ */
+
+/* ── Sora —— 自托管展示字体（variable 500–800，latin 子集）──
+   顶级规范：避免 Inter/Roboto/Space Grotesk 等"AI 收敛默认字体"；
+   Sora 几何技术感承接 latin（Agent/EN/品牌 wordmark）——字宽适中，
+   塞进中文标题不会把行撑爆（Syne 太宽 0.93em/字母 会让行折行）。
+   中文回退系统重无衬线（Noto Sans SC 900 / PingFang）。
+   font-display: swap 防白屏。 */
+@font-face {
+  font-family: 'Sora';
+  src: url('/fonts/sora.woff2') format('woff2');
+  font-weight: 500 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ── Root: token scope + deep-space ground ── */
+.landing-root {
+  --land-bg: #000108;
+  --land-surface: rgba(255, 255, 255, 0.03);
+  --land-surface-2: rgba(255, 255, 255, 0.06);
+  --land-hairline: rgba(255, 255, 255, 0.1);
+  --land-amber: #fbbf24;
+  --land-amber-2: #f97316;
+  --land-violet: #8b7dff;
+  --land-cyan: #6cc2ff;
+  --land-text: #fafafa;
+  --land-text-2: #a6abb9;
+  --land-text-3: #62687a;
+  --land-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* 展示字体：Sora（几何技术感，字宽适中，避开 AI 收敛默认）承接 latin；
+     中文回退系统重无衬线（900 字重可用时最重），latin+中文混排干净高级 */
+  --land-display: 'Sora', system-ui, -apple-system, 'PingFang SC',
+    'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+
+  background: var(--land-bg);
+  color: var(--land-text);
+  /* The landing page is its own scroll container: the console's global
+     html/body/#app-main overflow rules keep the document unscrollable, so a
+     fixed-height overflow layer here is what actually scrolls. ScrollTrigger
+     targets it via landingScroller(). */
+  height: 100dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  font-family: var(--font-inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-root {
+    scroll-behavior: auto;
+  }
+}
+
+/* ── Shared section scaffolding ── */
+.landing-section {
+  position: relative;
+  /* Let hash anchors land below the fixed top nav, not hidden under it. */
+  scroll-margin-top: 72px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(72px, 12vh, 144px) clamp(20px, 5vw, 64px);
+}
+
+.landing-section__head {
+  text-align: center;
+  margin-bottom: clamp(32px, 6vh, 64px);
+}
+.landing-section__head h2,
+.landing-cta__heading {
+  font-size: clamp(32px, 6vw, 64px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  text-wrap: balance;
+  margin: 0;
+}
+.landing-section__sub {
+  color: var(--land-text-2);
+  margin: 14px auto 0;
+  max-width: 60ch;
+  line-height: 1.6;
+  font-size: 15px;
+}
+
+.landing-eyebrow {
+  font-family: var(--land-mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--land-text-3);
+  margin: 0;
+  /* 编辑式引导线：琥珀渐变短横线领起 eyebrow，顶级落地页的层次语言 */
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+.landing-eyebrow::before {
+  content: '';
+  width: clamp(28px, 4vw, 56px);
+  height: 1px;
+  background: linear-gradient(90deg, var(--land-amber), transparent);
+  opacity: 0.75;
+}
+
+.frame-mask {
+  will-change: clip-path;
+}
+
+/* ── ① HERO ── */
+.landing-hero {
+  overflow: hidden;
+  padding: 0;
+  /* content 从顶部开始（.landing-section 默认 flex 居中会把文字区推到中央与 M 重叠） */
+  justify-content: flex-start;
+}
+.landing-hero__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(139, 125, 255, 0.07), transparent 55%),
+    radial-gradient(90% 70% at 50% 100%, rgba(251, 191, 36, 0.06), transparent 62%), var(--land-bg);
+}
+/* 稀疏星点 — 极淡，纯 CSS，绝不遮挡标题 */
+.landing-hero__bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.13) 1px, transparent 1.5px);
+  background-size: 34px 34px;
+  -webkit-mask-image: radial-gradient(70% 60% at 50% 42%, black, transparent 76%);
+  mask-image: radial-gradient(70% 60% at 50% 42%, black, transparent 76%);
+  opacity: 0.55;
+  pointer-events: none;
+}
+/* video-frame 容器（LandingVideoFrame）— 全屏视频帧，Zentry #video-frame 角色 */
+.landing-hero__frame {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+}
+/* 文案叠加 — 视频帧左中上（Zentry redefi<b>n</b>e 区），深空视频上白字清晰 */
+.landing-hero__content {
+  position: absolute;
+  left: clamp(20px, 6vw, 104px);
+  top: clamp(44px, 12vh, 128px);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: clamp(14px, 2.4vh, 24px);
+  /* 加宽内容列：两行大标题占满宽度（顶级 hero 的不对称张力） */
+  max-width: min(1080px, calc(100vw - 40px));
+}
+.landing-hero__title {
+  /* 惊艳 slogan：每行仅 3 字 → 字号可拉到超大（Apple/Linear 级大字）。
+     Sora 承接 latin，中文回退系统重无衬线。字重 700（900 会让部分系统
+     CJK faux-bold 出黑块）。全白无彩色强调。 */
+  font-family: var(--land-display);
+  font-size: clamp(64px, 11.5vw, 184px);
+  font-weight: 700;
+  letter-spacing: -0.055em;
+  line-height: 1;
+  max-width: none;
+  margin: 0;
+  color: var(--land-text);
+  /* 极轻投影：只在视频亮部给文字一点托底，绝不产生黑块 */
+  text-shadow: 0 2px 24px rgba(0, 1, 8, 0.55);
+}
+/* 两行标题各自独立成块（line-by-line 揭示），行内逐词 mask 升起。
+   高特异性压过 .word-reveal 的 inline-block：否则两行会并排而非堆叠
+   （之前"看着像两行"只是行太长被迫换行的假象，行短了就并排重叠）。 */
+.word-reveal.landing-hero__title-line {
+  display: block;
+}
+/* 行 2 关键概念「责任流动」—— amber 渐变强调（与 MtlLogo/wordmark 琥珀同源）。
+   继承的 title 投影在这里关掉（投影会把渐变文字描成深色块）；
+   background-clip:text 不支持的浏览器回退为纯 amber 文字（绝不出现色块）。 */
+.word-reveal .word--accent .word-inner {
+  color: var(--land-amber);
+  text-shadow: none;
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .word-reveal .word--accent .word-inner {
+    background: linear-gradient(100deg, var(--land-amber), var(--land-amber-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+/* 专业副行 —— 一句话说清产品实际价值（白灰，编辑式） */
+.landing-hero__sub {
+  font-size: clamp(15px, 1.5vw, 18px);
+  line-height: 1.7;
+  color: var(--land-text-2);
+  margin: 0;
+  max-width: 46ch;
+}
+/* 玻璃拟态 CTA —— 顶级 hero 标配行动入口（克制不花哨） */
+.landing-hero__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: var(--land-text);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  transition:
+    border-color 0.25s ease,
+    background 0.25s ease,
+    transform 0.25s ease;
+}
+.landing-hero__cta:hover {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+.landing-hero__cta-arrow {
+  transition: transform 0.25s ease;
+}
+.landing-hero__cta:hover .landing-hero__cta-arrow {
+  transform: translateX(3px);
+}
+/* 滚动提示 —— 玻璃胶囊「滚动光标」：鼠标轮廓 + 滚轮内发光点循环下移，
+   整体轻微浮动呼吸（世界级 Landing 滚动提示语言，非普通文字+细线） */
+.landing-hero__scroll-hint {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: clamp(20px, 4vh, 44px);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 18px 9px 12px;
+  border-radius: 999px;
+  color: var(--land-text-2);
+  font-family: var(--land-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+  border: 1px solid rgba(139, 125, 255, 0.18);
+  box-shadow:
+    0 12px 32px rgba(0, 1, 8, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  animation: landing-scroll-idle 2.6s ease-in-out infinite;
+}
+@keyframes landing-scroll-idle {
+  0%,
+  100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-5px);
+  }
+}
+.landing-hero__scroll-mouse {
+  position: relative;
+  width: 16px;
+  height: 26px;
+  border: 1.5px solid rgba(251, 191, 36, 0.6);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.landing-hero__scroll-dot {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 3px;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--land-amber);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.8);
+  transform: translateX(-50%);
+  animation: landing-scroll-dot 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes landing-scroll-dot {
+  0% {
+    top: 4px;
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    top: 16px;
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-hero__scroll-hint {
+    animation: none;
+  }
+  .landing-hero__scroll-dot {
+    animation: none;
+    top: 8px;
+    opacity: 0.7;
+  }
+}
+
+/* ── Word reveal (Zentry AnimatedTitle-style cascade rise) ──
+   纯上升显现，无 3D 透视翻转（perspective+rotateX/Y 在真实 GPU 会渲染成
+   斜线残影、字上半消失）。上升永远不可能裁掉字形。 */
+.word-reveal {
+  display: inline-block;
+}
+.word-reveal .word {
+  display: inline-block;
+  vertical-align: bottom;
+  margin-right: 0.22em;
+  /* mask-line 揭示：每词在遮罩内升起（Linear/Stripe 签名式标题语言）。
+     只动 transform（合成器友好）；padding-bottom 给 descender 留余量防
+     裁脚（g/p/y），负 margin 抵消其布局影响保持行高稳定。 */
+  overflow: hidden;
+  padding-bottom: 0.15em;
+  margin-bottom: -0.15em;
+}
+.word-reveal .word--cjk {
+  margin-right: 0.02em;
+}
+/* CJK 字紧跟在 latin 词前时补足 proper 空格宽度（防「看见Agent」挤在一起） */
+.word-reveal .word--cjk-gap {
+  margin-right: 0.3em;
+}
+.word-reveal .word-inner {
+  display: inline-block;
+  /* 只保留 transform/opacity（合成器友好）。不再常驻 filter 层：
+     揭示为 mask-line 上升（无逐词高斯模糊），filter 层纯属浪费内存。
+     GSAP 在动画期间会临时加 will-change、结束自动清掉。 */
+  will-change: transform;
+}
+
+/* ── 黑洞视频帧（LandingVideoFrame → Zentry video-frame）── */
+.landing-mark {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  will-change: clip-path, border-radius, transform, opacity;
+}
+/* CC0 黑洞视频背景 — 全幅铺满，中央吸积盘环 + 边缘深邃 */
+.landing-mark__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.92;
+  /* 黑洞素材本身极暗（边缘 avg≈2/255）——提亮让吸积盘环可见、边缘带氛围，
+     但仍保持黑洞的深邃感（不过曝中央环） */
+  filter: saturate(1.5) brightness(1.6) contrast(1.1);
+}
+/* 深空渐变叠层 — 只压上下两端保对比度，让左上文案区保持深邃纯净 */
+.landing-mark__scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(0, 1, 8, 0.35), transparent 55%),
+    radial-gradient(90% 70% at 50% 100%, rgba(0, 1, 8, 0.5), transparent 62%);
+}
+
+/* ── 开场品牌时刻（LandingMarkReveal → Zentry Spline intro 相机语言）── */
+.landing-mark-reveal {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  /* 品牌时刻黑场 —— 完全盖住黑洞视频：开场只呈现 MtlLogo 深空浮现
+     （Zentry 黑场品牌节奏），品牌坍缩退场时黑场渐隐、黑洞从黑中显现 */
+  background: radial-gradient(120% 120% at 50% 45%, #04050d 0%, #010208 58%, #000 100%);
+}
+.landing-brand-reveal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(18px, 3vh, 28px);
+  /* 3D 深空舞台 —— logo 的 translateZ 拉近/退回在此投影（Zentry 相机语言） */
+  perspective: 900px;
+}
+.landing-brand-reveal__logo {
+  /* 不额外加投影 —— 球心琥珀底色光晕是 MtlLogo 原始设计的 .mtl-glow，
+     再叠 drop-shadow 会在球心下方产生「偏阴影、底色」，破坏原始设计 */
+  will-change: transform, opacity, filter;
+}
+.landing-brand-reveal__wordmark {
+  margin: 0;
+  font-size: clamp(30px, 5.5vw, 56px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  background: linear-gradient(100deg, var(--land-amber), var(--land-amber-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  will-change: transform, opacity, letter-spacing;
+}
+/* reduced-motion：品牌开场不播放 —— 黑洞视频 + 文案完整直达 */
+@media (prefers-reduced-motion: reduce) {
+  .landing-mark-reveal {
+    display: none;
+  }
+}
+.landing-mark__halo {
+  position: absolute;
+  left: 50%;
+  bottom: 2%;
+  transform: translateX(-50%);
+  width: 56vw;
+  height: 16vh;
+  background: radial-gradient(ellipse at center, rgba(251, 191, 36, 0.13), transparent 70%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+/* reduced-motion：视频不动——隐藏视频层，静态 scrim + 深空底接管 */
+@media (prefers-reduced-motion: reduce) {
+  .landing-mark__video {
+    display: none;
+  }
+}
+
+/* ── ② Brand moment ── */
+.landing-brand {
+  text-align: center;
+}
+.landing-brand__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(24px, 4vh, 40px);
+  /* 3D 深空舞台 —— logo 的 translateZ 拉近在此投影（与开场 reveal 同语言） */
+  perspective: 900px;
+}
+.landing-brand__logo {
+  display: flex;
+  will-change: transform, opacity, filter;
+  /* 保持 MtlLogo 原生外观：不加额外投影/光环（用户红线——球心底色光晕
+     是 MtlLogo 原始的 .mtl-glow，绝不叠加） */
+}
+.landing-brand__wordmark {
+  font-family: var(--land-display);
+  font-size: clamp(36px, 8vw, 96px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin: 0;
+  /* 防窄屏横向溢出（单词不可折行，允许单词内断行避免 min-content 超视口） */
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  background: linear-gradient(100deg, var(--land-amber), var(--land-amber-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.landing-brand__tagline {
+  color: var(--land-text-2);
+  font-size: clamp(16px, 2vw, 20px);
+  max-width: 34ch;
+  line-height: 1.6;
+  margin: 0;
+  filter: drop-shadow(0 0 12px rgba(139, 125, 255, 0.2));
+}
+
+/* ── ③ Pipeline (BentoTilt cards) ── */
+/* ── ③ Pipeline — 纵向数据流管线（Observe 顶 → eBPF 底，数据向上流动）── */
+.landing-pipeline__track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 760px;
+}
+.landing-pipeline__layer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+/* 玻璃面板 —— 数据流点阵自下而上缓慢流动 + 顶部光源 + 紫韵玻璃底 */
+.landing-pipeline__node {
+  width: min(560px, 90vw);
+  padding: clamp(22px, 3vw, 34px);
+  background:
+    radial-gradient(rgba(108, 194, 255, 0.12) 1px, transparent 1.6px),
+    radial-gradient(120% 100% at 50% 0%, rgba(139, 125, 255, 0.1), transparent 55%),
+    linear-gradient(165deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015) 42%, rgba(139, 125, 255, 0.05)),
+    var(--land-surface);
+  background-size: 24px 24px, 100% 100%, 100% 100%, 100% 100%;
+  animation: landing-pipeline-dots-flow 14s linear infinite;
+  border: 1px solid rgba(139, 125, 255, 0.18);
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transform-style: preserve-3d;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 24px 60px rgba(0, 1, 8, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.35s ease;
+}
+/* 数据流点阵向上流动 —— eBPF 数据沿管线上升的意象 */
+@keyframes landing-pipeline-dots-flow {
+  to {
+    background-position: 0 -24px, 0 0, 0 0, 0 0;
+  }
+}
+/* 顶部 1px 光源描边 —— 琥珀→蓝紫的暖冷过渡高光线 */
+.landing-pipeline__node::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.6), rgba(108, 194, 255, 0.4), transparent);
+  opacity: 0.85;
+  pointer-events: none;
+}
+/* 鼠标跟随 spotlight —— 光斑随指针移动（--spot-x/--spot-y 由 BentoTilt 注入） */
+.landing-pipeline__node::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(520px circle at var(--spot-x, 50%) var(--spot-y, 0%), rgba(139, 125, 255, 0.16), transparent 42%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+.landing-pipeline__node:hover::after {
+  opacity: 1;
+}
+.landing-pipeline__node:hover {
+  border-color: rgba(139, 125, 255, 0.45);
+  box-shadow:
+    0 28px 70px rgba(0, 1, 8, 0.55),
+    0 0 44px rgba(139, 125, 255, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+/* 窗口标题栏 —— 三色指示灯 + 层名 + 状态 pill */
+.landing-pipeline__windowbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.landing-pipeline__dots {
+  display: flex;
+  gap: 6px;
+}
+.landing-pipeline__dots i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+.landing-pipeline__dots i:nth-child(1) {
+  background: rgba(251, 191, 36, 0.6);
+}
+.landing-pipeline__dots i:nth-child(2) {
+  background: rgba(139, 125, 255, 0.6);
+}
+.landing-pipeline__dots i:nth-child(3) {
+  background: rgba(108, 194, 255, 0.6);
+}
+.landing-pipeline__name {
+  flex: 1;
+  font-size: clamp(16px, 2vw, 20px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.landing-pipeline__status {
+  font-family: var(--land-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--land-amber);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 999px;
+  padding: 3px 10px;
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.35));
+}
+.landing-pipeline__desc {
+  color: var(--land-text-2);
+  line-height: 1.65;
+  font-size: 14px;
+  margin: 0;
+}
+/* 控制台内容 —— 真实产品窗口（终端 / 归因图 / 观察卡） */
+.landing-pipeline__console {
+  margin: 12px 0 4px;
+  border-radius: 14px;
+  background: rgba(2, 3, 12, 0.55);
+  border: 1px solid rgba(139, 125, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+/* eBPF 终端 */
+.landing-pipeline__console--term {
+  padding: 13px 16px;
+}
+.landing-pipeline__line {
+  font-family: var(--land-mono);
+  font-size: 12px;
+  line-height: 1.85;
+  margin: 0;
+  color: var(--land-text-2);
+}
+.landing-pipeline__line:nth-child(1) {
+  color: var(--land-violet);
+}
+.landing-pipeline__line:nth-child(2),
+.landing-pipeline__line:nth-child(3),
+.landing-pipeline__line:nth-child(4) {
+  color: rgba(108, 194, 255, 0.75);
+}
+.landing-pipeline__line:nth-child(5) {
+  color: rgba(251, 191, 36, 0.85);
+}
+.landing-pipeline__caret {
+  color: var(--land-amber);
+  animation: landing-pipeline-caret-blink 1.1s steps(2, start) infinite;
+}
+@keyframes landing-pipeline-caret-blink {
+  to {
+    visibility: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-pipeline__caret {
+    animation: none;
+  }
+}
+/* Rust 归因图面板 */
+.landing-pipeline__console--graph {
+  padding: 12px 16px 16px;
+}
+.landing-pipeline__graph {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.landing-pipeline__graph-edge--taint {
+  stroke-dasharray: 4 6;
+  animation: landing-pipeline-stream-flow 0.9s linear infinite;
+}
+.landing-pipeline__graph-node {
+  filter: drop-shadow(0 0 8px rgba(108, 194, 255, 0.5));
+}
+.landing-pipeline__graph-node--src {
+  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.6));
+}
+.landing-pipeline__graph-label {
+  font-family: var(--land-mono);
+  font-size: 11px;
+  fill: var(--land-text-3);
+}
+.landing-pipeline__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.landing-pipeline__chip {
+  font-family: var(--land-mono);
+  font-size: 11px;
+  color: var(--land-violet);
+  background: rgba(139, 125, 255, 0.08);
+  border: 1px solid rgba(139, 125, 255, 0.22);
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+/* Observe 观测仪表盘 */
+.landing-pipeline__console--observe {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 13px 16px;
+}
+.landing-pipeline__observe-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--land-mono);
+  font-size: 12px;
+  color: var(--land-text-2);
+}
+.landing-pipeline__observe-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--land-amber);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.7);
+}
+.landing-pipeline__observe-card:nth-child(2) .landing-pipeline__observe-dot {
+  background: var(--land-violet);
+  box-shadow: 0 0 8px rgba(139, 125, 255, 0.7);
+}
+.landing-pipeline__observe-card:nth-child(3) .landing-pipeline__observe-dot {
+  background: var(--land-cyan);
+  box-shadow: 0 0 8px rgba(108, 194, 255, 0.7);
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-pipeline__graph-edge--taint {
+    animation: none;
+  }
+}
+/* 数据流连接 —— 自下而上流动的发光光线（数据穿越管线层级） */
+.landing-pipeline__stream {
+  height: 56px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--land-amber);
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.5));
+}
+.landing-pipeline__stream-line {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 4 10;
+  animation: landing-pipeline-stream-flow 0.9s linear infinite;
+}
+@keyframes landing-pipeline-stream-flow {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-pipeline__node,
+  .landing-pipeline__stream-line {
+    animation: none;
+  }
+}
+
+/* ── ④ Real demo graph — 控制台窗口 + 发光责任图舞台 ── */
+.landing-demo__window {
+  width: min(880px, 94vw);
+  margin: 0;
+  border-radius: 22px;
+  border: 1px solid rgba(139, 125, 255, 0.18);
+  background: rgba(4, 6, 16, 0.6);
+  box-shadow:
+    0 24px 60px rgba(0, 1, 8, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+/* 控制台窗口标题栏 */
+.landing-demo__windowbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(139, 125, 255, 0.12);
+}
+.landing-demo__dots {
+  display: flex;
+  gap: 6px;
+}
+.landing-demo__dots i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+.landing-demo__dots i:nth-child(1) {
+  background: rgba(251, 191, 36, 0.6);
+}
+.landing-demo__dots i:nth-child(2) {
+  background: rgba(139, 125, 255, 0.6);
+}
+.landing-demo__dots i:nth-child(3) {
+  background: rgba(108, 194, 255, 0.6);
+}
+.landing-demo__title {
+  flex: 1;
+  font-family: var(--land-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--land-text-3);
+}
+.landing-demo__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--land-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--land-amber);
+}
+.landing-demo__live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--land-amber);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.8);
+  animation: landing-demo-live-blink 1.6s ease-in-out infinite;
+}
+@keyframes landing-demo-live-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-demo__live i {
+    animation: none;
+  }
+}
+.landing-demo__stage {
+  width: 100%;
+  margin: 0;
+  position: relative;
+  /* 深空网格舞台：紫韵光 + 等距细网格（呼应 hero 深空） */
+  background:
+    radial-gradient(80% 70% at 50% 45%, rgba(139, 125, 255, 0.07), transparent 65%),
+    linear-gradient(rgba(139, 125, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 125, 255, 0.055) 1px, transparent 1px);
+  background-size: 100% 100%, 44px 44px, 44px 44px;
+  padding: clamp(16px, 3vw, 34px);
+}
+.landing-demo__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.landing-demo__label {
+  font-family: var(--land-mono);
+  font-size: 15px;
+  fill: var(--land-text-2);
+}
+/* 节点发光 —— 类型区分 + hover 放大（transform-box 使 SVG g 以自身中心缩放） */
+.demo-node {
+  filter: drop-shadow(0 0 10px rgba(108, 194, 255, 0.4));
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+.demo-node:hover {
+  transform: scale(1.14);
+  filter: drop-shadow(0 0 18px rgba(108, 194, 255, 0.7));
+}
+.demo-node--source {
+  filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.6));
+}
+.demo-node--source:hover {
+  filter: drop-shadow(0 0 24px rgba(251, 191, 36, 0.9));
+}
+.demo-node--attribution {
+  filter: drop-shadow(0 0 14px rgba(139, 125, 255, 0.55));
+}
+/* 污染源波纹 —— 半径持续扩散的琥珀圈（污染传播的实时模拟） */
+.demo-ripple {
+  stroke-width: 2;
+  animation: demo-ripple-pulse 2.2s ease-out infinite;
+}
+@keyframes demo-ripple-pulse {
+  0% {
+    r: 12px;
+    opacity: 0.9;
+  }
+  70% {
+    opacity: 0.35;
+  }
+  100% {
+    r: 44px;
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-ripple {
+    animation: none;
+    opacity: 0;
+  }
+}
+/* 边缘发光 + 数据流流动 —— 责任沿边传播 */
+.demo-edge {
+  stroke-dasharray: 6 10;
+  animation: landing-demo-edge-flow 1.2s linear infinite;
+}
+@keyframes landing-demo-edge-flow {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-edge {
+    animation: none;
+  }
+}
+/* 沿边流动粒子 —— CSS offset-path 纯 CSS（无需 JS，无 JS 也流动），
+   负 animation-delay 错相成连续流；offset-path 由组件内联注入 */
+.demo-particle {
+  offset-distance: 0%;
+  will-change: offset-distance;
+  animation: demo-particle-flow linear infinite;
+  filter: drop-shadow(0 0 5px rgba(108, 194, 255, 0.75));
+}
+@keyframes demo-particle-flow {
+  to {
+    offset-distance: 100%;
+  }
+}
+/* 污染态（scrub 过半，is-contaminated 由 GSAP onUpdate 切换）：
+   taint / capability 边粒子变琥珀增亮 —— 污染传播的可见证据 */
+.is-contaminated .demo-particle[data-edge='TaintPropagation'],
+.is-contaminated .demo-particle[data-edge='CapabilityUse'] {
+  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.95));
+}
+.is-contaminated .demo-edge[data-edge='TaintPropagation'],
+.is-contaminated .demo-edge[data-edge='CapabilityUse'] {
+  stroke: #fbbf24;
+}
+/* 污染传播波前 —— 沿污染链推进的琥珀光点（位置由 GSAP MotionPath 驱动） */
+.demo-taint-chain {
+  filter: drop-shadow(0 0 12px rgba(251, 191, 36, 0.9));
+}
+/* 归因判定徽章 —— AUTHORITATIVE 裁决 */
+.demo-verdict__pill {
+  fill: rgba(8, 10, 22, 0.85);
+  stroke: rgba(251, 191, 36, 0.5);
+  stroke-width: 1.5;
+}
+.demo-verdict__text {
+  fill: var(--land-amber);
+  font-family: var(--land-mono);
+  font-size: 15px;
+  letter-spacing: 0.08em;
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-particle {
+    animation: none;
+    opacity: 0;
+  }
+  .demo-taint-chain,
+  .demo-verdict {
+    opacity: 0;
+  }
+}
+.landing-demo__capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  list-style: none;
+  padding: 0;
+  margin: 28px 0 0;
+}
+.landing-demo__cap {
+  font-family: var(--land-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--land-amber);
+  background: linear-gradient(165deg, rgba(251, 191, 36, 0.1), rgba(139, 125, 255, 0.08));
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  padding: 7px 15px;
+  border-radius: 999px;
+  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.22));
+}
+
+/* ── ⑤ Value pillars — 超大渐变数字 + 发光分隔 ── */
+.landing-values__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(24px, 4vh, 48px);
+  max-width: 760px;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+.landing-values__pillar {
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(24px, 4vw, 56px);
+  padding-bottom: clamp(20px, 3vh, 36px);
+  border-bottom: 1px solid var(--land-hairline);
+  position: relative;
+  transition: border-color 0.3s ease;
+}
+/* 编辑式索引列 —— 干净的独立编号（幽灵超大背景数字有 AI 感，已移除） */
+.landing-values__index {
+  font-family: var(--land-mono);
+  font-size: clamp(30px, 5vw, 56px);
+  font-weight: 700;
+  line-height: 1;
+  min-width: 2.2ch;
+  /* 渐变琥珀编号 + 柔和发光 —— 与 wordmark / 吸积盘同语言 */
+  background: linear-gradient(180deg, var(--land-amber), var(--land-amber-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 14px rgba(251, 191, 36, 0.3));
+  transition: filter 0.3s ease;
+}
+.landing-values__pillar:hover .landing-values__index {
+  filter: drop-shadow(0 0 24px rgba(251, 191, 36, 0.55));
+}
+.landing-values__body {
+  flex: 1;
+  max-width: 58ch;
+}
+/* 分隔线微光 —— 琥珀→紫的渐变细线（与卡片顶部光源同语言） */
+.landing-values__pillar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.5), rgba(139, 125, 255, 0.25), transparent);
+  opacity: 0.45;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.landing-values__pillar:hover {
+  border-color: rgba(251, 191, 36, 0.35);
+}
+.landing-values__pillar:hover::after {
+  opacity: 1;
+}
+.landing-values__title {
+  font-size: clamp(24px, 4vw, 40px);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  margin: 0;
+  transition: color 0.3s ease;
+}
+.landing-values__pillar:hover .landing-values__title {
+  color: var(--land-amber);
+}
+.landing-values__desc {
+  color: var(--land-text-2);
+  margin: 8px 0 0;
+  max-width: 58ch;
+  line-height: 1.7;
+  font-size: 15px;
+}
+/* 权威证明条 —— 真实系统能力规格（非营销数字，读起来像产品说明） */
+.landing-values__proof {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  max-width: 760px;
+  margin: clamp(28px, 5vh, 48px) 0 0;
+  padding: 16px 20px;
+  border: 1px solid rgba(139, 125, 255, 0.16);
+  border-radius: 16px;
+  background: rgba(139, 125, 255, 0.05);
+}
+.landing-values__proof-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--land-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--land-text-2);
+}
+.landing-values__proof-item dt {
+  color: var(--land-amber);
+  font-size: 10px;
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.6));
+}
+.landing-values__proof-item dd {
+  margin: 0;
+}
+
+/* ── ⑥ CTA + footer ── */
+.landing-cta {
+  gap: clamp(24px, 4vh, 40px);
+  text-align: center;
+
+  /* 控制台质感：细网格 + 中央暖紫双光晕（能量汇聚） */
+  background:
+    linear-gradient(rgba(139, 125, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 125, 255, 0.04) 1px, transparent 1px),
+    radial-gradient(60% 55% at 50% 46%, rgba(251, 191, 36, 0.07), transparent 64%),
+    radial-gradient(44% 42% at 50% 52%, rgba(139, 125, 255, 0.06), transparent 70%);
+  background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%;
+}
+/* CTA 包了 FrameMask 后，section 的 flex gap 只作用于 FrameMask 单个子元素——
+   内部 heading/ticker/按钮/stack/footer 失去间距全部紧贴（重叠错位根因之一）。
+   给 CTA 的 FrameMask 补回 flex 纵向 + 同样的 gap */
+.landing-cta .frame-mask {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(24px, 4vh, 40px);
+}
+.ln-btn {
+  font-family: var(--land-mono);
+}
+.ln-btn--giant {
+  position: relative;
+  font-size: clamp(15px, 2vw, 20px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #1a1206;
+  background: linear-gradient(120deg, var(--land-amber), var(--land-amber-2));
+  border: none;
+  border-radius: 999px;
+  padding: clamp(16px, 2.4vw, 22px) clamp(34px, 5vw, 60px);
+  cursor: pointer;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease,
+    filter 0.3s ease;
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.4),
+    0 8px 40px rgba(251, 191, 36, 0.18);
+}
+.ln-btn--giant::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 14%;
+  right: 14%;
+  height: 1px;
+  border-radius: 999px;
+  /* 玻璃按钮顶部光源 —— hover 时点亮 */
+  background: rgba(255, 255, 255, 0.7);
+  opacity: 0.45;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.ln-btn--giant:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.6),
+    0 16px 56px rgba(251, 191, 36, 0.32);
+  filter: brightness(1.05);
+}
+.ln-btn--giant:hover::after {
+  opacity: 1;
+}
+.ln-btn--giant:focus-visible,
+.ln-btn--nav:focus-visible,
+.landing-nav__link:focus-visible {
+  outline: 2px solid var(--land-amber);
+  outline-offset: 3px;
+}
+.ln-btn__labels {
+  position: relative;
+  display: inline-flex;
+  overflow: hidden;
+}
+.ln-btn__label {
+  transition:
+    transform 0.35s cubic-bezier(0.6, 0, 0.2, 1),
+    opacity 0.35s;
+}
+.ln-btn__label--roll {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(70%);
+}
+.ln-btn[data-hovered='true'] .ln-btn__label--default {
+  opacity: 0;
+  transform: translateY(-70%);
+}
+.ln-btn[data-hovered='true'] .ln-btn__label--roll {
+  opacity: 1;
+  transform: translateY(0);
+}
+.ln-btn__arrow {
+  flex-shrink: 0;
+}
+/* 实时事件流 ticker —— 观测台「活着」的证据（装饰，aria-hidden） */
+.landing-cta__ticker {
+  position: relative;
+  height: 22px;
+  width: min(420px, 88vw);
+  overflow: hidden;
+  font-family: var(--land-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--land-violet);
+  opacity: 0.85;
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.landing-cta__tick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  /* 垂直居中，原位轮换 —— 位移（GSAP y）会推出容器与 heading 重叠 */
+  transform: translateY(-50%);
+  opacity: 0;
+  white-space: nowrap;
+}
+.landing-cta__tick:first-child {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-cta__tick:not(:first-child) {
+    display: none;
+  }
+}
+/* 门户按钮 —— 磁吸 + conic 旋转光环（@property 现代浏览器旋转，旧浏览器静态兜底） */
+.ln-btn--portal {
+  position: relative;
+  /* 覆盖 .ln-btn--giant 的 overflow:hidden：光环要伸出按钮边界渲染；
+     label 滚动切换由 .ln-btn__labels 自带 overflow 承担，安全 */
+  overflow: visible;
+  animation: landing-cta-halo-breathe 4s ease-in-out infinite;
+}
+.ln-btn--portal::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--ring-angle, 0deg),
+    rgba(251, 191, 36, 0.9),
+    rgba(139, 125, 255, 0.75) 28%,
+    transparent 42%,
+    transparent 62%,
+    rgba(108, 194, 255, 0.55) 78%,
+    rgba(251, 191, 36, 0.9)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: landing-cta-ring-spin 6s linear infinite;
+}
+@property --ring-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes landing-cta-ring-spin {
+  to {
+    --ring-angle: 360deg;
+  }
+}
+@keyframes landing-cta-halo-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(251, 191, 36, 0.4),
+      0 8px 40px rgba(251, 191, 36, 0.18);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(251, 191, 36, 0.55),
+      0 14px 64px rgba(251, 191, 36, 0.3);
+  }
+}
+
+/* ── 离屏暂停 —— 顶级性能规范 ──
+   视口外的持续 CSS 动画 `animation-play-state: paused`，只渲染看得见的内容。
+   `anim-inview` 由 usePauseOffscreen（IntersectionObserver）按可见性增删：
+   静态 markup 自带该 class（no-JS / SSR / 测试下动画照常跑，零回归）；
+   离开视口 → 移除 → 以下规则暂停昂贵的逐帧重绘动画（点阵背景位移 /
+   dashoffset 数据流 / ripple r 动画 / 沿边粒子 / conic ring / halo）。 */
+.landing-pipeline:not(.anim-inview) .landing-pipeline__node,
+.landing-pipeline:not(.anim-inview) .landing-pipeline__stream-line,
+.landing-pipeline:not(.anim-inview) .landing-pipeline__graph-edge--taint,
+.landing-demo:not(.anim-inview) .demo-edge,
+.landing-demo:not(.anim-inview) .demo-ripple,
+.landing-demo:not(.anim-inview) .demo-particle,
+.landing-cta:not(.anim-inview) .ln-btn--portal,
+.landing-cta:not(.anim-inview) .ln-btn--portal::before {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ln-btn--portal {
+    animation: none;
+  }
+  .ln-btn--portal::before {
+    animation: none;
+  }
+}
+.landing-cta__stack {
+  font-family: var(--land-mono);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--land-text-2);
+  margin: 0;
+  /* 页脚技术标签不发光（之前的 amber drop-shadow 显廉价） */
+}
+.landing-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--land-text-3);
+  font-size: 13px;
+  font-family: var(--land-mono);
+  letter-spacing: 0.01em;
+  margin-top: clamp(36px, 6vh, 72px);
+  /* 顶部 hairline 分隔线 —— 页脚区精致收尾 */
+  padding-top: 22px;
+  border-top: 1px solid var(--land-hairline);
+  width: min(620px, 88vw);
+}
+
+/* ── Top navigation ── */
+.landing-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px clamp(20px, 4vw, 48px);
+  background: linear-gradient(to bottom, rgba(0, 1, 8, 0.85), transparent);
+  transition: transform 0.4s ease;
+}
+.landing-nav--hidden {
+  transform: translateY(-100%);
+}
+.landing-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--land-text);
+  text-decoration: none;
+}
+.landing-nav__brand-name {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.landing-nav__links {
+  display: flex;
+  gap: clamp(16px, 3vw, 40px);
+}
+.landing-nav__link {
+  color: var(--land-text-2);
+  text-decoration: none;
+  font-size: 12px;
+  font-family: var(--land-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: color 0.2s ease;
+}
+.landing-nav__link:hover {
+  color: var(--land-amber);
+}
+.ln-btn--nav {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--land-text);
+  background: var(--land-surface-2);
+  border: 1px solid var(--land-hairline);
+  border-radius: 999px;
+  padding: 9px 20px;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+.ln-btn--nav:hover {
+  border-color: var(--land-amber);
+  color: var(--land-amber);
+}
+
+@media (max-width: 720px) {
+  .landing-nav__links {
+    display: none;
+  }
+  .landing-nav__brand-name {
+    display: none;
+  }
 }

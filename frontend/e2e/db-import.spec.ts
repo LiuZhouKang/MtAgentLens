@@ -89,7 +89,7 @@ async function closeSelector(page: import('@playwright/test').Page) {
 
 test.describe('真实 db 导入（collector.responsibility.db）', () => {
   test('导入后数据源统计、告警队列与证据全部就绪', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/console', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.incident-rail')).toBeVisible({ timeout: 20000 });
 
     await openSelector(page);
@@ -123,10 +123,7 @@ test.describe('真实 db 导入（collector.responsibility.db）', () => {
     // 最坏 1000ms/块 × 13 告警）。fullyParallel 多浏览器并行 + 59MB db 解析会饿死
     // idle callback，最坏 ~20s+ 才渲染 dock。60s 是 rIC 保证上界（13s）的数倍余量。
     await expect(evDock).toBeVisible({ timeout: 60000 });
-    const evBadgeCount = parseInt(
-      (await evDock.textContent())?.replace(/\D/g, '') ?? '0',
-      10,
-    );
+    const evBadgeCount = parseInt((await evDock.textContent())?.replace(/\D/g, '') ?? '0', 10);
     expect(evBadgeCount).toBeGreaterThan(0);
 
     // 打开证据工作台：关联记录（linkedEvidence）就绪
@@ -134,13 +131,12 @@ test.describe('真实 db 导入（collector.responsibility.db）', () => {
     await expect(page.getByText('关联记录')).toBeVisible({ timeout: 10000 });
 
     // 选中告警的标题来自真实 db（非空）
-    const firstAlertTitle =
-      (await page.locator('.alert-list-btn').first().textContent()) ?? '';
+    const firstAlertTitle = (await page.locator('.alert-list-btn').first().textContent()) ?? '';
     expect(firstAlertTitle.trim().length).toBeGreaterThan(0);
   });
 
   test('拖放导入 db 同样生效（同一 importFile 管线）', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/console', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.incident-rail')).toBeVisible({ timeout: 20000 });
 
     await openSelector(page);
@@ -178,7 +174,7 @@ test.describe('真实 db 导入（collector.responsibility.db）', () => {
   test('有图无告警 db：态势渲染而非卡 LoadingScreen，告警空态带数据源统计', async ({ page }) => {
     // 真实监控 run 常无触发告警。此前态势页把「无告警」误判为「加载中」→ 永远
     // LoadingScreen（aria-busy 卡死），告警页则误导性提示「等待实时观测会话接入」。
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/console', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.incident-rail')).toBeVisible({ timeout: 20000 });
 
     await openSelector(page);
@@ -194,15 +190,19 @@ test.describe('真实 db 导入（collector.responsibility.db）', () => {
     // 告警空态应报告已解析的计数，而非误导「等待实时会话接入」
     await page.getByRole('link', { name: '告警', exact: true }).click();
     await expect(
-      page.getByText(`已解析 ${NO_ALERT_EXPECTED.nodes} 节点 · ${NO_ALERT_EXPECTED.evidence} 条证据`),
+      page.getByText(
+        `已解析 ${NO_ALERT_EXPECTED.nodes} 节点 · ${NO_ALERT_EXPECTED.evidence} 条证据`,
+      ),
     ).toBeVisible({ timeout: 15000 });
   });
 
-  test('后端 run 经 /api/runs/:id/db 消费（database: true 识别 + 全链路渲染）', async ({ page }) => {
+  test('后端 run 经 /api/runs/:id/db 消费（database: true 识别 + 全链路渲染）', async ({
+    page,
+  }) => {
     // goto 前先挂拦截：initData 会自动识别 database:true 的 run 并
     // loadRun → 下载 db → sql.js 解析。这是"后端 run → db 消费"的完整浏览器链路。
     await mockBackendRoutes(page);
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/console', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.incident-rail')).toBeVisible({ timeout: 20000 });
 
     // loadRun 完成（59MB db 下载 + 解析）后，trigger 显示 scenario 标签
@@ -219,10 +219,7 @@ test.describe('真实 db 导入（collector.responsibility.db）', () => {
     // 最坏 1000ms/块 × 13 告警）。fullyParallel 多浏览器并行 + 59MB db 解析会饿死
     // idle callback，最坏 ~20s+ 才渲染 dock。60s 是 rIC 保证上界（13s）的数倍余量。
     await expect(evDock).toBeVisible({ timeout: 60000 });
-    const evBadgeCount = parseInt(
-      (await evDock.textContent())?.replace(/\D/g, '') ?? '0',
-      10,
-    );
+    const evBadgeCount = parseInt((await evDock.textContent())?.replace(/\D/g, '') ?? '0', 10);
     expect(evBadgeCount).toBeGreaterThan(0);
   });
 });

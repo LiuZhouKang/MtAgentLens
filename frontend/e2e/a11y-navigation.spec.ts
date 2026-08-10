@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('keyboard accessibility', () => {
-  test('home exposes skip link and keyboard focus path', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+  test('console home exposes skip link and keyboard focus path', async ({ page }) => {
+    await page.goto('/console', { waitUntil: 'domcontentloaded' });
 
     await page.keyboard.press('Tab');
     const skipLink = page.getByRole('link', { name: '跳到主要内容' });

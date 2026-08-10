@@ -13,49 +13,48 @@
 //   finalize()    — Phase 2 authoritative batch refinement
 
 use tokio::sync::{broadcast, mpsc, watch};
-use tokio::time::{interval, Duration};
+use tokio::time::{Duration, interval};
 
-use crate::responsibility::claims::{
-    AlertBuilder, ClaimBuilder, TracebackBuilder,
-};
-use crate::responsibility::classification::pattern_matcher::{
-    default_templates, GraphPatternMatcher,
-};
+use crate::framework::Event;
+use crate::framework::analyzers::Analyzer;
+use crate::framework::analyzers::AnalyzerError;
+use crate::framework::runners::EventStream;
+use crate::responsibility::claims::{AlertBuilder, ClaimBuilder, TracebackBuilder};
 use crate::responsibility::classification::PhaseClassificationEngine;
+use crate::responsibility::classification::pattern_matcher::{
+    GraphPatternMatcher, default_templates,
+};
+use crate::responsibility::classification::types::Route as ClassRoute;
+use crate::responsibility::cross_layer_bus::{
+    ClaimSignal, ClassificationSignal, CrossLayerBus, ScoringSignal,
+};
 use crate::responsibility::evidence::correlator::EvidenceCorrelator;
 use crate::responsibility::evidence::intent_extractor::IntentExtractor;
 use crate::responsibility::graph::graph_builder::GraphBuilder;
 use crate::responsibility::graph::simplifier::GraphSimplifier;
 use crate::responsibility::identity::resolver::IdentityResolver;
+use crate::responsibility::observer::ObserverProvider;
 use crate::responsibility::observer::cache::ObserverCache;
 use crate::responsibility::observer::types::{CacheKey, CacheTTL};
-use crate::responsibility::observer::ObserverProvider;
-use crate::responsibility::classification::types::Route as ClassRoute;
+use crate::responsibility::output::{EvaluationSummary, OutputFormat, OutputWriter};
 use crate::responsibility::persistence::{
-    PersistenceWriter, PersistRecord, ProcessMetadata, TlsSession, BindingType,
+    BindingType, PersistRecord, PersistenceWriter, ProcessMetadata, TlsSession,
 };
 use crate::responsibility::runtime::buffer::GraphDeltaBuffer;
-use crate::responsibility::runtime::routing::{dispatch_event, DIAG_ACTIONS_PRODUCED, DIAG_EVIDENCE_INTENTS};
+use crate::responsibility::runtime::routing::{DIAG_EVIDENCE_INTENTS, dispatch_event};
+use crate::responsibility::scoring::progressive::DimIndex;
 use crate::responsibility::signals::SignalGraph;
 use crate::responsibility::types::alert_types::{
     BehaviorTimeline, BehaviorTimelineEntry, ResponsibilityAlert,
 };
-use crate::responsibility::scoring::progressive::DimIndex;
-use crate::responsibility::cross_layer_bus::{
-    CrossLayerBus, ScoringSignal, ClassificationSignal, ClaimSignal,
-};
-use crate::responsibility::output::{EvaluationSummary, OutputWriter, OutputFormat};
+use crate::responsibility::types::evidence_types::IntentAuthoritySource;
 use crate::responsibility::types::graph_types::{
-    GraphSnapshot, ResponsibilityEdgeType as NewEdgeType,
-    ResponsibilityNodeType as NewNodeType,
+    GraphSnapshot, ResponsibilityEdgeType as NewEdgeType, ResponsibilityNodeType as NewNodeType,
+};
+use crate::responsibility::types::ids::{
+    AlertId, ClaimId, EdgeId, MessageId, ProcessId, TlsSessionId,
 };
 use crate::responsibility::types::refinement::{GraphRefinement, GraphRefinementType};
-use crate::responsibility::types::evidence_types::IntentAuthoritySource;
-use crate::responsibility::types::ids::{AlertId, BoundaryId, ClaimId, EdgeId, MessageId, PolicyId, ProcessId, TlsSessionId};
-use crate::framework::analyzers::Analyzer;
-use crate::framework::analyzers::AnalyzerError;
-use crate::framework::runners::EventStream;
-use crate::framework::Event;
 use futures::StreamExt;
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -95,7 +94,8 @@ pub struct RuntimeConfig {
     pub max_observer_calls: usize,
     /// Optional ONNX DeBERTa classifier for Content Boundary Layer 3.
     /// When set, tool input text is classified for prompt injection.
-    pub classifier: Option<std::sync::Arc<crate::responsibility::judgment::classifier::OnnxClassifier>>,
+    pub classifier:
+        Option<std::sync::Arc<crate::responsibility::judgment::classifier::OnnxClassifier>>,
     /// Disable the responsibility-layer Observer LLM (→ heuristic only).
     /// Used for ablation A4: measures Observer's marginal contribution.
     pub disable_observer: bool,
@@ -202,7 +202,7 @@ struct ConnBuffer {
 
 impl ConnBuffer {
     const MAX_SIZE: usize = 512 * 1024; // 512KB max per connection
-    const TTL_NS: u64 = 60_000_000_000;  // 60s TTL
+    const TTL_NS: u64 = 60_000_000_000; // 60s TTL
 
     fn append(&mut self, chunk: &str, ts: u64) {
         if self.data.len() + chunk.len() <= Self::MAX_SIZE {
@@ -253,7 +253,8 @@ impl ResponsibilityRuntime {
                 crate::responsibility::scoring::progressive::ProgressiveConfig::default(),
             ),
             baseline_tracker: crate::responsibility::scoring::baseline::BaselineTracker::new(),
-            calibration_monitor: crate::responsibility::scoring::calibration::CalibrationMonitor::default(),
+            calibration_monitor:
+                crate::responsibility::scoring::calibration::CalibrationMonitor::default(),
             dirty: false,
             diag_tls_count: 0,
             conn_buffers: std::collections::HashMap::new(),
@@ -313,7 +314,7 @@ impl ResponsibilityRuntime {
                     let _output = self.route_event(event);
 
                     // Trigger on count threshold
-                    if self.event_count % self.config.trigger_every_n == 0 {
+                    if self.event_count.is_multiple_of(self.config.trigger_every_n) {
                         self.trigger().await;
                     }
                 }
@@ -380,15 +381,21 @@ impl ResponsibilityRuntime {
         // Persist new intents and actions for replay support.
         // Phase 2 replay reads these from SQLite to re-run batch correlation.
         for intent in &self.graph_buffer.intents[intents_before..] {
-            let _ = self.persistence.write(PersistRecord::Intent(intent.clone()));
+            let _ = self
+                .persistence
+                .write(PersistRecord::Intent(intent.clone()));
         }
         for action in &self.graph_buffer.actions[actions_before..] {
-            let _ = self.persistence.write(PersistRecord::Action(action.clone()));
+            let _ = self
+                .persistence
+                .write(PersistRecord::Action(action.clone()));
         }
 
         // Persist provisional identities and process→agent mappings
         for pi in self.identity_resolver.provisional_identities() {
-            let _ = self.persistence.write(PersistRecord::ProvisionalIdentity(pi.clone()));
+            let _ = self
+                .persistence
+                .write(PersistRecord::ProvisionalIdentity(pi.clone()));
             for pid in &pi.process_ids {
                 let _ = self.persistence.write(PersistRecord::IdentityMapping {
                     agent_id: pi.agent_id.clone(),
@@ -437,14 +444,16 @@ impl ResponsibilityRuntime {
                 .unwrap_or(&event.comm)
                 .to_string();
 
-            let _ = self.persistence.write(PersistRecord::Process(ProcessMetadata {
-                pid,
-                start_time_ns,
-                parent_pid,
-                parent_start_time_ns,
-                comm,
-                timestamp_ns: event.timestamp,
-            }));
+            let _ = self
+                .persistence
+                .write(PersistRecord::Process(ProcessMetadata {
+                    pid,
+                    start_time_ns,
+                    parent_pid,
+                    parent_start_time_ns,
+                    comm,
+                    timestamp_ns: event.timestamp,
+                }));
             return;
         }
 
@@ -477,7 +486,7 @@ impl ResponsibilityRuntime {
                 .get("connection_id")
                 .or_else(|| event.data.get("tls_session"))
                 .and_then(|v| v.as_str())
-                .map(|s| TlsSessionId::from(s))
+                .map(TlsSessionId::from)
                 .unwrap_or_else(TlsSessionId::new);
 
             let _ = self.persistence.write(PersistRecord::Tls(TlsSession {
@@ -493,24 +502,42 @@ impl ResponsibilityRuntime {
         }
 
         // ── Cross-event payload accumulation (all sources) ────────
-        let chunk: Option<&str> = event.data.get("data").and_then(|v| v.as_str())
+        let chunk: Option<&str> = event
+            .data
+            .get("data")
+            .and_then(|v| v.as_str())
             .or_else(|| event.data.get("body").and_then(|v| v.as_str()));
-        if let Some(chunk) = chunk {
-            if !chunk.is_empty() {
-                let pid = event.data.get("pid")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(event.pid as u64) as u32;
-                let rw = event.data.get("function")
-                    .and_then(|v| v.as_str())
-                    .map(|f| if f.to_lowercase().contains("read") { 0u64 } else { 1u64 })
-                    .unwrap_or(1);
-                // Separate buffers per PID and direction (read=response, write=request)
-                let conn_key = format!("{}:rw{}", pid, rw);
-                self.conn_buffers
-                    .entry(conn_key)
-                    .or_insert_with(|| ConnBuffer { data: String::new(), last_update_ns: 0, rw, tls_session_id: None })
-                    .append(chunk, event.timestamp);
-            }
+        if let Some(chunk) = chunk
+            && !chunk.is_empty()
+        {
+            let pid = event
+                .data
+                .get("pid")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(event.pid as u64) as u32;
+            let rw = event
+                .data
+                .get("function")
+                .and_then(|v| v.as_str())
+                .map(|f| {
+                    if f.to_lowercase().contains("read") {
+                        0u64
+                    } else {
+                        1u64
+                    }
+                })
+                .unwrap_or(1);
+            // Separate buffers per PID and direction (read=response, write=request)
+            let conn_key = format!("{}:rw{}", pid, rw);
+            self.conn_buffers
+                .entry(conn_key)
+                .or_insert_with(|| ConnBuffer {
+                    data: String::new(),
+                    last_update_ns: 0,
+                    rw,
+                    tls_session_id: None,
+                })
+                .append(chunk, event.timestamp);
         }
     }
 
@@ -523,17 +550,13 @@ impl ResponsibilityRuntime {
         let now = current_time_ns();
 
         // Expire old buffers first
-        self.conn_buffers.retain(|_, buf| {
-            now.saturating_sub(buf.last_update_ns) < ConnBuffer::TTL_NS
-        });
-
-
+        self.conn_buffers
+            .retain(|_, buf| now.saturating_sub(buf.last_update_ns) < ConnBuffer::TTL_NS);
 
         for (conn_key, buf) in &mut self.conn_buffers {
             if buf.data.is_empty() || buf.data.len() < 64 {
                 continue;
             }
-
 
             // Parse connection key: "pid:rwX"
             let pid: u32 = match conn_key.split(':').next().and_then(|s| s.parse().ok()) {
@@ -541,7 +564,9 @@ impl ResponsibilityRuntime {
                 None => continue,
             };
             let process_id = crate::responsibility::runtime::routing::resolve_process_id(
-                ProcessId::new(pid, 0), &snapshot);
+                ProcessId::new(pid, 0),
+                &snapshot,
+            );
 
             let source = if buf.rw == 1 {
                 IntentAuthoritySource::SseResponseToolUse // outgoing — has request context
@@ -636,10 +661,10 @@ impl ResponsibilityRuntime {
             // the intent's tool_args and create PolicyBoundary nodes for
             // each (e.g. /etc/hostname, credential patterns). This gives
             // claims granularity beyond just "Bash was used".
-            if let Some(pbc_delta) = self.graph_builder.handle_intent_pbc(
-                intent,
-                &self.identity_resolver,
-            ) {
+            if let Some(pbc_delta) = self
+                .graph_builder
+                .handle_intent_pbc(intent, &self.identity_resolver)
+            {
                 for node in &pbc_delta.new_nodes {
                     self.graph_buffer.push_node(node.clone());
                 }
@@ -651,7 +676,6 @@ impl ResponsibilityRuntime {
             // Re-push intent so correlator can still use it
             self.graph_buffer.push_intent(intent.clone());
         }
-
 
         // ── 3. Feed correlation evidence through graph builder ─────
         // Process each accumulated evidence item
@@ -686,10 +710,13 @@ impl ResponsibilityRuntime {
         // Remove low-confidence edges and merge duplicate resource nodes
         // before classification. This reduces noise from weak substring
         // matches and duplicate resources that inflate edge counts.
-        let simplify_delta = self.graph_simplifier.simplify(self.graph_builder.graph_mut());
+        let simplify_delta = self
+            .graph_simplifier
+            .simplify(self.graph_builder.graph_mut());
         if !simplify_delta.removed_edges.is_empty() || !simplify_delta.removed_nodes.is_empty() {
-            let _ = self.persistence.write(PersistRecord::GraphRefinement(
-                GraphRefinement {
+            let _ = self
+                .persistence
+                .write(PersistRecord::GraphRefinement(GraphRefinement {
                     refinement_type: GraphRefinementType::EdgeRemoved,
                     affected_nodes: simplify_delta.removed_nodes.clone(),
                     affected_edges: simplify_delta.removed_edges.clone(),
@@ -712,10 +739,18 @@ impl ResponsibilityRuntime {
         // and feed them into the six-dimension EWMA/CUSUM tracker.
         // Also read back fused scores and CUSUM alarms for downstream
         // observer trigger and alert composition.
-        let pbc_count = graph.edges_of_type(&NewEdgeType::PolicyBoundaryCrossing).len();
-        let evidence_conf = evidence_snapshot.iter().map(|e| e.confidence as f64).sum::<f64>()
+        let pbc_count = graph
+            .edges_of_type(&NewEdgeType::PolicyBoundaryCrossing)
+            .len();
+        let evidence_conf = evidence_snapshot
+            .iter()
+            .map(|e| e.confidence as f64)
+            .sum::<f64>()
             / evidence_snapshot.len().max(1) as f64;
-        let agent_count = graph.all_nodes().filter(|n| matches!(n.node_type, NewNodeType::Agent)).count();
+        let agent_count = graph
+            .all_nodes()
+            .filter(|n| matches!(n.node_type, NewNodeType::Agent))
+            .count();
 
         // Feed each dimension (using first agent's identity as proxy)
         // and capture the fused progressive score.
@@ -724,27 +759,51 @@ impl ResponsibilityRuntime {
         let mut cusum_alarm_dimensions: Vec<usize> = Vec::new();
         let mut evidence_conflict_flag: bool = false;
         let mut deberta_score: f64 = 0.0;
-        if let Some(agent_id) = graph.all_nodes()
-            .filter_map(|n| n.agent_id.clone())
-            .next()
-        {
+        if let Some(agent_id) = graph.all_nodes().filter_map(|n| n.agent_id.clone()).next() {
             let now_ns = current_time_ns();
             let scorer = &mut self.progressive_scorer;
-            scorer.update_dimension(&agent_id, DimIndex::D1Boundary, (pbc_count as f64 / 10.0).min(1.0), now_ns);
-            scorer.update_dimension(&agent_id, DimIndex::D2Content, patterns.iter().map(|p| p.confidence as f64).sum::<f64>() / patterns.len().max(1) as f64, now_ns);
-            scorer.update_dimension(&agent_id, DimIndex::D3Agentic, (agent_count as f64 / 5.0).min(1.0), now_ns);
-            scorer.update_dimension(&agent_id, DimIndex::D5CrossContext, evidence_conf.min(1.0), now_ns);
+            scorer.update_dimension(
+                &agent_id,
+                DimIndex::D1Boundary,
+                (pbc_count as f64 / 10.0).min(1.0),
+                now_ns,
+            );
+            scorer.update_dimension(
+                &agent_id,
+                DimIndex::D2Content,
+                patterns.iter().map(|p| p.confidence as f64).sum::<f64>()
+                    / patterns.len().max(1) as f64,
+                now_ns,
+            );
+            scorer.update_dimension(
+                &agent_id,
+                DimIndex::D3Agentic,
+                (agent_count as f64 / 5.0).min(1.0),
+                now_ns,
+            );
+            scorer.update_dimension(
+                &agent_id,
+                DimIndex::D5CrossContext,
+                evidence_conf.min(1.0),
+                now_ns,
+            );
 
             // D2 Content: DeBERTa augmentation (async, non-blocking)
             if let Some(ref _classifier) = self.config.classifier {
                 for intent in &standalone_intents {
                     if let Some(text) = intent.tool_args.iter().find_map(|a| match a {
-                        crate::responsibility::types::NormalizedArg::Content(c) if c.len() > 20 => Some(c.as_str()),
-                        _ => None,
-                    }) {
-                        if let Some(score) = _classifier.predict(text) {
-                            scorer.update_dimension(&agent_id, DimIndex::D2Content, score as f64, now_ns);
+                        crate::responsibility::types::NormalizedArg::Content(c) if c.len() > 20 => {
+                            Some(c.as_str())
                         }
+                        _ => None,
+                    }) && let Some(score) = _classifier.predict(text)
+                    {
+                        scorer.update_dimension(
+                            &agent_id,
+                            DimIndex::D2Content,
+                            score as f64,
+                            now_ns,
+                        );
                     }
                 }
             }
@@ -752,7 +811,9 @@ impl ResponsibilityRuntime {
             // ── Read back progressive scores for downstream use ──────
             progressive_fused = scorer.get_agent_fused_score(&agent_id);
             // Capture DeBERTa D2Content dimension for ablation persistence
-            deberta_score = scorer.agents.get(&agent_id)
+            deberta_score = scorer
+                .agents
+                .get(&agent_id)
                 .map(|s| s.dims[1].ewma)
                 .unwrap_or(0.0);
             let (alarm_count, alarms) = scorer.cusum_alarms(&agent_id);
@@ -763,65 +824,103 @@ impl ResponsibilityRuntime {
             // other dimension.  Pure D3 (Agentic) alarms alone are expected in
             // multi-agent scenarios and should not trigger observer calls.
             let has_boundary_or_content_alarm = alarms.contains(&0) || alarms.contains(&1); // D1=0, D2=1
-            let smart_cusum = alarm_count >= 2 || (alarm_count >= 1 && has_boundary_or_content_alarm);
+            let smart_cusum =
+                alarm_count >= 2 || (alarm_count >= 1 && has_boundary_or_content_alarm);
             cusum_triggered = smart_cusum;
             evidence_conflict_flag = scorer.evidence_conflict(&agent_id);
 
             // ── Compute D6 Behavioral from baseline ──────────────────
             // Read the behavioral baseline for this agent and compute
             // deviation scores, then feed to D6.
-            if let Some(baseline) = self.baseline_tracker.get(agent_id.as_str()) {
-                if baseline.is_established() {
-                    // Compute aggregate deviation from recent behavior
-                    let syscall_devs: Vec<f64> = baseline.syscall_profile.keys()
-                        .map(|name| baseline.syscall_deviation(name, 0.1))
-                        .collect();
-                    let file_devs: Vec<f64> = baseline.file_access_dirs.keys()
-                        .map(|path| baseline.file_deviation(path))
-                        .collect();
-                    let net_devs: Vec<f64> = baseline.network_ports.keys()
-                        .map(|port| baseline.network_deviation(*port))
-                        .collect();
-                    let d6_raw = baseline.aggregate_deviation(&syscall_devs, &file_devs, &net_devs);
-                    scorer.update_dimension(&agent_id, DimIndex::D6Behavioral, d6_raw, now_ns);
-                }
+            if let Some(baseline) = self.baseline_tracker.get(agent_id.as_str())
+                && baseline.is_established()
+            {
+                // Compute aggregate deviation from recent behavior
+                let syscall_devs: Vec<f64> = baseline
+                    .syscall_profile
+                    .keys()
+                    .map(|name| baseline.syscall_deviation(name, 0.1))
+                    .collect();
+                let file_devs: Vec<f64> = baseline
+                    .file_access_dirs
+                    .keys()
+                    .map(|path| baseline.file_deviation(path))
+                    .collect();
+                let net_devs: Vec<f64> = baseline
+                    .network_ports
+                    .keys()
+                    .map(|port| baseline.network_deviation(*port))
+                    .collect();
+                let d6_raw = baseline.aggregate_deviation(&syscall_devs, &file_devs, &net_devs);
+                scorer.update_dimension(&agent_id, DimIndex::D6Behavioral, d6_raw, now_ns);
             }
 
             // Feed behavior samples to baseline tracker
             for edge in graph.all_edges() {
-                if edge.edge_type == NewEdgeType::IntentCausesAction {
-                    if let Some(target) = graph.get_node(&edge.target) {
-                        let path = target.resource.as_ref().map(|r| match r {
-                            crate::responsibility::types::NormalizedResource::File { canonical_path } =>
-                                canonical_path.clone(),
-                            crate::responsibility::types::NormalizedResource::Network { host, port, .. } =>
-                                format!("{}:{}", host, port),
-                            _ => String::new(),
-                        });
-                        self.baseline_tracker.observe(agent_id.as_str(),
-                            crate::responsibility::scoring::baseline::BehaviorSample {
-                                syscall_name: None,
-                                file_path: path,
-                                port: None,
-                                is_tool_call: true,
-                                timestamp_ns: now_ns,
-                            });
-                    }
+                if edge.edge_type == NewEdgeType::IntentCausesAction
+                    && let Some(target) = graph.get_node(&edge.target)
+                {
+                    let path = target.resource.as_ref().map(|r| match r {
+                        crate::responsibility::types::NormalizedResource::File {
+                            canonical_path,
+                        } => canonical_path.clone(),
+                        crate::responsibility::types::NormalizedResource::Network {
+                            host,
+                            port,
+                            ..
+                        } => format!("{}:{}", host, port),
+                        _ => String::new(),
+                    });
+                    self.baseline_tracker.observe(
+                        agent_id.as_str(),
+                        crate::responsibility::scoring::baseline::BehaviorSample {
+                            syscall_name: None,
+                            file_path: path,
+                            port: None,
+                            is_tool_call: true,
+                            timestamp_ns: now_ns,
+                        },
+                    );
                 }
             }
-            self.baseline_tracker.rebuild_baseline(agent_id.as_str(), now_ns);
+            self.baseline_tracker
+                .rebuild_baseline(agent_id.as_str(), now_ns);
 
             // ── Emit scoring signal to cross-layer bus ──────────────
             self.bus.emit_scoring(ScoringSignal {
                 agent_id: agent_id.clone(),
                 fused_score: progressive_fused.unwrap_or(0.0),
                 dimension_scores: [
-                    scorer.agents.get(&agent_id).map(|s| s.dims[0].ewma).unwrap_or(0.0),
-                    scorer.agents.get(&agent_id).map(|s| s.dims[1].ewma).unwrap_or(0.0),
-                    scorer.agents.get(&agent_id).map(|s| s.dims[2].ewma).unwrap_or(0.0),
-                    scorer.agents.get(&agent_id).map(|s| s.dims[3].ewma).unwrap_or(0.0),
-                    scorer.agents.get(&agent_id).map(|s| s.dims[4].ewma).unwrap_or(0.0),
-                    scorer.agents.get(&agent_id).map(|s| s.dims[5].ewma).unwrap_or(0.0),
+                    scorer
+                        .agents
+                        .get(&agent_id)
+                        .map(|s| s.dims[0].ewma)
+                        .unwrap_or(0.0),
+                    scorer
+                        .agents
+                        .get(&agent_id)
+                        .map(|s| s.dims[1].ewma)
+                        .unwrap_or(0.0),
+                    scorer
+                        .agents
+                        .get(&agent_id)
+                        .map(|s| s.dims[2].ewma)
+                        .unwrap_or(0.0),
+                    scorer
+                        .agents
+                        .get(&agent_id)
+                        .map(|s| s.dims[3].ewma)
+                        .unwrap_or(0.0),
+                    scorer
+                        .agents
+                        .get(&agent_id)
+                        .map(|s| s.dims[4].ewma)
+                        .unwrap_or(0.0),
+                    scorer
+                        .agents
+                        .get(&agent_id)
+                        .map(|s| s.dims[5].ewma)
+                        .unwrap_or(0.0),
                 ],
                 cusum_triggered,
                 evidence_conflict: evidence_conflict_flag,
@@ -833,20 +932,34 @@ impl ResponsibilityRuntime {
 
         // Check L1+L2 cache before calling observer (if quota allows)
         let cache_key = {
-            let edge_types: Vec<String> = graph.all_edges().map(|e| format!("{:?}", e.edge_type)).collect();
-            let node_types: Vec<String> = graph.all_nodes().map(|n| format!("{:?}", n.node_type)).collect();
-            let subject = graph.all_nodes()
+            let edge_types: Vec<String> = graph
+                .all_edges()
+                .map(|e| format!("{:?}", e.edge_type))
+                .collect();
+            let node_types: Vec<String> = graph
+                .all_nodes()
+                .map(|n| format!("{:?}", n.node_type))
+                .collect();
+            let subject = graph
+                .all_nodes()
                 .find(|n| n.node_type == NewNodeType::Agent)
                 .and_then(|n| n.agent_id.as_ref().map(|a| a.as_str()))
                 .unwrap_or("");
-            let resource_path = graph.all_edges()
+            let resource_path = graph
+                .all_edges()
                 .filter(|e| e.edge_type == NewEdgeType::PolicyBoundaryCrossing)
                 .filter_map(|e| graph.get_node(&e.target))
-                .find_map(|n| n.resource.as_ref().map(|r| match r {
-                    crate::responsibility::types::NormalizedResource::File { canonical_path } => canonical_path.as_str(),
-                    crate::responsibility::types::NormalizedResource::Network { host, .. } => host.as_str(),
-                    _ => "",
-                }))
+                .find_map(|n| {
+                    n.resource.as_ref().map(|r| match r {
+                        crate::responsibility::types::NormalizedResource::File {
+                            canonical_path,
+                        } => canonical_path.as_str(),
+                        crate::responsibility::types::NormalizedResource::Network {
+                            host, ..
+                        } => host.as_str(),
+                        _ => "",
+                    })
+                })
                 .unwrap_or("");
             CacheKey::compute(&edge_types, &node_types, subject, resource_path)
         };
@@ -862,8 +975,9 @@ impl ResponsibilityRuntime {
         //   C5: High boundary density — PBC > 50 means ambiguous structural
         //       signals (could be attack or legitimate multi-agent work).
         //       Force Observer to semantically distinguish intent.
-        let needs_observer_extra = cusum_triggered || evidence_conflict_flag
-            || progressive_fused.map_or(false, |s| s > 0.4)
+        let needs_observer_extra = cusum_triggered
+            || evidence_conflict_flag
+            || progressive_fused.is_some_and(|s| s > 0.4)
             || pbc_count > 50;
 
         // Intent-triggered suspicious patterns → bypass L1 cache.
@@ -871,7 +985,21 @@ impl ResponsibilityRuntime {
         // even if a structurally similar graph was previously seen as safe.
         let has_suspicious_intents_now = standalone_intents.iter().any(|intent| {
             let text = format!("{} {:?}", intent.tool_name, intent.tool_args);
-            text.contains("docker") || text.contains("sudo") || text.contains("/etc/shadow") || text.contains("/etc/passwd") || text.contains("/proc/") || text.contains(".ssh/") || text.contains("credential") || text.contains("escape") || text.contains("inject") || text.contains("exploit") || text.contains("backdoor") || text.contains("typosquat") || text.contains("pyjwt") || text.contains("cryptograph") || text.contains("pip install")
+            text.contains("docker")
+                || text.contains("sudo")
+                || text.contains("/etc/shadow")
+                || text.contains("/etc/passwd")
+                || text.contains("/proc/")
+                || text.contains(".ssh/")
+                || text.contains("credential")
+                || text.contains("escape")
+                || text.contains("inject")
+                || text.contains("exploit")
+                || text.contains("backdoor")
+                || text.contains("typosquat")
+                || text.contains("pyjwt")
+                || text.contains("cryptograph")
+                || text.contains("pip install")
         });
 
         // CUSUM/conflict/boost triggers AND suspicious intents signal genuine
@@ -881,40 +1009,71 @@ impl ResponsibilityRuntime {
             && !self.config.disable_observer
             && cached.is_none();
 
-        let observer_for_call: Option<&dyn ObserverProvider> =
-            if self.config.disable_observer {
-                None
-            } else if cached.is_some() && !has_suspicious_intents_now {
-                None // Cache hit — skip (unless intents are suspicious)
-            } else if self.observer_calls < self.config.max_observer_calls || quota_bypass {
-                if needs_observer_extra && self.observer_calls >= self.config.max_observer_calls {
-                    eprintln!("[runtime:trigger] observer forced (quota bypass): cusum={} conflict={} pfuse={:?}",
-                        cusum_triggered, evidence_conflict_flag, progressive_fused);
-                }
-                Some(self.observer.as_ref())
-            } else {
-                None
-            };
+        let observer_for_call: Option<&dyn ObserverProvider> = if self.config.disable_observer
+            || (cached.is_some() && !has_suspicious_intents_now)
+        // Cache hit — skip (unless intents are suspicious)
+        {
+            None
+        } else if self.observer_calls < self.config.max_observer_calls || quota_bypass {
+            if needs_observer_extra && self.observer_calls >= self.config.max_observer_calls {
+                eprintln!(
+                    "[runtime:trigger] observer forced (quota bypass): cusum={} conflict={} pfuse={:?}",
+                    cusum_triggered, evidence_conflict_flag, progressive_fused
+                );
+            }
+            Some(self.observer.as_ref())
+        } else {
+            None
+        };
 
-        let intent_descriptions: Vec<String> = standalone_intents.iter().filter_map(|intent| {
+        let intent_descriptions: Vec<String> = standalone_intents
+            .iter()
+            .filter_map(|intent| {
                 let tool: &str = &intent.tool_name;
-                intent.tool_args.iter().find_map(|arg| match arg { crate::responsibility::types::NormalizedArg::Content(c) if !c.is_empty() => Some(format!("{}: {}", tool, c.chars().take(120).collect::<String>())), _ => None }).or_else(|| Some(tool.to_string()))
-            }).take(10).collect();
-        if has_suspicious_intents_now { eprintln!("[runtime:intent-trigger] forcing Observer due to suspicious intents"); }
+                intent
+                    .tool_args
+                    .iter()
+                    .find_map(|arg| match arg {
+                        crate::responsibility::types::NormalizedArg::Content(c)
+                            if !c.is_empty() =>
+                        {
+                            Some(format!(
+                                "{}: {}",
+                                tool,
+                                c.chars().take(120).collect::<String>()
+                            ))
+                        }
+                        _ => None,
+                    })
+                    .or_else(|| Some(tool.to_string()))
+            })
+            .take(10)
+            .collect();
+        if has_suspicious_intents_now {
+            eprintln!("[runtime:intent-trigger] forcing Observer due to suspicious intents");
+        }
         let intent_count = standalone_intents.len() as u32;
         let (mut classification_result, route) = self
             .classification_engine
-            .classify_provisional(graph, &patterns, &evidence_snapshot, observer_for_call, repetition_count,
-                needs_observer_extra || has_suspicious_intents_now, cache_prior, &intent_descriptions, intent_count).await;
+            .classify_provisional(
+                graph,
+                &patterns,
+                &evidence_snapshot,
+                observer_for_call,
+                repetition_count,
+                needs_observer_extra || has_suspicious_intents_now,
+                cache_prior,
+                &intent_descriptions,
+                intent_count,
+            )
+            .await;
 
         // ── Feed calibration monitor ──────────────────────────────
         // Record predictions for ECE tracking. When observer was called,
         // its decision serves as a pseudo-label for calibration.
         let is_observer_unsafe = route_is_unsafe(&route);
-        self.calibration_monitor.record(
-            classification_result.score as f64,
-            is_observer_unsafe,
-        );
+        self.calibration_monitor
+            .record(classification_result.score as f64, is_observer_unsafe);
         // v14: Feed pseudo-labels back into the calibrator for online SGD.
         // Observer decisions serve as pseudo-labels — the Observer's semantic
         // judgment is the best available ground truth in a streaming setting.
@@ -927,7 +1086,8 @@ impl ResponsibilityRuntime {
             classification_result.score_breakdown.evidence_score as f64,
             classification_result.score_breakdown.behavioral_score as f64,
         ];
-        self.calibration_monitor.feed_calibrator(&dim_scores_for_cal);
+        self.calibration_monitor
+            .feed_calibrator(&dim_scores_for_cal);
         if self.calibration_monitor.needs_recalibration() {
             eprintln!(
                 "[runtime:trigger] calibration ECE={:.4} exceeds threshold — recalibrating",
@@ -936,15 +1096,22 @@ impl ResponsibilityRuntime {
         }
 
         // ── Emit classification signal to cross-layer bus ─────────
-        let trigger_reason = if cusum_triggered { "cusum_drift".to_string() }
-            else if evidence_conflict_flag { "evidence_conflict".to_string() }
-            else if needs_observer_extra { "cross_layer_boost".to_string() }
-            else if classification_result.route.starts_with("observer") { "grey_zone".to_string() }
-            else { String::new() };
+        let trigger_reason = if cusum_triggered {
+            "cusum_drift".to_string()
+        } else if evidence_conflict_flag {
+            "evidence_conflict".to_string()
+        } else if needs_observer_extra {
+            "cross_layer_boost".to_string()
+        } else if classification_result.route.starts_with("observer") {
+            "grey_zone".to_string()
+        } else {
+            String::new()
+        };
 
         // Persist CUSUM data into classification_result for DB storage
         classification_result.cusum_triggered = cusum_triggered;
-        classification_result.cusum_dimensions = cusum_alarm_dimensions.iter()
+        classification_result.cusum_dimensions = cusum_alarm_dimensions
+            .iter()
             .map(|&i| DimIndex::from_usize(i).name().to_string())
             .collect();
         classification_result.progressive_fused = progressive_fused.unwrap_or(0.0);
@@ -968,18 +1135,22 @@ impl ResponsibilityRuntime {
             } {
                 // Now that the type system is unified, ObserverOutput is the same
                 // type across classification and observer modules.
-                self.observer_cache.store(cache_key, crate::responsibility::observer::types::ObserverOutput {
-                    decision: output.decision.clone(),
-                    severity: output.severity.clone(),
-                    confidence: output.confidence,
-                    cache_ttl: output.cache_ttl.clone(),
-                    authority: output.authority.clone(),
-                    reasoning: output.reasoning.clone(),
-                    attacked_flag: output.attacked_flag,
-                    evidence_cited: output.evidence_cited.clone(),
-                    rule_verdicts: output.rule_verdicts.clone(),
-                    pattern_verdicts: output.pattern_verdicts.clone(),
-                }, CacheTTL::Task);
+                self.observer_cache.store(
+                    cache_key,
+                    crate::responsibility::observer::types::ObserverOutput {
+                        decision: output.decision,
+                        severity: output.severity.clone(),
+                        confidence: output.confidence,
+                        cache_ttl: output.cache_ttl.clone(),
+                        authority: output.authority.clone(),
+                        reasoning: output.reasoning.clone(),
+                        attacked_flag: output.attacked_flag,
+                        evidence_cited: output.evidence_cited.clone(),
+                        rule_verdicts: output.rule_verdicts.clone(),
+                        pattern_verdicts: output.pattern_verdicts.clone(),
+                    },
+                    CacheTTL::Task,
+                );
             }
         }
 
@@ -1004,8 +1175,7 @@ impl ResponsibilityRuntime {
             total_duration_ms: if let (Some(first), Some(last)) =
                 (self.timeline.first(), self.timeline.last())
             {
-                (last.timestamp_ns.saturating_sub(first.timestamp_ns) / 1_000_000)
-                    .min(u64::MAX)
+                last.timestamp_ns.saturating_sub(first.timestamp_ns) / 1_000_000
             } else {
                 0
             },
@@ -1038,9 +1208,7 @@ impl ResponsibilityRuntime {
         // processed any processes yet (race between debounce timer and event
         // arrival). Skipping the alert here is safe — the data remains in
         // the buffer and will be picked up on the next trigger.
-        let has_graph_agent = graph
-            .all_nodes()
-            .any(|n| n.node_type == NewNodeType::Agent);
+        let has_graph_agent = graph.all_nodes().any(|n| n.node_type == NewNodeType::Agent);
         let can_identify_agent = fallback_agent.is_some() || has_graph_agent || !claims.is_empty();
 
         // Deterministic ClaimId: same logical claim → same id across cycles.
@@ -1054,7 +1222,9 @@ impl ResponsibilityRuntime {
         // v14: Allow alert creation when Observer detected Unsafe, even without
         // PBC claims. The Observer's evidence_cited provides justification.
         let observer_detected = classification_result.route == "observer_unsafe"
-            && observer_output.as_ref().map_or(false, |o| !o.evidence_cited.is_empty());
+            && observer_output
+                .as_ref()
+                .is_some_and(|o| !o.evidence_cited.is_empty());
 
         if (can_identify_agent && !new_claims.is_empty()) || observer_detected {
             // ── Emit claim signals to cross-layer bus ──────────────
@@ -1080,27 +1250,21 @@ impl ResponsibilityRuntime {
             // Persist claims FIRST (traceback has FOREIGN KEY to claim)
             for claim in &new_claims {
                 self.phase1_claim_ids.insert(claim.claim_id.clone());
-                let _ = self
-                    .persistence
-                    .write(PersistRecord::Claim(claim.clone()));
+                let _ = self.persistence.write(PersistRecord::Claim(claim.clone()));
             }
 
             // Build and persist tracebacks AFTER claims
             for claim in &new_claims {
                 if let Some(traceback) = TracebackBuilder::build(claim, graph) {
-                    let _ = self
-                        .persistence
-                        .write(PersistRecord::Traceback(traceback));
+                    let _ = self.persistence.write(PersistRecord::Traceback(traceback));
                 }
             }
 
             self.phase1_alert_ids.push(alert.alert_id.clone());
-            let _ = self
-                .persistence
-                .write(PersistRecord::Alert(alert.clone()));
+            let _ = self.persistence.write(PersistRecord::Alert(alert.clone()));
 
             // Broadcast alert to frontend SSE consumers
-            let _ = self.bus.emit_alert(alert);
+            self.bus.emit_alert(alert);
         }
 
         // ── 7. Persist graph nodes and edges (always, even without alert) ──
@@ -1126,7 +1290,9 @@ impl ResponsibilityRuntime {
             edges: graph.all_edges().cloned().collect(),
             metrics: graph.metrics(),
         };
-        let _ = self.persistence.write(PersistRecord::GraphSnapshot(snapshot));
+        let _ = self
+            .persistence
+            .write(PersistRecord::GraphSnapshot(snapshot));
 
         // ── Persist policy/judgment data ────────────────────────────
         // Policy evaluations: one per PolicyBoundaryCrossing edge
@@ -1164,7 +1330,8 @@ impl ResponsibilityRuntime {
                     contaminated_artifact: path.clone(),
                     propagation_path: vec![],
                     detected_at_ns: record.timestamp_ns,
-                }));
+                },
+            ));
         }
 
         // ── Cleanup ────────────────────────────────────────────────
@@ -1241,9 +1408,7 @@ impl ResponsibilityRuntime {
 
         // Persist batch evidence and refinements
         for ev in &batch_evidence.evidence {
-            let _ = self
-                .persistence
-                .write(PersistRecord::Evidence(ev.clone()));
+            let _ = self.persistence.write(PersistRecord::Evidence(ev.clone()));
         }
         for refinement in &batch_evidence.refinements {
             let _ = self
@@ -1263,13 +1428,13 @@ impl ResponsibilityRuntime {
             edges: snapshot_edges,
             metrics,
         };
-        let _ = self.persistence.write(PersistRecord::GraphSnapshot(graph_snapshot.clone()));
+        let _ = self
+            .persistence
+            .write(PersistRecord::GraphSnapshot(graph_snapshot.clone()));
 
-        let _frozen = self.graph_builder.finalize(
-            &authoritative_identity,
-            &batch_evidence,
-            graph_snapshot,
-        );
+        let _frozen =
+            self.graph_builder
+                .finalize(&authoritative_identity, &batch_evidence, graph_snapshot);
 
         // Persist graph refinements
         for refinement in &_frozen.refinements {
@@ -1285,15 +1450,13 @@ impl ResponsibilityRuntime {
         let repetition_count = all_intents.len() as u32;
         let intent_count = all_intents.len() as u32;
 
-        let (classification_result, _route) = self
-            .classification_engine
-            .classify_authoritative(
-                graph,
-                &patterns,
-                &batch_evidence.evidence,
-                repetition_count,
-                intent_count,
-            );
+        let (classification_result, _route) = self.classification_engine.classify_authoritative(
+            graph,
+            &patterns,
+            &batch_evidence.evidence,
+            repetition_count,
+            intent_count,
+        );
 
         // ── 6. Build authoritative claims/alerts/tracebacks ────────
         let claims = ClaimBuilder::build_claims(graph, &self.claimed_edge_ids);
@@ -1303,8 +1466,7 @@ impl ResponsibilityRuntime {
             total_duration_ms: if let (Some(first), Some(last)) =
                 (self.timeline.first(), self.timeline.last())
             {
-                (last.timestamp_ns.saturating_sub(first.timestamp_ns) / 1_000_000)
-                    .min(u64::MAX)
+                last.timestamp_ns.saturating_sub(first.timestamp_ns) / 1_000_000
             } else {
                 0
             },
@@ -1316,9 +1478,7 @@ impl ResponsibilityRuntime {
             .first()
             .map(|p| p.agent_id.clone());
 
-        let has_graph_agent = graph
-            .all_nodes()
-            .any(|n| n.node_type == NewNodeType::Agent);
+        let has_graph_agent = graph.all_nodes().any(|n| n.node_type == NewNodeType::Agent);
         let can_identify_agent = fallback_agent.is_some() || has_graph_agent || !claims.is_empty();
 
         if can_identify_agent {
@@ -1333,26 +1493,20 @@ impl ResponsibilityRuntime {
 
             // Persist claims FIRST (traceback has FOREIGN KEY to claim)
             for claim in &claims {
-                let _ = self
-                    .persistence
-                    .write(PersistRecord::Claim(claim.clone()));
+                let _ = self.persistence.write(PersistRecord::Claim(claim.clone()));
             }
 
             // Build and persist tracebacks AFTER claims
             for claim in &claims {
                 if let Some(traceback) = TracebackBuilder::build(claim, graph) {
-                    let _ = self
-                        .persistence
-                        .write(PersistRecord::Traceback(traceback));
+                    let _ = self.persistence.write(PersistRecord::Traceback(traceback));
                 }
             }
-            let _ = self
-                .persistence
-                .write(PersistRecord::Alert(alert.clone()));
+            let _ = self.persistence.write(PersistRecord::Alert(alert.clone()));
 
             // Broadcast final authoritative alert
             let phase2_alert_id = alert.alert_id.clone();
-            let _ = self.bus.emit_alert(alert);
+            self.bus.emit_alert(alert);
 
             // ── Persist Phase1→Phase2 refinements ──────────────────────
             for p1_id in self.phase1_alert_ids.drain(..) {
@@ -1383,30 +1537,47 @@ impl ResponsibilityRuntime {
             total_events: self.event_count as u64,
             total_intents: all_intents.len() as u64,
             total_actions: all_actions.len() as u64,
-            pbc_edge_count: graph.edges_of_type(&NewEdgeType::PolicyBoundaryCrossing).len() as u64,
+            pbc_edge_count: graph
+                .edges_of_type(&NewEdgeType::PolicyBoundaryCrossing)
+                .len() as u64,
             claim_count: claims.len() as u64,
             alert_count: self.phase1_alert_ids.len() as u64,
             observer_calls: self.observer_calls as u64,
             classification_route: classification_result.route.clone(),
             final_score: classification_result.score,
-            per_agent_scores: self.progressive_scorer.agents.iter().map(|(aid, state)| {
-                crate::responsibility::output::AgentScoreSummary {
-                    agent_id: aid.to_string(),
-                    fused_score: self.progressive_scorer.get_agent_fused_score(aid).unwrap_or(0.0),
-                    dimension_scores: [
-                        state.dims[0].ewma, state.dims[1].ewma,
-                        state.dims[2].ewma, state.dims[3].ewma,
-                        state.dims[4].ewma, state.dims[5].ewma,
-                    ],
-                    cusum_triggered: state.dims.iter().any(|d|
-                        d.cusum > self.progressive_scorer.config.cusum_h
-                            && d.consecutive >= self.progressive_scorer.config.consecutive_k),
-                    evidence_conflict: state.dims[DimIndex::D1Boundary as usize].ewma > 0.5
-                        && state.dims[DimIndex::D5CrossContext as usize].ewma < 0.2,
-                    baseline_established: self.baseline_tracker.get(aid.as_str())
-                        .map(|b| b.is_established()).unwrap_or(false),
-                }
-            }).collect(),
+            per_agent_scores: self
+                .progressive_scorer
+                .agents
+                .iter()
+                .map(
+                    |(aid, state)| crate::responsibility::output::AgentScoreSummary {
+                        agent_id: aid.to_string(),
+                        fused_score: self
+                            .progressive_scorer
+                            .get_agent_fused_score(aid)
+                            .unwrap_or(0.0),
+                        dimension_scores: [
+                            state.dims[0].ewma,
+                            state.dims[1].ewma,
+                            state.dims[2].ewma,
+                            state.dims[3].ewma,
+                            state.dims[4].ewma,
+                            state.dims[5].ewma,
+                        ],
+                        cusum_triggered: state.dims.iter().any(|d| {
+                            d.cusum > self.progressive_scorer.config.cusum_h
+                                && d.consecutive >= self.progressive_scorer.config.consecutive_k
+                        }),
+                        evidence_conflict: state.dims[DimIndex::D1Boundary as usize].ewma > 0.5
+                            && state.dims[DimIndex::D5CrossContext as usize].ewma < 0.2,
+                        baseline_established: self
+                            .baseline_tracker
+                            .get(aid.as_str())
+                            .map(|b| b.is_established())
+                            .unwrap_or(false),
+                    },
+                )
+                .collect(),
             alerts: vec![],
         };
         let writer = OutputWriter::new(OutputFormat::Text);
@@ -1468,8 +1639,7 @@ impl Analyzer for ResponsibilityRuntime {
         tick.tick().await; // suppress immediate first tick
 
         // Poll interval for shutdown check (every 500ms)
-        let mut shutdown_poll =
-            tokio::time::interval(std::time::Duration::from_millis(500));
+        let mut shutdown_poll = tokio::time::interval(std::time::Duration::from_millis(500));
 
         loop {
             tokio::select! {
@@ -1480,7 +1650,7 @@ impl Analyzer for ResponsibilityRuntime {
                             output.extend(emitted);
                             self.event_count += 1;
                             self.dirty = true;
-                            if self.event_count % self.config.trigger_every_n == 0 {
+                            if self.event_count.is_multiple_of(self.config.trigger_every_n) {
                                 self.trigger().await;
                             }
                         }

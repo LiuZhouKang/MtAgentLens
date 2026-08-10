@@ -13,16 +13,13 @@ use crate::responsibility::types::{IntentId, MatchLevel};
 
 // Re-export the canonical types for backward compat.
 pub use crate::responsibility::types::{
-    NonLinkDiagnostic, NonLinkReason, NON_LINK_DIAGNOSTIC_SCHEMA_VERSION,
+    NON_LINK_DIAGNOSTIC_SCHEMA_VERSION, NonLinkDiagnostic, NonLinkReason,
 };
 
 // ─── Convenience constructors ─────────────────────────────────────────
 
 /// Build a NonLinkDiagnostic for an intent that found no argument match.
-pub fn no_argument_match(
-    intent_id: IntentId,
-    timestamp_ns: u64,
-) -> NonLinkDiagnostic {
+pub fn no_argument_match(intent_id: IntentId, timestamp_ns: u64) -> NonLinkDiagnostic {
     NonLinkDiagnostic {
         schema_version: NON_LINK_DIAGNOSTIC_SCHEMA_VERSION,
         diagnostic_id: uuid::Uuid::new_v4().to_string(),
@@ -41,10 +38,7 @@ pub fn no_argument_match(
 }
 
 /// Build a NonLinkDiagnostic for an intent that has no eligible action candidate.
-pub fn candidate_not_available(
-    intent_id: IntentId,
-    timestamp_ns: u64,
-) -> NonLinkDiagnostic {
+pub fn candidate_not_available(intent_id: IntentId, timestamp_ns: u64) -> NonLinkDiagnostic {
     NonLinkDiagnostic {
         schema_version: NON_LINK_DIAGNOSTIC_SCHEMA_VERSION,
         diagnostic_id: uuid::Uuid::new_v4().to_string(),
@@ -111,10 +105,7 @@ pub fn outside_time_window(
 }
 
 /// Build a NonLinkDiagnostic for ambiguous competition.
-pub fn ambiguous_competition(
-    intent_id: IntentId,
-    timestamp_ns: u64,
-) -> NonLinkDiagnostic {
+pub fn ambiguous_competition(intent_id: IntentId, timestamp_ns: u64) -> NonLinkDiagnostic {
     NonLinkDiagnostic {
         schema_version: NON_LINK_DIAGNOSTIC_SCHEMA_VERSION,
         diagnostic_id: uuid::Uuid::new_v4().to_string(),
@@ -133,10 +124,7 @@ pub fn ambiguous_competition(
 }
 
 /// Build a NonLinkDiagnostic for a non-primary-eligible intent.
-pub fn intent_not_primary_eligible(
-    intent_id: IntentId,
-    timestamp_ns: u64,
-) -> NonLinkDiagnostic {
+pub fn intent_not_primary_eligible(intent_id: IntentId, timestamp_ns: u64) -> NonLinkDiagnostic {
     NonLinkDiagnostic {
         schema_version: NON_LINK_DIAGNOSTIC_SCHEMA_VERSION,
         diagnostic_id: uuid::Uuid::new_v4().to_string(),

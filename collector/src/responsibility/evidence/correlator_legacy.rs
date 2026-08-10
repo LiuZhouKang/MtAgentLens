@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-use crate::responsibility::evidence::{
-    ActionCandidate, ActionCandidateType, NonLinkDiagnostic, NonLinkReason,
-};
-use crate::responsibility::signals::SignalGraph;
-use crate::responsibility::judgment::evaluate_accountability_policy;
 use crate::responsibility::evidence::normalizer::{
     command_basename, normalize_path, normalize_url, tokenize_command,
 };
+use crate::responsibility::evidence::{
+    ActionCandidate, ActionCandidateType, NonLinkDiagnostic, NonLinkReason,
+};
+use crate::responsibility::judgment::evaluate_accountability_policy;
+use crate::responsibility::signals::SignalGraph;
 use crate::responsibility::types::support_types::{CausalEdge, IntentEvent, ProcessId, ResourceId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -162,6 +162,12 @@ pub struct EvidenceCorrelator {
     observer_enabled: bool,
 }
 
+impl Default for EvidenceCorrelator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EvidenceCorrelator {
     pub fn new() -> Self {
         Self::with_observer(false)
@@ -205,7 +211,9 @@ impl EvidenceCorrelator {
 
         if let Some(existing) = self.intent_buffer.iter_mut().find(|existing| {
             existing.intent_id == intent.intent_id
-                && graph.snapshot().can_correlate(intent.process_id, existing.process_id)
+                && graph
+                    .snapshot()
+                    .can_correlate(intent.process_id, existing.process_id)
                 && existing.tool_name == intent.tool_name
                 && existing.tool_args == intent.tool_args
                 && existing.intent_class == intent.intent_class
@@ -327,7 +335,11 @@ impl EvidenceCorrelator {
         let candidates: Vec<_> = self
             .candidate_buffer
             .iter()
-            .filter(|c| graph.snapshot().can_correlate(intent.process_id, c.process_id))
+            .filter(|c| {
+                graph
+                    .snapshot()
+                    .can_correlate(intent.process_id, c.process_id)
+            })
             .cloned()
             .collect();
         self.resolve_matches_for_intent(intent, candidates)
@@ -342,7 +354,9 @@ impl EvidenceCorrelator {
             .intent_buffer
             .iter()
             .filter(|i| {
-                graph.snapshot().can_correlate(i.process_id, candidate.process_id)
+                graph
+                    .snapshot()
+                    .can_correlate(i.process_id, candidate.process_id)
             })
             .filter(|i| !self.linked_intent_ids.contains(&i.intent_id))
             .cloned()
@@ -449,15 +463,14 @@ impl EvidenceCorrelator {
                 "tool_name".to_string(),
                 serde_json::Value::String(intent.tool_name.clone()),
             );
-            if let Some(tool_args_val) = serde_json::to_value(&intent.tool_args).ok() {
-                if tool_args_val.is_object()
-                    && !tool_args_val
-                        .as_object()
-                        .map(|o| o.is_empty())
-                        .unwrap_or(true)
-                {
-                    object.insert("tool_args".to_string(), tool_args_val);
-                }
+            if let Ok(tool_args_val) = serde_json::to_value(&intent.tool_args)
+                && tool_args_val.is_object()
+                && !tool_args_val
+                    .as_object()
+                    .map(|o| o.is_empty())
+                    .unwrap_or(true)
+            {
+                object.insert("tool_args".to_string(), tool_args_val);
             }
             let resource =
                 resource_from_candidate_for_policy(&candidate.candidate_type, target.as_deref());
@@ -814,7 +827,9 @@ impl EvidenceCorrelator {
         graph: &SignalGraph,
     ) {
         for intent in self.intent_buffer.iter() {
-            if !graph.snapshot().can_correlate(intent.process_id, candidate.process_id)
+            if !graph
+                .snapshot()
+                .can_correlate(intent.process_id, candidate.process_id)
                 || !intent.primary_matching_eligible
             {
                 continue;
@@ -872,7 +887,10 @@ impl EvidenceCorrelator {
         graph: &SignalGraph,
     ) {
         for candidate in self.candidate_buffer.iter() {
-            if !graph.snapshot().can_correlate(intent.process_id, candidate.process_id) {
+            if !graph
+                .snapshot()
+                .can_correlate(intent.process_id, candidate.process_id)
+            {
                 continue;
             }
 
@@ -1027,7 +1045,8 @@ impl EvidenceCorrelator {
         let mut args = Vec::new();
         let a = &candidate.normalized_args;
 
-        if let Some(path) = a.get("path")
+        if let Some(path) = a
+            .get("path")
             .or_else(|| a.get("file_path"))
             .and_then(|v| v.as_str())
         {
@@ -1042,10 +1061,10 @@ impl EvidenceCorrelator {
                 args.push(NormalizedArg::Path(stripped));
             }
         }
-        if let Some(argv) = a.get("argv").and_then(|v| v.as_array()) {
-            if let Some(first) = argv.first().and_then(|v| v.as_str()) {
-                args.push(NormalizedArg::Command(command_basename(first)));
-            }
+        if let Some(argv) = a.get("argv").and_then(|v| v.as_array())
+            && let Some(first) = argv.first().and_then(|v| v.as_str())
+        {
+            args.push(NormalizedArg::Command(command_basename(first)));
         }
         if let Some(host) = a.get("host").and_then(|v| v.as_str()) {
             let host = host.to_lowercase();
@@ -1502,7 +1521,10 @@ mod tests {
         );
         assert_eq!(diagnostic.reason, NonLinkReason::IntentNotPrimaryEligible);
         assert_eq!(diagnostic.stage, "eligibility_gate");
-        assert_eq!(diagnostic.intent_class, Some(intent.intent_class.to_string()));
+        assert_eq!(
+            diagnostic.intent_class,
+            Some(intent.intent_class.to_string())
+        );
         assert_eq!(diagnostic.parse_state, Some(intent.parse_state.to_string()));
     }
 

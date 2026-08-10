@@ -1,8 +1,6 @@
 use crate::responsibility::claims::ClaimSeverity;
 use crate::responsibility::graph::graph::ResponsibilityGraph;
-use crate::responsibility::types::graph_types::{
-    ResponsibilityEdgeType, ResponsibilityNodeType,
-};
+use crate::responsibility::types::graph_types::{ResponsibilityEdgeType, ResponsibilityNodeType};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,9 +65,7 @@ impl GraphPatternMatcher {
             .filter(|et| edge_types.contains(et))
             .count();
 
-        if !template.required_edge_types.is_empty()
-            && found_edge_types < template.min_matches
-        {
+        if !template.required_edge_types.is_empty() && found_edge_types < template.min_matches {
             return None;
         }
 
@@ -158,7 +154,8 @@ pub fn default_templates() -> Vec<GraphPatternTemplate> {
         },
         GraphPatternTemplate {
             template_id: "context_pollution_confused_deputy".into(),
-            description: "Agent pollutes context causing downstream agent to act on tainted data".into(),
+            description: "Agent pollutes context causing downstream agent to act on tainted data"
+                .into(),
             severity: ClaimSeverity::Warning,
             required_node_types: vec![Agent, Context],
             required_edge_types: vec![TaintPropagation, ContextInheritance],

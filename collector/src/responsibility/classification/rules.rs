@@ -200,7 +200,9 @@ pub fn unsafe_rules() -> Vec<SafetyRule> {
         SafetyRule {
             rule_id: "unsafe.credential_pattern".into(),
             description: "Path or resource name suggests credential/key material".into(),
-            resource_pattern: ResourcePattern::Glob("**.{env,pem,key,token,secret,htpasswd,netrc}".into()),
+            resource_pattern: ResourcePattern::Glob(
+                "**.{env,pem,key,token,secret,htpasswd,netrc}".into(),
+            ),
             operation_types: vec![OperationCategory::CredentialAccess],
             decision: RuleDecision::Unsafe,
         },

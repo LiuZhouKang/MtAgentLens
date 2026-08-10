@@ -7,12 +7,44 @@ function makeSnapshotJson(): string {
     snapshot_id: 'test-1',
     graph: {
       nodes: [
-        { node_id: 'n1', node_type: 'Agent', agent_id: 'a1', resource: null, evidence_refs: [], timestamp_ns: 0, phase: 'Provisional' },
-        { node_id: 'n2', node_type: 'Resource', agent_id: null, resource: null, evidence_refs: [], timestamp_ns: 0, phase: 'Provisional' },
-        { node_id: 'n3', node_type: 'Agent', agent_id: 'a2', resource: null, evidence_refs: [], timestamp_ns: 0, phase: 'Provisional' },
+        {
+          node_id: 'n1',
+          node_type: 'Agent',
+          agent_id: 'a1',
+          resource: null,
+          evidence_refs: [],
+          timestamp_ns: 0,
+          phase: 'Provisional',
+        },
+        {
+          node_id: 'n2',
+          node_type: 'Resource',
+          agent_id: null,
+          resource: null,
+          evidence_refs: [],
+          timestamp_ns: 0,
+          phase: 'Provisional',
+        },
+        {
+          node_id: 'n3',
+          node_type: 'Agent',
+          agent_id: 'a2',
+          resource: null,
+          evidence_refs: [],
+          timestamp_ns: 0,
+          phase: 'Provisional',
+        },
       ],
       edges: [
-        { edge_id: 'e1', edge_type: 'IntentCausesAction', source: 'n1', target: 'n2', evidence_refs: [], confidence: 0.9, phase: 'Provisional' },
+        {
+          edge_id: 'e1',
+          edge_type: 'IntentCausesAction',
+          source: 'n1',
+          target: 'n2',
+          evidence_refs: [],
+          confidence: 0.9,
+          phase: 'Provisional',
+        },
       ],
     },
     metrics: {

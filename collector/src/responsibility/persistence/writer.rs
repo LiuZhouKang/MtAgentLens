@@ -13,6 +13,7 @@ use crate::responsibility::types::graph_types::{
 use crate::responsibility::types::identity_types::{
     AuthoritativeIdentity, ProvisionalIdentity, SubagentBoundary,
 };
+use crate::responsibility::types::ids::{AgentId, MessageId, TlsSessionId};
 use crate::responsibility::types::policy_types::{
     ContextPollution, DelegationRecord, PolicyEvaluation,
 };
@@ -21,13 +22,10 @@ use crate::responsibility::types::refinement::{
     IdentityRefinement,
 };
 use crate::responsibility::types::replay_types::RunRecord;
-use crate::responsibility::types::ids::{
-    MessageId, TlsSessionId, AgentId,
-};
 
-use rusqlite::{params, Connection};
-use std::sync::atomic::{AtomicU64, Ordering};
+use rusqlite::{Connection, params};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{mpsc, oneshot};
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -148,15 +146,9 @@ pub enum PersistRecord {
 
     // --- Run metadata ---
     /// Start a new run
-    RunStart {
-        run_id: String,
-        timestamp_ns: u64,
-    },
+    RunStart { run_id: String, timestamp_ns: u64 },
     /// End a run
-    RunEnd {
-        run_id: String,
-        timestamp_ns: u64,
-    },
+    RunEnd { run_id: String, timestamp_ns: u64 },
     /// Full run record for metadata
     RunRecord(RunRecord),
 
@@ -225,10 +217,7 @@ impl PersistenceWriter {
             writer_task(conn, rx, batch_size, batch_interval_ms, lost_for_task).await;
         });
 
-        Ok(Self {
-            tx,
-            lost_count,
-        })
+        Ok(Self { tx, lost_count })
     }
 
     /// Send a persist record. Non-blocking — discards if the channel is full.
@@ -327,7 +316,10 @@ async fn writer_task(
                 );
                 continue;
             }
-            PersistRecord::RunEnd { run_id, timestamp_ns } => {
+            PersistRecord::RunEnd {
+                run_id,
+                timestamp_ns,
+            } => {
                 // Run end is written immediately
                 if pending > 0 {
                     let _ = commit_batch(&conn, &mut pending, &mut current_run_id);
@@ -445,8 +437,8 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             )?;
         }
         PersistRecord::Intent(intent) => {
-            let tool_args = serde_json::to_string(&intent.tool_args)
-                .unwrap_or_else(|_| "[]".to_string());
+            let tool_args =
+                serde_json::to_string(&intent.tool_args).unwrap_or_else(|_| "[]".to_string());
             conn.execute(
                 "INSERT OR IGNORE INTO intents
                  (intent_id, pid, process_start_time_ns, message_id, tool_name, tool_args_json,
@@ -469,8 +461,8 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             )?;
         }
         PersistRecord::Action(action) => {
-            let norm_args = serde_json::to_string(&action.normalized_args)
-                .unwrap_or_else(|_| "[]".to_string());
+            let norm_args =
+                serde_json::to_string(&action.normalized_args).unwrap_or_else(|_| "[]".to_string());
             conn.execute(
                 "INSERT OR IGNORE INTO actions
                  (action_id, pid, process_start_time_ns, action_type, normalized_args_json,
@@ -490,8 +482,8 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             )?;
         }
         PersistRecord::Evidence(ev) => {
-            let matched = serde_json::to_string(&ev.matched_fields)
-                .unwrap_or_else(|_| "{}".to_string());
+            let matched =
+                serde_json::to_string(&ev.matched_fields).unwrap_or_else(|_| "{}".to_string());
             conn.execute(
                 "INSERT OR IGNORE INTO correlation_evidence
                  (evidence_id, intent_id, action_id, match_level, confidence, matched_fields_json,
@@ -518,8 +510,8 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 params![
                     diag.diagnostic_id,
-                    diag.intent_id.as_ref().map(|s| s.as_str()),
-                    diag.candidate_id.as_ref().map(|s| s.as_str()),
+                    diag.intent_id.as_deref(),
+                    diag.candidate_id.as_deref(),
                     format!("{:?}", diag.reason),
                     diag.timestamp_ns as i64,
                     run_id,
@@ -527,8 +519,7 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             )?;
         }
         PersistRecord::ProvisionalIdentity(pi) => {
-            let pids = serde_json::to_string(&pi.process_ids)
-                .unwrap_or_else(|_| "[]".to_string());
+            let pids = serde_json::to_string(&pi.process_ids).unwrap_or_else(|_| "[]".to_string());
             conn.execute(
                 "INSERT OR REPLACE INTO provisional_identities
                  (agent_id, process_ids_json, primary_signal, confidence, run_id)
@@ -543,10 +534,10 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             )?;
         }
         PersistRecord::GraphNode(node) => {
-            let resource = serde_json::to_string(&node.resource)
-                .unwrap_or_else(|_| "null".to_string());
-            let ev_refs = serde_json::to_string(&node.evidence_refs)
-                .unwrap_or_else(|_| "[]".to_string());
+            let resource =
+                serde_json::to_string(&node.resource).unwrap_or_else(|_| "null".to_string());
+            let ev_refs =
+                serde_json::to_string(&node.evidence_refs).unwrap_or_else(|_| "[]".to_string());
             conn.execute(
                 "INSERT OR REPLACE INTO graph_nodes
                  (node_id, node_type, agent_id, resource_json, evidence_refs_json, timestamp_ns, phase, run_id)
@@ -564,8 +555,8 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             )?;
         }
         PersistRecord::GraphEdge(edge) => {
-            let ev_refs = serde_json::to_string(&edge.evidence_refs)
-                .unwrap_or_else(|_| "[]".to_string());
+            let ev_refs =
+                serde_json::to_string(&edge.evidence_refs).unwrap_or_else(|_| "[]".to_string());
             conn.execute(
                 "INSERT OR REPLACE INTO graph_edges
                  (edge_id, edge_type, source_node_id, target_node_id, evidence_refs_json, confidence, phase, run_id)
@@ -583,12 +574,10 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             )?;
         }
         PersistRecord::PolicyEvaluation(pe) => {
-            let judgment = serde_json::to_string(&pe.judgment)
-                .unwrap_or_else(|_| "{}".to_string());
-            let resource = serde_json::to_string(&pe.resource)
-                .unwrap_or_else(|_| "null".to_string());
-            let ev_refs = serde_json::to_string(&pe.evidence)
-                .unwrap_or_else(|_| "[]".to_string());
+            let judgment = serde_json::to_string(&pe.judgment).unwrap_or_else(|_| "{}".to_string());
+            let resource =
+                serde_json::to_string(&pe.resource).unwrap_or_else(|_| "null".to_string());
+            let ev_refs = serde_json::to_string(&pe.evidence).unwrap_or_else(|_| "[]".to_string());
             conn.execute(
                 "INSERT OR REPLACE INTO policy_evaluations
                  (policy_id, boundary, judgment_json, subject_agent_id, resource_json,
@@ -628,8 +617,8 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             )?;
         }
         PersistRecord::ContextPollution(cp) => {
-            let path = serde_json::to_string(&cp.propagation_path)
-                .unwrap_or_else(|_| "[]".to_string());
+            let path =
+                serde_json::to_string(&cp.propagation_path).unwrap_or_else(|_| "[]".to_string());
             conn.execute(
                 "INSERT INTO context_pollution_events
                  (source_agent_id, contaminated_artifact, propagation_path_json, detected_at_ns, run_id)
@@ -644,14 +633,13 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             )?;
         }
         PersistRecord::Alert(alert) => {
-            let involved = serde_json::to_string(&alert.involved_agents)
-                .unwrap_or_else(|_| "[]".to_string());
-            let engine = serde_json::to_string(&alert.engine)
-                .unwrap_or_else(|_| "{}".to_string());
-            let timeline = serde_json::to_string(&alert.timeline)
-                .unwrap_or_else(|_| "[]".to_string());
-            let metrics = serde_json::to_string(&alert.graph_snapshot)
-                .unwrap_or_else(|_| "{}".to_string());
+            let involved =
+                serde_json::to_string(&alert.involved_agents).unwrap_or_else(|_| "[]".to_string());
+            let engine = serde_json::to_string(&alert.engine).unwrap_or_else(|_| "{}".to_string());
+            let timeline =
+                serde_json::to_string(&alert.timeline).unwrap_or_else(|_| "[]".to_string());
+            let metrics =
+                serde_json::to_string(&alert.graph_snapshot).unwrap_or_else(|_| "{}".to_string());
             conn.execute(
                 "INSERT OR REPLACE INTO responsibility_alerts
                  (alert_id, timestamp_ns, display_profile, decision, severity, confidence, authority,
@@ -682,8 +670,8 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             )?;
         }
         PersistRecord::Claim(claim) => {
-            let ev_refs = serde_json::to_string(&claim.evidence_refs)
-                .unwrap_or_else(|_| "[]".to_string());
+            let ev_refs =
+                serde_json::to_string(&claim.evidence_refs).unwrap_or_else(|_| "[]".to_string());
             let competing = serde_json::to_string(&claim.competing_explanations)
                 .unwrap_or_else(|_| "[]".to_string());
             conn.execute(
@@ -710,10 +698,10 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             )?;
         }
         PersistRecord::Traceback(tb) => {
-            let chain_nodes = serde_json::to_string(&tb.chain_node_ids)
-                .unwrap_or_else(|_| "[]".to_string());
-            let chain_edges = serde_json::to_string(&tb.chain_edge_ids)
-                .unwrap_or_else(|_| "[]".to_string());
+            let chain_nodes =
+                serde_json::to_string(&tb.chain_node_ids).unwrap_or_else(|_| "[]".to_string());
+            let chain_edges =
+                serde_json::to_string(&tb.chain_edge_ids).unwrap_or_else(|_| "[]".to_string());
             conn.execute(
                 "INSERT OR REPLACE INTO responsibility_tracebacks
                  (traceback_id, claim_id, chain_node_ids_json, chain_edge_ids_json,
@@ -732,14 +720,11 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             )?;
         }
         PersistRecord::AuthoritativeIdentity(ai) => {
-            let pids = serde_json::to_string(&ai.process_ids)
-                .unwrap_or_else(|_| "[]".to_string());
-            let msgs = serde_json::to_string(&ai.message_ids)
-                .unwrap_or_else(|_| "[]".to_string());
-            let tlss = serde_json::to_string(&ai.tls_sessions)
-                .unwrap_or_else(|_| "[]".to_string());
-            let prov_refs = serde_json::to_string(&ai.provisional_refs)
-                .unwrap_or_else(|_| "[]".to_string());
+            let pids = serde_json::to_string(&ai.process_ids).unwrap_or_else(|_| "[]".to_string());
+            let msgs = serde_json::to_string(&ai.message_ids).unwrap_or_else(|_| "[]".to_string());
+            let tlss = serde_json::to_string(&ai.tls_sessions).unwrap_or_else(|_| "[]".to_string());
+            let prov_refs =
+                serde_json::to_string(&ai.provisional_refs).unwrap_or_else(|_| "[]".to_string());
             conn.execute(
                 "INSERT OR REPLACE INTO agent_identities
                  (agent_id, process_ids_json, message_ids_json, tls_sessions_json, confidence,
@@ -785,10 +770,10 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             )?;
         }
         PersistRecord::GraphRefinement(gr) => {
-            let nodes = serde_json::to_string(&gr.affected_nodes)
-                .unwrap_or_else(|_| "[]".to_string());
-            let edges = serde_json::to_string(&gr.affected_edges)
-                .unwrap_or_else(|_| "[]".to_string());
+            let nodes =
+                serde_json::to_string(&gr.affected_nodes).unwrap_or_else(|_| "[]".to_string());
+            let edges =
+                serde_json::to_string(&gr.affected_edges).unwrap_or_else(|_| "[]".to_string());
             conn.execute(
                 "INSERT INTO graph_refinements
                  (refinement_type, affected_nodes_json, affected_edges_json, description, run_id)
@@ -803,12 +788,9 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             )?;
         }
         PersistRecord::GraphSnapshot(snap) => {
-            let nodes = serde_json::to_string(&snap.nodes)
-                .unwrap_or_else(|_| "[]".to_string());
-            let edges = serde_json::to_string(&snap.edges)
-                .unwrap_or_else(|_| "[]".to_string());
-            let metrics = serde_json::to_string(&snap.metrics)
-                .unwrap_or_else(|_| "{}".to_string());
+            let nodes = serde_json::to_string(&snap.nodes).unwrap_or_else(|_| "[]".to_string());
+            let edges = serde_json::to_string(&snap.edges).unwrap_or_else(|_| "[]".to_string());
+            let metrics = serde_json::to_string(&snap.metrics).unwrap_or_else(|_| "{}".to_string());
             conn.execute(
                 "INSERT OR REPLACE INTO graph_snapshots
                  (snapshot_id, timestamp_ns, nodes_json, edges_json, metrics_json, run_id)
@@ -859,10 +841,12 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
                   child_pid, child_start_time_ns, reason, run_id)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                 params![
-                    format!("{}-{}-{}",
+                    format!(
+                        "{}-{}-{}",
                         sb.parent_agent.as_str(),
                         sb.child_agent.as_str(),
-                        sb.parent_process.start_time_ns),
+                        sb.parent_process.start_time_ns
+                    ),
                     sb.parent_agent.as_str(),
                     sb.child_agent.as_str(),
                     sb.parent_process.pid as i64,
@@ -1117,7 +1101,8 @@ mod tests {
         let alert = ResponsibilityAlert {
             alert_id: AlertId::from("a1"),
             timestamp_ns: 1000,
-            display_profile: crate::responsibility::types::alert_types::DisplayProfile::UnsafeByEngine,
+            display_profile:
+                crate::responsibility::types::alert_types::DisplayProfile::UnsafeByEngine,
             decision: crate::responsibility::types::alert_types::AlertDecision::Unsafe,
             severity: crate::responsibility::types::alert_types::AlertSeverity::Warning,
             confidence: 0.85,
@@ -1143,14 +1128,14 @@ mod tests {
                     evidence_score: 0.0,
                     role_score: 0.0,
                     repetition_score: 0.0,
-            behavioral_score: 0.0,
+                    behavioral_score: 0.0,
                     total: 0.5,
                 },
                 cusum_triggered: false,
-            cusum_dimensions: vec![],
-            progressive_fused: 0.0,
-            observer_trigger_reason: String::new(),
-            deberta_score: 0.0,
+                cusum_dimensions: vec![],
+                progressive_fused: 0.0,
+                observer_trigger_reason: String::new(),
+                deberta_score: 0.0,
             },
             timeline: crate::responsibility::types::alert_types::BehaviorTimeline {
                 steps: vec![],

@@ -89,5 +89,5 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "recon-user-enumeration",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "env/scenarios/recon-user-enumeration.json"
+  "source_scenario_path": "env/scenarios/reconnaissance/recon-user-enumeration.json"
 }

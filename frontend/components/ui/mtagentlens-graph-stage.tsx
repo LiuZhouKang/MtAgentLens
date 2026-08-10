@@ -24,11 +24,16 @@ type Props = {
 };
 
 // ── Alert highlight colors ──
-const VIOLATION_COLOR = '#f97316';   // orange — violation path
-const CONTEXT_COLOR = '#5e6ad2';     // blue — context edges
-const DIM_OPACITY = 0.04;            // dimmed nodes/links
+const VIOLATION_COLOR = '#f97316'; // orange — violation path
+const CONTEXT_COLOR = '#5e6ad2'; // blue — context edges
+const DIM_OPACITY = 0.04; // dimmed nodes/links
 
-export default function MtAgentLensGraphStage({ active, onNodeClick, onBackgroundClick, graphOverride }: Props) {
+export default function MtAgentLensGraphStage({
+  active,
+  onNodeClick,
+  onBackgroundClick,
+  graphOverride,
+}: Props) {
   // Stable selectors — only re-render when data identity changes
   const storeGraph = useAppStore((s) => s.graph);
   const graph = graphOverride ?? storeGraph;
@@ -51,9 +56,20 @@ export default function MtAgentLensGraphStage({ active, onNodeClick, onBackgroun
   // changes with unchanged counts.
   const { graphData, rawIdToLinkIdx } = useMemo<{
     graphData: {
-      nodes: { id: string; node_type: string; agent_id: string; desc: string; raw_node_ids?: string[] }[];
+      nodes: {
+        id: string;
+        node_type: string;
+        agent_id: string;
+        desc: string;
+        raw_node_ids?: string[];
+      }[];
       // react-force-graph-3d replaces source/target with node objects at runtime
-      links: { source: string | { id: string }; target: string | { id: string }; edge_type: string; raw_edge_ids: string[] }[];
+      links: {
+        source: string | { id: string };
+        target: string | { id: string };
+        edge_type: string;
+        raw_edge_ids: string[];
+      }[];
     };
     rawIdToLinkIdx: Map<string, number>;
   }>(() => {
@@ -159,13 +175,15 @@ export default function MtAgentLensGraphStage({ active, onNodeClick, onBackgroun
   useEffect(() => {
     if (!active || !containerRef.current) return;
     const el = containerRef.current;
-    let prevW = 0, prevH = 0;
+    let prevW = 0,
+      prevH = 0;
     const update = () => {
       const r = el.getBoundingClientRect();
       const w = Math.round(r.width);
       const h = Math.round(r.height);
       if (w > 0 && h > 0 && (w !== prevW || h !== prevH)) {
-        prevW = w; prevH = h;
+        prevW = w;
+        prevH = h;
         setSize({ w, h });
       }
     };
@@ -174,7 +192,10 @@ export default function MtAgentLensGraphStage({ active, onNodeClick, onBackgroun
     obs.observe(el);
     // Mark as ready after initial layout settles
     const t = setTimeout(() => setReady(true), 1200);
-    return () => { obs.disconnect(); clearTimeout(t); };
+    return () => {
+      obs.disconnect();
+      clearTimeout(t);
+    };
   }, [active]);
 
   if (!active) return null;
@@ -183,12 +204,17 @@ export default function MtAgentLensGraphStage({ active, onNodeClick, onBackgroun
     <div ref={containerRef} style={{ position: 'absolute', inset: 0 }}>
       {/* Loading indicator while graph initializes */}
       {!ready && (
-        <div style={{
-          position: 'absolute', inset: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: '#010101',
-          zIndex: 1,
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#010101',
+            zIndex: 1,
+          }}
+        >
           <LoadingIndicator size={44} label="正在构建责任网络…" />
         </div>
       )}
@@ -206,7 +232,9 @@ export default function MtAgentLensGraphStage({ active, onNodeClick, onBackgroun
           enableNavigationControls={true}
           cooldownTime={isLarge ? 600 : 3000}
           d3VelocityDecay={0.6}
-          onNodeClick={(n: any) => onNodeClick?.({ id: n.id, node_type: n.node_type, agent_id: n.agent_id, desc: n.desc })}
+          onNodeClick={(n: any) =>
+            onNodeClick?.({ id: n.id, node_type: n.node_type, agent_id: n.agent_id, desc: n.desc })
+          }
           onBackgroundClick={onBackgroundClick}
 
           // ── Living particles (premium look) ──
@@ -215,39 +243,62 @@ export default function MtAgentLensGraphStage({ active, onNodeClick, onBackgroun
           // colored particles, context edges get blue ones, and unrelated
           // edges go quiet. Large graphs disable particles entirely — they are
           // the dominant per-frame GPU cost in 3d-force-graph.
-          linkDirectionalParticles={isLarge ? 0 : (link: any) => {
-            if (!hasHighlight) return 1;
-            const k = linkKey(link);
-            if (!highlightedKeys.has(k)) return 0;
-            return link.edge_type === 'PolicyBoundaryCrossing' || link.edge_type === 'TaintPropagatesTo' ? 4 : 2;
-          }}
-          linkDirectionalParticleWidth={isLarge ? 0 : (link: any) => {
-            if (!hasHighlight) return 1.2;
-            const k = linkKey(link);
-            if (!highlightedKeys.has(k)) return 0;
-            return link.edge_type === 'PolicyBoundaryCrossing' ? 2.4 : 1.4;
-          }}
-          linkDirectionalParticleSpeed={isLarge ? 0 : (link: any) => {
-            if (!hasHighlight) return 0.004;
-            const k = linkKey(link);
-            if (!highlightedKeys.has(k)) return 0.004;
-            return link.edge_type === 'PolicyBoundaryCrossing' ? 0.012 : 0.006;
-          }}
-          linkDirectionalParticleColor={isLarge ? 'rgba(255,255,255,0)' : (link: any) => {
-            if (!hasHighlight) return 'rgba(255,255,255,0.55)';
-            const k = linkKey(link);
-            if (!highlightedKeys.has(k)) return 'rgba(255,255,255,0.55)';
-            return link.edge_type === 'PolicyBoundaryCrossing' || link.edge_type === 'TaintPropagatesTo'
-              ? VIOLATION_COLOR : CONTEXT_COLOR;
-          }}
+          linkDirectionalParticles={
+            isLarge
+              ? 0
+              : (link: any) => {
+                  if (!hasHighlight) return 1;
+                  const k = linkKey(link);
+                  if (!highlightedKeys.has(k)) return 0;
+                  return link.edge_type === 'PolicyBoundaryCrossing' ||
+                    link.edge_type === 'TaintPropagatesTo'
+                    ? 4
+                    : 2;
+                }
+          }
+          linkDirectionalParticleWidth={
+            isLarge
+              ? 0
+              : (link: any) => {
+                  if (!hasHighlight) return 1.2;
+                  const k = linkKey(link);
+                  if (!highlightedKeys.has(k)) return 0;
+                  return link.edge_type === 'PolicyBoundaryCrossing' ? 2.4 : 1.4;
+                }
+          }
+          linkDirectionalParticleSpeed={
+            isLarge
+              ? 0
+              : (link: any) => {
+                  if (!hasHighlight) return 0.004;
+                  const k = linkKey(link);
+                  if (!highlightedKeys.has(k)) return 0.004;
+                  return link.edge_type === 'PolicyBoundaryCrossing' ? 0.012 : 0.006;
+                }
+          }
+          linkDirectionalParticleColor={
+            isLarge
+              ? 'rgba(255,255,255,0)'
+              : (link: any) => {
+                  if (!hasHighlight) return 'rgba(255,255,255,0.55)';
+                  const k = linkKey(link);
+                  if (!highlightedKeys.has(k)) return 'rgba(255,255,255,0.55)';
+                  return link.edge_type === 'PolicyBoundaryCrossing' ||
+                    link.edge_type === 'TaintPropagatesTo'
+                    ? VIOLATION_COLOR
+                    : CONTEXT_COLOR;
+                }
+          }
 
           // ── Link color: crisp white web by default, highlight violation path ──
           linkColor={(link: any) => {
             if (!hasHighlight) return 'rgba(255,255,255,0.18)';
             const k = linkKey(link);
             if (highlightedKeys.has(k)) {
-              return link.edge_type === 'PolicyBoundaryCrossing' || link.edge_type === 'TaintPropagatesTo'
-                ? VIOLATION_COLOR : CONTEXT_COLOR;
+              return link.edge_type === 'PolicyBoundaryCrossing' ||
+                link.edge_type === 'TaintPropagatesTo'
+                ? VIOLATION_COLOR
+                : CONTEXT_COLOR;
             }
             return `rgba(255,255,255,${DIM_OPACITY})`;
           }}
@@ -257,7 +308,6 @@ export default function MtAgentLensGraphStage({ active, onNodeClick, onBackgroun
             return highlightedKeys.has(k) ? 0.6 : 0.1;
           }}
           linkOpacity={0.9}
-
         />
       )}
     </div>

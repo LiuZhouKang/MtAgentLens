@@ -52,11 +52,7 @@ impl RiskFactors {
 /// Total = (base + Σ additive) × Π multiplicative
 pub fn compute_risk_score(base: f64, factors: &RiskFactors) -> f64 {
     let additive: f64 = factors.additive.iter().map(|f| f.value).sum();
-    let multiplicative: f64 = factors
-        .multiplicative
-        .iter()
-        .map(|f| f.value)
-        .product();
+    let multiplicative: f64 = factors.multiplicative.iter().map(|f| f.value).product();
     (base + additive) * multiplicative.max(1.0)
 }
 
@@ -73,14 +69,32 @@ impl Default for RiskFactorConfig {
     fn default() -> Self {
         Self {
             additive_defaults: vec![
-                RiskFactor { name: "admin_process".into(), value: 15.0 },
-                RiskFactor { name: "repeated_alert".into(), value: 10.0 },
-                RiskFactor { name: "high_sensitivity_target".into(), value: 20.0 },
-                RiskFactor { name: "multi_agent_coordination".into(), value: 10.0 },
+                RiskFactor {
+                    name: "admin_process".into(),
+                    value: 15.0,
+                },
+                RiskFactor {
+                    name: "repeated_alert".into(),
+                    value: 10.0,
+                },
+                RiskFactor {
+                    name: "high_sensitivity_target".into(),
+                    value: 20.0,
+                },
+                RiskFactor {
+                    name: "multi_agent_coordination".into(),
+                    value: 10.0,
+                },
             ],
             multiplicative_defaults: vec![
-                RiskFactor { name: "critical_destination".into(), value: 1.5 },
-                RiskFactor { name: "privileged_context".into(), value: 2.0 },
+                RiskFactor {
+                    name: "critical_destination".into(),
+                    value: 1.5,
+                },
+                RiskFactor {
+                    name: "privileged_context".into(),
+                    value: 2.0,
+                },
             ],
         }
     }

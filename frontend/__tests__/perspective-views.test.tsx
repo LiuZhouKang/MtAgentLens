@@ -2,11 +2,24 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { renderPerspectiveView } from '@/components/overview/monitoring/perspective-views';
-import type { MonitoringState, PerspectiveHealth, PerspectiveKey } from '@/lib/monitoring/monitoring-types';
+import type {
+  MonitoringState,
+  PerspectiveHealth,
+  PerspectiveKey,
+} from '@/lib/monitoring/monitoring-types';
 
-const KEYS: PerspectiveKey[] = ['topologyDrift', 'topologyHealth', 'intentMismatch', 'policyCompliance', 'toolFootprint', 'networkSessions'];
+const KEYS: PerspectiveKey[] = [
+  'topologyDrift',
+  'topologyHealth',
+  'intentMismatch',
+  'policyCompliance',
+  'toolFootprint',
+  'networkSessions',
+];
 
-function health(over: Partial<Record<PerspectiveKey, Partial<PerspectiveHealth>>> = {}): MonitoringState['health'] {
+function health(
+  over: Partial<Record<PerspectiveKey, Partial<PerspectiveHealth>>> = {},
+): MonitoringState['health'] {
   const base: PerspectiveHealth = { status: 'normal', available: true, score: 0, signals: ['—'] };
   const out = {} as MonitoringState['health'];
   for (const k of KEYS) out[k] = { ...base, ...(over[k] ?? {}) };
@@ -33,8 +46,28 @@ describe('PerspectiveView — 六个视角详情', () => {
     const monitoring = makeMonitoring({
       topologyDrift: {
         frames: [
-          { snapshot_id: 'f0', timestamp_ns: 0, nodeCount: 2, edgeCount: 2, agentCount: 1, crossAgentEdges: 0, delegationDepth: 0, taintChains: 0, avgConfidence: 0.6 },
-          { snapshot_id: 'f1', timestamp_ns: 1, nodeCount: 3, edgeCount: 2, agentCount: 1, crossAgentEdges: 0, delegationDepth: 0, taintChains: 0, avgConfidence: 0.85 },
+          {
+            snapshot_id: 'f0',
+            timestamp_ns: 0,
+            nodeCount: 2,
+            edgeCount: 2,
+            agentCount: 1,
+            crossAgentEdges: 0,
+            delegationDepth: 0,
+            taintChains: 0,
+            avgConfidence: 0.6,
+          },
+          {
+            snapshot_id: 'f1',
+            timestamp_ns: 1,
+            nodeCount: 3,
+            edgeCount: 2,
+            agentCount: 1,
+            crossAgentEdges: 0,
+            delegationDepth: 0,
+            taintChains: 0,
+            avgConfidence: 0.85,
+          },
         ],
         latest: null,
         delta: { nodes: 1, edges: 0, agents: 0 },

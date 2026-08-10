@@ -1,5 +1,5 @@
-use std::sync::Mutex;
 use async_trait::async_trait;
+use std::sync::Mutex;
 
 use crate::responsibility::classification::{ObserverInput, ObserverOutput};
 use crate::responsibility::observer::provider::{ObserverProvider, ObserverProviderError};

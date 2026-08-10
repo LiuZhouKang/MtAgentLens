@@ -388,15 +388,14 @@ pub fn handle_verify_2fa<B>(
     }
 
     // Mark backup code as consumed if used
-    if is_valid_backup {
-        if let Some(idx) = user_state
+    if is_valid_backup
+        && let Some(idx) = user_state
             .backup_code_hashes
             .iter()
             .position(|h| *h == hash_code(code))
-        {
-            let hash = user_state.backup_code_hashes[idx].clone();
-            user_state.consumed_codes.push(hash);
-        }
+    {
+        let hash = user_state.backup_code_hashes[idx].clone();
+        user_state.consumed_codes.push(hash);
     }
 
     // Enable 2FA

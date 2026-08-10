@@ -8,8 +8,7 @@
 
 use crate::responsibility::evidence::args::extract_action_args;
 use crate::responsibility::types::{
-    Action, ActionCandidateType, ActionId, CandidateDerivationMode, NormalizedArg, ProcessId,
-    SignalClass,
+    Action, ActionCandidateType, ActionId, CandidateDerivationMode, ProcessId, SignalClass,
 };
 
 // ─── Linux O_* flag constants ─────────────────────────────────────────
@@ -76,19 +75,13 @@ impl ActionClassifier {
             }
 
             // ── Read syscalls ──
-            "read" | "pread64" | "preadv" | "readv" => {
-                Some(ActionCandidateType::FileRead)
-            }
+            "read" | "pread64" | "preadv" | "readv" => Some(ActionCandidateType::FileRead),
 
             // ── Write syscalls ──
-            "write" | "pwrite64" | "pwritev" | "writev" => {
-                Some(ActionCandidateType::FileWrite)
-            }
+            "write" | "pwrite64" | "pwritev" | "writev" => Some(ActionCandidateType::FileWrite),
 
             // ── File deletion ──
-            "unlink" | "unlinkat" | "rmdir" => {
-                Some(ActionCandidateType::FileDelete)
-            }
+            "unlink" | "unlinkat" | "rmdir" => Some(ActionCandidateType::FileDelete),
 
             // ── Network ──
             "connect" => Some(ActionCandidateType::NetworkConnect),
@@ -98,9 +91,7 @@ impl ActionClassifier {
             "execve" | "execveat" => Some(ActionCandidateType::ProcessExec),
 
             // ── Process spawn (fork/clone) ──
-            "clone" | "clone3" | "fork" | "vfork" => {
-                Some(ActionCandidateType::ProcessSpawn)
-            }
+            "clone" | "clone3" | "fork" | "vfork" => Some(ActionCandidateType::ProcessSpawn),
 
             // ── Not actionable ──
             _ => None,
@@ -203,55 +194,43 @@ mod tests {
             1000,
         );
         assert!(action.is_some());
-        assert_eq!(action.unwrap().action_type, ActionCandidateType::FileOverwrite);
+        assert_eq!(
+            action.unwrap().action_type,
+            ActionCandidateType::FileOverwrite
+        );
     }
 
     #[test]
     fn test_read_syscall() {
-        let action = ActionClassifier::classify(
-            "read",
-            &["3".to_string()],
-            pid(),
-            1000,
-        );
+        let action = ActionClassifier::classify("read", &["3".to_string()], pid(), 1000);
         assert!(action.is_some());
         assert_eq!(action.unwrap().action_type, ActionCandidateType::FileRead);
     }
 
     #[test]
     fn test_write_syscall() {
-        let action = ActionClassifier::classify(
-            "write",
-            &["1".to_string()],
-            pid(),
-            1000,
-        );
+        let action = ActionClassifier::classify("write", &["1".to_string()], pid(), 1000);
         assert!(action.is_some());
         assert_eq!(action.unwrap().action_type, ActionCandidateType::FileWrite);
     }
 
     #[test]
     fn test_unlink_delete() {
-        let action = ActionClassifier::classify(
-            "unlink",
-            &["/tmp/todelete".to_string()],
-            pid(),
-            1000,
-        );
+        let action =
+            ActionClassifier::classify("unlink", &["/tmp/todelete".to_string()], pid(), 1000);
         assert!(action.is_some());
         assert_eq!(action.unwrap().action_type, ActionCandidateType::FileDelete);
     }
 
     #[test]
     fn test_connect_network() {
-        let action = ActionClassifier::classify(
-            "connect",
-            &["127.0.0.1:8080".to_string()],
-            pid(),
-            1000,
-        );
+        let action =
+            ActionClassifier::classify("connect", &["127.0.0.1:8080".to_string()], pid(), 1000);
         assert!(action.is_some());
-        assert_eq!(action.unwrap().action_type, ActionCandidateType::NetworkConnect);
+        assert_eq!(
+            action.unwrap().action_type,
+            ActionCandidateType::NetworkConnect
+        );
     }
 
     #[test]
@@ -263,42 +242,37 @@ mod tests {
             1000,
         );
         assert!(action.is_some());
-        assert_eq!(action.unwrap().action_type, ActionCandidateType::ProcessExec);
+        assert_eq!(
+            action.unwrap().action_type,
+            ActionCandidateType::ProcessExec
+        );
     }
 
     #[test]
     fn test_fork_process_spawn() {
-        let action = ActionClassifier::classify(
-            "clone",
-            &[],
-            pid(),
-            1000,
-        );
+        let action = ActionClassifier::classify("clone", &[], pid(), 1000);
         assert!(action.is_some());
-        assert_eq!(action.unwrap().action_type, ActionCandidateType::ProcessSpawn);
+        assert_eq!(
+            action.unwrap().action_type,
+            ActionCandidateType::ProcessSpawn
+        );
     }
 
     #[test]
     fn test_not_actionable() {
-        let action = ActionClassifier::classify(
-            "getpid",
-            &[],
-            pid(),
-            1000,
-        );
+        let action = ActionClassifier::classify("getpid", &[], pid(), 1000);
         assert!(action.is_none());
     }
 
     #[test]
     fn test_sendto_network_send() {
-        let action = ActionClassifier::classify(
-            "sendto",
-            &["10.0.0.1:443".to_string()],
-            pid(),
-            1000,
-        );
+        let action =
+            ActionClassifier::classify("sendto", &["10.0.0.1:443".to_string()], pid(), 1000);
         assert!(action.is_some());
-        assert_eq!(action.unwrap().action_type, ActionCandidateType::NetworkSend);
+        assert_eq!(
+            action.unwrap().action_type,
+            ActionCandidateType::NetworkSend
+        );
     }
 
     #[test]

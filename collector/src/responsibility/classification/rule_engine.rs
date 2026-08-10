@@ -1,10 +1,10 @@
 use crate::responsibility::classification::rules::{
     OperationCategory, ResourcePattern, RuleDecision, RuleHit, SafetyRule,
 };
+use crate::responsibility::graph::ResponsibilityGraph;
 use crate::responsibility::types::{
     NormalizedResource, ResponsibilityEdgeType as NewEdgeType, ResponsibilityNode as NewNode,
 };
-use crate::responsibility::graph::ResponsibilityGraph;
 
 /// RuleEngine evaluates a graph against a set of safety rules
 /// (5 Safe + 18 Unsafe) loaded from default configuration.
@@ -167,11 +167,7 @@ fn extract_resources(node: &NewNode) -> Vec<String> {
                 resources.push(canonical_path.clone());
             }
             NormalizedResource::Network { host, port, scheme } => {
-                resources.push(format!(
-                    "{}:{}",
-                    host,
-                    port
-                ));
+                resources.push(format!("{}:{}", host, port));
                 // Also push with scheme for richer matching
                 if !scheme.is_empty() {
                     resources.push(format!("{}://{}:{}", scheme, host, port));
@@ -184,7 +180,10 @@ fn extract_resources(node: &NewNode) -> Vec<String> {
                 resources.push(credential_id.clone());
             }
             NormalizedResource::Process { process_id } => {
-                resources.push(format!("process:{}:{}", process_id.pid, process_id.start_time_ns));
+                resources.push(format!(
+                    "process:{}:{}",
+                    process_id.pid, process_id.start_time_ns
+                ));
             }
             _ => {}
         }
@@ -193,11 +192,7 @@ fn extract_resources(node: &NewNode) -> Vec<String> {
 }
 
 /// Check if a safety rule matches a specific resource+operation combination.
-fn rule_matches_resource(
-    rule: &SafetyRule,
-    resource: &str,
-    op: &OperationCategory,
-) -> bool {
+fn rule_matches_resource(rule: &SafetyRule, resource: &str, op: &OperationCategory) -> bool {
     if !rule.operation_types.contains(op) {
         return false;
     }
@@ -206,14 +201,12 @@ fn rule_matches_resource(
         ResourcePattern::Prefix(prefix) => resource.starts_with(prefix),
         ResourcePattern::Glob(pattern) => simple_glob_match(resource, pattern),
         ResourcePattern::Host(host) => resource.contains(host),
-        ResourcePattern::Port(port) => {
-            resource
-                .split(':')
-                .last()
-                .and_then(|p| p.parse::<u16>().ok())
-                .map(|p| p == *port)
-                .unwrap_or(false)
-        }
+        ResourcePattern::Port(port) => resource
+            .split(':')
+            .next_back()
+            .and_then(|p| p.parse::<u16>().ok())
+            .map(|p| p == *port)
+            .unwrap_or(false),
         ResourcePattern::IpLiteral => {
             let host_part = resource
                 .split("://")
@@ -335,7 +328,6 @@ fn default_unsafe_rules() -> Vec<SafetyRule> {
             operation_types: vec![OperationCategory::FileRead],
             decision: RuleDecision::Unsafe,
         },
-
         // ── Suspicious execution ────────────────────────────────
         SafetyRule {
             rule_id: "unsafe.usr_bin".into(),
@@ -351,27 +343,35 @@ fn default_unsafe_rules() -> Vec<SafetyRule> {
             operation_types: vec![OperationCategory::ProcessEnum],
             decision: RuleDecision::Unsafe,
         },
-
         // ── Network exfiltration ────────────────────────────────
         SafetyRule {
             rule_id: "unsafe.pastebin".into(),
             description: "Connecting to known exfiltration paste sites".into(),
             resource_pattern: ResourcePattern::Host("pastebin.com".into()),
-            operation_types: vec![OperationCategory::NetworkConnect, OperationCategory::NetworkSend],
+            operation_types: vec![
+                OperationCategory::NetworkConnect,
+                OperationCategory::NetworkSend,
+            ],
             decision: RuleDecision::Unsafe,
         },
         SafetyRule {
             rule_id: "unsafe.paste_ee".into(),
             description: "Connecting to paste.ee".into(),
             resource_pattern: ResourcePattern::Host("paste.ee".into()),
-            operation_types: vec![OperationCategory::NetworkConnect, OperationCategory::NetworkSend],
+            operation_types: vec![
+                OperationCategory::NetworkConnect,
+                OperationCategory::NetworkSend,
+            ],
             decision: RuleDecision::Unsafe,
         },
         SafetyRule {
             rule_id: "unsafe.hastebin".into(),
             description: "Connecting to hastebin.com".into(),
             resource_pattern: ResourcePattern::Host("hastebin.com".into()),
-            operation_types: vec![OperationCategory::NetworkConnect, OperationCategory::NetworkSend],
+            operation_types: vec![
+                OperationCategory::NetworkConnect,
+                OperationCategory::NetworkSend,
+            ],
             decision: RuleDecision::Unsafe,
         },
         SafetyRule {
@@ -406,17 +406,22 @@ fn default_unsafe_rules() -> Vec<SafetyRule> {
             rule_id: "unsafe.host_malicious".into(),
             description: "Hostname contains 'malicious' (suspicious C2)".into(),
             resource_pattern: ResourcePattern::Host("malicious".into()),
-            operation_types: vec![OperationCategory::NetworkConnect, OperationCategory::NetworkSend],
+            operation_types: vec![
+                OperationCategory::NetworkConnect,
+                OperationCategory::NetworkSend,
+            ],
             decision: RuleDecision::Unsafe,
         },
         SafetyRule {
             rule_id: "unsafe.host_paste".into(),
             description: "Hostname contains 'paste' (possible exfiltration)".into(),
             resource_pattern: ResourcePattern::Host("paste".into()),
-            operation_types: vec![OperationCategory::NetworkConnect, OperationCategory::NetworkSend],
+            operation_types: vec![
+                OperationCategory::NetworkConnect,
+                OperationCategory::NetworkSend,
+            ],
             decision: RuleDecision::Unsafe,
         },
-
         // ── Resource / credential abuse ─────
         SafetyRule {
             rule_id: "unsafe.hog_script".into(),
@@ -440,14 +445,18 @@ fn default_unsafe_rules() -> Vec<SafetyRule> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::responsibility::types::{
-        AgentId, EdgeId, NodeId, NormalizedResource, PhaseIndicator,
-        ResponsibilityEdge, ResponsibilityEdgeType, ResponsibilityNode,
-        ResponsibilityNodeType,
-    };
     use crate::responsibility::graph::{GraphConfig, ResponsibilityGraph};
+    use crate::responsibility::types::{
+        AgentId, EdgeId, NodeId, NormalizedResource, PhaseIndicator, ResponsibilityEdge,
+        ResponsibilityEdgeType, ResponsibilityNode, ResponsibilityNodeType,
+    };
 
-    fn make_node(id: &str, node_type: ResponsibilityNodeType, agent: Option<&str>, resource: Option<NormalizedResource>) -> ResponsibilityNode {
+    fn make_node(
+        id: &str,
+        node_type: ResponsibilityNodeType,
+        agent: Option<&str>,
+        resource: Option<NormalizedResource>,
+    ) -> ResponsibilityNode {
         ResponsibilityNode {
             node_id: NodeId::from(id),
             node_type,
@@ -459,7 +468,12 @@ mod tests {
         }
     }
 
-    fn make_edge(id: &str, edge_type: ResponsibilityEdgeType, source: &str, target: &str) -> ResponsibilityEdge {
+    fn make_edge(
+        id: &str,
+        edge_type: ResponsibilityEdgeType,
+        source: &str,
+        target: &str,
+    ) -> ResponsibilityEdge {
         ResponsibilityEdge {
             edge_id: EdgeId::from(id),
             edge_type,
@@ -475,10 +489,26 @@ mod tests {
     #[test]
     fn test_safe_rule_project_read() {
         let mut g = ResponsibilityGraph::default();
-        g.add_node(make_node("a1", ResponsibilityNodeType::Agent, Some("agent-1"), None));
-        g.add_node(make_node("r1", ResponsibilityNodeType::Resource, Some("agent-1"),
-            Some(NormalizedResource::File { canonical_path: "/home/lzk/mtagentlens/src/main.rs".into() })));
-        g.add_edge(make_edge("e1", ResponsibilityEdgeType::IntentCausesAction, "a1", "r1"));
+        g.add_node(make_node(
+            "a1",
+            ResponsibilityNodeType::Agent,
+            Some("agent-1"),
+            None,
+        ));
+        g.add_node(make_node(
+            "r1",
+            ResponsibilityNodeType::Resource,
+            Some("agent-1"),
+            Some(NormalizedResource::File {
+                canonical_path: "/home/lzk/mtagentlens/src/main.rs".into(),
+            }),
+        ));
+        g.add_edge(make_edge(
+            "e1",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "a1",
+            "r1",
+        ));
 
         let engine = RuleEngine::new();
         let (decision, hits) = engine.evaluate(&g);
@@ -490,10 +520,26 @@ mod tests {
     #[test]
     fn test_unsafe_rule_shadow() {
         let mut g = ResponsibilityGraph::default();
-        g.add_node(make_node("a1", ResponsibilityNodeType::Agent, Some("agent-1"), None));
-        g.add_node(make_node("r1", ResponsibilityNodeType::Resource, Some("agent-1"),
-            Some(NormalizedResource::File { canonical_path: "/etc/shadow".into() })));
-        g.add_edge(make_edge("e1", ResponsibilityEdgeType::IntentCausesAction, "a1", "r1"));
+        g.add_node(make_node(
+            "a1",
+            ResponsibilityNodeType::Agent,
+            Some("agent-1"),
+            None,
+        ));
+        g.add_node(make_node(
+            "r1",
+            ResponsibilityNodeType::Resource,
+            Some("agent-1"),
+            Some(NormalizedResource::File {
+                canonical_path: "/etc/shadow".into(),
+            }),
+        ));
+        g.add_edge(make_edge(
+            "e1",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "a1",
+            "r1",
+        ));
 
         let engine = RuleEngine::new();
         let (decision, hits) = engine.evaluate(&g);
@@ -505,14 +551,28 @@ mod tests {
     #[test]
     fn test_unsafe_rule_pastebin_network() {
         let mut g = ResponsibilityGraph::default();
-        g.add_node(make_node("a1", ResponsibilityNodeType::Agent, Some("agent-1"), None));
-        g.add_node(make_node("r1", ResponsibilityNodeType::Resource, Some("agent-1"),
+        g.add_node(make_node(
+            "a1",
+            ResponsibilityNodeType::Agent,
+            Some("agent-1"),
+            None,
+        ));
+        g.add_node(make_node(
+            "r1",
+            ResponsibilityNodeType::Resource,
+            Some("agent-1"),
             Some(NormalizedResource::Network {
                 host: "pastebin.com".into(),
                 port: 443,
                 scheme: "https".into(),
-            })));
-        g.add_edge(make_edge("e1", ResponsibilityEdgeType::IntentCausesAction, "a1", "r1"));
+            }),
+        ));
+        g.add_edge(make_edge(
+            "e1",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "a1",
+            "r1",
+        ));
 
         let engine = RuleEngine::new();
         let (decision, hits) = engine.evaluate(&g);
@@ -524,14 +584,28 @@ mod tests {
     #[test]
     fn test_nonstandard_port() {
         let mut g = ResponsibilityGraph::default();
-        g.add_node(make_node("a1", ResponsibilityNodeType::Agent, Some("agent-1"), None));
-        g.add_node(make_node("r1", ResponsibilityNodeType::Resource, Some("agent-1"),
+        g.add_node(make_node(
+            "a1",
+            ResponsibilityNodeType::Agent,
+            Some("agent-1"),
+            None,
+        ));
+        g.add_node(make_node(
+            "r1",
+            ResponsibilityNodeType::Resource,
+            Some("agent-1"),
             Some(NormalizedResource::Network {
                 host: "example.com".into(),
                 port: 4444,
                 scheme: "http".into(),
-            })));
-        g.add_edge(make_edge("e1", ResponsibilityEdgeType::IntentCausesAction, "a1", "r1"));
+            }),
+        ));
+        g.add_edge(make_edge(
+            "e1",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "a1",
+            "r1",
+        ));
 
         let engine = RuleEngine::new();
         let (decision, _hits) = engine.evaluate(&g);
@@ -541,10 +615,26 @@ mod tests {
     #[test]
     fn test_no_match_returns_nomatch() {
         let mut g = ResponsibilityGraph::default();
-        g.add_node(make_node("a1", ResponsibilityNodeType::Agent, Some("agent-1"), None));
-        g.add_node(make_node("r1", ResponsibilityNodeType::Resource, Some("agent-1"),
-            Some(NormalizedResource::File { canonical_path: "/tmp/safe_file.txt".into() })));
-        g.add_edge(make_edge("e1", ResponsibilityEdgeType::IntentCausesAction, "a1", "r1"));
+        g.add_node(make_node(
+            "a1",
+            ResponsibilityNodeType::Agent,
+            Some("agent-1"),
+            None,
+        ));
+        g.add_node(make_node(
+            "r1",
+            ResponsibilityNodeType::Resource,
+            Some("agent-1"),
+            Some(NormalizedResource::File {
+                canonical_path: "/tmp/safe_file.txt".into(),
+            }),
+        ));
+        g.add_edge(make_edge(
+            "e1",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "a1",
+            "r1",
+        ));
 
         // No rule matches /tmp/safe_file.txt — /tmp prefix is in safe rules
         let engine = RuleEngine::new();
@@ -558,14 +648,28 @@ mod tests {
     #[test]
     fn test_host_malicious_match() {
         let mut g = ResponsibilityGraph::default();
-        g.add_node(make_node("a1", ResponsibilityNodeType::Agent, Some("agent-1"), None));
-        g.add_node(make_node("r1", ResponsibilityNodeType::Resource, Some("agent-1"),
+        g.add_node(make_node(
+            "a1",
+            ResponsibilityNodeType::Agent,
+            Some("agent-1"),
+            None,
+        ));
+        g.add_node(make_node(
+            "r1",
+            ResponsibilityNodeType::Resource,
+            Some("agent-1"),
             Some(NormalizedResource::Network {
                 host: "exfil-malicious.example.com".into(),
                 port: 8080,
                 scheme: "https".into(),
-            })));
-        g.add_edge(make_edge("e1", ResponsibilityEdgeType::PolicyBoundaryCrossing, "a1", "r1"));
+            }),
+        ));
+        g.add_edge(make_edge(
+            "e1",
+            ResponsibilityEdgeType::PolicyBoundaryCrossing,
+            "a1",
+            "r1",
+        ));
 
         let engine = RuleEngine::new();
         let (decision, hits) = engine.evaluate(&g);
@@ -576,7 +680,15 @@ mod tests {
     #[test]
     fn test_rule_count() {
         let engine = RuleEngine::new();
-        assert!(engine.safe_rules().len() >= 5, "got {} safe rules", engine.safe_rules().len());
-        assert!(engine.unsafe_rules().len() >= 18, "got {} unsafe rules", engine.unsafe_rules().len());
+        assert!(
+            engine.safe_rules().len() >= 5,
+            "got {} safe rules",
+            engine.safe_rules().len()
+        );
+        assert!(
+            engine.unsafe_rules().len() >= 18,
+            "got {} unsafe rules",
+            engine.unsafe_rules().len()
+        );
     }
 }

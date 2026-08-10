@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Responsibility architecture persistence schema — 27 tables, single clean DDL.
 
-use rusqlite::{Connection, Result, OpenFlags};
+use rusqlite::{Connection, OpenFlags, Result};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SCHEMA_DDL — all 27 CREATE TABLE IF NOT EXISTS statements
@@ -751,7 +751,8 @@ mod tests {
              parent_pid, parent_start_time_ns, child_pid, child_start_time_ns, reason, run_id)
              VALUES ('b-1', 'agent-1', 'agent-2', 100, 1000, 200, 2000, 'ClaudeChildOfClaude', ?1)",
             [run_id],
-        ).unwrap();
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO evidence_refinements (phase1_evidence_id, phase2_evidence_id, refinement_type, reason, run_id)
              VALUES ('ev-1', 'ev-1-v2', 'Confirmed', '', ?1)",

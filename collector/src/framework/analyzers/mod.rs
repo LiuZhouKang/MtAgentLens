@@ -19,7 +19,7 @@ pub trait Analyzer: Send + Sync {
 }
 
 pub mod agent_teams_role_hijack;
-pub mod alert_enrichment;  // TODO
+pub mod alert_enrichment; // TODO
 pub mod analyzer_composition_contract;
 pub mod auth_header_remover;
 // causal_link_* modules removed — replaced by ResponsibilityRuntime
@@ -28,13 +28,13 @@ pub mod connection_buffer;
 pub mod conversation_flow;
 // pub mod context_pollution;  // TODO
 pub mod event;
-pub mod file_access_audit;  // FAAP-001: Compilation fixed, wiring ready
+pub mod file_access_audit; // FAAP-001: Compilation fixed, wiring ready
 pub mod file_access_audit_contract;
 pub mod file_logger;
 pub mod handoff_injection;
 pub mod http_filter;
-pub mod latency;
 pub mod http_parser;
+pub mod latency;
 pub mod multi_agent_anomaly;
 pub mod observability_metrics;
 pub mod output;

@@ -22,11 +22,11 @@ export interface TraceEventModel {
   input: string | null;
   output: string | null;
   // full eBPF context
-  prompt: string | null;       // LLM prompt (system + user messages)
-  response: string | null;     // LLM response (assistant + tool calls)
-  toolCall: string | null;     // tool name + full arguments
-  toolResult: string | null;   // tool execution result
-  processTree: string | null;  // process chain (pid/ppid/comm)
+  prompt: string | null; // LLM prompt (system + user messages)
+  response: string | null; // LLM response (assistant + tool calls)
+  toolCall: string | null; // tool name + full arguments
+  toolResult: string | null; // tool execution result
+  processTree: string | null; // process chain (pid/ppid/comm)
   rawEvidence: Record<string, unknown> | null; // all matched_fields
   parentEventId: string | null;
   depth: number;
@@ -208,11 +208,27 @@ function buildObserverEvents(alert: ResponsibilityAlert): TraceEventModel[] {
 
   for (const rule of alert.engine.rule_verdicts) {
     if (rule.llm_agreed === null) continue;
-    push(rule.rule_id, rule.rule_id, rule.description, rule.matched_resource, rule.llm_comment, rule.llm_agreed, alert.confidence);
+    push(
+      rule.rule_id,
+      rule.rule_id,
+      rule.description,
+      rule.matched_resource,
+      rule.llm_comment,
+      rule.llm_agreed,
+      alert.confidence,
+    );
   }
   for (const pattern of alert.engine.pattern_verdicts) {
     if (pattern.llm_agreed === null) continue;
-    push(pattern.template_id, pattern.template_id, `模式匹配 ${pattern.template_id}`, pattern.template_id, pattern.llm_comment, pattern.llm_agreed, pattern.match_confidence);
+    push(
+      pattern.template_id,
+      pattern.template_id,
+      `模式匹配 ${pattern.template_id}`,
+      pattern.template_id,
+      pattern.llm_comment,
+      pattern.llm_agreed,
+      pattern.match_confidence,
+    );
   }
   return events;
 }
@@ -246,7 +262,9 @@ export function buildTraceRunModel(
       ? Math.max(1, Math.round((nextStep.timestamp_ns - step.timestamp_ns) / 1_000_000))
       : Math.max(10, Math.round((alert.timeline.total_duration_ms || 1000) * 0.1));
     const parentId = prevStep
-      ? (prevStep.event_type === 'agent_role_claim' || prevStep.event_type.includes('delegation')) ? prevStep.source_event_id ?? `${alert.alert_id}-step-${index - 1}` : null
+      ? prevStep.event_type === 'agent_role_claim' || prevStep.event_type.includes('delegation')
+        ? (prevStep.source_event_id ?? `${alert.alert_id}-step-${index - 1}`)
+        : null
       : null;
 
     // synthesize rich I/O from evidence + alert data — no more black box
@@ -255,7 +273,9 @@ export function buildTraceRunModel(
     const command = evidence?.matched_fields.command || null;
     const path = evidence?.matched_fields.canonical_path || null;
     const host = evidence?.matched_fields.host || null;
-    const rawEv = evidence?.matched_fields ? { ...evidence.matched_fields } as Record<string, unknown> : null;
+    const rawEv = evidence?.matched_fields
+      ? ({ ...evidence.matched_fields } as Record<string, unknown>)
+      : null;
 
     // input: what went INTO this event
     const input = command || fullArgs || step.resource || null;
@@ -265,11 +285,14 @@ export function buildTraceRunModel(
     // LLM-specific: prompt/response from reasoning chain + alert context
     const isLLM = kind === 'llm';
     const isTool = kind === 'tool';
-    const prompt = isLLM ? (alert.reasoning || step.description || null) : null;
-    const response = isLLM ? (alert.action_hint || step.resource || null) : null;
-    const toolCall = isTool ? (step.resource || fullArgs || step.description || null) : null;
-    const toolResult = isTool ? (path || host || step.operation || null) : null;
-    const processTree = (step.operation && step.operation !== 'unknown') ? `${step.operation} · ${step.agent_id ?? alert.primary_agent.agent_id}${command ? ' · ' + command : ''}` : null;
+    const prompt = isLLM ? alert.reasoning || step.description || null : null;
+    const response = isLLM ? alert.action_hint || step.resource || null : null;
+    const toolCall = isTool ? step.resource || fullArgs || step.description || null : null;
+    const toolResult = isTool ? path || host || step.operation || null : null;
+    const processTree =
+      step.operation && step.operation !== 'unknown'
+        ? `${step.operation} · ${step.agent_id ?? alert.primary_agent.agent_id}${command ? ' · ' + command : ''}`
+        : null;
 
     return {
       id: step.source_event_id ?? `${alert.alert_id}-step-${index}`,

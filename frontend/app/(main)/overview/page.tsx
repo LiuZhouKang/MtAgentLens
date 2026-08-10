@@ -4,7 +4,9 @@ import dynamic from 'next/dynamic';
 import { Suspense } from 'react';
 import PageSkeleton from '@/components/ui/page-skeleton';
 
-const OverviewPageClient = dynamic(() => import('@/components/overview/overview-page-client'), { ssr: false });
+const OverviewPageClient = dynamic(() => import('@/components/overview/overview-page-client'), {
+  ssr: false,
+});
 
 export default function OverviewPage() {
   return (

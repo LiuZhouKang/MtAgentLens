@@ -40,7 +40,6 @@
 //! is Phase C). Metrics aggregation and API endpoints are Phase B.
 
 use super::{Analyzer, AnalyzerError};
-use crate::framework::analyzers::pipeline_contract::{PipelineStage, StageMetrics};
 use crate::framework::core::Event;
 use crate::framework::runners::EventStream;
 use async_trait::async_trait;
@@ -76,9 +75,9 @@ impl Default for ConversationFlowConfig {
     fn default() -> Self {
         Self {
             max_capacity: 10_000,
-            ttl_ns: Duration::from_secs(30 * 60).as_nanos() as u64,     // 30 minutes
+            ttl_ns: Duration::from_secs(30 * 60).as_nanos() as u64, // 30 minutes
             stall_timeout_ns: Duration::from_secs(300).as_nanos() as u64, // 5 minutes
-            grace_period_ns: Duration::from_secs(30).as_nanos() as u64,  // 30 seconds
+            grace_period_ns: Duration::from_secs(30).as_nanos() as u64, // 30 seconds
         }
     }
 }
@@ -365,8 +364,8 @@ impl ConversationFlowAnalyzer {
             .as_nanos() as u64;
 
         // Only process causal_link events
-        let is_conversation_event = event.source == "causal_link"
-            || event.source == "causal_link_metrics";
+        let is_conversation_event =
+            event.source == "causal_link" || event.source == "causal_link_metrics";
 
         if !is_conversation_event {
             return vec![event];
@@ -465,12 +464,8 @@ impl ConversationFlowAnalyzer {
             eviction.touch(&message_id);
         } else {
             // New conversation detected
-            let mut state = ConversationState::new(
-                message_id.clone(),
-                agent_id_1,
-                agent_id_2,
-                now_ns,
-            );
+            let mut state =
+                ConversationState::new(message_id.clone(), agent_id_1, agent_id_2, now_ns);
 
             if is_completion {
                 // First event is already a completion — mark as completed immediately
@@ -496,7 +491,12 @@ impl ConversationFlowAnalyzer {
 
             // Check if we need to evict
             if conversations.len() >= self.config.max_capacity {
-                Self::evict_one(&mut conversations, &mut eviction, &self.config, &self.evicted_count);
+                Self::evict_one(
+                    &mut conversations,
+                    &mut eviction,
+                    &self.config,
+                    &self.evicted_count,
+                );
             }
 
             conversations.insert(message_id.clone(), state);
@@ -509,12 +509,18 @@ impl ConversationFlowAnalyzer {
 
         // We already hold the write lock on conversations, so check all active ones
         // for stall transitions periodically (every 100 events to avoid O(n) per event).
-        let processed = self.events_processed.load(std::sync::atomic::Ordering::Relaxed);
-        if processed % 100 == 0 {
+        let processed = self
+            .events_processed
+            .load(std::sync::atomic::Ordering::Relaxed);
+        if processed.is_multiple_of(100) {
             let stalled_ids: Vec<(ConversationId, u64)> = conversations
                 .iter_mut()
                 .filter_map(|(id, state)| {
-                    if state.check_stall(now_ns, self.config.stall_timeout_ns, self.config.grace_period_ns) {
+                    if state.check_stall(
+                        now_ns,
+                        self.config.stall_timeout_ns,
+                        self.config.grace_period_ns,
+                    ) {
                         let duration_s = state.idle_time_ns(now_ns) / 1_000_000_000;
                         Some((id.clone(), duration_s))
                     } else {
@@ -635,9 +641,8 @@ impl ConversationFlowAnalyzer {
             .as_nanos() as u64;
         let stall_timeout_ns = self.config.stall_timeout_ns;
 
-        let mut snapshot: HashMap<ConversationId, ConversationState> = 
-            conversations.clone();
-        for (_, state) in snapshot.iter_mut() {
+        let mut snapshot: HashMap<ConversationId, ConversationState> = conversations.clone();
+        for state in snapshot.values_mut() {
             state.refresh_health_score(now_ns, stall_timeout_ns);
         }
         snapshot
@@ -679,7 +684,9 @@ impl ConversationFlowAnalyzer {
     /// Get total conversations that have been tracked (including evicted).
     pub fn total_conversations(&self) -> u64 {
         let current = self.conversations.read().unwrap().len() as u64;
-        let evicted = self.evicted_count.load(std::sync::atomic::Ordering::Relaxed);
+        let evicted = self
+            .evicted_count
+            .load(std::sync::atomic::Ordering::Relaxed);
         // Note: completed conversations are still in the map, so we don't
         // add completed_count separately (they're included in current).
         current + evicted
@@ -713,17 +720,20 @@ impl ConversationFlowAnalyzer {
 
     /// Get the total number of events processed by this analyzer.
     pub fn events_processed_count(&self) -> u64 {
-        self.events_processed.load(std::sync::atomic::Ordering::Relaxed)
+        self.events_processed
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Get the number of evicted conversations.
     pub fn evicted_count(&self) -> u64 {
-        self.evicted_count.load(std::sync::atomic::Ordering::Relaxed)
+        self.evicted_count
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Get the number of completed conversations.
     pub fn completed_count(&self) -> u64 {
-        self.completed_count.load(std::sync::atomic::Ordering::Relaxed)
+        self.completed_count
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 
@@ -746,7 +756,7 @@ impl Analyzer for ConversationFlowAnalyzer {
         let evicted_count = Arc::clone(&self.evicted_count);
         let completed_count = Arc::clone(&self.completed_count);
         let events_processed = Arc::clone(&self.events_processed);
-        let name = self.name.clone();
+        let _name = self.name.clone();
 
         // Build a processing closure that the stream can use
         let mapped = stream.flat_map(move |event| {
@@ -906,7 +916,7 @@ impl Analyzer for ConversationFlowAnalyzer {
 
             // Periodic stall check (every 100 events)
             let processed = events_processed.load(std::sync::atomic::Ordering::Relaxed);
-            if processed % 100 == 0 {
+            if processed.is_multiple_of(100) {
                 let stalled: Vec<(ConversationId, u64)> = conv_guard
                     .iter_mut()
                     .filter_map(|(id, state)| {
@@ -967,12 +977,7 @@ mod tests {
     use std::time::Duration;
 
     /// Helper to create a causal_link event with a message_id.
-    fn make_causal_event(
-        timestamp: u64,
-        message_id: &str,
-        pid: u32,
-        sub_type: &str,
-    ) -> Event {
+    fn make_causal_event(timestamp: u64, message_id: &str, pid: u32, sub_type: &str) -> Event {
         Event::new_with_timestamp(
             timestamp,
             "causal_link".to_string(),
@@ -987,11 +992,7 @@ mod tests {
     }
 
     /// Helper to create an agent_labels_resolved event.
-    fn make_completion_event(
-        timestamp: u64,
-        message_id: &str,
-        agent_ids: Vec<&str>,
-    ) -> Event {
+    fn make_completion_event(timestamp: u64, message_id: &str, agent_ids: Vec<&str>) -> Event {
         let agents: Vec<serde_json::Value> = agent_ids
             .iter()
             .map(|id| {
@@ -1081,12 +1082,8 @@ mod tests {
 
     #[test]
     fn test_conversation_state_expired() {
-        let mut state = ConversationState::new(
-            ConversationId("conv_test".into()),
-            None,
-            None,
-            1000,
-        );
+        let mut state =
+            ConversationState::new(ConversationId("conv_test".into()), None, None, 1000);
 
         state.mark_expired();
         assert_eq!(state.status, ConversationStatus::Expired);
@@ -1120,12 +1117,7 @@ mod tests {
     fn test_health_score_computation() {
         let stall_timeout_ns = Duration::from_secs(300).as_nanos() as u64; // 5 min
 
-        let state = ConversationState::new(
-            ConversationId("conv_test".into()),
-            None,
-            None,
-            1000,
-        );
+        let state = ConversationState::new(ConversationId("conv_test".into()), None, None, 1000);
 
         // At the turn time, score should be 1.0
         let score = state.compute_health_score(1000, stall_timeout_ns);
@@ -1147,12 +1139,8 @@ mod tests {
         assert!((score - 0.0).abs() < 0.001, "Score should floor at 0.0");
 
         // Refresh updates the stored value
-        let mut mutable = ConversationState::new(
-            ConversationId("conv_test2".into()),
-            None,
-            None,
-            1000,
-        );
+        let mut mutable =
+            ConversationState::new(ConversationId("conv_test2".into()), None, None, 1000);
         let refreshed = mutable.refresh_health_score(1000 + stall_timeout_ns / 2, stall_timeout_ns);
         assert!((refreshed - 0.5).abs() < 0.001);
         assert!((mutable.health_score - 0.5).abs() < 0.001);
@@ -1171,7 +1159,11 @@ mod tests {
         );
 
         // Stall 1
-        state.check_stall(1000 + stall_timeout_ns + 1, stall_timeout_ns, grace_period_ns);
+        state.check_stall(
+            1000 + stall_timeout_ns + 1,
+            stall_timeout_ns,
+            grace_period_ns,
+        );
         assert_eq!(state.stall_count, 1);
 
         // Recover
@@ -1179,14 +1171,22 @@ mod tests {
         assert_eq!(state.status, ConversationStatus::Active);
 
         // Stall 2
-        state.check_stall(2000 + stall_timeout_ns + 1, stall_timeout_ns, grace_period_ns);
+        state.check_stall(
+            2000 + stall_timeout_ns + 1,
+            stall_timeout_ns,
+            grace_period_ns,
+        );
         assert_eq!(state.stall_count, 2);
 
         // Recover
         state.record_turn(3000, stall_timeout_ns);
 
         // Stall 3
-        state.check_stall(3000 + stall_timeout_ns + 1, stall_timeout_ns, grace_period_ns);
+        state.check_stall(
+            3000 + stall_timeout_ns + 1,
+            stall_timeout_ns,
+            grace_period_ns,
+        );
         assert_eq!(state.stall_count, 3);
     }
 
@@ -1209,7 +1209,11 @@ mod tests {
         let result = analyzer.process(stream).await.unwrap();
         let events: Vec<Event> = result.collect().await;
 
-        assert_eq!(events.len(), 1, "Non-causal event should pass through unchanged");
+        assert_eq!(
+            events.len(),
+            1,
+            "Non-causal event should pass through unchanged"
+        );
         assert_eq!(events[0].source, "process");
     }
 
@@ -1291,7 +1295,11 @@ mod tests {
         let all_events: Vec<Event> = result.collect().await;
 
         // Original 4 + 3 created + 1 turn = 8
-        assert_eq!(all_events.len(), 8, "Should have 4 originals + 4 derived events");
+        assert_eq!(
+            all_events.len(),
+            8,
+            "Should have 4 originals + 4 derived events"
+        );
 
         let (active, stalled, completed, expired) = analyzer.get_status_counts();
         assert_eq!(active, 3, "Should have 3 active conversations");
@@ -1366,7 +1374,9 @@ mod tests {
 
         // Should have evicted the oldest conversation (conv_000)
         let state_oldest = analyzer.get_state(&ConversationId("conv_000".into()));
-        assert!(state_oldest.is_none() || state_oldest.unwrap().status == ConversationStatus::Expired);
+        assert!(
+            state_oldest.is_none() || state_oldest.unwrap().status == ConversationStatus::Expired
+        );
 
         // Latest (conv_005) should still be present
         let state_latest = analyzer.get_state(&ConversationId("conv_005".into()));
@@ -1416,15 +1426,18 @@ mod tests {
             })
             .collect();
 
-        // Process them to trigger the eviction check... 
+        // Process them to trigger the eviction check...
         // Actually, TTL eviction happens when max_capacity is reached.
         // For this test, let's verify the mechanism differently.
-        
+
         // The old conversation should have expired TTL but still be present
         // since we haven't hit max_capacity. Let's check it's still there.
         let state_old = analyzer.get_state(&ConversationId("conv_old".into()));
-        assert!(state_old.is_some(), "Old conversation should still be present (capacity not reached)");
-        
+        assert!(
+            state_old.is_some(),
+            "Old conversation should still be present (capacity not reached)"
+        );
+
         // Force eviction by filling to capacity
         let fill_events: Vec<Event> = (0..100)
             .map(|i| {
@@ -1444,15 +1457,15 @@ mod tests {
         // Now the old conversation should have been evicted
         let state_old = analyzer.get_state(&ConversationId("conv_old".into()));
         assert!(
-            state_old.is_none() || state_old.as_ref().map(|s| s.status) == Some(ConversationStatus::Expired),
+            state_old.is_none()
+                || state_old.as_ref().map(|s| s.status) == Some(ConversationStatus::Expired),
             "Old conversation should be evicted after capacity reached"
         );
     }
 
     #[tokio::test]
     async fn test_avg_health_score() {
-        let config = ConversationFlowConfig::default()
-            .with_stall_timeout(Duration::from_secs(300));
+        let config = ConversationFlowConfig::default().with_stall_timeout(Duration::from_secs(300));
         let mut analyzer = ConversationFlowAnalyzer::with_config(config);
 
         // Create two active conversations at the same timestamp
@@ -1467,6 +1480,10 @@ mod tests {
 
         // Both should have health_score 1.0 (just created)
         let avg = analyzer.avg_health_score();
-        assert!((avg - 1.0).abs() < 0.01, "Avg health score should be ~1.0 right after creation, got {}", avg);
+        assert!(
+            (avg - 1.0).abs() < 0.01,
+            "Avg health score should be ~1.0 right after creation, got {}",
+            avg
+        );
     }
 }

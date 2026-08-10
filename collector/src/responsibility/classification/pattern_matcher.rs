@@ -2,5 +2,5 @@
 // Re-exports from the original location to avoid code duplication
 // while establishing this as the canonical import path going forward.
 pub use crate::responsibility::graph::pattern_matcher::{
-    default_templates, GraphPatternMatch, GraphPatternMatcher, GraphPatternTemplate,
+    GraphPatternMatch, GraphPatternMatcher, GraphPatternTemplate, default_templates,
 };

@@ -65,7 +65,7 @@ pub fn match_args(
         for a_arg in action_args {
             if let Some((level, score)) = compare_args(i_arg, a_arg) {
                 let ord = match_level_ord(&level);
-                let current_best_ord = best_level.as_ref().map(|l| match_level_ord(l)).unwrap_or(0);
+                let current_best_ord = best_level.as_ref().map(match_level_ord).unwrap_or(0);
                 if ord > current_best_ord || (ord == current_best_ord && score > best_score) {
                     best_level = Some(level);
                     best_score = score;
@@ -174,10 +174,11 @@ fn compare_commands(intent_cmd: &str, action_cmd: &str) -> Option<(MatchLevel, f
     // In practice, Command args are already basenames, so L4 is same as L3 here
 
     // L5: substring (min 3 chars)
-    if il.len() >= MIN_COMMAND_SUBSTRING && al.len() >= MIN_COMMAND_SUBSTRING {
-        if longest_common_substring(&il, &al, MIN_COMMAND_SUBSTRING).is_some() {
-            return Some((MatchLevel::L5Substring, 0.35));
-        }
+    if il.len() >= MIN_COMMAND_SUBSTRING
+        && al.len() >= MIN_COMMAND_SUBSTRING
+        && longest_common_substring(&il, &al, MIN_COMMAND_SUBSTRING).is_some()
+    {
+        return Some((MatchLevel::L5Substring, 0.35));
     }
 
     None
@@ -212,10 +213,11 @@ fn compare_command_to_path(cmd: &str, path: &str) -> Option<(MatchLevel, f32)> {
     }
 
     // L5: substring (min 3 chars)
-    if cmd_lower.len() >= MIN_COMMAND_SUBSTRING && path_lower.len() >= MIN_COMMAND_SUBSTRING {
-        if longest_common_substring(&cmd_lower, &path_lower, MIN_COMMAND_SUBSTRING).is_some() {
-            return Some((MatchLevel::L5Substring, 0.35));
-        }
+    if cmd_lower.len() >= MIN_COMMAND_SUBSTRING
+        && path_lower.len() >= MIN_COMMAND_SUBSTRING
+        && longest_common_substring(&cmd_lower, &path_lower, MIN_COMMAND_SUBSTRING).is_some()
+    {
+        return Some((MatchLevel::L5Substring, 0.35));
     }
 
     None
@@ -257,10 +259,11 @@ fn compare_urls(
     }
 
     // L5: substring match on hostname (min 3 chars)
-    if ih.len() >= MIN_COMMAND_SUBSTRING && ah.len() >= MIN_COMMAND_SUBSTRING {
-        if longest_common_substring(&ih, &ah, MIN_COMMAND_SUBSTRING).is_some() {
-            return Some((MatchLevel::L5Substring, 0.35));
-        }
+    if ih.len() >= MIN_COMMAND_SUBSTRING
+        && ah.len() >= MIN_COMMAND_SUBSTRING
+        && longest_common_substring(&ih, &ah, MIN_COMMAND_SUBSTRING).is_some()
+    {
+        return Some((MatchLevel::L5Substring, 0.35));
     }
 
     None
@@ -325,9 +328,9 @@ fn resolve_dot_segments(path: &str) -> String {
     let mut components: Vec<&str> = Vec::new();
     for segment in path.split('/') {
         match segment {
-            "" | "." => {}           // skip empty and current-dir
+            "" | "." => {} // skip empty and current-dir
             ".." => {
-                components.pop();    // go up one level
+                components.pop(); // go up one level
             }
             _ => components.push(segment),
         }
@@ -426,7 +429,10 @@ mod tests {
         );
         assert!(result.is_some());
         let (level, _) = result.unwrap();
-        assert!(matches!(level, MatchLevel::L1Exact | MatchLevel::L2Normalized));
+        assert!(matches!(
+            level,
+            MatchLevel::L1Exact | MatchLevel::L2Normalized
+        ));
     }
 
     #[test]

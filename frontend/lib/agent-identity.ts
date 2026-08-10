@@ -22,7 +22,7 @@ export const AGENT_PALETTE = [
 export const AGENT_COLOR_OVERRIDES: Record<string, string> = {
   'agent-security': '#ff6b9d', // rose — security incidents are the focal point
   'agent-frontend': '#7aa2ff', // blue — development work
-  'agent-builder': '#ffb454',  // orange — build/assembly
+  'agent-builder': '#ffb454', // orange — build/assembly
 };
 
 /** FNV-1a 32-bit — explicit stable hash (never the runtime's randomized hash). */
@@ -81,14 +81,14 @@ export function shortAgentId(agentId: string): string {
  * agent population, so no two agents ever share an avatar.
  */
 export const GLYPH_KINDS = [
-  'ring',      // open ring — an instrument readout
-  'arcs',      // twin arcs — a traced signal
-  'diamond',   // diamond — an attribution marker
-  'bars',      // parallel bars — a gauge
-  'triangle',  // triangle
-  'hex',       // hexagon
+  'ring', // open ring — an instrument readout
+  'arcs', // twin arcs — a traced signal
+  'diamond', // diamond — an attribution marker
+  'bars', // parallel bars — a gauge
+  'triangle', // triangle
+  'hex', // hexagon
   'crosshair', // crosshair + center dot — an observation reticle
-  'dotgrid',   // 2×2 dot grid
+  'dotgrid', // 2×2 dot grid
 ] as const;
 
 export type GlyphKind = (typeof GLYPH_KINDS)[number];
@@ -122,9 +122,7 @@ export function agentGlyphSpec(agentId: string): AgentGlyphSpec | null {
 export function darkenHex(hex: string, factor: number): string {
   const value = parseInt(hex.slice(1), 16);
   const channel = (shift: number) => Math.round(((value >> shift) & 255) * (1 - factor));
-  return `#${[16, 8, 0]
-    .map((shift) => channel(shift).toString(16).padStart(2, '0'))
-    .join('')}`;
+  return `#${[16, 8, 0].map((shift) => channel(shift).toString(16).padStart(2, '0')).join('')}`;
 }
 
 /** Avatar gradient fill: [agent color, darkened agent color]. */

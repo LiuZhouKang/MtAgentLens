@@ -157,6 +157,7 @@ export default function RunSelector() {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const [dragging, setDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -196,17 +197,32 @@ export default function RunSelector() {
     async (file: File) => {
       setImportError(null);
       setLoadError(null);
+      setImporting(true);
       try {
         if (/\.(db|sqlite|sqlite3)$/i.test(file.name)) {
           const bytes = new Uint8Array(await file.arrayBuffer());
-          applyImport(await loadDatabaseFromBytes(bytes, file.name));
+          const local = await loadDatabaseFromBytes(bytes, file.name);
+          // 有效 sqlite 但无责任数据（图/告警/动作全空）→ 不导入、不静默：明确提示 + 写 store
+          // 供页面横幅展示（store.errorMessage 跨页可读），避免「导入后页面没有任何变化」。
+          if (!local.hasConsumableData) {
+            const msg = '该数据库不含责任数据（无图 / 告警 / 动作），可能不是 responsibility.db';
+            setImportError(msg);
+            useAppStore.getState().setError(msg);
+            return;
+          }
+          applyImport(local);
         } else {
           const text = await file.text();
           applyImport(parseSnapshotJson(text, file.name));
         }
         setOpen(false);
       } catch (err) {
-        setImportError(err instanceof Error ? err.message : '导入失败，请检查文件内容');
+        const msg = err instanceof Error ? err.message : '导入失败，请检查文件内容';
+        setImportError(msg);
+        // 解析失败同样写入 store：错误横幅跨页可读，页面不再「无反馈」
+        useAppStore.getState().setError(msg);
+      } finally {
+        setImporting(false);
       }
     },
     [applyImport],
@@ -280,10 +296,12 @@ export default function RunSelector() {
     if (!q) files.push({ type: 'import' });
     if (files.length > 0) groups.push({ key: 'files', title: '本地文件', entries: files });
 
-    const runEntries = runs.filter((r) => {
-      const entry: SourceEntry = { type: 'run', run: r };
-      return matches(entry);
-    }).map((run) => ({ type: 'run', run }) as SourceEntry);
+    const runEntries = runs
+      .filter((r) => {
+        const entry: SourceEntry = { type: 'run', run: r };
+        return matches(entry);
+      })
+      .map((run) => ({ type: 'run', run }) as SourceEntry);
     if (runEntries.length > 0) groups.push({ key: 'runs', title: '后端会话', entries: runEntries });
 
     return groups;
@@ -372,6 +390,7 @@ export default function RunSelector() {
         aria-expanded={open}
         aria-label={sourceLabel}
         data-testid="data-source-trigger"
+        disabled={loading || importing}
         onClick={() => {
           setOpen((v) => !v);
           setQuery('');
@@ -379,19 +398,28 @@ export default function RunSelector() {
           setImportError(null);
         }}
         style={{
-          display: 'flex', alignItems: 'center', gap: 7,
-          padding: '4px 10px', borderRadius: 6,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 7,
+          padding: '4px 10px',
+          borderRadius: 6,
           border: '1px solid rgba(255,255,255,0.08)',
           background: open ? 'rgba(255,255,255,0.06)' : 'transparent',
           color: loadError ? 'rgba(248,113,113,0.85)' : 'rgba(255,255,255,0.75)',
-          fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+          fontSize: 12,
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
           transition: 'background 120ms, border-color 120ms',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-        onMouseLeave={(e) => { if (!open) e.currentTarget.style.background = 'transparent'; }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+        }}
+        onMouseLeave={(e) => {
+          if (!open) e.currentTarget.style.background = 'transparent';
+        }}
         title={loadError ?? undefined}
       >
-        {loading ? (
+        {loading || importing ? (
           <Loader2 size={15} className="mtl-spinner" style={{ opacity: 0.7 }} />
         ) : (
           <ButtonIcon size={15} style={{ opacity: 0.75 }} />
@@ -399,7 +427,11 @@ export default function RunSelector() {
         <span style={{ fontWeight: 500 }}>{sourceLabel}</span>
         <ChevronDown
           size={13}
-          style={{ opacity: 0.4, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }}
+          style={{
+            opacity: 0.4,
+            transform: open ? 'rotate(180deg)' : 'none',
+            transition: 'transform 150ms',
+          }}
         />
       </button>
 
@@ -425,15 +457,22 @@ export default function RunSelector() {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             style={{
-              position: 'absolute', top: 'calc(100% + 6px)', right: 0,
-              width: 440, maxHeight: 480,
+              position: 'absolute',
+              top: 'calc(100% + 6px)',
+              right: 0,
+              width: 440,
+              maxHeight: 480,
               background: 'rgba(13,14,15,0.98)',
               backdropFilter: 'blur(20px)',
-              border: dragging ? '1px dashed rgba(94,106,210,0.6)' : '1px solid rgba(255,255,255,0.08)',
+              border: dragging
+                ? '1px dashed rgba(94,106,210,0.6)'
+                : '1px solid rgba(255,255,255,0.08)',
               borderRadius: 12,
-              overflow: 'hidden', zIndex: 100,
+              overflow: 'hidden',
+              zIndex: 100,
               boxShadow: '0 16px 48px rgba(0,0,0,0.4)',
-              display: 'flex', flexDirection: 'column',
+              display: 'flex',
+              flexDirection: 'column',
               transition: 'border-color 100ms',
             }}
           >
@@ -441,8 +480,12 @@ export default function RunSelector() {
             <div style={{ padding: '12px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               <div
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '0 10px', height: 30, borderRadius: 6,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '0 10px',
+                  height: 30,
+                  borderRadius: 6,
                   background: 'rgba(255,255,255,0.04)',
                   border: '1px solid rgba(255,255,255,0.06)',
                 }}
@@ -455,22 +498,57 @@ export default function RunSelector() {
                   autoFocus
                   aria-label="搜索数据源"
                   style={{
-                    flex: 1, background: 'none', border: 'none', outline: 'none',
-                    fontSize: 12, color: 'rgba(255,255,255,0.85)', fontFamily: 'inherit',
+                    flex: 1,
+                    background: 'none',
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: 12,
+                    color: 'rgba(255,255,255,0.85)',
+                    fontFamily: 'inherit',
                   }}
                 />
-                <kbd style={{ fontSize: 9, opacity: 0.35, fontFamily: 'var(--ln-mono, monospace)' }}>esc</kbd>
+                <kbd
+                  style={{ fontSize: 9, opacity: 0.35, fontFamily: 'var(--ln-mono, monospace)' }}
+                >
+                  esc
+                </kbd>
               </div>
             </div>
+
+            {/* Import progress（大 db 解析期给反馈，用户不再以为没反应） */}
+            {importing && (
+              <div
+                style={{
+                  margin: '8px 12px 0',
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  background: 'rgba(94,106,210,0.10)',
+                  border: '1px solid rgba(94,106,210,0.25)',
+                  color: 'rgba(196,201,255,0.85)',
+                  fontSize: 11,
+                }}
+              >
+                <Loader2
+                  size={12}
+                  className="mtl-spinner"
+                  style={{ verticalAlign: -2, marginRight: 6 }}
+                />
+                正在解析数据库…
+              </div>
+            )}
 
             {/* Inline errors */}
             {(loadError || importError) && (
               <div
                 role="alert"
                 style={{
-                  margin: '8px 12px 0', padding: '6px 10px', borderRadius: 6,
-                  background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.18)',
-                  color: 'rgba(248,113,113,0.85)', fontSize: 11,
+                  margin: '8px 12px 0',
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  background: 'rgba(248,113,113,0.08)',
+                  border: '1px solid rgba(248,113,113,0.18)',
+                  color: 'rgba(248,113,113,0.85)',
+                  fontSize: 11,
                 }}
               >
                 {importError ?? loadError}
@@ -481,9 +559,14 @@ export default function RunSelector() {
             {dragging && (
               <div
                 style={{
-                  margin: '8px 12px 0', padding: '10px 12px', borderRadius: 8,
-                  background: 'rgba(94,106,210,0.12)', border: '1px solid rgba(94,106,210,0.35)',
-                  color: 'rgba(196,201,255,0.9)', fontSize: 11, fontWeight: 500,
+                  margin: '8px 12px 0',
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  background: 'rgba(94,106,210,0.12)',
+                  border: '1px solid rgba(94,106,210,0.35)',
+                  color: 'rgba(196,201,255,0.9)',
+                  fontSize: 11,
+                  fontWeight: 500,
                   textAlign: 'center',
                 }}
               >
@@ -497,8 +580,11 @@ export default function RunSelector() {
                 <div key={group.key}>
                   <div
                     style={{
-                      padding: '8px 12px 4px', fontSize: 10, fontWeight: 600,
-                      color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em',
+                      padding: '8px 12px 4px',
+                      fontSize: 10,
+                      fontWeight: 600,
+                      color: 'rgba(255,255,255,0.3)',
+                      letterSpacing: '0.08em',
                       textTransform: 'uppercase',
                     }}
                   >
@@ -525,34 +611,52 @@ export default function RunSelector() {
                         onClick={() => void selectEntry(entry)}
                         onMouseEnter={() => setActiveIndex(idx)}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: 8,
-                          width: '100%', textAlign: 'left',
-                          padding: '7px 12px', border: 'none', borderRadius: 6, cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '7px 12px',
+                          border: 'none',
+                          borderRadius: 6,
+                          cursor: 'pointer',
                           background: selected
                             ? 'rgba(94,106,210,0.12)'
                             : highlighted
                               ? 'rgba(255,255,255,0.05)'
                               : 'transparent',
                           color: selected ? '#fafafa' : 'rgba(255,255,255,0.6)',
-                          fontSize: 11, fontFamily: 'var(--ln-mono, monospace)',
+                          fontSize: 11,
+                          fontFamily: 'var(--ln-mono, monospace)',
                           transition: 'background 80ms',
                         }}
                       >
                         <EntryIcon entry={entry} />
-                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span
+                          style={{
+                            flex: 1,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
                           {entryLabel(entry)}
                         </span>
                         {meta && (
                           <span
                             style={{
-                              flexShrink: 0, fontSize: 9, color: 'rgba(255,255,255,0.3)',
+                              flexShrink: 0,
+                              fontSize: 9,
+                              color: 'rgba(255,255,255,0.3)',
                               fontFamily: 'var(--ln-mono, monospace)',
                             }}
                           >
                             {meta}
                           </span>
                         )}
-                        {selected && <Check size={13} style={{ color: '#5e6ad2', flexShrink: 0 }} />}
+                        {selected && (
+                          <Check size={13} style={{ color: '#5e6ad2', flexShrink: 0 }} />
+                        )}
                       </button>
                     );
                   })}

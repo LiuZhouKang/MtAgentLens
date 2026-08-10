@@ -1,7 +1,12 @@
 import { collectAlertEvidenceRefs } from './investigation';
 import type {
-  ContextPollutionEvent, CorrelationEvidence, GraphData, Intent,
-  NonLinkDiagnostic, PolicyEvaluation, ResponsibilityAlert,
+  ContextPollutionEvent,
+  CorrelationEvidence,
+  GraphData,
+  Intent,
+  NonLinkDiagnostic,
+  PolicyEvaluation,
+  ResponsibilityAlert,
 } from './types';
 
 export type WhyFacetKind = 'pollution' | 'policy' | 'diagnostic';
@@ -53,11 +58,16 @@ function involvedAgentSet(alert: ResponsibilityAlert): Set<string> {
 
 /** 归组计数 → 降序（count），同值按 key 升序。 */
 function sortRows<T>(rows: T[], countOf: (r: T) => number, keyOf: (r: T) => string): T[] {
-  return [...rows].sort((a, b) => countOf(b) - countOf(a) || (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0));
+  return [...rows].sort(
+    (a, b) => countOf(b) - countOf(a) || (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0),
+  );
 }
 
 /** 按 keyOf 归组计数并降序；平票按 key 升序。返回 [{ key, count }]。 */
-function countRows<T>(items: T[], keyOf: (item: T) => string): Array<{ key: string; count: number }> {
+function countRows<T>(
+  items: T[],
+  keyOf: (item: T) => string,
+): Array<{ key: string; count: number }> {
   const map = new Map<string, number>();
   for (const item of items) {
     const key = keyOf(item);
@@ -65,7 +75,8 @@ function countRows<T>(items: T[], keyOf: (item: T) => string): Array<{ key: stri
   }
   return sortRows(
     Array.from(map, ([key, count]) => ({ key, count })),
-    (r) => r.count, (r) => r.key,
+    (r) => r.count,
+    (r) => r.key,
   );
 }
 
@@ -84,8 +95,13 @@ function summarizePollution(events: ContextPollutionEvent[]): PollutionSummary {
     for (const m of members) membershipMap.set(m, (membershipMap.get(m) ?? 0) + 1);
   }
 
-  const bySource = countRows(events, (e) => e.source_agent_id).map(({ key: agentId, count }) => ({ agentId, count }));
-  const byArtifact = countRows(events, (e) => e.contaminated_artifact).map(({ key: artifact, count }) => ({ artifact, count }));
+  const bySource = countRows(events, (e) => e.source_agent_id).map(({ key: agentId, count }) => ({
+    agentId,
+    count,
+  }));
+  const byArtifact = countRows(events, (e) => e.contaminated_artifact).map(
+    ({ key: artifact, count }) => ({ artifact, count }),
+  );
   const hubAgents = Array.from(membershipMap.entries())
     .filter(([, n]) => n >= 2)
     .map(([agentId]) => agentId)
@@ -119,28 +135,42 @@ function summarizePolicy(evals: PolicyEvaluation[]): PolicySummary {
 
   return {
     total: evals.length,
-    byJudgment: countRows(evals, (p) => p.judgment?.result ?? 'unknown').map(({ key: result, count }) => ({ result, count })),
-    byBoundary: countRows(evals, (p) => p.boundary).map(({ key: boundary, count }) => ({ boundary, count })),
-    bySubject: countRows(evals, (p) => p.subject_agent_id).map(({ key: subjectAgentId, count }) => ({ subjectAgentId, count })),
+    byJudgment: countRows(evals, (p) => p.judgment?.result ?? 'unknown').map(
+      ({ key: result, count }) => ({ result, count }),
+    ),
+    byBoundary: countRows(evals, (p) => p.boundary).map(({ key: boundary, count }) => ({
+      boundary,
+      count,
+    })),
+    bySubject: countRows(evals, (p) => p.subject_agent_id).map(
+      ({ key: subjectAgentId, count }) => ({ subjectAgentId, count }),
+    ),
     violationCount,
     violationRate: evals.length ? violationCount / evals.length : 0,
     violationsByBoundary: sortRows(
       Array.from(boundaryStats, ([boundary, stats]) => ({ boundary, ...stats })),
-      (r) => r.violationCount, (r) => r.boundary,
+      (r) => r.violationCount,
+      (r) => r.boundary,
     ),
   };
 }
 
 function summarizeDiagnostics(diags: NonLinkDiagnostic[], intents: Intent[]): DiagnosticSummary {
   const intentById = new Map(intents.map((i) => [i.intent_id, i]));
-  const withIntent = (d: NonLinkDiagnostic): d is NonLinkDiagnostic & { intent_id: string } => d.intent_id != null;
+  const withIntent = (d: NonLinkDiagnostic): d is NonLinkDiagnostic & { intent_id: string } =>
+    d.intent_id != null;
   const intentRows = countRows(diags.filter(withIntent), (d) => d.intent_id);
 
   return {
     total: diags.length,
-    byReason: countRows(diags, (d) => d.reason).map(({ key: reason, count }) => ({ reason, count })),
+    byReason: countRows(diags, (d) => d.reason).map(({ key: reason, count }) => ({
+      reason,
+      count,
+    })),
     byIntentId: intentRows.map(({ key: intentId, count }) => ({
-      intentId, toolName: intentById.get(intentId)?.tool_name ?? null, count,
+      intentId,
+      toolName: intentById.get(intentId)?.tool_name ?? null,
+      count,
     })),
     intentsAffected: intentRows.length,
   };
@@ -155,7 +185,15 @@ export function buildWhyFacets(input: {
   evidence: CorrelationEvidence[];
   graph: GraphData;
 }): WhyFacets {
-  const { alerts, pollutionEvents, policyEvaluations, nonLinkDiagnostics, intents, evidence, graph } = input;
+  const {
+    alerts,
+    pollutionEvents,
+    policyEvaluations,
+    nonLinkDiagnostics,
+    intents,
+    evidence,
+    graph,
+  } = input;
 
   const pollutionAgents = new Set<string>();
   for (const p of pollutionEvents) {
@@ -192,7 +230,10 @@ export function buildWhyFacets(input: {
       const intentId = evidenceIntent.get(ref);
       if (intentId != null) linkedIntents.add(intentId);
     }
-    if (linkedIntents.size > 0 && Array.from(linkedIntents).some((id) => diagnosedIntents.has(id))) {
+    if (
+      linkedIntents.size > 0 &&
+      Array.from(linkedIntents).some((id) => diagnosedIntents.has(id))
+    ) {
       matches.push('diagnostic');
     }
 
@@ -224,7 +265,23 @@ export function filterAlertsByFacet(
 export const EMPTY_WHY: WhyFacets = {
   facetCounts: { pollution: 0, policy: 0, diagnostic: 0 },
   alertFacets: {},
-  pollution: { total: 0, bySource: [], byArtifact: [], hubAgents: [], multiHopCount: 0, maxHops: 0, avgHops: 0 },
-  policy: { total: 0, byJudgment: [], byBoundary: [], bySubject: [], violationCount: 0, violationRate: 0, violationsByBoundary: [] },
+  pollution: {
+    total: 0,
+    bySource: [],
+    byArtifact: [],
+    hubAgents: [],
+    multiHopCount: 0,
+    maxHops: 0,
+    avgHops: 0,
+  },
+  policy: {
+    total: 0,
+    byJudgment: [],
+    byBoundary: [],
+    bySubject: [],
+    violationCount: 0,
+    violationRate: 0,
+    violationsByBoundary: [],
+  },
   diagnostic: { total: 0, byReason: [], byIntentId: [], intentsAffected: 0 },
 };

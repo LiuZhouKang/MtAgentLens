@@ -13,17 +13,36 @@ describe('WhyAttribution', () => {
   const onFacetChange = vi.fn();
 
   it('0 命中的分面 chip 禁用；生效 chip aria-pressed；折叠钮 aria-controls', () => {
-    render(<WhyAttribution why={why} facet="all" onFacetChange={onFacetChange} alertCount={5} dbPresent />);
+    render(
+      <WhyAttribution
+        why={why}
+        facet="all"
+        onFacetChange={onFacetChange}
+        alertCount={5}
+        dbPresent
+      />,
+    );
     const pollution = screen.getByRole('button', { name: /污染 2/ });
     const policy = screen.getByRole('button', { name: /违规 0/ });
     expect(pollution).toBeEnabled();
     expect(policy).toBeDisabled();
     expect(pollution).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: /归因/ })).toHaveAttribute('aria-controls', 'why-attribution-body');
+    expect(screen.getByRole('button', { name: /归因/ })).toHaveAttribute(
+      'aria-controls',
+      'why-attribution-body',
+    );
   });
 
   it('生效分面 chip aria-pressed=true 且可一键清除', () => {
-    render(<WhyAttribution why={why} facet="pollution" onFacetChange={onFacetChange} alertCount={5} dbPresent />);
+    render(
+      <WhyAttribution
+        why={why}
+        facet="pollution"
+        onFacetChange={onFacetChange}
+        alertCount={5}
+        dbPresent
+      />,
+    );
     const active = screen.getByRole('button', { name: /污染 2/ });
     expect(active).toHaveAttribute('aria-pressed', 'true');
     const clear = screen.getByRole('button', { name: /清除分面/ });
@@ -32,7 +51,15 @@ describe('WhyAttribution', () => {
   });
 
   it('dbPresent=false 时 chips 与折叠钮禁用且显示导入提示', () => {
-    render(<WhyAttribution why={EMPTY_WHY} facet="all" onFacetChange={onFacetChange} alertCount={0} dbPresent={false} />);
+    render(
+      <WhyAttribution
+        why={EMPTY_WHY}
+        facet="all"
+        onFacetChange={onFacetChange}
+        alertCount={0}
+        dbPresent={false}
+      />,
+    );
     expect(screen.getByText(/导入 responsibility\.db 后启用/)).toBeTruthy();
     expect(screen.getByRole('button', { name: /归因/ })).toBeDisabled();
   });

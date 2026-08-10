@@ -345,8 +345,8 @@ fn test_parse_design_handoff_yaml() {
     let yaml_str = FIXTURE_DESIGN_YAML;
 
     // Act
-    let contract: HandoffContract = serde_yaml::from_str(yaml_str)
-        .expect("Should parse valid design handoff YAML");
+    let contract: HandoffContract =
+        serde_yaml::from_str(yaml_str).expect("Should parse valid design handoff YAML");
 
     // Assert
     assert_eq!(contract.handoff_id, "fixture-design-ho-01");
@@ -357,9 +357,17 @@ fn test_parse_design_handoff_yaml() {
 
     // Verify context block
     let ctx = contract.context.expect("Should have context block");
-    let decisions = ctx.key_design_decisions.expect("Should have key_design_decisions");
-    assert!(decisions.len() >= 2, "Should have at least 2 design decisions");
-    assert!(decisions[0].contains("DDR-001"), "First decision should be DDR-001");
+    let decisions = ctx
+        .key_design_decisions
+        .expect("Should have key_design_decisions");
+    assert!(
+        decisions.len() >= 2,
+        "Should have at least 2 design decisions"
+    );
+    assert!(
+        decisions[0].contains("DDR-001"),
+        "First decision should be DDR-001"
+    );
 
     // Verify quality gates
     let gates = contract.quality_gates.expect("Should have quality gates");
@@ -392,8 +400,8 @@ fn test_fixture_chain_all_four_phases_parse() {
     for (phase_name, yaml_str) in &fixture_yamls {
         let contract: HandoffContract = serde_yaml::from_str(yaml_str)
             .unwrap_or_else(|e| panic!("Should parse {} handoff: {}", phase_name, e));
-        let idx = phase_index(*phase_name)
-            .unwrap_or_else(|| panic!("Unknown phase: {}", phase_name));
+        let idx =
+            phase_index(*phase_name).unwrap_or_else(|| panic!("Unknown phase: {}", phase_name));
         contracts.push((idx, contract.feature_name.clone(), contract));
     }
 
@@ -419,30 +427,39 @@ fn test_sequential_dependency_chain() {
 
     // Act & Assert
     // A → B: Implementation must reference Design's handoff_id
-    let impl_deps = impl_contract.dependencies.as_ref()
+    let impl_deps = impl_contract
+        .dependencies
+        .as_ref()
         .expect("Implementation phase must declare dependencies");
     assert!(
         impl_deps.contains(&design.handoff_id),
         "Implementation phase must reference Design handoff_id '{}', got: {:?}",
-        design.handoff_id, impl_deps
+        design.handoff_id,
+        impl_deps
     );
 
     // B → C: Testing must reference Implementation's handoff_id
-    let test_deps = test.dependencies.as_ref()
+    let test_deps = test
+        .dependencies
+        .as_ref()
         .expect("Testing phase must declare dependencies");
     assert!(
         test_deps.contains(&impl_contract.handoff_id),
         "Testing phase must reference Implementation handoff_id '{}', got: {:?}",
-        impl_contract.handoff_id, test_deps
+        impl_contract.handoff_id,
+        test_deps
     );
 
     // C → D: Documentation must reference Testing's handoff_id
-    let doc_deps = doc.dependencies.as_ref()
+    let doc_deps = doc
+        .dependencies
+        .as_ref()
         .expect("Documentation phase must declare dependencies");
     assert!(
         doc_deps.contains(&test.handoff_id),
         "Documentation phase must reference Testing handoff_id '{}', got: {:?}",
-        test.handoff_id, doc_deps
+        test.handoff_id,
+        doc_deps
     );
 
     // No orphan: design has no dependencies (it's the root)
@@ -487,16 +504,28 @@ fn test_all_quality_gates_pass() {
     // Arrange
     let contracts: Vec<(&str, HandoffContract)> = vec![
         ("design", serde_yaml::from_str(FIXTURE_DESIGN_YAML).unwrap()),
-        ("implementation", serde_yaml::from_str(FIXTURE_IMPL_YAML).unwrap()),
+        (
+            "implementation",
+            serde_yaml::from_str(FIXTURE_IMPL_YAML).unwrap(),
+        ),
         ("testing", serde_yaml::from_str(FIXTURE_TEST_YAML).unwrap()),
-        ("documentation", serde_yaml::from_str(FIXTURE_DOC_YAML).unwrap()),
+        (
+            "documentation",
+            serde_yaml::from_str(FIXTURE_DOC_YAML).unwrap(),
+        ),
     ];
 
     // Act & Assert
     for (phase, contract) in &contracts {
-        let gates = contract.quality_gates.as_ref()
+        let gates = contract
+            .quality_gates
+            .as_ref()
             .unwrap_or_else(|| panic!("Phase '{}' must define quality gates", phase));
-        assert!(!gates.is_empty(), "Phase '{}' must have at least one quality gate", phase);
+        assert!(
+            !gates.is_empty(),
+            "Phase '{}' must have at least one quality gate",
+            phase
+        );
 
         for gate in gates {
             assert_eq!(
@@ -516,9 +545,15 @@ fn test_all_phases_ready_for_next() {
     // Arrange
     let contracts: Vec<(&str, HandoffContract)> = vec![
         ("design", serde_yaml::from_str(FIXTURE_DESIGN_YAML).unwrap()),
-        ("implementation", serde_yaml::from_str(FIXTURE_IMPL_YAML).unwrap()),
+        (
+            "implementation",
+            serde_yaml::from_str(FIXTURE_IMPL_YAML).unwrap(),
+        ),
         ("testing", serde_yaml::from_str(FIXTURE_TEST_YAML).unwrap()),
-        ("documentation", serde_yaml::from_str(FIXTURE_DOC_YAML).unwrap()),
+        (
+            "documentation",
+            serde_yaml::from_str(FIXTURE_DOC_YAML).unwrap(),
+        ),
     ];
 
     // Act & Assert
@@ -553,7 +588,8 @@ fn test_temporal_monotonicity() {
         assert!(
             window[0] <= window[1],
             "Timestamp regression: '{}' is not <= '{}'",
-            window[0], window[1]
+            window[0],
+            window[1]
         );
     }
 }
@@ -570,30 +606,41 @@ fn test_risks_propagate_from_design_through_chain() {
 
     // Extract risk descriptions from design phase
     let design_risks = design.risks.expect("Design must have risks");
-    let design_risk_ids: Vec<String> = design_risks.iter()
-        .filter_map(|r| r.id.clone())
-        .collect();
+    let design_risk_ids: Vec<String> = design_risks.iter().filter_map(|r| r.id.clone()).collect();
 
     // Act & Assert — each design risk ID should appear in impl or testing
     // (R-DESIGN-001 appears in impl; R-DESIGN-002/003 are tracked by reference)
-    let impl_risk_ids: Vec<String> = impl_contract.risks.as_ref()
+    let impl_risk_ids: Vec<String> = impl_contract
+        .risks
+        .as_ref()
         .map(|r| r.iter().filter_map(|r| r.id.clone()).collect())
         .unwrap_or_default();
-    let test_risk_ids: Vec<String> = test.risks.as_ref()
+    let test_risk_ids: Vec<String> = test
+        .risks
+        .as_ref()
         .map(|r| r.iter().filter_map(|r| r.id.clone()).collect())
         .unwrap_or_default();
 
     // Check that at least some design risks are re-referenced
     // In our fixtures: R-DESIGN-001 is re-referenced in implementation
-    let all_downstream_ids: Vec<&str> = impl_risk_ids.iter().map(|s| s.as_str())
+    let all_downstream_ids: Vec<&str> = impl_risk_ids
+        .iter()
+        .map(|s| s.as_str())
         .chain(test_risk_ids.iter().map(|s| s.as_str()))
         .collect();
 
     for risk_id in &design_risk_ids {
         let id_str = risk_id.as_str();
         // Allow risks to be explicitly resolved (not re-referenced) — just check tracking
-        println!("  Design risk '{}' tracked downstream: {}", id_str,
-            if all_downstream_ids.contains(&id_str) { "YES" } else { "resolved" });
+        println!(
+            "  Design risk '{}' tracked downstream: {}",
+            id_str,
+            if all_downstream_ids.contains(&id_str) {
+                "YES"
+            } else {
+                "resolved"
+            }
+        );
     }
 
     // At minimum, R-DESIGN-001 (highest likelihood=medium) must be tracked
@@ -611,20 +658,31 @@ fn test_owner_transitions_through_phases() {
     // Arrange
     let contracts: Vec<(&str, HandoffContract)> = vec![
         ("design", serde_yaml::from_str(FIXTURE_DESIGN_YAML).unwrap()),
-        ("implementation", serde_yaml::from_str(FIXTURE_IMPL_YAML).unwrap()),
+        (
+            "implementation",
+            serde_yaml::from_str(FIXTURE_IMPL_YAML).unwrap(),
+        ),
         ("testing", serde_yaml::from_str(FIXTURE_TEST_YAML).unwrap()),
-        ("documentation", serde_yaml::from_str(FIXTURE_DOC_YAML).unwrap()),
+        (
+            "documentation",
+            serde_yaml::from_str(FIXTURE_DOC_YAML).unwrap(),
+        ),
     ];
 
     // Act — collect owners
-    let owners: Vec<&str> = contracts.iter()
+    let owners: Vec<&str> = contracts
+        .iter()
         .map(|(_, c)| c.owner.as_deref().unwrap_or("unknown"))
         .collect();
 
     // Assert — owners must not all be the same (indicates no real handoff)
     let first_owner = owners[0];
     let all_same = owners.iter().all(|o| *o == first_owner);
-    assert!(!all_same, "Owners must transition across phases: {:?}", owners);
+    assert!(
+        !all_same,
+        "Owners must transition across phases: {:?}",
+        owners
+    );
 
     // Verify previous_owner matches for handoffs
     for i in 1..contracts.len() {
@@ -658,23 +716,34 @@ fn test_deliverable_paths_have_expected_format() {
     // Act & Assert
     let mut total_deliverables = 0;
     for contract in &contracts {
-        let deliverables = contract.deliverables.as_ref()
+        let deliverables = contract
+            .deliverables
+            .as_ref()
             .expect("Each phase must list deliverables");
-        assert!(!deliverables.is_empty(), "Must have at least one deliverable");
+        assert!(
+            !deliverables.is_empty(),
+            "Must have at least one deliverable"
+        );
         total_deliverables += deliverables.len();
 
         for del in deliverables {
             // Verify the path has a plausible format
             assert!(
-                del.path.ends_with(".rs") || del.path.ends_with(".md") || del.path.ends_with(".yaml")
-                    || del.path.ends_with(".png") || del.path.contains('/'),
+                del.path.ends_with(".rs")
+                    || del.path.ends_with(".md")
+                    || del.path.ends_with(".yaml")
+                    || del.path.ends_with(".png")
+                    || del.path.contains('/'),
                 "Deliverable path '{}' should have a recognizable extension or directory prefix",
                 del.path
             );
         }
     }
 
-    assert!(total_deliverables >= 4, "Must have at least 4 total deliverables across all phases");
+    assert!(
+        total_deliverables >= 4,
+        "Must have at least 4 total deliverables across all phases"
+    );
 }
 
 // =============================================================================
@@ -716,8 +785,8 @@ timestamp: "2026-05-05T13:00:00Z"
 "#;
 
     // Act — parse and check phase ordering
-    let contract: HandoffContract = serde_yaml::from_str(invalid_yaml)
-        .expect("Should parse structurally valid YAML");
+    let contract: HandoffContract =
+        serde_yaml::from_str(invalid_yaml).expect("Should parse structurally valid YAML");
 
     let from_idx = phase_index(&contract.from_phase);
     let to_idx = phase_index(&contract.to_phase);
@@ -730,7 +799,10 @@ timestamp: "2026-05-05T13:00:00Z"
                 !is_valid,
                 "design → documentation is not an adjacent phase transition"
             );
-            println!("  ✓ Invalid transition design→documentation correctly flagged (skip={})", t - f - 1);
+            println!(
+                "  ✓ Invalid transition design→documentation correctly flagged (skip={})",
+                t - f - 1
+            );
         }
         _ => panic!("Both phases must be in canonical order"),
     }
@@ -795,7 +867,11 @@ fn test_filesystem_handoff_yamls_conform_to_schema() {
         return;
     }
 
-    println!("  Found {} handoff YAMLs in {:?}", yaml_files.len(), handoff_dir);
+    println!(
+        "  Found {} handoff YAMLs in {:?}",
+        yaml_files.len(),
+        handoff_dir
+    );
 
     // Act — parse each YAML
     let mut parsed: Vec<(std::path::PathBuf, HandoffContract)> = Vec::new();
@@ -815,12 +891,17 @@ fn test_filesystem_handoff_yamls_conform_to_schema() {
     }
 
     // Assert — at least some parsed successfully
-    assert!(!parsed.is_empty(), "At least one handoff YAML must parse successfully");
+    assert!(
+        !parsed.is_empty(),
+        "At least one handoff YAML must parse successfully"
+    );
 
     // Group by feature_name
-    let mut by_feature: HashMap<String, Vec<(std::path::PathBuf, HandoffContract)>> = HashMap::new();
+    let mut by_feature: HashMap<String, Vec<(std::path::PathBuf, HandoffContract)>> =
+        HashMap::new();
     for (path, contract) in parsed.drain(..) {
-        by_feature.entry(contract.feature_name.clone())
+        by_feature
+            .entry(contract.feature_name.clone())
             .or_default()
             .push((path, contract));
     }
@@ -830,11 +911,19 @@ fn test_filesystem_handoff_yamls_conform_to_schema() {
     // For each multi-phase feature, validate chain integrity
     for (feature, contracts) in &by_feature {
         if contracts.len() < 2 {
-            println!("  ⚠ Feature '{}' has only {} handoff(s) — chain incomplete", feature, contracts.len());
+            println!(
+                "  ⚠ Feature '{}' has only {} handoff(s) — chain incomplete",
+                feature,
+                contracts.len()
+            );
             continue;
         }
 
-        println!("  ✓ Feature '{}' — {} handoff phase(s)", feature, contracts.len());
+        println!(
+            "  ✓ Feature '{}' — {} handoff phase(s)",
+            feature,
+            contracts.len()
+        );
 
         // Sort by phase order
         let mut sorted: Vec<&HandoffContract> = contracts.iter().map(|(_, c)| c).collect();
@@ -852,7 +941,8 @@ fn test_filesystem_handoff_yamls_conform_to_schema() {
 
         // Verify next_phase_ready
         for c in &sorted {
-            let path = &contracts.iter()
+            let path = &contracts
+                .iter()
                 .find(|(_, hc)| hc.handoff_id == c.handoff_id)
                 .map(|(p, _)| p.display().to_string())
                 .unwrap_or_default();
@@ -860,7 +950,8 @@ fn test_filesystem_handoff_yamls_conform_to_schema() {
                 c.next_phase_ready,
                 Some(true),
                 "Handoff '{}' ({}) must have next_phase_ready: true",
-                c.handoff_id, path
+                c.handoff_id,
+                path
             );
         }
     }
@@ -889,7 +980,8 @@ fn test_no_dag_cycles_possible() {
         assert!(
             to_idx > from_idx,
             "Transition {}→{} is backward (cycle) — must be rejected",
-            from, to
+            from,
+            to
         );
     }
 }
@@ -903,12 +995,18 @@ fn test_no_dag_cycles_possible() {
 fn find_handoff_dir() -> Option<std::path::PathBuf> {
     // Try several candidate locations
     let candidates = [
-        std::env::current_dir().ok().map(|p| p.join(".kiro/handoffs")),
-        std::env::current_dir().ok().map(|p| p.join("../.kiro/handoffs")),
-        std::env::current_exe().ok()
+        std::env::current_dir()
+            .ok()
+            .map(|p| p.join(".kiro/handoffs")),
+        std::env::current_dir()
+            .ok()
+            .map(|p| p.join("../.kiro/handoffs")),
+        std::env::current_exe()
+            .ok()
             .and_then(|p| p.parent().map(|p| p.to_path_buf()))
             .map(|p| p.join("../../../../.kiro/handoffs")),
-        std::env::current_exe().ok()
+        std::env::current_exe()
+            .ok()
             .and_then(|p| p.parent().map(|p| p.to_path_buf()))
             .map(|p| p.join("../../../.kiro/handoffs")),
     ];
@@ -961,51 +1059,96 @@ fn test_e2e_sequential_handoff_chain_validation() {
         "Phase A must be root (no dependencies)"
     );
     assert_eq!(phase_a.from_phase, "design", "Phase A must be design phase");
-    assert_eq!(phase_a.to_phase, "implementation", "Phase A must transition to implementation");
+    assert_eq!(
+        phase_a.to_phase, "implementation",
+        "Phase A must transition to implementation"
+    );
     assert!(
-        phase_a.quality_gates.as_ref().map_or(false, |gates| gates.iter().all(|g| g.status == "pass")),
+        phase_a
+            .quality_gates
+            .as_ref()
+            .map_or(false, |gates| gates.iter().all(|g| g.status == "pass")),
         "Phase A must have all quality gates passing"
     );
-    assert_eq!(phase_a.next_phase_ready, Some(true), "Phase A must signal next phase ready");
+    assert_eq!(
+        phase_a.next_phase_ready,
+        Some(true),
+        "Phase A must signal next phase ready"
+    );
 
     // Step 2: Validate Phase B (depends on A)
-    let phase_b_deps = phase_b.dependencies.as_ref()
+    let phase_b_deps = phase_b
+        .dependencies
+        .as_ref()
         .expect("Phase B must declare dependencies");
     assert!(
         phase_b_deps.contains(&phase_a.handoff_id),
         "Phase B must depend on Phase A handoff_id"
     );
-    assert_eq!(phase_b.from_phase, "implementation", "Phase B must be implementation phase");
-    assert_eq!(phase_b.to_phase, "testing", "Phase B must transition to testing");
+    assert_eq!(
+        phase_b.from_phase, "implementation",
+        "Phase B must be implementation phase"
+    );
+    assert_eq!(
+        phase_b.to_phase, "testing",
+        "Phase B must transition to testing"
+    );
     assert!(
-        phase_b.quality_gates.as_ref().map_or(false, |gates| gates.iter().all(|g| g.status == "pass")),
+        phase_b
+            .quality_gates
+            .as_ref()
+            .map_or(false, |gates| gates.iter().all(|g| g.status == "pass")),
         "Phase B must have all quality gates passing"
     );
-    assert_eq!(phase_b.next_phase_ready, Some(true), "Phase B must signal next phase ready");
+    assert_eq!(
+        phase_b.next_phase_ready,
+        Some(true),
+        "Phase B must signal next phase ready"
+    );
 
     // Step 3: Validate Phase C (depends on B)
-    let phase_c_deps = phase_c.dependencies.as_ref()
+    let phase_c_deps = phase_c
+        .dependencies
+        .as_ref()
         .expect("Phase C must declare dependencies");
     assert!(
         phase_c_deps.contains(&phase_b.handoff_id),
         "Phase C must depend on Phase B handoff_id"
     );
-    assert_eq!(phase_c.from_phase, "testing", "Phase C must be testing phase");
-    assert_eq!(phase_c.to_phase, "documentation", "Phase C must transition to documentation");
+    assert_eq!(
+        phase_c.from_phase, "testing",
+        "Phase C must be testing phase"
+    );
+    assert_eq!(
+        phase_c.to_phase, "documentation",
+        "Phase C must transition to documentation"
+    );
     assert!(
-        phase_c.quality_gates.as_ref().map_or(false, |gates| gates.iter().all(|g| g.status == "pass")),
+        phase_c
+            .quality_gates
+            .as_ref()
+            .map_or(false, |gates| gates.iter().all(|g| g.status == "pass")),
         "Phase C must have all quality gates passing"
     );
-    assert_eq!(phase_c.next_phase_ready, Some(true), "Phase C must signal next phase ready");
+    assert_eq!(
+        phase_c.next_phase_ready,
+        Some(true),
+        "Phase C must signal next phase ready"
+    );
 
     // Step 4: Validate Phase D (depends on C, terminal)
-    let phase_d_deps = phase_d.dependencies.as_ref()
+    let phase_d_deps = phase_d
+        .dependencies
+        .as_ref()
         .expect("Phase D must declare dependencies");
     assert!(
         phase_d_deps.contains(&phase_c.handoff_id),
         "Phase D must depend on Phase C handoff_id"
     );
-    assert_eq!(phase_d.from_phase, "documentation", "Phase D must be documentation phase");
+    assert_eq!(
+        phase_d.from_phase, "documentation",
+        "Phase D must be documentation phase"
+    );
     // Phase D is terminal (no to_phase or to_phase is None/empty)
     // Phase D (documentation) is terminal: to_phase should be empty or a terminal indicator
     assert!(
@@ -1017,7 +1160,10 @@ fn test_e2e_sequential_handoff_chain_validation() {
         phase_d.to_phase
     );
     assert!(
-        phase_d.quality_gates.as_ref().map_or(false, |gates| gates.iter().all(|g| g.status == "pass")),
+        phase_d
+            .quality_gates
+            .as_ref()
+            .map_or(false, |gates| gates.iter().all(|g| g.status == "pass")),
         "Phase D must have all quality gates passing"
     );
 }
@@ -1037,28 +1183,47 @@ fn test_e2e_context_bridging_across_phases() {
     let phase_d = serde_yaml::from_str::<HandoffContract>(FIXTURE_DOC_YAML).unwrap();
 
     // A→B: Implementation must reference design decisions
-    let phase_a_decisions = phase_a.context.as_ref()
+    let phase_a_decisions = phase_a
+        .context
+        .as_ref()
         .and_then(|ctx| ctx.key_design_decisions.as_ref())
         .map(|decs| decs.len())
         .unwrap_or(0);
-    assert!(phase_a_decisions > 0, "Phase A must document design decisions");
+    assert!(
+        phase_a_decisions > 0,
+        "Phase A must document design decisions"
+    );
 
     // B→C: Testing must reference implementation deliverables
-    let phase_b_deliverables = phase_b.deliverables.as_ref()
+    let phase_b_deliverables = phase_b
+        .deliverables
+        .as_ref()
         .map(|dels| dels.len())
         .unwrap_or(0);
-    assert!(phase_b_deliverables > 0, "Phase B must document deliverables");
+    assert!(
+        phase_b_deliverables > 0,
+        "Phase B must document deliverables"
+    );
 
     // C→D: Documentation must reference test results
-    let phase_c_context = phase_c.context.as_ref()
+    let phase_c_context = phase_c
+        .context
+        .as_ref()
         .and_then(|ctx| ctx.summary.as_ref())
         .map(|s| s.len())
         .unwrap_or(0);
-    assert!(phase_c_context > 0, "Phase C must document test results in context");
+    assert!(
+        phase_c_context > 0,
+        "Phase C must document test results in context"
+    );
 
     // D: Documentation must reference all prior phases
     let phase_d_deps = phase_d.dependencies.as_ref().unwrap();
-    assert_eq!(phase_d_deps.len(), 1, "Phase D must depend on Phase C (transitive closure)");
+    assert_eq!(
+        phase_d_deps.len(),
+        1,
+        "Phase D must depend on Phase C (transitive closure)"
+    );
 }
 
 // =============================================================================
@@ -1080,9 +1245,7 @@ fn test_e2e_no_blockers_in_chain() {
         let contract = serde_yaml::from_str::<HandoffContract>(yaml)
             .expect(&format!("Phase {} must parse", phase_name));
 
-        let blockers = contract.blockers.as_ref()
-            .map(|b| b.len())
-            .unwrap_or(0);
+        let blockers = contract.blockers.as_ref().map(|b| b.len()).unwrap_or(0);
         assert_eq!(
             blockers, 0,
             "Phase {} must have no blockers (found {})",
@@ -1106,7 +1269,16 @@ fn test_e2e_feature_name_immutability() {
     let phase_d = serde_yaml::from_str::<HandoffContract>(FIXTURE_DOC_YAML).unwrap();
 
     let feature_name = &phase_a.feature_name;
-    assert_eq!(&phase_b.feature_name, feature_name, "Phase B feature name must match Phase A");
-    assert_eq!(&phase_c.feature_name, feature_name, "Phase C feature name must match Phase A");
-    assert_eq!(&phase_d.feature_name, feature_name, "Phase D feature name must match Phase A");
+    assert_eq!(
+        &phase_b.feature_name, feature_name,
+        "Phase B feature name must match Phase A"
+    );
+    assert_eq!(
+        &phase_c.feature_name, feature_name,
+        "Phase C feature name must match Phase A"
+    );
+    assert_eq!(
+        &phase_d.feature_name, feature_name,
+        "Phase D feature name must match Phase A"
+    );
 }

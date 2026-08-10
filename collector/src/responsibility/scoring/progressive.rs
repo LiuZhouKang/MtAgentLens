@@ -127,9 +127,9 @@ impl AgentScoreState {
     }
 
     pub fn any_cusum_alarm(&self, config: &ProgressiveConfig) -> bool {
-        self.dims.iter().any(|d| {
-            d.cusum > config.cusum_h && d.consecutive >= config.consecutive_k
-        })
+        self.dims
+            .iter()
+            .any(|d| d.cusum > config.cusum_h && d.consecutive >= config.consecutive_k)
     }
 
     pub fn dim_scores(&self) -> [f64; NUM_DIMS] {
@@ -264,8 +264,11 @@ impl ProgressiveScorer {
             state.dims[5].ewma,
         ];
         // Use default weights matching the scoring system
-        let weights: [f64; NUM_DIMS] = crate::responsibility::scoring::progressive::DEFAULT_DIM_WEIGHTS;
-        Some(crate::responsibility::scoring::fusion::fuse_dimensions(&dims, &weights))
+        let weights: [f64; NUM_DIMS] =
+            crate::responsibility::scoring::progressive::DEFAULT_DIM_WEIGHTS;
+        Some(crate::responsibility::scoring::fusion::fuse_dimensions(
+            &dims, &weights,
+        ))
     }
 
     /// Check if any dimension for an agent has a CUSUM alarm.

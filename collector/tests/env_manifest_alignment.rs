@@ -9,7 +9,10 @@ fn scenario_manifest_lists_all_current_env_scenarios() {
     let manifest = match fs::read_to_string(manifest_path()) {
         Ok(content) => content,
         Err(_) => {
-            eprintln!("manifest not found at {} — skipping validation", manifest_path());
+            eprintln!(
+                "manifest not found at {} — skipping validation",
+                manifest_path()
+            );
             return;
         }
     };

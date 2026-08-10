@@ -799,7 +799,11 @@ mod api_tests {
             Some(&enroll_resp.backup_codes[1]),
         )
         .await;
-        assert_eq!(resp.status(), StatusCode::OK, "first login with backup code");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "first login with backup code"
+        );
 
         // Login again with SAME backup code — should fail (consumed)
         let resp2 = login(
@@ -869,8 +873,7 @@ mod api_tests {
         let state = new_auth_state();
 
         // Enroll two users concurrently
-        let (enroll_a, enroll_b) =
-            join!(enroll(&state, "test-user"), enroll(&state, "other-user"));
+        let (enroll_a, enroll_b) = join!(enroll(&state, "test-user"), enroll(&state, "other-user"));
 
         // Verify both secrets are valid
         assert_eq!(enroll_a.secret.len(), 32, "user-a secret length");
@@ -975,8 +978,8 @@ mod api_tests {
 
     #[tokio::test]
     async fn gap_it04_verify_with_real_totp_code() {
-        use crate::auth::totp::compute_totp;
         use crate::auth::totp::base32_decode;
+        use crate::auth::totp::compute_totp;
         use std::time::{SystemTime, UNIX_EPOCH};
 
         let state = new_auth_state();
@@ -1010,8 +1013,8 @@ mod api_tests {
 
     #[tokio::test]
     async fn gap_it04b_real_totp_login_flow() {
-        use crate::auth::totp::compute_totp;
         use crate::auth::totp::base32_decode;
+        use crate::auth::totp::compute_totp;
         use std::time::{SystemTime, UNIX_EPOCH};
 
         let state = new_auth_state();
@@ -1034,13 +1037,7 @@ mod api_tests {
         // Compute a fresh TOTP code for login (same window since both calls are fast)
         let totp_code2 = compute_totp(&decoded, counter, 6);
 
-        let resp = login(
-            &state,
-            "test-user",
-            "test-password-123",
-            Some(&totp_code2),
-        )
-        .await;
+        let resp = login(&state, "test-user", "test-password-123", Some(&totp_code2)).await;
         assert_eq!(
             resp.status(),
             StatusCode::OK,
@@ -1056,8 +1053,8 @@ mod api_tests {
 
     #[tokio::test]
     async fn gap_it04c_wrong_secret_totp_fails() {
-        use crate::auth::totp::compute_totp;
         use crate::auth::totp::base32_decode;
+        use crate::auth::totp::compute_totp;
         use std::time::{SystemTime, UNIX_EPOCH};
 
         let state = new_auth_state();

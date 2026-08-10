@@ -32,10 +32,7 @@ export function collectLinkedEvidence(
 const nodeByIdCache = new WeakMap<GraphData, Map<string, GraphData['nodes'][number]>>();
 const agentNodeCache = new WeakMap<GraphData, Map<string, GraphData['nodes'][number]>>();
 
-function getNodeById(
-  graph: GraphData,
-  nodeId: string,
-): GraphData['nodes'][number] | undefined {
+function getNodeById(graph: GraphData, nodeId: string): GraphData['nodes'][number] | undefined {
   let index = nodeByIdCache.get(graph);
   if (!index) {
     index = new Map(graph.nodes.map((node) => [node.node_id, node]));
@@ -66,10 +63,7 @@ export function findAgentNode(
   return index.get(agentId);
 }
 
-export function findDirectlyConnectedNodeIds(
-  graph: GraphData,
-  seedNodeIds: string[],
-): string[] {
+export function findDirectlyConnectedNodeIds(graph: GraphData, seedNodeIds: string[]): string[] {
   const connected = new Set<string>();
   for (const edge of graph.edges) {
     if (seedNodeIds.includes(edge.source)) connected.add(edge.target);

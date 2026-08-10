@@ -1,61 +1,61 @@
-import type { DatasetOverview } from './types'
+import type { DatasetOverview } from './types';
 
 export interface KpiTile {
-  key: string
-  label: string
-  value: number
-  hint: string
-  tone: 'danger' | 'warning' | 'info' | 'success'
+  key: string;
+  label: string;
+  value: number;
+  hint: string;
+  tone: 'danger' | 'warning' | 'info' | 'success';
 }
 
 export interface FrictionSignal {
-  severity: 'Critical' | 'Warning' | 'Info'
-  category: string
-  title: string
-  detail: string
-  count: number
+  severity: 'Critical' | 'Warning' | 'Info';
+  category: string;
+  title: string;
+  detail: string;
+  count: number;
 }
 
 export interface DatasetSummary {
-  health: 'critical' | 'warning' | 'normal'
-  healthReason: string
-  identity: { scenarioId: string | null; mode: string | null; collectorVersion: string | null }
-  timeRange: { startedAtNs: number | null; endedAtNs: number | null; durationMs: number | null }
-  kpi: KpiTile[]
-  signals: FrictionSignal[]
-  statCards: { category: string; items: { label: string; value: number }[] }[]
+  health: 'critical' | 'warning' | 'normal';
+  healthReason: string;
+  identity: { scenarioId: string | null; mode: string | null; collectorVersion: string | null };
+  timeRange: { startedAtNs: number | null; endedAtNs: number | null; durationMs: number | null };
+  kpi: KpiTile[];
+  signals: FrictionSignal[];
+  statCards: { category: string; items: { label: string; value: number }[] }[];
 }
 
 const sumValues = (record: Record<string, number>): number =>
-  Object.values(record).reduce((sum, n) => sum + n, 0)
+  Object.values(record).reduce((sum, n) => sum + n, 0);
 
 const formatBreakdown = (record: Record<string, number>): string =>
   Object.entries(record)
     .sort((a, b) => b[1] - a[1])
     .map(([k, n]) => `${k} ${n}`)
-    .join(' · ')
+    .join(' · ');
 
 /**
  * Derive the overview summary strictly from the dataset overview. Nothing is
  * invented: a panel that cannot be computed from the counts is left empty.
  */
 export function deriveDatasetSummary(overview: DatasetOverview): DatasetSummary {
-  const criticalClaims = overview.claims.by_severity.Critical ?? 0
-  const criticalAlerts = overview.alerts.count // alerts 表无 severity 分布 → 保守按 count
+  const criticalClaims = overview.claims.by_severity.Critical ?? 0;
+  const criticalAlerts = overview.alerts.count; // alerts 表无 severity 分布 → 保守按 count
   const health: DatasetSummary['health'] =
-    criticalClaims > 0 ? 'critical' : criticalAlerts > 0 ? 'warning' : 'normal'
+    criticalClaims > 0 ? 'critical' : criticalAlerts > 0 ? 'warning' : 'normal';
   const healthReason =
     criticalClaims > 0
       ? `${criticalClaims} 条 Critical 责任声明需关注`
       : criticalAlerts > 0
         ? `${criticalAlerts} 条告警需关注`
-        : '无风险信号'
+        : '无风险信号';
 
   const fileActivity = sumValues(
     Object.fromEntries(
       Object.entries(overview.actions.by_action_type).filter(([k]) => k.startsWith('File')),
     ),
-  )
+  );
 
   const kpi: KpiTile[] = [
     {
@@ -100,9 +100,9 @@ export function deriveDatasetSummary(overview: DatasetOverview): DatasetSummary 
       hint: '',
       tone: criticalAlerts > 0 ? 'danger' : 'info',
     },
-  ]
+  ];
 
-  const signals: FrictionSignal[] = []
+  const signals: FrictionSignal[] = [];
   if (overview.pollution.count > 0) {
     signals.push({
       severity: 'Critical',
@@ -110,7 +110,7 @@ export function deriveDatasetSummary(overview: DatasetOverview): DatasetSummary 
       title: '上下文污染事件',
       detail: '被污染的上下文进入后续请求上下文',
       count: overview.pollution.count,
-    })
+    });
   }
   if (criticalClaims > 0) {
     signals.push({
@@ -119,20 +119,20 @@ export function deriveDatasetSummary(overview: DatasetOverview): DatasetSummary 
       title: 'Critical 责任声明',
       detail: formatBreakdown(overview.claims.by_type),
       count: criticalClaims,
-    })
+    });
   }
-  const weakCount = overview.evidence.by_match_level.L5Substring ?? 0
+  const weakCount = overview.evidence.by_match_level.L5Substring ?? 0;
   if (weakCount > 0) {
-    const pct = overview.evidence.count > 0 ? (weakCount / overview.evidence.count) * 100 : 0
+    const pct = overview.evidence.count > 0 ? (weakCount / overview.evidence.count) * 100 : 0;
     signals.push({
       severity: 'Info',
       category: 'weak-evidence',
       title: '弱匹配证据',
       detail: `L5 弱匹配 ${pct.toFixed(1)}%（${weakCount}/${overview.evidence.count}）`,
       count: weakCount,
-    })
+    });
   }
-  const policyViolations = overview.policy_evaluations.violations ?? 0
+  const policyViolations = overview.policy_evaluations.violations ?? 0;
   if (policyViolations > 0) {
     signals.push({
       severity: 'Warning',
@@ -140,7 +140,7 @@ export function deriveDatasetSummary(overview: DatasetOverview): DatasetSummary 
       title: '策略违规',
       detail: 'judgment_json.result = Violation',
       count: policyViolations,
-    })
+    });
   }
 
   const statCards: DatasetSummary['statCards'] = [
@@ -184,13 +184,13 @@ export function deriveDatasetSummary(overview: DatasetOverview): DatasetSummary 
         { label: '身份', value: overview.provisional_identities.count },
       ],
     },
-  ]
+  ];
 
-  const run = overview.run
+  const run = overview.run;
   const durationMs =
     run?.started_at_ns != null && run.ended_at_ns != null
       ? Math.max(0, (run.ended_at_ns - run.started_at_ns) / 1_000_000)
-      : null
+      : null;
 
   return {
     health,
@@ -208,5 +208,5 @@ export function deriveDatasetSummary(overview: DatasetOverview): DatasetSummary 
     kpi,
     signals,
     statCards,
-  }
+  };
 }

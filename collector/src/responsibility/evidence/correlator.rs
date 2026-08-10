@@ -30,9 +30,8 @@ use crate::responsibility::evidence::non_link_diagnostic;
 use crate::responsibility::evidence::quality::passes_quality_gate;
 use crate::responsibility::signals::SignalSnapshot;
 use crate::responsibility::types::{
-    Action, ActionId, CandidateDerivationMode, CorrelationEvidence, EvidenceId,
-    EvidenceRefinement, EvidenceRefinementType, Intent, IntentId, MatchLevel, NonLinkDiagnostic,
-    PhaseIndicator,
+    Action, CandidateDerivationMode, CorrelationEvidence, EvidenceId, EvidenceRefinement,
+    EvidenceRefinementType, Intent, IntentId, MatchLevel, NonLinkDiagnostic, PhaseIndicator,
 };
 use std::collections::HashSet;
 
@@ -162,10 +161,11 @@ impl EvidenceCorrelator {
         if !intent.primary_matching_eligible {
             // Non-primary intents (regex fallback) get a diagnostic but
             // we still attempt matching
-            self.diagnostics.push(non_link_diagnostic::intent_not_primary_eligible(
-                intent.intent_id.clone(),
-                now_ns,
-            ));
+            self.diagnostics
+                .push(non_link_diagnostic::intent_not_primary_eligible(
+                    intent.intent_id.clone(),
+                    now_ns,
+                ));
         }
 
         let mut matched = false;
@@ -173,9 +173,14 @@ impl EvidenceCorrelator {
         // Clone actions to avoid borrow conflict with try_correlate(&mut self)
         let actions: Vec<Action> = self.action_buffer.iter().cloned().collect();
         for action in &actions {
-            if let Some(evidence) =
-                self.try_correlate(&intent, action, snapshot, PhaseIndicator::Provisional { timestamp_ns: now_ns })
-            {
+            if let Some(evidence) = self.try_correlate(
+                &intent,
+                action,
+                snapshot,
+                PhaseIndicator::Provisional {
+                    timestamp_ns: now_ns,
+                },
+            ) {
                 results.push(evidence);
                 matched = true;
             }
@@ -189,15 +194,17 @@ impl EvidenceCorrelator {
                 .any(|a| snapshot.can_correlate(intent.process_id, a.process_id));
 
             if has_eligible {
-                self.diagnostics.push(non_link_diagnostic::no_argument_match(
-                    intent.intent_id.clone(),
-                    now_ns,
-                ));
+                self.diagnostics
+                    .push(non_link_diagnostic::no_argument_match(
+                        intent.intent_id.clone(),
+                        now_ns,
+                    ));
             } else {
-                self.diagnostics.push(non_link_diagnostic::candidate_not_available(
-                    intent.intent_id.clone(),
-                    now_ns,
-                ));
+                self.diagnostics
+                    .push(non_link_diagnostic::candidate_not_available(
+                        intent.intent_id.clone(),
+                        now_ns,
+                    ));
             }
         }
 
@@ -229,9 +236,14 @@ impl EvidenceCorrelator {
         // Clone intents to avoid borrow conflict with try_correlate(&mut self)
         let intents: Vec<Intent> = self.intent_buffer.iter().cloned().collect();
         for intent in &intents {
-            if let Some(evidence) =
-                self.try_correlate(intent, &action, snapshot, PhaseIndicator::Provisional { timestamp_ns: now_ns })
-            {
+            if let Some(evidence) = self.try_correlate(
+                intent,
+                &action,
+                snapshot,
+                PhaseIndicator::Provisional {
+                    timestamp_ns: now_ns,
+                },
+            ) {
                 results.push(evidence);
                 matched = true;
             }
@@ -244,12 +256,13 @@ impl EvidenceCorrelator {
                 .any(|i| snapshot.can_correlate(i.process_id, action.process_id));
 
             if has_eligible {
-                self.diagnostics.push(non_link_diagnostic::no_argument_match(
-                    // Use a placeholder intent_id for action-only diagnostic
-                    // The diagnostic is about the action not finding any matching intent
-                    IntentId::from(format!("action-diag-{}", action.action_id.as_str())),
-                    now_ns,
-                ));
+                self.diagnostics
+                    .push(non_link_diagnostic::no_argument_match(
+                        // Use a placeholder intent_id for action-only diagnostic
+                        // The diagnostic is about the action not finding any matching intent
+                        IntentId::from(format!("action-diag-{}", action.action_id.as_str())),
+                        now_ns,
+                    ));
             }
             // Note: we don't produce candidate_not_available for isolated actions
             // as they may be matched later when their intent arrives
@@ -284,21 +297,21 @@ impl EvidenceCorrelator {
         let mut linked_intents: HashSet<String> = HashSet::new();
         let mut linked_actions: HashSet<String> = HashSet::new();
         // Track competing matches per intent for confidence scoring
-        let mut match_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        let mut match_counts: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
 
         // First pass: find all valid matches
         let mut matches: Vec<(usize, usize, MatchLevel, f32)> = Vec::new();
         for (i_idx, intent) in intents.iter().enumerate() {
             for (a_idx, action) in actions.iter().enumerate() {
-                if let Some((level, _score)) = match_args(&intent.tool_args, &action.normalized_args) {
+                if let Some((level, _score)) =
+                    match_args(&intent.tool_args, &action.normalized_args)
+                {
                     // Check process tree
                     if snapshot.can_correlate(intent.process_id, action.process_id) {
-                        let tree_dist = compute_tree_distance(intent.process_id, action.process_id, snapshot);
-                        let time_delta = if intent.timestamp_ns > action.timestamp_ns {
-                            intent.timestamp_ns - action.timestamp_ns
-                        } else {
-                            action.timestamp_ns - intent.timestamp_ns
-                        };
+                        let tree_dist =
+                            compute_tree_distance(intent.process_id, action.process_id, snapshot);
+                        let _time_delta = intent.timestamp_ns.abs_diff(action.timestamp_ns);
                         // Get competing matches count
                         let competing = *match_counts.get(intent.intent_id.as_str()).unwrap_or(&0);
                         // Phase 2 batch: no time window per spec §7.3.
@@ -330,7 +343,10 @@ impl EvidenceCorrelator {
             let action = &actions[a_idx];
 
             // Dedup: skip already-linked pairs
-            let pair_key = (intent.intent_id.as_str().to_string(), action.action_id.as_str().to_string());
+            let pair_key = (
+                intent.intent_id.as_str().to_string(),
+                action.action_id.as_str().to_string(),
+            );
             if self.linked_pairs.contains(&pair_key) {
                 continue;
             }
@@ -363,23 +379,23 @@ impl EvidenceCorrelator {
 
         // Produce diagnostics for unmatched intents
         for intent in intents {
-            if !linked_intents.contains(intent.intent_id.as_str()) {
-                if intent.primary_matching_eligible {
-                    // Check if any action was process-tree eligible
-                    let eligible = actions
-                        .iter()
-                        .any(|a| snapshot.can_correlate(intent.process_id, a.process_id));
-                    if eligible {
-                        non_links.push(non_link_diagnostic::no_argument_match(
-                            intent.intent_id.clone(),
-                            intent.timestamp_ns,
-                        ));
-                    } else {
-                        non_links.push(non_link_diagnostic::candidate_not_available(
-                            intent.intent_id.clone(),
-                            intent.timestamp_ns,
-                        ));
-                    }
+            if !linked_intents.contains(intent.intent_id.as_str())
+                && intent.primary_matching_eligible
+            {
+                // Check if any action was process-tree eligible
+                let eligible = actions
+                    .iter()
+                    .any(|a| snapshot.can_correlate(intent.process_id, a.process_id));
+                if eligible {
+                    non_links.push(non_link_diagnostic::no_argument_match(
+                        intent.intent_id.clone(),
+                        intent.timestamp_ns,
+                    ));
+                } else {
+                    non_links.push(non_link_diagnostic::candidate_not_available(
+                        intent.intent_id.clone(),
+                        intent.timestamp_ns,
+                    ));
                 }
             }
         }
@@ -420,7 +436,10 @@ impl EvidenceCorrelator {
         snapshot: &SignalSnapshot,
         phase: PhaseIndicator,
     ) -> Option<CorrelationEvidence> {
-        let pair_key = (intent.intent_id.as_str().to_string(), action.action_id.as_str().to_string());
+        let pair_key = (
+            intent.intent_id.as_str().to_string(),
+            action.action_id.as_str().to_string(),
+        );
         if self.linked_pairs.contains(&pair_key) {
             return None; // Already linked
         }
@@ -441,7 +460,10 @@ impl EvidenceCorrelator {
 
         // Quality gate: reject fundamentally weak L4/L5 matches before
         // computing the full confidence score.
-        if matches!(match_level, MatchLevel::L4Basename | MatchLevel::L5Substring) {
+        if matches!(
+            match_level,
+            MatchLevel::L4Basename | MatchLevel::L5Substring
+        ) {
             // Build a rough representation of what was matched for the gate check
             let matched_rep = format_matched_string(intent, action);
             if !passes_quality_gate(&match_level, base_score, &matched_rep) {
@@ -450,11 +472,7 @@ impl EvidenceCorrelator {
         }
 
         // Time delta
-        let time_delta = if intent.timestamp_ns > action.timestamp_ns {
-            intent.timestamp_ns - action.timestamp_ns
-        } else {
-            action.timestamp_ns - intent.timestamp_ns
-        };
+        let time_delta = intent.timestamp_ns.abs_diff(action.timestamp_ns);
 
         // Confidence
         let confidence = compute_confidence(
@@ -467,13 +485,14 @@ impl EvidenceCorrelator {
 
         if confidence < min_confidence_for_level(&match_level) {
             // Record below-cutoff diagnostic
-            self.diagnostics.push(non_link_diagnostic::below_confidence_cutoff(
-                intent.intent_id.clone(),
-                action.action_id.clone(),
-                confidence,
-                match_level.clone(),
-                std::cmp::max(intent.timestamp_ns, action.timestamp_ns),
-            ));
+            self.diagnostics
+                .push(non_link_diagnostic::below_confidence_cutoff(
+                    intent.intent_id.clone(),
+                    action.action_id.clone(),
+                    confidence,
+                    match_level.clone(),
+                    std::cmp::max(intent.timestamp_ns, action.timestamp_ns),
+                ));
             return None;
         }
 
@@ -638,7 +657,7 @@ mod tests {
     use super::*;
     use crate::responsibility::signals::SignalGraph;
     use crate::responsibility::types::{
-        ActionCandidateType, CandidateDerivationMode, IntentAuthoritySource, IntentClass,
+        ActionCandidateType, ActionId, CandidateDerivationMode, IntentAuthoritySource, IntentClass,
         IntentParseState, MessageId, NormalizedArg, ProcessId, SignalClass,
     };
 
@@ -682,7 +701,9 @@ mod tests {
         }
     }
 
-    fn build_snapshot(parent_child_pairs: &[(ProcessId, ProcessId)]) -> (SignalGraph, std::sync::Arc<SignalSnapshot>) {
+    fn build_snapshot(
+        parent_child_pairs: &[(ProcessId, ProcessId)],
+    ) -> (SignalGraph, std::sync::Arc<SignalSnapshot>) {
         let mut g = SignalGraph::new();
         // Add init process
         let init = pid(1, 0);
@@ -704,13 +725,23 @@ mod tests {
 
         let mut corr = EvidenceCorrelator::new();
 
-        let intent = make_intent(p, "Write", vec![NormalizedArg::Path("/etc/hosts".into())], 1000);
+        let intent = make_intent(
+            p,
+            "Write",
+            vec![NormalizedArg::Path("/etc/hosts".into())],
+            1000,
+        );
 
         // Feed intent first
         let results = corr.on_intent(intent, &snap);
         assert!(results.is_empty()); // No action yet
 
-        let action = make_action(p, ActionCandidateType::FileWrite, vec![NormalizedArg::Path("/etc/hosts".into())], 2000);
+        let action = make_action(
+            p,
+            ActionCandidateType::FileWrite,
+            vec![NormalizedArg::Path("/etc/hosts".into())],
+            2000,
+        );
 
         let results = corr.on_action(action, &snap);
         assert!(!results.is_empty());
@@ -728,11 +759,21 @@ mod tests {
 
         let mut corr = EvidenceCorrelator::new();
 
-        let action = make_action(p, ActionCandidateType::FileRead, vec![NormalizedArg::Path("/etc/passwd".into())], 1000);
+        let action = make_action(
+            p,
+            ActionCandidateType::FileRead,
+            vec![NormalizedArg::Path("/etc/passwd".into())],
+            1000,
+        );
         let results = corr.on_action(action, &snap);
         assert!(results.is_empty()); // No intent yet
 
-        let intent = make_intent(p, "Read", vec![NormalizedArg::Path("/etc/passwd".into())], 2000);
+        let intent = make_intent(
+            p,
+            "Read",
+            vec![NormalizedArg::Path("/etc/passwd".into())],
+            2000,
+        );
         let results = corr.on_intent(intent, &snap);
         assert!(!results.is_empty());
     }
@@ -746,10 +787,20 @@ mod tests {
 
         let mut corr = EvidenceCorrelator::new();
 
-        let intent = make_intent(p, "Read", vec![NormalizedArg::Path("/etc/hosts".into())], 1000);
+        let intent = make_intent(
+            p,
+            "Read",
+            vec![NormalizedArg::Path("/etc/hosts".into())],
+            1000,
+        );
         corr.on_intent(intent, &snap);
 
-        let action = make_action(p, ActionCandidateType::FileRead, vec![NormalizedArg::Path("/var/log/syslog".into())], 2000);
+        let action = make_action(
+            p,
+            ActionCandidateType::FileRead,
+            vec![NormalizedArg::Path("/var/log/syslog".into())],
+            2000,
+        );
         let results = corr.on_action(action, &snap);
         assert!(results.is_empty());
     }
@@ -773,8 +824,18 @@ mod tests {
         let mut corr = EvidenceCorrelator::new();
 
         // Intent from parent, action from child_a → should correlate
-        let intent = make_intent(parent, "Bash", vec![NormalizedArg::Command("cat".into())], 1000);
-        let action = make_action(child_a, ActionCandidateType::ProcessExec, vec![NormalizedArg::Command("cat".into())], 2000);
+        let intent = make_intent(
+            parent,
+            "Bash",
+            vec![NormalizedArg::Command("cat".into())],
+            1000,
+        );
+        let action = make_action(
+            child_a,
+            ActionCandidateType::ProcessExec,
+            vec![NormalizedArg::Command("cat".into())],
+            2000,
+        );
 
         let results = corr.on_intent(intent, &snap);
         assert!(results.is_empty());
@@ -792,7 +853,12 @@ mod tests {
         let mut corr = EvidenceCorrelator::new();
 
         let intent = make_intent(p, "Write", vec![NormalizedArg::Path("/tmp/f".into())], 1000);
-        let action = make_action(p, ActionCandidateType::FileWrite, vec![NormalizedArg::Path("/tmp/f".into())], 2000);
+        let action = make_action(
+            p,
+            ActionCandidateType::FileWrite,
+            vec![NormalizedArg::Path("/tmp/f".into())],
+            2000,
+        );
 
         let results1 = corr.on_intent(intent.clone(), &snap);
         assert!(results1.is_empty());
@@ -814,12 +880,20 @@ mod tests {
         let mut corr = EvidenceCorrelator::new();
 
         // Intent with no matching action
-        let intent = make_intent(p, "Read", vec![NormalizedArg::Path("/etc/shadow".into())], 1000);
+        let intent = make_intent(
+            p,
+            "Read",
+            vec![NormalizedArg::Path("/etc/shadow".into())],
+            1000,
+        );
         corr.on_intent(intent, &snap);
 
         let diags = corr.drain_diagnostics();
         assert!(!diags.is_empty());
-        assert_eq!(diags[0].reason, crate::responsibility::types::NonLinkReason::CandidateNotAvailable);
+        assert_eq!(
+            diags[0].reason,
+            crate::responsibility::types::NonLinkReason::CandidateNotAvailable
+        );
 
         // Drain should empty
         let diags2 = corr.drain_diagnostics();
@@ -835,9 +909,19 @@ mod tests {
 
         let corr = EvidenceCorrelator::new();
 
-        let intents = vec![make_intent(p, "Read", vec![NormalizedArg::Path("/etc/hosts".into())], 1000)];
+        let intents = vec![make_intent(
+            p,
+            "Read",
+            vec![NormalizedArg::Path("/etc/hosts".into())],
+            1000,
+        )];
         let actions = vec![
-            make_action(p, ActionCandidateType::FileRead, vec![NormalizedArg::Path("/etc/hosts".into())], 120_000_000_000), // 120 seconds later — no time gate!
+            make_action(
+                p,
+                ActionCandidateType::FileRead,
+                vec![NormalizedArg::Path("/etc/hosts".into())],
+                120_000_000_000,
+            ), // 120 seconds later — no time gate!
         ];
 
         let result = corr.correlate_batch(&intents, &actions, &snap);
@@ -855,13 +939,28 @@ mod tests {
         let corr = EvidenceCorrelator::new();
 
         // Immediate match
-        let intents = vec![make_intent(p, "Read", vec![NormalizedArg::Path("/tmp/f".into())], 1000)];
-        let actions = vec![make_action(p, ActionCandidateType::FileRead, vec![NormalizedArg::Path("/tmp/f".into())], 1500)];
+        let intents = vec![make_intent(
+            p,
+            "Read",
+            vec![NormalizedArg::Path("/tmp/f".into())],
+            1000,
+        )];
+        let actions = vec![make_action(
+            p,
+            ActionCandidateType::FileRead,
+            vec![NormalizedArg::Path("/tmp/f".into())],
+            1500,
+        )];
 
         let result_immediate = corr.correlate_batch(&intents, &actions, &snap);
 
         // Far-apart match (30s)
-        let actions_far = vec![make_action(p, ActionCandidateType::FileRead, vec![NormalizedArg::Path("/tmp/f".into())], 30_000_000_000)];
+        let actions_far = vec![make_action(
+            p,
+            ActionCandidateType::FileRead,
+            vec![NormalizedArg::Path("/tmp/f".into())],
+            30_000_000_000,
+        )];
 
         let result_far = corr.correlate_batch(&intents, &actions_far, &snap);
 
@@ -882,13 +981,26 @@ mod tests {
 
         let corr = EvidenceCorrelator::new();
 
-        let intents = vec![make_intent(p, "Read", vec![NormalizedArg::Path("/etc/hosts".into())], 1000)];
-        let actions = vec![make_action(p, ActionCandidateType::FileRead, vec![NormalizedArg::Path("/etc/hosts".into())], 2000)];
+        let intents = vec![make_intent(
+            p,
+            "Read",
+            vec![NormalizedArg::Path("/etc/hosts".into())],
+            1000,
+        )];
+        let actions = vec![make_action(
+            p,
+            ActionCandidateType::FileRead,
+            vec![NormalizedArg::Path("/etc/hosts".into())],
+            2000,
+        )];
 
         let result = corr.correlate_batch(&intents, &actions, &snap);
         assert_eq!(result.evidence.len(), 1);
         assert_eq!(result.refinements.len(), 1);
-        assert_eq!(result.refinements[0].refinement_type, EvidenceRefinementType::Discovered);
+        assert_eq!(
+            result.refinements[0].refinement_type,
+            EvidenceRefinementType::Discovered
+        );
     }
 
     #[test]
@@ -900,8 +1012,18 @@ mod tests {
 
         let corr = EvidenceCorrelator::new();
 
-        let intents = vec![make_intent(p, "Read", vec![NormalizedArg::Path("/etc/hosts".into())], 1000)];
-        let actions = vec![make_action(p, ActionCandidateType::FileRead, vec![NormalizedArg::Path("/var/log/syslog".into())], 2000)];
+        let intents = vec![make_intent(
+            p,
+            "Read",
+            vec![NormalizedArg::Path("/etc/hosts".into())],
+            1000,
+        )];
+        let actions = vec![make_action(
+            p,
+            ActionCandidateType::FileRead,
+            vec![NormalizedArg::Path("/var/log/syslog".into())],
+            2000,
+        )];
 
         let result = corr.correlate_batch(&intents, &actions, &snap);
         assert!(result.evidence.is_empty());

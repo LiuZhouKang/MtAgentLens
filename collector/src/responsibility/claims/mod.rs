@@ -5,9 +5,9 @@
 // ── Legacy modules (backward compatibility) ────────────────────────────────
 pub mod accountability_claim;
 pub mod accountability_evidence;
-pub mod responsibility_evidence;
 pub mod alert;
 pub mod persistence;
+pub mod responsibility_evidence;
 
 // ── Authoritative modules ──────────────────────────────────────────────────
 pub mod alert_builder;
@@ -26,8 +26,8 @@ pub use accountability_evidence::{
     accountability_evidence_shape_is_valid, build_accountability_evidence_payload,
 };
 pub use alert::{
-    AccountabilityAlert, AgentRef, BehaviorTimeline, BehaviorTimelineEntry,
-    CausalGraphSnapshot, EngineSection,
+    AccountabilityAlert, AgentRef, BehaviorTimeline, BehaviorTimelineEntry, CausalGraphSnapshot,
+    EngineSection,
 };
 pub use persistence::ResponsibilityWriter;
 // ResponsibilityTraceback is defined in types/; re-export for backward compat

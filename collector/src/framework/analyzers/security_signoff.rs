@@ -270,12 +270,7 @@ fn process_from_handoff_injection(
         .get("injection_chain")
         .and_then(|c| c.get("acceptance_marker"))
         .and_then(Value::as_str)
-        .or_else(|| {
-            event
-                .data
-                .get("acceptance_marker")
-                .and_then(Value::as_str)
-        })
+        .or_else(|| event.data.get("acceptance_marker").and_then(Value::as_str))
         .unwrap_or_default()
         .to_string();
 
@@ -349,35 +344,34 @@ fn process_from_handoff_injection(
     // Process identity confusion correlation events directly (rule_id match).
     // These arrive when the HandoffInjectionAnalyzer emitted cross-agent or
     // unverified-acceptance correlation events with `handoff_injection` source.
-    if let Some(rule_id) = event.data.get("rule_id").and_then(Value::as_str) {
-        if rule_id == "cross_agent_verdict_propagation"
-            || rule_id == "unverified_acceptance_of_signed_verdict"
-        {
-            let agent_data = event.data.get("agent").unwrap();
-            let root_pid = agent_data
-                .get("root_pid")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as u32)
-                .unwrap_or(event.pid);
+    if let Some(rule_id) = event.data.get("rule_id").and_then(Value::as_str)
+        && (rule_id == "cross_agent_verdict_propagation"
+            || rule_id == "unverified_acceptance_of_signed_verdict")
+    {
+        let agent_data = event.data.get("agent").unwrap();
+        let root_pid = agent_data
+            .get("root_pid")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32)
+            .unwrap_or(event.pid);
 
-            let grantor_role = "security-performance-auditor".to_string();
-            let is_authorized = is_role_authorized(&grantor_role, config);
+        let grantor_role = "security-performance-auditor".to_string();
+        let is_authorized = is_role_authorized(&grantor_role, config);
 
-            let agent_state = state.agents.entry(root_pid).or_default();
-            agent_state.signoff = SignoffState::Accepted {
-                accepted_by: root_pid,
-                grantor_role: grantor_role.clone(),
-                timestamp_ns: event.timestamp,
-            };
+        let agent_state = state.agents.entry(root_pid).or_default();
+        agent_state.signoff = SignoffState::Accepted {
+            accepted_by: root_pid,
+            grantor_role: grantor_role.clone(),
+            timestamp_ns: event.timestamp,
+        };
 
-            return vec![build_identity_confusion_signoff_event(
-                event,
-                root_pid,
-                &grantor_role,
-                is_authorized,
-                agent_state.read_security_handoff,
-            )];
-        }
+        return vec![build_identity_confusion_signoff_event(
+            event,
+            root_pid,
+            &grantor_role,
+            is_authorized,
+            agent_state.read_security_handoff,
+        )];
     }
 
     Vec::new()

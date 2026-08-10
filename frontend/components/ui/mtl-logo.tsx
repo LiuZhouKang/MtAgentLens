@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useId, useRef } from 'react';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 
@@ -32,6 +32,9 @@ export function MtlLogo({
   mono?: boolean;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
+  // 每实例唯一的渐变 ID —— 防跨实例 url(#id) 解析到被 display:none 的兄弟渐变
+  // （SVG 规范：引用不渲染子树里的 paint server 会失效，导致核心/轨道不绘制）
+  const gradId = `mtl-grad-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
   useGSAP(
     () => {
@@ -131,30 +134,52 @@ export function MtlLogo({
         style={{ display: 'block', color: 'currentColor' }}
       >
         <ellipse
-          cx="256" cy="256" rx="206" ry="72"
-          stroke="currentColor" fill="none" strokeLinecap="round" strokeDasharray="868 62"
+          cx="256"
+          cy="256"
+          rx="206"
+          ry="72"
+          stroke="currentColor"
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray="868 62"
           style={{ strokeWidth: 38 }}
           opacity="0.9"
           transform="rotate(6 256 256)"
         />
         <ellipse
-          cx="256" cy="256" rx="178" ry="62"
-          stroke="currentColor" fill="none" strokeLinecap="round" strokeDasharray="620 220"
+          cx="256"
+          cy="256"
+          rx="178"
+          ry="62"
+          stroke="currentColor"
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray="620 220"
           style={{ strokeWidth: 32 }}
           opacity="0.55"
           transform="rotate(-55 256 256)"
         />
         <ellipse
-          cx="256" cy="256" rx="140" ry="48"
-          stroke="currentColor" fill="none" strokeLinecap="round" strokeDasharray="340 330"
+          cx="256"
+          cy="256"
+          rx="140"
+          ry="48"
+          stroke="currentColor"
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray="340 330"
           style={{ strokeWidth: 26 }}
           opacity="0.28"
           transform="rotate(65 256 256)"
         />
         {/* Core — open ring, line style (matches button icons) */}
         <circle
-          cx="256" cy="256" r="46"
-          stroke="currentColor" fill="none" strokeLinecap="round"
+          cx="256"
+          cy="256"
+          r="46"
+          stroke="currentColor"
+          fill="none"
+          strokeLinecap="round"
           style={{ strokeWidth: 30 }}
         />
       </svg>
@@ -175,8 +200,11 @@ export function MtlLogo({
     >
       <defs>
         <linearGradient
-          id="mtl-grad"
-          x1="80" y1="80" x2="432" y2="432"
+          id={gradId}
+          x1="80"
+          y1="80"
+          x2="432"
+          y2="432"
           gradientUnits="userSpaceOnUse"
         >
           <stop offset="0" stopColor="#fbbf24" />
@@ -190,20 +218,35 @@ export function MtlLogo({
       {/* Radar pulse rings — two seamless staggered scans */}
       <circle
         className="mtl-pulse"
-        cx="256" cy="256" r="54"
-        stroke="#fbbf24" strokeWidth="3" fill="none" opacity="0"
+        cx="256"
+        cy="256"
+        r="54"
+        stroke="#fbbf24"
+        strokeWidth="3"
+        fill="none"
+        opacity="0"
       />
       <circle
         className="mtl-pulse2"
-        cx="256" cy="256" r="54"
-        stroke="#f97316" strokeWidth="2.5" fill="none" opacity="0"
+        cx="256"
+        cy="256"
+        r="54"
+        stroke="#f97316"
+        strokeWidth="2.5"
+        fill="none"
+        opacity="0"
       />
 
       {/* Orbit A — large */}
       <ellipse
         className="mtl-orbit"
-        cx="256" cy="256" rx="206" ry="72"
-        stroke="url(#mtl-grad)" strokeWidth="14" strokeLinecap="round"
+        cx="256"
+        cy="256"
+        rx="206"
+        ry="72"
+        stroke={`url(#${gradId})`}
+        strokeWidth="14"
+        strokeLinecap="round"
         strokeDasharray="868 62"
         opacity="0.9"
         transform="rotate(6 256 256)"
@@ -211,8 +254,13 @@ export function MtlLogo({
       {/* Orbit B — medium */}
       <ellipse
         className="mtl-orbit"
-        cx="256" cy="256" rx="178" ry="62"
-        stroke="url(#mtl-grad)" strokeWidth="12" strokeLinecap="round"
+        cx="256"
+        cy="256"
+        rx="178"
+        ry="62"
+        stroke={`url(#${gradId})`}
+        strokeWidth="12"
+        strokeLinecap="round"
         strokeDasharray="700 140"
         opacity="0.55"
         transform="rotate(-55 256 256)"
@@ -220,8 +268,13 @@ export function MtlLogo({
       {/* Orbit C — small */}
       <ellipse
         className="mtl-orbit"
-        cx="256" cy="256" rx="140" ry="48"
-        stroke="url(#mtl-grad)" strokeWidth="10" strokeLinecap="round"
+        cx="256"
+        cy="256"
+        rx="140"
+        ry="48"
+        stroke={`url(#${gradId})`}
+        strokeWidth="10"
+        strokeLinecap="round"
         strokeDasharray="450 220"
         opacity="0.28"
         transform="rotate(65 256 256)"
@@ -229,7 +282,7 @@ export function MtlLogo({
 
       {/* Agent core — one clean gradient body */}
       <g className="mtl-core">
-        <circle cx="256" cy="256" r="46" fill="url(#mtl-grad)" />
+        <circle cx="256" cy="256" r="46" fill={`url(#${gradId})`} />
       </g>
 
       {/* Quiet glass highlight */}

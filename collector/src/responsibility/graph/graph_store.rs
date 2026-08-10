@@ -366,19 +366,11 @@ impl GraphStore {
 
         let orphan_intents = intents
             .iter()
-            .filter(|i| {
-                adj.intent_to_candidate
-                    .get(*i)
-                    .map_or(true, |v| v.is_empty())
-            })
+            .filter(|i| adj.intent_to_candidate.get(*i).is_none_or(|v| v.is_empty()))
             .count();
         let orphan_candidates = candidates
             .iter()
-            .filter(|c| {
-                adj.candidate_to_intent
-                    .get(*c)
-                    .map_or(true, |v| v.is_empty())
-            })
+            .filter(|c| adj.candidate_to_intent.get(*c).is_none_or(|v| v.is_empty()))
             .count();
 
         let total_out: usize = adj.intent_to_candidate.values().map(|v| v.len()).sum();
@@ -396,7 +388,7 @@ impl GraphStore {
             .unwrap_or(0);
 
         // Density: |E| / (|I| * |C|) for a bipartite graph
-        let density = if intent_count > 0 && candidates.len() > 0 {
+        let density = if intent_count > 0 && !candidates.is_empty() {
             edge_count as f64 / (intent_count * candidates.len()) as f64
         } else {
             0.0
@@ -459,7 +451,7 @@ impl GraphStore {
             if frontier.is_empty() {
                 break;
             }
-            let current_layer: Vec<GraphNode> = frontier.drain(..).collect();
+            let current_layer: Vec<GraphNode> = std::mem::take(&mut frontier);
             let mut next_frontier: Vec<GraphNode> = Vec::new();
 
             for node in &current_layer {
@@ -468,24 +460,24 @@ impl GraphStore {
                     continue;
                 }
                 visited.insert(key);
-                if let GraphNode::Intent(intent_id) = node {
-                    if let Some(outgoing) = adj.intent_to_candidate.get(intent_id) {
-                        for (_link_id, candidate_id, _confidence) in outgoing {
-                            if !visited.contains(candidate_id) {
-                                next_frontier.push(GraphNode::Candidate(candidate_id.clone()));
-                            }
+                if let GraphNode::Intent(intent_id) = node
+                    && let Some(outgoing) = adj.intent_to_candidate.get(intent_id)
+                {
+                    for (_link_id, candidate_id, _confidence) in outgoing {
+                        if !visited.contains(candidate_id) {
+                            next_frontier.push(GraphNode::Candidate(candidate_id.clone()));
                         }
                     }
                 }
             }
             // Also push candidates that feed intents further downstream
             for node in &current_layer {
-                if let GraphNode::Candidate(candidate_id) = node {
-                    if let Some(incoming) = adj.candidate_to_intent.get(candidate_id) {
-                        for (_link_id, intent_id) in incoming {
-                            if !visited.contains(intent_id) {
-                                next_frontier.push(GraphNode::Intent(intent_id.clone()));
-                            }
+                if let GraphNode::Candidate(candidate_id) = node
+                    && let Some(incoming) = adj.candidate_to_intent.get(candidate_id)
+                {
+                    for (_link_id, intent_id) in incoming {
+                        if !visited.contains(intent_id) {
+                            next_frontier.push(GraphNode::Intent(intent_id.clone()));
                         }
                     }
                 }

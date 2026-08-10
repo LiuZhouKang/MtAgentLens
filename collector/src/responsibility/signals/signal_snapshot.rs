@@ -206,10 +206,10 @@ impl SignalSnapshot {
             if !self.tls_sessions_for_process(pid).is_empty() {
                 return true;
             }
-            if let Some(meta) = self.get_process(pid.pid, pid.start_time_ns) {
-                if AGENT_COMMS.contains(&meta.comm.as_str()) {
-                    return true;
-                }
+            if let Some(meta) = self.get_process(pid.pid, pid.start_time_ns)
+                && AGENT_COMMS.contains(&meta.comm.as_str())
+            {
+                return true;
             }
             false
         };
@@ -281,12 +281,12 @@ impl SignalSnapshot {
 
         // 1. Messages from TLS sessions owned by this process
         for (tls_session, &owner) in &self.tls_to_process {
-            if owner == process_id {
-                if let Some(msgs) = self.tls_to_messages.get(tls_session) {
-                    for m in msgs {
-                        if seen.insert(m.as_str()) {
-                            result.push(m.clone());
-                        }
+            if owner == process_id
+                && let Some(msgs) = self.tls_to_messages.get(tls_session)
+            {
+                for m in msgs {
+                    if seen.insert(m.as_str()) {
+                        result.push(m.clone());
                     }
                 }
             }

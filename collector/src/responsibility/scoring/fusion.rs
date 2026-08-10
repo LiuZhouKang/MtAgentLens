@@ -29,7 +29,9 @@ pub fn fuse_dimensions(dim_scores: &[f64; NUM_DIMS], dim_weights: &[f64; NUM_DIM
     let owa = compute_owa(dim_scores, DEFAULT_OWA_ORNESS);
 
     // Dimension activation: scale each weight by signal strength
-    let activated_weights: Vec<f64> = dim_scores.iter().zip(dim_weights.iter())
+    let activated_weights: Vec<f64> = dim_scores
+        .iter()
+        .zip(dim_weights.iter())
         .map(|(&d, &w)| w * (d / 0.15).min(1.0))
         .collect();
     let weight_sum: f64 = activated_weights.iter().sum();
@@ -41,8 +43,7 @@ pub fn fuse_dimensions(dim_scores: &[f64; NUM_DIMS], dim_weights: &[f64; NUM_DIM
     }
 
     // Normalize activated weights
-    let norm_weights: Vec<f64> = activated_weights.iter()
-        .map(|&w| w / weight_sum).collect();
+    let norm_weights: Vec<f64> = activated_weights.iter().map(|&w| w / weight_sum).collect();
 
     let mut active_dims: Vec<f64> = Vec::new();
     let mut active_norm_weights: Vec<f64> = Vec::new();
@@ -65,7 +66,9 @@ fn compute_weighted_geometric_mean_raw(scores: &[f64], weights: &[f64]) -> f64 {
     if weight_sum < 1e-9 {
         return 0.0;
     }
-    let log_sum: f64 = scores.iter().zip(weights.iter())
+    let log_sum: f64 = scores
+        .iter()
+        .zip(weights.iter())
         .map(|(s, w)| w * s.max(EPS).ln())
         .sum();
     (log_sum / weight_sum).exp()
@@ -180,7 +183,9 @@ pub fn compute_ece(predictions: &[(f64, bool)], n_bins: usize) -> f64 {
     let mut ece = 0.0;
     let n = predictions.len() as f64;
     for bin in &bins {
-        if bin.is_empty() { continue; }
+        if bin.is_empty() {
+            continue;
+        }
         let avg_conf: f64 = bin.iter().map(|(c, _)| c).sum::<f64>() / bin.len() as f64;
         let acc: f64 = bin.iter().filter(|(_, l)| *l).count() as f64 / bin.len() as f64;
         ece += (bin.len() as f64 / n) * (acc - avg_conf).abs();
@@ -199,7 +204,10 @@ mod tests {
         let dims = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1];
         let weights = [0.28, 0.25, 0.20, 0.10, 0.10, 0.07];
         let score = fuse_dimensions(&dims, &weights);
-        assert!(score < 0.3, "all-low inputs should give low score, got {score}");
+        assert!(
+            score < 0.3,
+            "all-low inputs should give low score, got {score}"
+        );
     }
 
     #[test]
@@ -207,7 +215,10 @@ mod tests {
         let dims = [0.9, 0.9, 0.9, 0.9, 0.9, 0.9];
         let weights = [0.28, 0.25, 0.20, 0.10, 0.10, 0.07];
         let score = fuse_dimensions(&dims, &weights);
-        assert!(score > 0.7, "all-high inputs should give high score, got {score}");
+        assert!(
+            score > 0.7,
+            "all-high inputs should give high score, got {score}"
+        );
     }
 
     #[test]
@@ -219,7 +230,10 @@ mod tests {
         let weights = [0.28, 0.25, 0.20, 0.10, 0.10, 0.07];
         let score = fuse_dimensions(&dims, &weights);
         // Single strong signal should elevate above pure noise floor
-        assert!(score > 0.2, "OWA should elevate single strong signal above noise, got {score}");
+        assert!(
+            score > 0.2,
+            "OWA should elevate single strong signal above noise, got {score}"
+        );
         // But GeoMean drags it below 0.5 — correct: need corroboration
         assert!(score < 0.5);
     }

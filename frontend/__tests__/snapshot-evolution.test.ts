@@ -3,14 +3,44 @@ import { pickRepresentativeFrames } from '@/lib/db-import';
 import { buildFrameDiff, summarizeFrameChange } from '@/lib/snapshot-evolution';
 import type { GraphMetrics, GraphSnapshotFrame } from '@/lib/types';
 
-const metrics: GraphMetrics = { node_counts: {}, edge_counts: {}, agent_count: 0, cross_agent_edges: 0, delegation_depth: 0, taint_chains: 0, avg_confidence: 0 };
+const metrics: GraphMetrics = {
+  node_counts: {},
+  edge_counts: {},
+  agent_count: 0,
+  cross_agent_edges: 0,
+  delegation_depth: 0,
+  taint_chains: 0,
+  avg_confidence: 0,
+};
 
-const frame = (id: string, nodeIds: string[], edgeKeys: string[], ts: number): GraphSnapshotFrame => ({
+const frame = (
+  id: string,
+  nodeIds: string[],
+  edgeKeys: string[],
+  ts: number,
+): GraphSnapshotFrame => ({
   snapshot_id: id,
   timestamp_ns: ts,
   graph: {
-    nodes: nodeIds.map((n) => ({ node_id: n, node_type: 'Agent', agent_id: n, resource: null, evidence_refs: [], timestamp_ns: ts, phase: { Provisional: { timestamp_ns: ts } } })),
-    edges: edgeKeys.map((k, i) => ({ edge_id: `e${i}`, edge_type: 'IntentCausesAction', source: k.split('>')[0], target: k.split('>')[1], evidence_refs: [], confidence: 0.8, phase: { Provisional: { timestamp_ns: ts } }, signal: null })),
+    nodes: nodeIds.map((n) => ({
+      node_id: n,
+      node_type: 'Agent',
+      agent_id: n,
+      resource: null,
+      evidence_refs: [],
+      timestamp_ns: ts,
+      phase: { Provisional: { timestamp_ns: ts } },
+    })),
+    edges: edgeKeys.map((k, i) => ({
+      edge_id: `e${i}`,
+      edge_type: 'IntentCausesAction',
+      source: k.split('>')[0],
+      target: k.split('>')[1],
+      evidence_refs: [],
+      confidence: 0.8,
+      phase: { Provisional: { timestamp_ns: ts } },
+      signal: null,
+    })),
   },
   metrics,
 });

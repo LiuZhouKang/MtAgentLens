@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import initSqlJs from 'sql.js';
 
 // Isolate the store: initData falls through to demo fixtures with no backend.
 vi.mock('@/lib/api', () => ({
@@ -10,7 +11,9 @@ vi.mock('@/lib/api', () => ({
     getRuns: vi.fn().mockResolvedValue([]),
     getGraph: vi.fn().mockResolvedValue({ nodes: [], edges: [] }),
     getAlerts: vi.fn().mockResolvedValue([]),
-    getEvidence: vi.fn().mockResolvedValue({ evidence: [], intents: [], actions: [], non_links: [] }),
+    getEvidence: vi
+      .fn()
+      .mockResolvedValue({ evidence: [], intents: [], actions: [], non_links: [] }),
     getRunDb: vi.fn().mockRejectedValue(new Error('no db endpoint')),
   },
 }));
@@ -26,7 +29,15 @@ import { loadSampleData } from '@/lib/load-sample-data';
 const sampleData = {
   graph: {
     nodes: [
-      { node_id: 's1', node_type: 'Agent', agent_id: 'a', resource: null, evidence_refs: [], timestamp_ns: 0, phase: 'Provisional' },
+      {
+        node_id: 's1',
+        node_type: 'Agent',
+        agent_id: 'a',
+        resource: null,
+        evidence_refs: [],
+        timestamp_ns: 0,
+        phase: 'Provisional',
+      },
     ],
     edges: [],
   },
@@ -45,7 +56,15 @@ const sampleData = {
 const validSnapshotJson = JSON.stringify({
   graph: {
     nodes: [
-      { node_id: 'n1', node_type: 'Agent', agent_id: 'a', resource: null, evidence_refs: [], timestamp_ns: 0, phase: 'Provisional' },
+      {
+        node_id: 'n1',
+        node_type: 'Agent',
+        agent_id: 'a',
+        resource: null,
+        evidence_refs: [],
+        timestamp_ns: 0,
+        phase: 'Provisional',
+      },
     ],
     edges: [],
   },
@@ -156,16 +175,19 @@ describe('RunSelector — data source browser', () => {
     );
 
     fireEvent.click(screen.getByTestId('data-source-trigger'));
-    expect((await screen.findByText(/3 节点 · 2 告警 · 3 证据 · 2 声明 · 1 回溯 · 3 意图 · 3 动作/)).textContent).toMatch(
-      /3 节点 · 2 告警 · 3 证据 · 2 声明 · 1 回溯 · 3 意图 · 3 动作/,
-    );
+    expect(
+      (await screen.findByText(/3 节点 · 2 告警 · 3 证据 · 2 声明 · 1 回溯 · 3 意图 · 3 动作/))
+        .textContent,
+    ).toMatch(/3 节点 · 2 告警 · 3 证据 · 2 声明 · 1 回溯 · 3 意图 · 3 动作/);
   });
 
   it('imports a valid JSON snapshot from the file picker', async () => {
     openSelector();
 
     fireEvent.change(fileInput(), {
-      target: { files: [new File([validSnapshotJson], 'run-42.json', { type: 'application/json' })] },
+      target: {
+        files: [new File([validSnapshotJson], 'run-42.json', { type: 'application/json' })],
+      },
     });
 
     await waitFor(() =>
@@ -176,7 +198,9 @@ describe('RunSelector — data source browser', () => {
   it('keeps an imported snapshot as a re-selectable local file', async () => {
     openSelector();
     fireEvent.change(fileInput(), {
-      target: { files: [new File([validSnapshotJson], 'run-42.json', { type: 'application/json' })] },
+      target: {
+        files: [new File([validSnapshotJson], 'run-42.json', { type: 'application/json' })],
+      },
     });
     await waitFor(() =>
       expect(useAppStore.getState().dataSource).toEqual({ kind: 'file', label: 'run-42.json' }),
@@ -207,5 +231,41 @@ describe('RunSelector — data source browser', () => {
     expect(screen.getByText('演示数据')).toBeTruthy();
     expect(screen.queryByText('样例运行')).toBeNull();
     expect(screen.queryByText('导入本地数据（JSON / DB）')).toBeNull();
+  });
+
+  it('imports an empty / unrelated sqlite db → reports "no responsibility data" and keeps current source', async () => {
+    // 用 sql.js 现造一个「有效 sqlite 但无责任表」的空库（正是用户拖入无关 db 的场景）
+    const SQL = await initSqlJs();
+    const db = new SQL.Database();
+    db.run('CREATE TABLE unrelated (x INTEGER)');
+    db.run('INSERT INTO unrelated VALUES (1)');
+    // sql.js export 返回 Uint8Array<ArrayBufferLike>，拷贝成 ArrayBuffer 才能作 BlobPart
+    const buf = new Uint8Array(db.export());
+    db.close();
+
+    openSelector();
+    fireEvent.change(fileInput(), {
+      target: { files: [new File([buf], 'notes.db', { type: 'application/x-sqlite3' })] },
+    });
+
+    expect((await screen.findByRole('alert')).textContent).toMatch(/不含责任数据/);
+    // 不污染当前数据源 + 错误写入 store（错误横幅跨页可读）
+    expect(useAppStore.getState().dataSource).toBeNull();
+    expect(useAppStore.getState().errorMessage).toMatch(/不含责任数据/);
+  });
+
+  it('imports a non-sqlite *.db → surfaces the parse error in the store too', async () => {
+    openSelector();
+    fireEvent.change(fileInput(), {
+      target: {
+        files: [
+          new File(['not a database at all'], 'broken.db', { type: 'application/x-sqlite3' }),
+        ],
+      },
+    });
+
+    expect((await screen.findByRole('alert')).textContent).toMatch(/不是有效的 SQLite/);
+    expect(useAppStore.getState().errorMessage).toMatch(/不是有效的 SQLite/);
+    expect(useAppStore.getState().dataSource).toBeNull();
   });
 });

@@ -1,9 +1,10 @@
-import type { PerspectiveKey } from '@/lib/monitoring/monitoring-types'
+import type { PerspectiveKey } from '@/lib/monitoring/monitoring-types';
 
 export const PERSPECTIVE_META: Record<PerspectiveKey, { label: string; description: string }> = {
   topologyDrift: {
     label: '拓扑漂移',
-    description: 'graph_snapshots.metrics_json 逐帧演进：节点/边/agent 数随快照帧的变化与首末差分。',
+    description:
+      'graph_snapshots.metrics_json 逐帧演进：节点/边/agent 数随快照帧的变化与首末差分。',
   },
   topologyHealth: {
     label: '拓扑健康',
@@ -11,7 +12,8 @@ export const PERSPECTIVE_META: Record<PerspectiveKey, { label: string; descripti
   },
   intentMismatch: {
     label: '意图-动作失配',
-    description: 'non_link_diagnostics 诊断量、按 reason 分布与证据匹配强度（L5Substring 为弱证据）。',
+    description:
+      'non_link_diagnostics 诊断量、按 reason 分布与证据匹配强度（L5Substring 为弱证据）。',
   },
   policyCompliance: {
     label: '策略合规',
@@ -25,7 +27,7 @@ export const PERSPECTIVE_META: Record<PerspectiveKey, { label: string; descripti
     label: '网络会话',
     description: 'tls_sessions 会话计数、60s 时间分桶与按 pid 分布。',
   },
-}
+};
 
 export const PERSPECTIVE_ORDER: PerspectiveKey[] = [
   'topologyDrift',
@@ -34,7 +36,7 @@ export const PERSPECTIVE_ORDER: PerspectiveKey[] = [
   'policyCompliance',
   'toolFootprint',
   'networkSessions',
-]
+];
 
 /** 阶段二实时视角（SSE 占位）——静态文案，不接入数据。 */
 export const PHASE2_PILLS = [
@@ -46,4 +48,4 @@ export const PHASE2_PILLS = [
   'SSE 内容扫描',
   '去重诊断',
   '分析器流水线',
-]
+];

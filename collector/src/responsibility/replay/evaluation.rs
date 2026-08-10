@@ -12,8 +12,8 @@
 
 use crate::responsibility::replay::executor::RefinementBundle;
 use crate::responsibility::types::{
-    ClassificationRefinementType, ClaimRefinementType, EvidenceRefinementType,
-    GraphRefinementType, IdentityRefinementType,
+    ClaimRefinementType, ClassificationRefinementType, EvidenceRefinementType, GraphRefinementType,
+    IdentityRefinementType,
 };
 use serde::{Deserialize, Serialize};
 
@@ -199,14 +199,13 @@ impl EvaluationMetrics {
         let identity_breakdown = build_identity_breakdown(&refinements.identity);
         let evidence_breakdown = build_evidence_breakdown(&refinements.evidence);
         let graph_breakdown = build_graph_breakdown(&refinements.graph);
-        let classification_breakdown =
-            ClassificationRefinementBreakdown {
-                confirmed: confirmed_count,
-                changed: changed_count,
-                dismissed: dismissed_count,
-                discovered: discovered_count,
-                total: refinements.classification.len(),
-            };
+        let classification_breakdown = ClassificationRefinementBreakdown {
+            confirmed: confirmed_count,
+            changed: changed_count,
+            dismissed: dismissed_count,
+            discovered: discovered_count,
+            total: refinements.classification.len(),
+        };
         let claim_breakdown = build_claim_breakdown(&refinements.claim);
 
         // ── Precision / Recall / F1 ───────────────────────────────────
@@ -441,14 +440,12 @@ mod tests {
                     score_delta: 0.8,
                 },
             ],
-            claim: vec![
-                ClaimRefinement {
-                    phase1_claim_id: ClaimId::from("pending"),
-                    phase2_claim_id: ClaimId::from("c1"),
-                    refinement_type: ClaimRefinementType::Discovered,
-                    reason: "test".into(),
-                },
-            ],
+            claim: vec![ClaimRefinement {
+                phase1_claim_id: ClaimId::from("pending"),
+                phase2_claim_id: ClaimId::from("c1"),
+                refinement_type: ClaimRefinementType::Discovered,
+                reason: "test".into(),
+            }],
         }
     }
 

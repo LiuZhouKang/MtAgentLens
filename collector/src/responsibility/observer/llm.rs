@@ -6,13 +6,12 @@
 // from ObserverSignatures and validates/parses raw LLM responses.
 // Used by ObserverProvider implementations (provider.rs).
 
-use serde::Deserialize;
-use crate::responsibility::observer::types::{
-    AlertAuthority, CacheTTL, ObserverDecision, ObserverError,
-    ObserverInput, ObserverOutput, ObserverSignature, CachePrior,
-    RuleVerdict, PatternVerdict, ContentSignals,
-};
 use crate::responsibility::claims::ClaimSeverity;
+use crate::responsibility::observer::types::{
+    AlertAuthority, CachePrior, CacheTTL, ContentSignals, ObserverDecision, ObserverError,
+    ObserverInput, ObserverOutput, ObserverSignature, PatternVerdict, RuleVerdict,
+};
+use serde::Deserialize;
 
 /// Observer LLM interface: validates input/output, detects injection.
 pub struct ObserverLLM;
@@ -49,10 +48,18 @@ struct RawObserverResponse {
     pattern_verdicts: Vec<RawVerdict>,
 }
 
-fn default_decision() -> String { "uncertain".into() }
-fn default_severity() -> String { "warning".into() }
-fn default_confidence() -> f32 { 0.5 }
-fn default_cache_ttl() -> String { "once".into() }
+fn default_decision() -> String {
+    "uncertain".into()
+}
+fn default_severity() -> String {
+    "warning".into()
+}
+fn default_confidence() -> f32 {
+    0.5
+}
+fn default_cache_ttl() -> String {
+    "once".into()
+}
 
 impl ObserverLLM {
     /// Build the structured prompt from observer signature (full JSON format).
@@ -74,21 +81,79 @@ impl ObserverLLM {
     ///
     /// Cost reduction: ~60% fewer input tokens vs full JSON serialization,
     /// while preserving all decision-critical information.
-    pub fn build_compact_prompt(signature: &ObserverSignature, prior: &CachePrior, content: Option<&ContentSignals>) -> String {
-        let sig = &signature.classification; let score = sig.score; let sb = &sig.score_breakdown;
-        let pbc = signature.graph.boundary_crossings; let agents = signature.graph.agent_count;
+    pub fn build_compact_prompt(
+        signature: &ObserverSignature,
+        prior: &CachePrior,
+        content: Option<&ContentSignals>,
+    ) -> String {
+        let sig = &signature.classification;
+        let score = sig.score;
+        let sb = &sig.score_breakdown;
+        let pbc = signature.graph.boundary_crossings;
+        let agents = signature.graph.agent_count;
         let mut cf = Vec::new();
-        if signature.correlation_evidence.has_delegation_chain { cf.push("delegation"); }
-        if signature.correlation_evidence.has_tainted_context { cf.push("tainted"); }
-        if signature.correlation_evidence.has_credential_pattern { cf.push("credential"); }
-        let evq = if signature.evidence.total > 0 { format!("{}/{} avg={:.2}", signature.evidence.direct, signature.evidence.total, signature.evidence.avg_confidence) } else { "none".into() };
-        let ops = if let Some(cs) = content { cs.resource_paths_touched.iter().take(10).map(|s| s.as_str()).collect::<Vec<_>>().join("; ") } else { "none".into() };
+        if signature.correlation_evidence.has_delegation_chain {
+            cf.push("delegation");
+        }
+        if signature.correlation_evidence.has_tainted_context {
+            cf.push("tainted");
+        }
+        if signature.correlation_evidence.has_credential_pattern {
+            cf.push("credential");
+        }
+        let evq = if signature.evidence.total > 0 {
+            format!(
+                "{}/{} avg={:.2}",
+                signature.evidence.direct,
+                signature.evidence.total,
+                signature.evidence.avg_confidence
+            )
+        } else {
+            "none".into()
+        };
+        let ops = if let Some(cs) = content {
+            cs.resource_paths_touched
+                .iter()
+                .take(10)
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join("; ")
+        } else {
+            "none".into()
+        };
         let pf = format!("{:.3}", sig.progressive_fused);
-        let cu = if sig.cusum_triggered { format!("YES [{}]", sig.cusum_dimensions.join(",")) } else { "no".into() };
-        format!("Operations: {ops}\nDims: D1={d1:.2} D2={d2:.2} D3={d3:.2} D4={d4:.2} D5={d5:.2} D6={d6:.2} | Score={s:.3} pfuse={pf} | {pbc}PBC {ag}agents | Ev:{evq} | Corr:{corr} | CUSUM:{cu} | L2:hit={l2} rate={r:.2}\n\nReply JSON: {{\"decision\":\"safe|unsafe|uncertain\",\"severity\":\"info|warning|critical\",\"confidence\":0.0-1.0,\"reasoning\":\"<200 chars\",\"evidence_cited\":[],\"cache_ttl\":\"once|task|all\"}}",
-            ops=ops, d1=if sb.boundary_score>sb.rule_score{sb.boundary_score}else{sb.rule_score}, d2=sb.pattern_score, d3=sb.role_score, d4=sb.repetition_score,
-            d5=sb.evidence_score, d6=sb.behavioral_score, s=score, pf=pf, pbc=pbc, ag=agents, evq=evq,
-            corr=if cf.is_empty(){"none".into()}else{cf.join(",")}, cu=cu, l2=prior.l2_hit, r=prior.l2_prior_anomaly_rate.unwrap_or(0.0))
+        let cu = if sig.cusum_triggered {
+            format!("YES [{}]", sig.cusum_dimensions.join(","))
+        } else {
+            "no".into()
+        };
+        format!(
+            "Operations: {ops}\nDims: D1={d1:.2} D2={d2:.2} D3={d3:.2} D4={d4:.2} D5={d5:.2} D6={d6:.2} | Score={s:.3} pfuse={pf} | {pbc}PBC {ag}agents | Ev:{evq} | Corr:{corr} | CUSUM:{cu} | L2:hit={l2} rate={r:.2}\n\nReply JSON: {{\"decision\":\"safe|unsafe|uncertain\",\"severity\":\"info|warning|critical\",\"confidence\":0.0-1.0,\"reasoning\":\"<200 chars\",\"evidence_cited\":[],\"cache_ttl\":\"once|task|all\"}}",
+            ops = ops,
+            d1 = if sb.boundary_score > sb.rule_score {
+                sb.boundary_score
+            } else {
+                sb.rule_score
+            },
+            d2 = sb.pattern_score,
+            d3 = sb.role_score,
+            d4 = sb.repetition_score,
+            d5 = sb.evidence_score,
+            d6 = sb.behavioral_score,
+            s = score,
+            pf = pf,
+            pbc = pbc,
+            ag = agents,
+            evq = evq,
+            corr = if cf.is_empty() {
+                "none".into()
+            } else {
+                cf.join(",")
+            },
+            cu = cu,
+            l2 = prior.l2_hit,
+            r = prior.l2_prior_anomaly_rate.unwrap_or(0.0)
+        )
     }
 
     /// Parse and validate raw LLM response into ObserverOutput.
@@ -134,8 +199,14 @@ impl ObserverLLM {
         }
 
         // 2. Injection detection in reasoning
-        let forbidden = ["!OVERRIDE", "!SYSTEM", "SYSTEM:", "!IGNORE",
-                         "IGNORE PREVIOUS", "DISREGARD"];
+        let forbidden = [
+            "!OVERRIDE",
+            "!SYSTEM",
+            "SYSTEM:",
+            "!IGNORE",
+            "IGNORE PREVIOUS",
+            "DISREGARD",
+        ];
         for pattern in &forbidden {
             if raw.reasoning.to_uppercase().contains(pattern) {
                 return Err(ObserverError::InjectionDetected);
@@ -171,33 +242,46 @@ impl ObserverLLM {
             _ => CacheTTL::Once,
         };
 
-        let rule_verdicts: Vec<RuleVerdict> = raw.rule_verdicts.iter().filter_map(|v| {
-            let rule_id = v.rule_id.clone()?;
-            Some(RuleVerdict {
-                rule_id,
-                description: String::new(),
-                matched_resource: String::new(),
-                llm_agreed: Some(v.agreed),
-                llm_comment: v.comment.clone(),
+        let rule_verdicts: Vec<RuleVerdict> = raw
+            .rule_verdicts
+            .iter()
+            .filter_map(|v| {
+                let rule_id = v.rule_id.clone()?;
+                Some(RuleVerdict {
+                    rule_id,
+                    description: String::new(),
+                    matched_resource: String::new(),
+                    llm_agreed: Some(v.agreed),
+                    llm_comment: v.comment.clone(),
+                })
             })
-        }).collect();
+            .collect();
 
-        let pattern_verdicts: Vec<PatternVerdict> = raw.pattern_verdicts.iter().filter_map(|v| {
-            let template_id = v.template_id.clone()?;
-            Some(PatternVerdict {
-                template_id,
-                match_confidence: 0.0,
-                llm_agreed: Some(v.agreed),
-                llm_comment: v.comment.clone(),
+        let pattern_verdicts: Vec<PatternVerdict> = raw
+            .pattern_verdicts
+            .iter()
+            .filter_map(|v| {
+                let template_id = v.template_id.clone()?;
+                Some(PatternVerdict {
+                    template_id,
+                    match_confidence: 0.0,
+                    llm_agreed: Some(v.agreed),
+                    llm_comment: v.comment.clone(),
+                })
             })
-        }).collect();
+            .collect();
 
         Ok(ObserverOutput {
-            decision, severity, confidence: raw.confidence,
-            cache_ttl, authority,
-            reasoning: raw.reasoning, attacked_flag: false,
+            decision,
+            severity,
+            confidence: raw.confidence,
+            cache_ttl,
+            authority,
+            reasoning: raw.reasoning,
+            attacked_flag: false,
             evidence_cited: raw.evidence_cited,
-            rule_verdicts, pattern_verdicts,
+            rule_verdicts,
+            pattern_verdicts,
         })
     }
 

@@ -39,7 +39,7 @@ use super::{Analyzer, AnalyzerError};
 use crate::framework::core::Event;
 use crate::framework::runners::EventStream;
 use async_trait::async_trait;
-use futures::stream::{self, StreamExt};
+use futures::stream::StreamExt;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 
@@ -228,14 +228,10 @@ impl AlertEnrichmentAnalyzer {
         let description = self.build_description(event);
 
         // Gather agent information
-        let agent_info = event
-            .data
-            .get("agent")
-            .cloned()
-            .unwrap_or(json!({
-                "event_pid": event.pid,
-                "event_comm": event.comm,
-            }));
+        let agent_info = event.data.get("agent").cloned().unwrap_or(json!({
+            "event_pid": event.pid,
+            "event_comm": event.comm,
+        }));
 
         // Build the enriched alert event
         let alert_event = Event::new_with_timestamp(
@@ -366,7 +362,11 @@ mod tests {
         let alert = output.iter().find(|e| e.source == "alert");
         assert!(alert.is_some(), "expected alert event");
         assert_eq!(
-            alert.unwrap().data.get("alert_type").and_then(Value::as_str),
+            alert
+                .unwrap()
+                .data
+                .get("alert_type")
+                .and_then(Value::as_str),
             Some("context_pollution")
         );
     }
@@ -465,7 +465,11 @@ mod tests {
         let alert = output.iter().find(|e| e.source == "alert");
         assert!(alert.is_some(), "expected alert event");
         assert_eq!(
-            alert.unwrap().data.get("description").and_then(Value::as_str),
+            alert
+                .unwrap()
+                .data
+                .get("description")
+                .and_then(Value::as_str),
             Some("Shared file read by 3 distinct agents")
         );
     }

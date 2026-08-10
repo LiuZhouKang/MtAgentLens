@@ -14,10 +14,10 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use crate::framework::Event;
 use crate::framework::analyzers::Analyzer;
 use crate::framework::analyzers::AnalyzerError;
 use crate::framework::runners::EventStream;
-use crate::framework::Event;
 use futures::StreamExt;
 use serde_json::json;
 
@@ -27,6 +27,12 @@ pub struct ConnectionBuffer {
     buffers: SessionBuffers,
     /// Queued events waiting to be emitted (avoids dropping SSL_read).
     pending: Arc<Mutex<Vec<Event>>>,
+}
+
+impl Default for ConnectionBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ConnectionBuffer {
@@ -86,7 +92,7 @@ impl Analyzer for ConnectionBuffer {
                     let mut bufs = buffers.lock().unwrap();
                     if raw_data.len() < 64 * 1024 {
                         bufs.entry(tid)
-                            .or_insert_with(Vec::new)
+                            .or_default()
                             .extend_from_slice(raw_data.as_bytes());
                         None // swallow request fragment
                     } else {
@@ -99,25 +105,25 @@ impl Analyzer for ConnectionBuffer {
                         bufs.remove(&tid)
                     };
 
-                    if let Some(buf) = assembled {
-                        if !buf.is_empty() {
-                            let body = String::from_utf8(buf).unwrap_or_default();
-                            if !body.trim().is_empty() {
-                                // Emit the assembled request as a synthetic
-                                // SSL event, then queue the original read
-                                // event for the next iteration.
-                                let mut synth_data = event.data.clone();
-                                synth_data["data"] = json!(body);
-                                let synth = Event::new_with_timestamp(
-                                    event.timestamp,
-                                    "ssl".to_string(),
-                                    event.pid,
-                                    event.comm.clone(),
-                                    synth_data,
-                                );
-                                pending.lock().unwrap().push(event); // original read follows
-                                return Some(synth);
-                            }
+                    if let Some(buf) = assembled
+                        && !buf.is_empty()
+                    {
+                        let body = String::from_utf8(buf).unwrap_or_default();
+                        if !body.trim().is_empty() {
+                            // Emit the assembled request as a synthetic
+                            // SSL event, then queue the original read
+                            // event for the next iteration.
+                            let mut synth_data = event.data.clone();
+                            synth_data["data"] = json!(body);
+                            let synth = Event::new_with_timestamp(
+                                event.timestamp,
+                                "ssl".to_string(),
+                                event.pid,
+                                event.comm.clone(),
+                                synth_data,
+                            );
+                            pending.lock().unwrap().push(event); // original read follows
+                            return Some(synth);
                         }
                     }
 

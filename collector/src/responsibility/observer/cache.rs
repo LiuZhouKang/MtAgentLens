@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use crate::responsibility::observer::types::{
     CacheKey, CachePrior, CacheTTL, ObserverDecision, ObserverOutput,
 };
+use std::collections::HashMap;
 
 // ── L2 Record ───────────────────────────────────────────────────────
 
@@ -28,6 +28,12 @@ pub struct ObserverCache {
     l1: HashMap<u32, ObserverOutput>,
     /// L2: signature key → list of observed outcomes with counts.
     l2: HashMap<u32, Vec<L2Record>>,
+}
+
+impl Default for ObserverCache {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ObserverCache {
@@ -57,9 +63,10 @@ impl ObserverCache {
 
         if ttl != CacheTTL::Once {
             let records = self.l2.entry(key.0).or_default();
-            if let Some(existing) = records.iter_mut().find(|r| {
-                r.output.decision == output.decision
-            }) {
+            if let Some(existing) = records
+                .iter_mut()
+                .find(|r| r.output.decision == output.decision)
+            {
                 existing.count += 1;
             } else {
                 records.push(L2Record { output, count: 1 });

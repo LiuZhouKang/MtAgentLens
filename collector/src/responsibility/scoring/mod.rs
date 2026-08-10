@@ -6,23 +6,21 @@
 // tracking, OWA+GeoMean fusion, multi-feature Platt calibration,
 // behavioral baselines, Splunk RBA risk factors, and AIVSS computation.
 
-pub mod progressive;
-pub mod fusion;
-pub mod calibration;
 pub mod baseline;
+pub mod calibration;
+pub mod fusion;
+pub mod progressive;
 pub mod risk_factors;
 
-pub use progressive::{
-    AgentScoreState, DimIndex, DimProgressiveState, ProgressiveConfig,
-    ProgressiveResult, ProgressiveScorer, NUM_DIMS, DEFAULT_CUSUM_DELTA, DEFAULT_DIM_WEIGHTS,
-    compute_decay_sum, temporal_decay_weight,
-};
-pub use fusion::{
-    compute_ece, compute_owa, compute_weighted_geometric_mean, fuse_dimensions,
-    platt_multi, platt_sigmoid, platt_sigmoid_params,
-};
-pub use calibration::{CalibrationMonitor, MultiFeatureCalibrator};
 pub use baseline::{BaselineTracker, BehaviorBaseline, BehaviorSample};
-pub use risk_factors::{
-    RiskFactor, RiskFactorConfig, RiskFactors, RiskLevel, compute_risk_score,
+pub use calibration::{CalibrationMonitor, MultiFeatureCalibrator};
+pub use fusion::{
+    compute_ece, compute_owa, compute_weighted_geometric_mean, fuse_dimensions, platt_multi,
+    platt_sigmoid, platt_sigmoid_params,
 };
+pub use progressive::{
+    AgentScoreState, DEFAULT_CUSUM_DELTA, DEFAULT_DIM_WEIGHTS, DimIndex, DimProgressiveState,
+    NUM_DIMS, ProgressiveConfig, ProgressiveResult, ProgressiveScorer, compute_decay_sum,
+    temporal_decay_weight,
+};
+pub use risk_factors::{RiskFactor, RiskFactorConfig, RiskFactors, RiskLevel, compute_risk_score};

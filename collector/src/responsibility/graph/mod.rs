@@ -32,7 +32,7 @@ pub use graph::ResponsibilityGraph;
 pub use graph_builder::GraphBuilder;
 pub use repository::GraphRepository;
 pub use simplifier::GraphSimplifier;
-pub use snapshot::{create_snapshot, diff_snapshot, FrozenGraph};
+pub use snapshot::{FrozenGraph, create_snapshot, diff_snapshot};
 pub use taint::{TaintAccess, TaintRecord, TaintTracker};
 
 // ── Type re-exports (canonical definitions in types/) ────────────────────
@@ -46,7 +46,7 @@ pub use crate::responsibility::types::graph_types::{
 // ── Module re-exports ────────────────────────────────────────────────────
 pub use graph_store::GraphStore;
 pub use pattern_matcher::{
-    default_templates, GraphPatternMatch, GraphPatternMatcher, GraphPatternTemplate,
+    GraphPatternMatch, GraphPatternMatcher, GraphPatternTemplate, default_templates,
 };
 pub use responsibility_edge::ResponsibilityEdgeType;
 pub use responsibility_node::ResponsibilityNodeType;

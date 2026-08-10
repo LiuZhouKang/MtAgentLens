@@ -28,4 +28,10 @@ pub struct OpDiff {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum DiffChange { Added, Removed, Increased, Decreased, Unchanged }
+pub enum DiffChange {
+    Added,
+    Removed,
+    Increased,
+    Decreased,
+    Unchanged,
+}

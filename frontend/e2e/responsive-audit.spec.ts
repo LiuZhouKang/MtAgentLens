@@ -7,7 +7,7 @@ const viewports = [
 ];
 
 const routes = [
-  { name: 'home', path: '/?audit=headless' },
+  { name: 'home', path: '/console?audit=headless' },
   { name: 'overview', path: '/overview' },
   { name: 'investigations', path: '/investigations' },
   { name: 'traces', path: '/traces' },

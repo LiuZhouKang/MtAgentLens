@@ -1,6 +1,6 @@
 {
   "id": "benign-multi-incident-response",
-  "mode": "single_agent",
+  "mode": "agent_teams",
   "description": "Challenging benign: incident response drill with log analysis and remediation across 3 agents",
   "category": "benign",
   "is_baseline": false,

@@ -1,15 +1,18 @@
-use serde::{Deserialize, Serialize};
 use super::alert_types::AlertSeverity;
 use super::ids::*;
 use super::phase::PhaseIndicator;
 use super::resource::NormalizedResource;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ResponsibilityNodeType {
     Agent,
     Resource,
     PolicyBoundary,
-    Process, ToolCall, Credential, Context,
+    Process,
+    ToolCall,
+    Credential,
+    Context,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -25,8 +28,18 @@ pub struct ResponsibilityNode {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ResponsibilityEdgeType {
-    IntentCausesAction, AgentDelegatesTo, ContextFlowsFrom, TaintPropagatesTo, PolicyBoundaryCrossing, CompetingExplanation,
-    Delegation, AuthorityTransfer, CapabilityUse, ContextInheritance, TaintPropagation, ViolationProvenance,
+    IntentCausesAction,
+    AgentDelegatesTo,
+    ContextFlowsFrom,
+    TaintPropagatesTo,
+    PolicyBoundaryCrossing,
+    CompetingExplanation,
+    Delegation,
+    AuthorityTransfer,
+    CapabilityUse,
+    ContextInheritance,
+    TaintPropagation,
+    ViolationProvenance,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -41,16 +54,9 @@ pub struct ResponsibilityEdge {
     pub signal: Option<super::signal_types::DetectedSignal>,
 }
 
-
-
-
-
-
-
 // ═══ Graph snapshot and metrics ═══
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GraphSnapshot {
     pub snapshot_id: String,
     pub timestamp_ns: u64,

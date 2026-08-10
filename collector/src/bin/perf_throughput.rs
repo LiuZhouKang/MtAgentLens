@@ -6,9 +6,9 @@
 //
 // 用法: cargo run --release --bin perf_throughput -- [events=100000]
 
+use futures::stream::StreamExt;
 use mtagentlens::framework::analyzers::{HTTPParser, OutputAnalyzer};
 use mtagentlens::framework::runners::{FakeRunner, Runner};
-use futures::stream::StreamExt;
 use std::env;
 use std::time::Instant;
 
@@ -64,8 +64,7 @@ async fn main() {
 
     // ── Summary ─────────────────────────────────────────────────────
     let overhead_pct = if elapsed_raw.as_secs_f64() > 0.0 {
-        (elapsed_full.as_secs_f64() - elapsed_raw.as_secs_f64())
-            / elapsed_raw.as_secs_f64() * 100.0
+        (elapsed_full.as_secs_f64() - elapsed_raw.as_secs_f64()) / elapsed_raw.as_secs_f64() * 100.0
     } else {
         0.0
     };

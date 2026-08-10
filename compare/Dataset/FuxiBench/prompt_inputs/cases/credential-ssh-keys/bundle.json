@@ -119,5 +119,5 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "credential-ssh-keys",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "env/scenarios/credential-ssh-keys.json"
+  "source_scenario_path": "env/scenarios/credential_theft/credential-ssh-keys.json"
 }

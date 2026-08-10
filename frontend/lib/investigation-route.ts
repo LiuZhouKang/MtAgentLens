@@ -30,12 +30,18 @@ export function parseInvestigationAlertId(searchParams: URLSearchParams, hash?: 
 export const FACET_PARAM = 'facet';
 const VALID_FACETS: WhyFacetKind[] = ['pollution', 'policy', 'diagnostic'];
 
-export function parseFacetSelection(searchParams: { get(k: string): string | null } | null): FacetSelection {
+export function parseFacetSelection(
+  searchParams: { get(k: string): string | null } | null,
+): FacetSelection {
   const raw = searchParams?.get(FACET_PARAM);
   return (VALID_FACETS as readonly string[]).includes(raw ?? '') ? (raw as WhyFacetKind) : 'all';
 }
 
-export function buildFacetHref(facet: FacetSelection, currentSearch: string, currentHash: string): string {
+export function buildFacetHref(
+  facet: FacetSelection,
+  currentSearch: string,
+  currentHash: string,
+): string {
   const params = new URLSearchParams(currentSearch);
   if (facet === 'all') params.delete(FACET_PARAM);
   else params.set(FACET_PARAM, facet);
@@ -51,7 +57,10 @@ export function buildFacetHref(facet: FacetSelection, currentSearch: string, cur
  * 同时剔除 query 中陈旧的 `alertId`：hash 是选中告警的唯一权威，避免外部 `?alertId=`
  * 深链与 hash 冲突时 `parseInvestigationAlertId` 优先 query 把选中「弹回」旧告警。
  */
-export function buildAlertHrefWithQuery(alertId: string | null | undefined, currentSearch: string): string {
+export function buildAlertHrefWithQuery(
+  alertId: string | null | undefined,
+  currentSearch: string,
+): string {
   const base = buildInvestigationHref(alertId);
   const params = new URLSearchParams(currentSearch.trim());
   params.delete('alertId');

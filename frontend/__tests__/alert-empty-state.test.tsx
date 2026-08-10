@@ -33,8 +33,6 @@ describe('AlertEmptyState', () => {
         evidenceCount={0}
       />,
     );
-    expect(
-      screen.getByText('当前数据源「empty.db」中没有可解析的责任数据'),
-    ).toBeDefined();
+    expect(screen.getByText('当前数据源「empty.db」中没有可解析的责任数据')).toBeDefined();
   });
 });

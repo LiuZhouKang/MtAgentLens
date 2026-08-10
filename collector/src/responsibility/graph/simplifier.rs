@@ -64,9 +64,7 @@ impl GraphSimplifier {
         let orphan_resources: Vec<NodeId> = graph
             .nodes_of_type(&ResponsibilityNodeType::Resource)
             .iter()
-            .filter(|nid| {
-                graph.outgoing_from(nid).is_empty() && graph.incoming_to(nid).is_empty()
-            })
+            .filter(|nid| graph.outgoing_from(nid).is_empty() && graph.incoming_to(nid).is_empty())
             .cloned()
             .collect();
 
@@ -186,11 +184,7 @@ impl GraphSimplifier {
     // ── Internal ───────────────────────────────────────────────────────
 
     /// Merge duplicate resource nodes (same resource representation).
-    fn merge_duplicate_resources(
-        &self,
-        graph: &mut ResponsibilityGraph,
-        delta: &mut GraphDelta,
-    ) {
+    fn merge_duplicate_resources(&self, graph: &mut ResponsibilityGraph, delta: &mut GraphDelta) {
         use std::collections::HashMap;
 
         let resource_nodes: Vec<_> = graph
@@ -238,8 +232,8 @@ impl Default for GraphSimplifier {
 mod tests {
     use super::*;
     use crate::responsibility::types::{
-        EdgeId, NodeId, PhaseIndicator, ResponsibilityEdge, ResponsibilityEdgeType,
-        ResponsibilityNode, ResponsibilityNodeType, NormalizedResource,
+        EdgeId, NodeId, NormalizedResource, PhaseIndicator, ResponsibilityEdge,
+        ResponsibilityEdgeType, ResponsibilityNode, ResponsibilityNodeType,
     };
 
     fn make_node(id: &str, node_type: ResponsibilityNodeType) -> ResponsibilityNode {
@@ -269,7 +263,7 @@ mod tests {
             evidence_refs: Vec::new(),
             confidence,
             phase: PhaseIndicator::Provisional { timestamp_ns: 1000 },
-        signal: None,
+            signal: None,
         }
     }
 
@@ -282,8 +276,20 @@ mod tests {
         let mut graph = ResponsibilityGraph::new(config.clone());
         graph.add_node(make_node("n1", ResponsibilityNodeType::Agent));
         graph.add_node(make_node("n2", ResponsibilityNodeType::Resource));
-        graph.add_edge(make_edge("e1", ResponsibilityEdgeType::IntentCausesAction, "n1", "n2", 0.9));
-        graph.add_edge(make_edge("e2", ResponsibilityEdgeType::IntentCausesAction, "n1", "n2", 0.2));
+        graph.add_edge(make_edge(
+            "e1",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "n1",
+            "n2",
+            0.9,
+        ));
+        graph.add_edge(make_edge(
+            "e2",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "n1",
+            "n2",
+            0.2,
+        ));
 
         let simplifier = GraphSimplifier::new(config);
         let delta = simplifier.simplify(&mut graph);
@@ -325,9 +331,7 @@ mod tests {
         graph.add_node(make_node("drop", ResponsibilityNodeType::Resource));
 
         let simplifier = GraphSimplifier::new(config);
-        let delta = simplifier.filter(&mut graph, |nid| {
-            nid.as_str() == "keep"
-        });
+        let delta = simplifier.filter(&mut graph, |nid| nid.as_str() == "keep");
 
         assert!(delta.removed_nodes.contains(&NodeId::from("drop")));
         assert!(graph.has_node(&NodeId::from("keep")));
@@ -354,6 +358,10 @@ mod tests {
         // After merge + orphan removal: duplicate merged, then the keep
         // node is removed as orphan (no incident edges). So 0 remain.
         let remaining = graph.nodes_of_type(&ResponsibilityNodeType::Resource);
-        assert_eq!(remaining.len(), 0, "Duplicate merged then orphaned node removed");
+        assert_eq!(
+            remaining.len(),
+            0,
+            "Duplicate merged then orphaned node removed"
+        );
     }
 }

@@ -73,8 +73,7 @@ export const api = {
   /** Raw SQLite artifact (collector.responsibility.db) consumed via sql.js. */
   getRunDb: (id: string) => fetchBuffer(`/api/runs/${id}/db`, 30_000),
 
-  getAlerts: (id: string) =>
-    fetchJson<ResponsibilityAlert[]>(`/api/runs/${id}/alerts?lean=1`),
+  getAlerts: (id: string) => fetchJson<ResponsibilityAlert[]>(`/api/runs/${id}/alerts?lean=1`),
 
   getEvidence: (id: string) =>
     fetchJson<{

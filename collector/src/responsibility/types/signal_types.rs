@@ -59,8 +59,8 @@ pub enum SignalType {
 // ═══ Detection method ═══
 
 /// How the signal was detected — captures both the method and its parameters.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(PartialEq)]pub enum DetectionMethod {
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum DetectionMethod {
     /// Regex-based pattern matching with the pattern string.
     Regex(String),
     /// Heuristic scoring with a numeric score and human-readable factors.
@@ -106,7 +106,7 @@ pub struct EscalationStep {
 // ═══ Detected signal ═══
 
 /// A single detected signal produced by the detection pipeline.
-#[derive(PartialEq)]#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct DetectedSignal {
     /// The semantic type of the signal.
     pub signal_type: SignalType,
@@ -174,7 +174,7 @@ impl AccumKey {
         signal: &DetectedSignal,
         resource: Option<&NormalizedResource>,
     ) -> Self {
-        let resource_digest = resource.map(|r| resource_to_digest(r));
+        let resource_digest = resource.map(resource_to_digest);
         Self {
             agent_id,
             signal_type: signal.signal_type.clone(),

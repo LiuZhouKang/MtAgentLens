@@ -7,12 +7,10 @@ use crate::responsibility::graph::graph_store::GraphStore;
 use crate::responsibility::judgment::delegation::DelegationRecord;
 use crate::responsibility::judgment::policy::ContextPollutionResult;
 use crate::responsibility::types::support_types::{
-    ResponsibilityClaimState, ActionEvent, AgentInstance, IntentEvent, ViolationPatternMatchRecord,
+    ActionEvent, AgentInstance, IntentEvent, ResponsibilityClaimState, ViolationPatternMatchRecord,
 };
 use rusqlite::{Connection, params};
 use std::sync::{Arc, Mutex};
-
-pub use super::schema::{open_db, open_db_read_only};
 
 fn claim_state_to_str(value: &ResponsibilityClaimState) -> &'static str {
     match value {
@@ -87,7 +85,12 @@ impl SqliteWriter {
         Ok(())
     }
 
-    pub fn write_agent_process(&self, agent_id: &str, pid: u32, start_time_ns: u64) -> rusqlite::Result<()> {
+    pub fn write_agent_process(
+        &self,
+        agent_id: &str,
+        pid: u32,
+        start_time_ns: u64,
+    ) -> rusqlite::Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT OR IGNORE INTO agent_processes (agent_id, pid, start_time_ns) VALUES (?1, ?2, ?3)",
@@ -96,7 +99,12 @@ impl SqliteWriter {
         Ok(())
     }
 
-    pub fn write_unresolved_process(&self, pid: u32, start_time_ns: u64, reason: &str) -> rusqlite::Result<()> {
+    pub fn write_unresolved_process(
+        &self,
+        pid: u32,
+        start_time_ns: u64,
+        reason: &str,
+    ) -> rusqlite::Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT OR IGNORE INTO unresolved_processes (pid, start_time_ns, reason) VALUES (?1, ?2, ?3)",

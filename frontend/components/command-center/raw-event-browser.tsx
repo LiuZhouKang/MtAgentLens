@@ -87,7 +87,7 @@ function EventRow({
       >
         <div className="flex items-center gap-2">
           <span
-            className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
+            className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold tracking-wider uppercase"
             style={{ color: meta.color, background: `${meta.color}1a` }}
           >
             {meta.label}
@@ -98,14 +98,14 @@ function EventRow({
               {row.agentId}
             </span>
           )}
-          <span className="ml-auto shrink-0 font-mono text-[10px] tabular-nums text-white/35">
+          <span className="ml-auto shrink-0 font-mono text-[10px] text-white/35 tabular-nums">
             {formatTs(row.timestampNs)}
           </span>
         </div>
         <div className="mt-1 truncate font-mono text-[10px] text-white/45">{row.detail}</div>
       </button>
       {expanded && (
-        <pre className="mt-1 overflow-auto rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-[10px] leading-relaxed whitespace-pre-wrap break-words text-emerald-200/80">
+        <pre className="mt-1 overflow-auto rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-[10px] leading-relaxed break-words whitespace-pre-wrap text-emerald-200/80">
           {JSON.stringify(row.raw, null, 2)}
         </pre>
       )}
@@ -210,7 +210,7 @@ export default function RawEventBrowser({
           <Codicon name="list-unordered" size={14} className="text-white/40" />
           <h2 className="text-sm font-semibold tracking-wide text-white/90">原始事件流</h2>
         </div>
-        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] tabular-nums text-white/50">
+        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] text-white/50 tabular-nums">
           已展示 {visible.length} / {filtered.length}
         </span>
         <button
@@ -251,7 +251,7 @@ export default function RawEventBrowser({
             value={agentId ?? ''}
             onChange={(e) => setAgentId(e.target.value === '' ? null : e.target.value)}
             aria-label="按 Agent 筛选"
-            className="rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5 font-mono text-[11px] text-white/70 outline-none transition-all focus:border-white/25"
+            className="rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5 font-mono text-[11px] text-white/70 transition-all outline-none focus:border-white/25"
           >
             <option value="">全部 Agent</option>
             {agents.map((a) => (
@@ -265,13 +265,13 @@ export default function RawEventBrowser({
             onChange={(e) => setText(e.target.value)}
             placeholder="搜索 comm / id / args…"
             aria-label="文本筛选"
-            className="min-w-0 flex-1 rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5 font-mono text-[11px] text-white/70 placeholder:text-white/25 outline-none transition-all focus:border-white/25"
+            className="min-w-0 flex-1 rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5 font-mono text-[11px] text-white/70 transition-all outline-none placeholder:text-white/25 focus:border-white/25"
           />
           <select
             value={rangeWindow ?? ''}
             onChange={(e) => setRangeWindow(e.target.value === '' ? null : Number(e.target.value))}
             aria-label="时间范围"
-            className="rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5 font-mono text-[11px] text-white/70 outline-none transition-all focus:border-white/25"
+            className="rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5 font-mono text-[11px] text-white/70 transition-all outline-none focus:border-white/25"
           >
             {TIME_RANGES.map((r) => (
               <option key={r.label} value={r.window ?? ''}>

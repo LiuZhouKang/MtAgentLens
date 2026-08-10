@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { buildWhyFacets, filterAlertsByFacet, EMPTY_WHY } from '@/lib/why-facets';
-import { parseFacetSelection, buildFacetHref, buildAlertHrefWithQuery, FACET_PARAM } from '@/lib/investigation-route';
+import {
+  parseFacetSelection,
+  buildFacetHref,
+  buildAlertHrefWithQuery,
+  FACET_PARAM,
+} from '@/lib/investigation-route';
 import type {
-  ContextPollutionEvent, CorrelationEvidence, GraphData, Intent,
-  NonLinkDiagnostic, PolicyEvaluation, ResponsibilityAlert,
+  ContextPollutionEvent,
+  CorrelationEvidence,
+  GraphData,
+  Intent,
+  NonLinkDiagnostic,
+  PolicyEvaluation,
+  ResponsibilityAlert,
 } from '@/lib/types';
 
 // ── 构造辅助 ──
@@ -21,14 +31,44 @@ const alert = (over: Partial<ResponsibilityAlert> & { alert_id: string }): Respo
   action_hint: over.action_hint ?? null,
   primary_agent: over.primary_agent ?? { agent_id: 'agent-a', claimed_role: null },
   involved_agents: over.involved_agents ?? [{ agent_id: 'agent-a', claimed_role: null }],
-  engine: over.engine ?? { rule_verdicts: [], pattern_verdicts: [], classification_score: 0, classification_route: '', score_breakdown: { rule_score: 0, pattern_score: 0, boundary_score: 0, evidence_score: 0, role_score: 0, repetition_score: 0, total: 0 } },
+  engine: over.engine ?? {
+    rule_verdicts: [],
+    pattern_verdicts: [],
+    classification_score: 0,
+    classification_route: '',
+    score_breakdown: {
+      rule_score: 0,
+      pattern_score: 0,
+      boundary_score: 0,
+      evidence_score: 0,
+      role_score: 0,
+      repetition_score: 0,
+      total: 0,
+    },
+  },
   timeline: over.timeline ?? { steps: [], total_duration_ms: 0 },
-  graph_snapshot: over.graph_snapshot ?? { snapshot_id: 's', timestamp_ns: 1000, nodes: [], edges: [], metrics: { node_counts: {}, edge_counts: {}, agent_count: 0, cross_agent_edges: 0, delegation_depth: 0, taint_chains: 0, avg_confidence: 0 } },
+  graph_snapshot: over.graph_snapshot ?? {
+    snapshot_id: 's',
+    timestamp_ns: 1000,
+    nodes: [],
+    edges: [],
+    metrics: {
+      node_counts: {},
+      edge_counts: {},
+      agent_count: 0,
+      cross_agent_edges: 0,
+      delegation_depth: 0,
+      taint_chains: 0,
+      avg_confidence: 0,
+    },
+  },
   phase: over.phase ?? { Provisional: { timestamp_ns: 1000 } },
   provisional_ref: over.provisional_ref ?? null,
 });
 
-const pollution = (o: Partial<ContextPollutionEvent> & { pollution_id: number }): ContextPollutionEvent => ({
+const pollution = (
+  o: Partial<ContextPollutionEvent> & { pollution_id: number },
+): ContextPollutionEvent => ({
   pollution_id: o.pollution_id,
   source_agent_id: o.source_agent_id ?? 'agent-a',
   contaminated_artifact: o.contaminated_artifact ?? '/tmp/a',
@@ -74,10 +114,14 @@ const intent = (id: string, toolName: string): Intent => ({
 });
 
 const evidence = (id: string, intentId: string): CorrelationEvidence => ({
-  evidence_id: id, intent_id: intentId, action_id: 'act-1', match_level: 'L1Exact',
+  evidence_id: id,
+  intent_id: intentId,
+  action_id: 'act-1',
+  match_level: 'L1Exact',
   confidence: 0.9,
   matched_fields: { canonical_path: null, host: null, port: null, command: null, raw_args: [] },
-  derivation_mode: 'Direct', phase: { Provisional: { timestamp_ns: 1000 } },
+  derivation_mode: 'Direct',
+  phase: { Provisional: { timestamp_ns: 1000 } },
   timestamp_ns: 1000,
 });
 
@@ -96,21 +140,55 @@ describe('buildWhyFacets — 分面计数与映射', () => {
       }),
     ];
     const pollutionEvents = [pollution({ pollution_id: 1, source_agent_id: 'agent-a' })];
-    const policyEvaluations = [policy({ policy_id: 'p1', subject_agent_id: 'agent-b', judgment: { result: 'Violation' } })];
-    const why = buildWhyFacets({ alerts, pollutionEvents, policyEvaluations, nonLinkDiagnostics: [], intents: [], evidence: [], graph });
+    const policyEvaluations = [
+      policy({ policy_id: 'p1', subject_agent_id: 'agent-b', judgment: { result: 'Violation' } }),
+    ];
+    const why = buildWhyFacets({
+      alerts,
+      pollutionEvents,
+      policyEvaluations,
+      nonLinkDiagnostics: [],
+      intents: [],
+      evidence: [],
+      graph,
+    });
     expect(why.facetCounts).toEqual({ pollution: 1, policy: 1, diagnostic: 0 });
     expect(why.alertFacets.a1).toEqual(['pollution']);
     expect(why.alertFacets.a2).toEqual(['policy']);
   });
 
   it('diagnostic 分面经 evidence 桥接命中（timeline evidence_ref → evidence → intent → 诊断）', () => {
-    const alerts = [alert({
-      alert_id: 'a1',
-      timeline: { steps: [{ timestamp_ns: 900, event_type: 'EXEC', description: 'x', resource: null, evidence_ref: 'ev-1', agent_id: 'agent-a', operation: null, evidence_level: null, triggering_rule_ids: [], triggering_pattern_id: null, source_event_id: null }], total_duration_ms: 0 },
-    })];
+    const alerts = [
+      alert({
+        alert_id: 'a1',
+        timeline: {
+          steps: [
+            {
+              timestamp_ns: 900,
+              event_type: 'EXEC',
+              description: 'x',
+              resource: null,
+              evidence_ref: 'ev-1',
+              agent_id: 'agent-a',
+              operation: null,
+              evidence_level: null,
+              triggering_rule_ids: [],
+              triggering_pattern_id: null,
+              source_event_id: null,
+            },
+          ],
+          total_duration_ms: 0,
+        },
+      }),
+    ];
     const why = buildWhyFacets({
-      alerts, pollutionEvents: [], policyEvaluations: [], nonLinkDiagnostics: [diag({ diagnostic_id: 'd1', intent_id: 'int-1' })],
-      intents: [intent('int-1', 'Bash')], evidence: [evidence('ev-1', 'int-1')], graph,
+      alerts,
+      pollutionEvents: [],
+      policyEvaluations: [],
+      nonLinkDiagnostics: [diag({ diagnostic_id: 'd1', intent_id: 'int-1' })],
+      intents: [intent('int-1', 'Bash')],
+      evidence: [evidence('ev-1', 'int-1')],
+      graph,
     });
     expect(why.facetCounts).toEqual({ pollution: 0, policy: 0, diagnostic: 1 });
     expect(why.alertFacets.a1).toEqual(['diagnostic']);
@@ -120,14 +198,26 @@ describe('buildWhyFacets — 分面计数与映射', () => {
     // 红：collectAlertEvidenceRefs 在相关边集为空时回退收集全图边 refs，使任何含
     // 诊断意图证据的图边都能把无关告警桥进 diagnostic 分面（虚高）。严格模式只采纳
     // 告警自身时间线证据 + 追溯边，全图回退仅保留给证据面板的 store 告警联动。
-    const alerts = [alert({
-      alert_id: 'a1',
-      primary_agent: { agent_id: 'ghost', claimed_role: null },
-      involved_agents: [{ agent_id: 'ghost', claimed_role: null }],
-    })];
+    const alerts = [
+      alert({
+        alert_id: 'a1',
+        primary_agent: { agent_id: 'ghost', claimed_role: null },
+        involved_agents: [{ agent_id: 'ghost', claimed_role: null }],
+      }),
+    ];
     const graphWithEdge: GraphData = {
       nodes: [],
-      edges: [{ edge_id: 'e1', edge_type: 'ContextFlowsFrom', source: 'x', target: 'y', evidence_refs: ['ev-9'], confidence: 0.9, phase: { Provisional: { timestamp_ns: 1000 } } }],
+      edges: [
+        {
+          edge_id: 'e1',
+          edge_type: 'ContextFlowsFrom',
+          source: 'x',
+          target: 'y',
+          evidence_refs: ['ev-9'],
+          confidence: 0.9,
+          phase: { Provisional: { timestamp_ns: 1000 } },
+        },
+      ],
     };
     const why = buildWhyFacets({
       alerts,
@@ -143,9 +233,23 @@ describe('buildWhyFacets — 分面计数与映射', () => {
   });
 
   it('无 involved_agents 的告警不命中污染/违规；证据桥接为空不命中失配', () => {
-    const alerts = [alert({ alert_id: 'a1', primary_agent: { agent_id: '', claimed_role: null }, involved_agents: [] })];
+    const alerts = [
+      alert({
+        alert_id: 'a1',
+        primary_agent: { agent_id: '', claimed_role: null },
+        involved_agents: [],
+      }),
+    ];
     const pollutionEvents = [pollution({ pollution_id: 1, source_agent_id: 'agent-a' })];
-    const why = buildWhyFacets({ alerts, pollutionEvents, policyEvaluations: [], nonLinkDiagnostics: [], intents: [], evidence: [], graph });
+    const why = buildWhyFacets({
+      alerts,
+      pollutionEvents,
+      policyEvaluations: [],
+      nonLinkDiagnostics: [],
+      intents: [],
+      evidence: [],
+      graph,
+    });
     expect(why.facetCounts).toEqual({ pollution: 0, policy: 0, diagnostic: 0 });
   });
 
@@ -159,15 +263,49 @@ describe('buildWhyFacets — 分面计数与映射', () => {
     const pollutionEvents = [
       pollution({ pollution_id: 1, source_agent_id: 'agent-a', propagation_path: [] }),
       pollution({ pollution_id: 2, source_agent_id: 'agent-b', propagation_path: [] }),
-      pollution({ pollution_id: 3, source_agent_id: 'agent-a', propagation_path: ['agent-a', 'agent-b', 'agent-c'] }),
+      pollution({
+        pollution_id: 3,
+        source_agent_id: 'agent-a',
+        propagation_path: ['agent-a', 'agent-b', 'agent-c'],
+      }),
     ];
     const policyEvaluations = [
-      policy({ policy_id: 'p1', boundary: 'Capability', subject_agent_id: 'agent-a', judgment: { result: 'Compliant' } }),
-      policy({ policy_id: 'p2', boundary: 'Capability', subject_agent_id: 'agent-a', judgment: { result: 'Compliant' } }),
-      policy({ policy_id: 'p3', boundary: 'Capability', subject_agent_id: 'agent-a', judgment: { result: 'Compliant' } }),
-      policy({ policy_id: 'p4', boundary: 'Capability', subject_agent_id: 'agent-a', judgment: { result: 'Compliant' } }),
-      policy({ policy_id: 'p5', boundary: 'DataFlow', subject_agent_id: 'agent-b', judgment: { result: 'Allow' } }),
-      policy({ policy_id: 'p6', boundary: 'Capability', subject_agent_id: 'agent-a', judgment: { result: 'Violation' } }),
+      policy({
+        policy_id: 'p1',
+        boundary: 'Capability',
+        subject_agent_id: 'agent-a',
+        judgment: { result: 'Compliant' },
+      }),
+      policy({
+        policy_id: 'p2',
+        boundary: 'Capability',
+        subject_agent_id: 'agent-a',
+        judgment: { result: 'Compliant' },
+      }),
+      policy({
+        policy_id: 'p3',
+        boundary: 'Capability',
+        subject_agent_id: 'agent-a',
+        judgment: { result: 'Compliant' },
+      }),
+      policy({
+        policy_id: 'p4',
+        boundary: 'Capability',
+        subject_agent_id: 'agent-a',
+        judgment: { result: 'Compliant' },
+      }),
+      policy({
+        policy_id: 'p5',
+        boundary: 'DataFlow',
+        subject_agent_id: 'agent-b',
+        judgment: { result: 'Allow' },
+      }),
+      policy({
+        policy_id: 'p6',
+        boundary: 'Capability',
+        subject_agent_id: 'agent-a',
+        judgment: { result: 'Violation' },
+      }),
     ];
     const nonLinkDiagnostics = [
       diag({ diagnostic_id: 'nld-1', intent_id: 'int-1', reason: 'BelowConfidenceCutoff' }),
@@ -176,25 +314,36 @@ describe('buildWhyFacets — 分面计数与映射', () => {
       diag({ diagnostic_id: 'nld-4', intent_id: 'int-2', reason: 'AmbiguousMatch' }),
     ];
     const why = buildWhyFacets({
-      alerts, pollutionEvents, policyEvaluations, nonLinkDiagnostics,
+      alerts,
+      pollutionEvents,
+      policyEvaluations,
+      nonLinkDiagnostics,
       intents: [intent('int-1', 'Bash'), intent('int-2', 'Read'), intent('int-3', 'Glob')],
-      evidence: [], graph,
+      evidence: [],
+      graph,
     });
     expect(why.facetCounts).toEqual({ pollution: 2, policy: 2, diagnostic: 0 });
-    expect(why.pollution.bySource).toEqual([{ agentId: 'agent-a', count: 2 }, { agentId: 'agent-b', count: 1 }]);
+    expect(why.pollution.bySource).toEqual([
+      { agentId: 'agent-a', count: 2 },
+      { agentId: 'agent-b', count: 1 },
+    ]);
     expect(why.pollution.hubAgents).toEqual(['agent-a', 'agent-b']);
     expect(why.pollution.multiHopCount).toBe(1);
     expect(why.pollution.maxHops).toBe(3);
     expect(why.pollution.avgHops).toBe(1.0);
     // byJudgment 降序：Compliant×4 居首；Allow/Violation 平票按 result 升序
     expect(why.policy.byJudgment).toEqual([
-      { result: 'Compliant', count: 4 }, { result: 'Allow', count: 1 }, { result: 'Violation', count: 1 },
+      { result: 'Compliant', count: 4 },
+      { result: 'Allow', count: 1 },
+      { result: 'Violation', count: 1 },
     ]);
     expect(why.policy.violationCount).toBe(1);
     expect(why.policy.violationRate).toBeCloseTo(1 / 6, 5);
     // byReason 降序；byIntentId 按 count 降序、平票按 intentId 升序
     expect(why.diagnostic.byReason).toEqual([
-      { reason: 'BelowConfidenceCutoff', count: 2 }, { reason: 'AmbiguousMatch', count: 1 }, { reason: 'NoArgumentMatch', count: 1 },
+      { reason: 'BelowConfidenceCutoff', count: 2 },
+      { reason: 'AmbiguousMatch', count: 1 },
+      { reason: 'NoArgumentMatch', count: 1 },
     ]);
     expect(why.diagnostic.byIntentId).toEqual([
       { intentId: 'int-2', toolName: 'Read', count: 2 },
@@ -217,8 +366,13 @@ describe('filterAlertsByFacet', () => {
   ];
   // 过滤直接消费 why.alertFacets（与分面计数同源，杜绝传入不一致映射）。
   const why = buildWhyFacets({
-    alerts, pollutionEvents: [pollution({ pollution_id: 1, source_agent_id: 'agent-a' })],
-    policyEvaluations: [], nonLinkDiagnostics: [], intents: [], evidence: [], graph,
+    alerts,
+    pollutionEvents: [pollution({ pollution_id: 1, source_agent_id: 'agent-a' })],
+    policyEvaluations: [],
+    nonLinkDiagnostics: [],
+    intents: [],
+    evidence: [],
+    graph,
   });
 
   it("'all' 原样返回", () => {
@@ -235,11 +389,26 @@ describe('buildWhyFacets — 摘要', () => {
     const events = [
       pollution({ pollution_id: 1, source_agent_id: 'agent-a', propagation_path: [] }),
       pollution({ pollution_id: 2, source_agent_id: 'agent-b', propagation_path: [] }),
-      pollution({ pollution_id: 3, source_agent_id: 'agent-a', propagation_path: ['agent-a', 'agent-b', 'agent-c'] }),
+      pollution({
+        pollution_id: 3,
+        source_agent_id: 'agent-a',
+        propagation_path: ['agent-a', 'agent-b', 'agent-c'],
+      }),
     ];
-    const why = buildWhyFacets({ alerts: [], pollutionEvents: events, policyEvaluations: [], nonLinkDiagnostics: [], intents: [], evidence: [], graph });
+    const why = buildWhyFacets({
+      alerts: [],
+      pollutionEvents: events,
+      policyEvaluations: [],
+      nonLinkDiagnostics: [],
+      intents: [],
+      evidence: [],
+      graph,
+    });
     expect(why.pollution.total).toBe(3);
-    expect(why.pollution.bySource).toEqual([{ agentId: 'agent-a', count: 2 }, { agentId: 'agent-b', count: 1 }]);
+    expect(why.pollution.bySource).toEqual([
+      { agentId: 'agent-a', count: 2 },
+      { agentId: 'agent-b', count: 1 },
+    ]);
     expect(why.pollution.byArtifact).toEqual([{ artifact: '/tmp/a', count: 3 }]);
     expect(why.pollution.hubAgents).toEqual(['agent-a', 'agent-b']);
     expect(why.pollution.multiHopCount).toBe(1);
@@ -251,15 +420,35 @@ describe('buildWhyFacets — 摘要', () => {
     const evals = [
       policy({ policy_id: 'p1', boundary: 'Capability', judgment: { result: 'Violation' } }),
       policy({ policy_id: 'p2', boundary: 'Capability', judgment: { result: 'Compliant' } }),
-      policy({ policy_id: 'p3', boundary: 'DataFlow', subject_agent_id: 'agent-b', judgment: { result: 'Allow' } }),
-      policy({ policy_id: 'p4', boundary: 'DataFlow', subject_agent_id: 'agent-b', judgment: null }),
+      policy({
+        policy_id: 'p3',
+        boundary: 'DataFlow',
+        subject_agent_id: 'agent-b',
+        judgment: { result: 'Allow' },
+      }),
+      policy({
+        policy_id: 'p4',
+        boundary: 'DataFlow',
+        subject_agent_id: 'agent-b',
+        judgment: null,
+      }),
     ];
-    const why = buildWhyFacets({ alerts: [], pollutionEvents: [], policyEvaluations: evals, nonLinkDiagnostics: [], intents: [], evidence: [], graph });
+    const why = buildWhyFacets({
+      alerts: [],
+      pollutionEvents: [],
+      policyEvaluations: evals,
+      nonLinkDiagnostics: [],
+      intents: [],
+      evidence: [],
+      graph,
+    });
     expect(why.policy.total).toBe(4);
     // 平票（各 1）按 result 升序：'Allow'(A) < 'Compliant'(C) < 'Violation'(V) < 'unknown'(u)
     expect(why.policy.byJudgment).toEqual([
-      { result: 'Allow', count: 1 }, { result: 'Compliant', count: 1 },
-      { result: 'Violation', count: 1 }, { result: 'unknown', count: 1 },
+      { result: 'Allow', count: 1 },
+      { result: 'Compliant', count: 1 },
+      { result: 'Violation', count: 1 },
+      { result: 'unknown', count: 1 },
     ]);
     expect(why.policy.violationCount).toBe(1);
     expect(why.policy.violationRate).toBeCloseTo(0.25, 5);
@@ -276,11 +465,21 @@ describe('buildWhyFacets — 摘要', () => {
       diag({ diagnostic_id: 'd3', intent_id: 'int-3', reason: 'NoArgumentMatch' }),
       diag({ diagnostic_id: 'd4', intent_id: null, reason: 'AmbiguousMatch' }),
     ];
-    const why = buildWhyFacets({ alerts: [], pollutionEvents: [], policyEvaluations: [], nonLinkDiagnostics: diags, intents: [intent('int-1', 'Bash'), intent('int-3', 'Read')], evidence: [], graph });
+    const why = buildWhyFacets({
+      alerts: [],
+      pollutionEvents: [],
+      policyEvaluations: [],
+      nonLinkDiagnostics: diags,
+      intents: [intent('int-1', 'Bash'), intent('int-3', 'Read')],
+      evidence: [],
+      graph,
+    });
     expect(why.diagnostic.total).toBe(4);
     // BelowConfidenceCutoff×2 居首；NoArgumentMatch/AmbiguousMatch 平票按 reason 升序（'AmbiguousMatch' < 'NoArgumentMatch'）
     expect(why.diagnostic.byReason).toEqual([
-      { reason: 'BelowConfidenceCutoff', count: 2 }, { reason: 'AmbiguousMatch', count: 1 }, { reason: 'NoArgumentMatch', count: 1 },
+      { reason: 'BelowConfidenceCutoff', count: 2 },
+      { reason: 'AmbiguousMatch', count: 1 },
+      { reason: 'NoArgumentMatch', count: 1 },
     ]);
     expect(why.diagnostic.byIntentId).toEqual([
       { intentId: 'int-1', toolName: 'Bash', count: 1 },
@@ -291,7 +490,15 @@ describe('buildWhyFacets — 摘要', () => {
   });
 
   it('空输入 → 全零不抛错', () => {
-    const why = buildWhyFacets({ alerts: [], pollutionEvents: [], policyEvaluations: [], nonLinkDiagnostics: [], intents: [], evidence: [], graph });
+    const why = buildWhyFacets({
+      alerts: [],
+      pollutionEvents: [],
+      policyEvaluations: [],
+      nonLinkDiagnostics: [],
+      intents: [],
+      evidence: [],
+      graph,
+    });
     expect(why.facetCounts).toEqual({ pollution: 0, policy: 0, diagnostic: 0 });
     expect(why.pollution.avgHops).toBe(0);
     expect(why.policy.violationRate).toBe(0);
@@ -314,10 +521,14 @@ describe('parseFacetSelection', () => {
 
 describe('buildFacetHref', () => {
   it('写入 facet 并保留 hash', () => {
-    expect(buildFacetHref('pollution', 'alertId=abc', '#alertId=abc')).toBe('/investigations?alertId=abc&facet=pollution#alertId=abc');
+    expect(buildFacetHref('pollution', 'alertId=abc', '#alertId=abc')).toBe(
+      '/investigations?alertId=abc&facet=pollution#alertId=abc',
+    );
   });
   it("'all' 移除 facet", () => {
-    expect(buildFacetHref('all', 'alertId=abc&facet=pollution', '#alertId=abc')).toBe('/investigations?alertId=abc#alertId=abc');
+    expect(buildFacetHref('all', 'alertId=abc&facet=pollution', '#alertId=abc')).toBe(
+      '/investigations?alertId=abc#alertId=abc',
+    );
   });
   it('空 query 且 all → 仅 hash', () => {
     expect(buildFacetHref('all', '', '#alertId=abc')).toBe('/investigations#alertId=abc');
@@ -329,7 +540,9 @@ describe('buildFacetHref', () => {
 
 describe('buildAlertHrefWithQuery — 分面内点告警不丢 query', () => {
   it('保留当前 query 并注入 alertId hash', () => {
-    expect(buildAlertHrefWithQuery('abc', 'facet=pollution')).toBe('/investigations?facet=pollution#alertId=abc');
+    expect(buildAlertHrefWithQuery('abc', 'facet=pollution')).toBe(
+      '/investigations?facet=pollution#alertId=abc',
+    );
   });
   it('无 query 时原样返回', () => {
     expect(buildAlertHrefWithQuery('abc', '')).toBe('/investigations#alertId=abc');
@@ -338,6 +551,8 @@ describe('buildAlertHrefWithQuery — 分面内点告警不丢 query', () => {
     expect(buildAlertHrefWithQuery(null, 'facet=policy')).toBe('/investigations?facet=policy');
   });
   it('剔除 query 中陈旧 alertId，避免 hash 选中被弹回旧告警', () => {
-    expect(buildAlertHrefWithQuery('def', 'alertId=abc&facet=pollution')).toBe('/investigations?facet=pollution#alertId=def');
+    expect(buildAlertHrefWithQuery('def', 'alertId=abc&facet=pollution')).toBe(
+      '/investigations?facet=pollution#alertId=def',
+    );
   });
 });

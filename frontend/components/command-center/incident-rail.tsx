@@ -176,23 +176,29 @@ function buildPathPreview(selectedModel: InvestigationModel) {
   return labels.length > 3 ? `${preview} -> +${labels.length - 3}` : preview;
 }
 
-function AnimatedPathPreview({ nodes, fallback }: { nodes: { label: string }[]; fallback: string }) {
+function AnimatedPathPreview({
+  nodes,
+  fallback,
+}: {
+  nodes: { label: string }[];
+  fallback: string;
+}) {
   if (!nodes.length) {
     return <span className="text-sm font-light text-white/50">{fallback}</span>;
   }
-  
+
   const displayNodes = nodes.slice(0, 3);
   const overflow = nodes.length > 3 ? nodes.length - 3 : 0;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 mt-1">
+    <div className="mt-1 flex flex-wrap items-center gap-2">
       {displayNodes.map((node, idx) => (
         <Fragment key={idx}>
           <motion.div
             initial={{ opacity: 0, scale: 0.9, filter: 'blur(4px)' }}
             animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-            transition={{ delay: 0.1 + idx * 0.1, type: "spring", stiffness: 300, damping: 20 }}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-white/10 bg-white/[0.03] shadow-[0_0_10px_rgba(255,255,255,0.02)] transition-all hover:bg-white/[0.06] hover:border-white/20"
+            transition={{ delay: 0.1 + idx * 0.1, type: 'spring', stiffness: 300, damping: 20 }}
+            className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 shadow-[0_0_10px_rgba(255,255,255,0.02)] transition-all hover:border-white/20 hover:bg-white/[0.06]"
           >
             <Codicon name="gist-commit" size={12} className="text-white/40" />
             <span className="text-xs font-medium tracking-wide text-white/80">{node.label}</span>
@@ -208,7 +214,7 @@ function AnimatedPathPreview({ nodes, fallback }: { nodes: { label: string }[]; 
           )}
         </Fragment>
       ))}
-      
+
       {overflow > 0 && (
         <>
           <motion.div
@@ -221,8 +227,8 @@ function AnimatedPathPreview({ nodes, fallback }: { nodes: { label: string }[]; 
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 + displayNodes.length * 0.1, type: "spring" }}
-            className="flex items-center justify-center px-2 py-1 rounded-full border border-white/5 bg-white/[0.02]"
+            transition={{ delay: 0.2 + displayNodes.length * 0.1, type: 'spring' }}
+            className="flex items-center justify-center rounded-full border border-white/5 bg-white/[0.02] px-2 py-1"
           >
             <span className="text-[10px] font-bold text-white/40">+{overflow}</span>
           </motion.div>
@@ -233,13 +239,13 @@ function AnimatedPathPreview({ nodes, fallback }: { nodes: { label: string }[]; 
 }
 
 function buildReactFlowData(model: InvestigationModel) {
-  const nodes = model.pathNodes.map(node => ({
+  const nodes = model.pathNodes.map((node) => ({
     id: node.nodeId,
     label: node.label,
     nodeType: node.nodeType || 'NODE',
   }));
 
-  const edges = model.pathEdges.map(edge => ({
+  const edges = model.pathEdges.map((edge) => ({
     id: edge.edge_id,
     source: edge.source,
     target: edge.target,
@@ -361,8 +367,11 @@ function MtAgentLensMark() {
       {/* Minimal single-lens mark — matches dock button icon style (currentColor line icon) */}
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
         <circle
-          cx="12" cy="12" r="8"
-          stroke="currentColor" fill="none"
+          cx="12"
+          cy="12"
+          r="8"
+          stroke="currentColor"
+          fill="none"
           style={{ strokeWidth: 1.7 }}
           opacity="0.9"
         />
@@ -371,8 +380,6 @@ function MtAgentLensMark() {
     </span>
   );
 }
-
-
 
 function RailSurface({
   theater,
@@ -423,42 +430,48 @@ function SignalList({
   icon?: string;
 }) {
   if (!items.length) {
-    return <p className="text-xs font-light text-white/40 py-2">{emptyLabel}</p>;
+    return <p className="py-2 text-xs font-light text-white/40">{emptyLabel}</p>;
   }
 
   return (
-    <div className="relative flex flex-col w-full">
+    <div className="relative flex w-full flex-col">
       {/* 动态脉冲连接线 */}
-      <div className="absolute left-[11px] top-4 bottom-4 w-[2px] bg-gradient-to-b from-white/10 via-white/5 to-transparent z-0 rounded-full" />
-      
+      <div className="absolute top-4 bottom-4 left-[11px] z-0 w-[2px] rounded-full bg-gradient-to-b from-white/10 via-white/5 to-transparent" />
+
       <AnimatedList delay={150}>
         {items.map((item, index) => (
-          <div 
-            key={item.id} 
-            className="group relative flex gap-4 p-2.5 -ml-2.5 rounded-xl transition-all duration-400 hover:bg-white/[0.04] cursor-default"
+          <div
+            key={item.id}
+            className="group relative -ml-2.5 flex cursor-default gap-4 rounded-xl p-2.5 transition-all duration-400 hover:bg-white/[0.04]"
           >
             {/* 顶级图标锚点 & 发光动效 */}
             <div className="relative z-10 flex flex-col items-center justify-start pt-1">
-              <div className="relative flex h-[24px] w-[24px] items-center justify-center rounded-full border border-white/10 bg-[#141415] shadow-[0_0_12px_rgba(255,255,255,0.02)] group-hover:border-white/30 group-hover:shadow-[0_0_20px_rgba(255,255,255,0.15)] group-hover:bg-[#1C1C1E] transition-all duration-500">
-                <Codicon name={icon} size={12} className="text-white/40 group-hover:text-white/90 group-hover:scale-110 transition-all duration-500" />
+              <div className="relative flex h-[24px] w-[24px] items-center justify-center rounded-full border border-white/10 bg-[#141415] shadow-[0_0_12px_rgba(255,255,255,0.02)] transition-all duration-500 group-hover:border-white/30 group-hover:bg-[#1C1C1E] group-hover:shadow-[0_0_20px_rgba(255,255,255,0.15)]">
+                <Codicon
+                  name={icon}
+                  size={12}
+                  className="text-white/40 transition-all duration-500 group-hover:scale-110 group-hover:text-white/90"
+                />
               </div>
               {/* 微小的连接点 */}
               {index !== items.length - 1 && (
-                 <div className="absolute top-[24px] bottom-[-10px] w-px bg-gradient-to-b from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute top-[24px] bottom-[-10px] w-px bg-gradient-to-b from-white/20 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
               )}
             </div>
-            
+
             {/* 核心内容区 */}
-            <div className="flex flex-col gap-1 min-w-0 flex-1 pt-1 pb-2">
+            <div className="flex min-w-0 flex-1 flex-col gap-1 pt-1 pb-2">
               <div className="flex items-center justify-between gap-3">
-                <strong className="text-sm font-medium tracking-wide text-white/70 group-hover:text-white truncate transition-colors duration-300">{item.label}</strong>
+                <strong className="truncate text-sm font-medium tracking-wide text-white/70 transition-colors duration-300 group-hover:text-white">
+                  {item.label}
+                </strong>
                 {item.meta && (
-                  <span className="shrink-0 rounded-md border border-white/5 bg-white/[0.02] px-2 py-0.5 text-[9px] font-medium uppercase tracking-widest text-white/40 group-hover:border-white/20 group-hover:text-white/80 group-hover:bg-white/[0.06] transition-all duration-300">
+                  <span className="shrink-0 rounded-md border border-white/5 bg-white/[0.02] px-2 py-0.5 text-[9px] font-medium tracking-widest text-white/40 uppercase transition-all duration-300 group-hover:border-white/20 group-hover:bg-white/[0.06] group-hover:text-white/80">
                     {item.meta}
                   </span>
                 )}
               </div>
-              <p className="text-xs font-light leading-relaxed text-white/30 group-hover:text-white/60 transition-colors duration-300 break-words mt-0.5">
+              <p className="mt-0.5 text-xs leading-relaxed font-light break-words text-white/30 transition-colors duration-300 group-hover:text-white/60">
                 {item.detail}
               </p>
             </div>
@@ -639,10 +652,14 @@ export default function IncidentRail({
 
   const getFluidPalette = (toolId: string) => {
     switch (toolId) {
-      case 'incident': return FLUID_PALETTES.incident;
-      case 'evidence': return FLUID_PALETTES.evidence;
-      case 'trace': return FLUID_PALETTES.narrative;
-      default: return FLUID_PALETTES.incident;
+      case 'incident':
+        return FLUID_PALETTES.incident;
+      case 'evidence':
+        return FLUID_PALETTES.evidence;
+      case 'trace':
+        return FLUID_PALETTES.narrative;
+      default:
+        return FLUID_PALETTES.incident;
     }
   };
   const activeFluidColors = getFluidPalette(activeTool);
@@ -804,7 +821,7 @@ export default function IncidentRail({
       }
     : undefined;
   const theaterPanelContentStyle: CSSProperties | undefined = isTheater
-    ? {
+    ? ({
         height: 'auto',
         minHeight: 0,
         maxHeight: 'calc(100vh - 40px)',
@@ -812,9 +829,8 @@ export default function IncidentRail({
         display: 'flex',
         flexDirection: 'column',
         gap: '16px',
-      } as React.CSSProperties
-    : {
-      } as React.CSSProperties;
+      } as React.CSSProperties)
+    : ({} as React.CSSProperties);
   const theaterPanelHeroStyle: CSSProperties | undefined = isTheater
     ? {
         minHeight: '116px',
@@ -963,9 +979,7 @@ export default function IncidentRail({
           aria-hidden="true"
           animate={reduceMotion ? undefined : { opacity: [0.08, 0.14, 0.08] }}
           transition={
-            reduceMotion
-              ? undefined
-              : { duration: 10, repeat: Infinity, ease: 'easeInOut' }
+            reduceMotion ? undefined : { duration: 10, repeat: Infinity, ease: 'easeInOut' }
           }
         />
       )}
@@ -1009,8 +1023,16 @@ export default function IncidentRail({
                   : { opacity: 0, x: -10, scale: 0.992, filter: 'blur(4px)' }
               }
               animate={
-                  reduceMotion ? { opacity: 1 } : { opacity: 1, x: 0, scale: 1, filter: 'blur(0px)', transitionEnd: { transform: 'none' } }
-                }
+                reduceMotion
+                  ? { opacity: 1 }
+                  : {
+                      opacity: 1,
+                      x: 0,
+                      scale: 1,
+                      filter: 'blur(0px)',
+                      transitionEnd: { transform: 'none' },
+                    }
+              }
               exit={
                 reduceMotion
                   ? { opacity: 0 }
@@ -1018,27 +1040,30 @@ export default function IncidentRail({
               }
               transition={panelTransition}
             >
-                <RailSurface
-                  theater={isTheater}
-                  className="incident-rail__panel"
-                  style={{ ...theaterPanelStyle, position: 'relative', zIndex: 1 }}
-                  contentClassName="incident-rail__panel-content"
-                  contentStyle={{ ...theaterPanelContentStyle, position: 'relative' }}
+              <RailSurface
+                theater={isTheater}
+                className="incident-rail__panel"
+                style={{ ...theaterPanelStyle, position: 'relative', zIndex: 1 }}
+                contentClassName="incident-rail__panel-content"
+                contentStyle={{ ...theaterPanelContentStyle, position: 'relative' }}
+              >
+                <div
+                  className="incident-rail__panel-header"
+                  style={{
+                    position: 'relative',
+                    overflow: 'hidden',
+                    backgroundColor: 'transparent',
+                    borderBottom: 'none',
+                    zIndex: 1,
+                  }}
                 >
-                  <div 
-                    className="incident-rail__panel-header" 
-                    style={{ 
-                      position: 'relative', 
-                      overflow: 'hidden', 
-                      backgroundColor: 'transparent', 
-                      borderBottom: 'none', 
-                      zIndex: 1 
-                    }}
+                  <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
+                    <FluidHeader colors={activeFluidColors} />
+                  </div>
+                  <div
+                    className="incident-rail__panel-hero"
+                    style={{ ...theaterPanelHeroStyle, position: 'relative', zIndex: 1 }}
                   >
-                    <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
-                      <FluidHeader colors={activeFluidColors} />
-                    </div>
-                    <div className="incident-rail__panel-hero" style={{ ...theaterPanelHeroStyle, position: 'relative', zIndex: 1 }}>
                     <div className="incident-rail__panel-title mesh-text-layer">
                       <span className="incident-rail__panel-kicker">MtAgentLens / 责任透镜</span>
                       <div className="incident-rail__panel-heading">
@@ -1054,10 +1079,15 @@ export default function IncidentRail({
                     <div className="incident-rail__panel-meta mesh-text-layer">
                       <span data-tone={severity}>{severityLabel(selectedAlert.severity)}</span>
                       <span>{decisionLabel(selectedAlert.decision)}</span>
-                      <span><CountUp value={pulse} /></span>
+                      <span>
+                        <CountUp value={pulse} />
+                      </span>
                     </div>
                   </div>
-                  <div className="incident-rail__panel-toolbar" style={{ position: 'relative', zIndex: 2 }}>
+                  <div
+                    className="incident-rail__panel-toolbar"
+                    style={{ position: 'relative', zIndex: 2 }}
+                  >
                     <Magnetic strength={15}>
                       <Link
                         href={workspaceAction.href}
@@ -1090,24 +1120,48 @@ export default function IncidentRail({
                       key={activeTool}
                       className="incident-inspector-view w-full"
                       style={theaterSurfaceStyle}
-                      initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10, filter: 'blur(5px)' }}
-                      animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' }}
-                      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -5, filter: 'blur(2px)' }}
+                      initial={
+                        reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10, filter: 'blur(5px)' }
+                      }
+                      animate={
+                        reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' }
+                      }
+                      exit={
+                        reduceMotion ? { opacity: 0 } : { opacity: 0, y: -5, filter: 'blur(2px)' }
+                      }
                       transition={{ duration: reduceMotion ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
                     >
                       {activeTool === 'incident' && (
-                        <section className="incident-panel-flow w-full" aria-label="当前事件摘要" style={theaterSurfaceStyle}>
+                        <section
+                          className="incident-panel-flow w-full"
+                          aria-label="当前事件摘要"
+                          style={theaterSurfaceStyle}
+                        >
                           <div className="flex flex-col gap-4 pb-12">
                             <BentoCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex flex-wrap items-center gap-3">
-                                  <ToolbenchStatus icon="warning" label="当前事件" value={severityLabel(selectedAlert.severity)} />
-                                  <ToolbenchStatus icon="shield" label="判定" value={decisionLabel(selectedAlert.decision)} />
+                                  <ToolbenchStatus
+                                    icon="warning"
+                                    label="当前事件"
+                                    value={severityLabel(selectedAlert.severity)}
+                                  />
+                                  <ToolbenchStatus
+                                    icon="shield"
+                                    label="判定"
+                                    value={decisionLabel(selectedAlert.decision)}
+                                  />
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">{selectionSummary.eyebrow}</span>
-                                  <h2 className="text-2xl font-light leading-snug tracking-tight text-white/90">{selectionSummary.title}</h2>
-                                  <p className="mt-1 text-sm leading-relaxed text-white/50 font-light">{selectionSummary.description}</p>
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    {selectionSummary.eyebrow}
+                                  </span>
+                                  <h2 className="text-2xl leading-snug font-light tracking-tight text-white/90">
+                                    {selectionSummary.title}
+                                  </h2>
+                                  <p className="mt-1 text-sm leading-relaxed font-light text-white/50">
+                                    {selectionSummary.description}
+                                  </p>
                                 </div>
                               </div>
                             </BentoCard>
@@ -1116,16 +1170,31 @@ export default function IncidentRail({
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center justify-between">
                                   <div className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">风险脉冲</span>
-                                    <small className="text-xs text-white/40 font-light">{selectedModel.boundaryCrossingCount} 次边界 · {selectedModel.evidenceRefs.length} 条证据</small>
+                                    <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                      风险脉冲
+                                    </span>
+                                    <small className="text-xs font-light text-white/40">
+                                      {selectedModel.boundaryCrossingCount} 次边界 ·{' '}
+                                      {selectedModel.evidenceRefs.length} 条证据
+                                    </small>
                                   </div>
                                   <div className="flex items-baseline gap-1">
-                                    <strong className="text-5xl font-extralight tracking-tighter text-white/90 tabular-nums"><CountUp value={pulse} /></strong>
+                                    <strong className="text-5xl font-extralight tracking-tighter text-white/90 tabular-nums">
+                                      <CountUp value={pulse} />
+                                    </strong>
                                     <span className="text-lg font-light text-white/30">%</span>
                                   </div>
                                 </div>
-                                <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.03]" aria-hidden="true">
-                                  <motion.i className="block h-full rounded-full bg-gradient-to-r from-rose-500/80 to-orange-400/80" initial={{ width: 0 }} animate={{ width: `${pulse}%` }} transition={{ delay: 0.3, duration: 0.8, ease: 'easeOut' }} />
+                                <div
+                                  className="h-1 w-full overflow-hidden rounded-full bg-white/[0.03]"
+                                  aria-hidden="true"
+                                >
+                                  <motion.i
+                                    className="block h-full rounded-full bg-gradient-to-r from-rose-500/80 to-orange-400/80"
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${pulse}%` }}
+                                    transition={{ delay: 0.3, duration: 0.8, ease: 'easeOut' }}
+                                  />
                                 </div>
                               </div>
                             </BentoCard>
@@ -1134,23 +1203,36 @@ export default function IncidentRail({
                               <div className="flex flex-col gap-4">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="zap" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">下一步动作</span>
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    下一步动作
+                                  </span>
                                 </div>
-                                <p className="text-sm font-light leading-relaxed text-white/80">{nextAction}</p>
-                                <div className="flex items-center gap-3 mt-1">
-                                  <Link href={buildInvestigationHref(selectedAlert.alert_id)} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white">
+                                <p className="text-sm leading-relaxed font-light text-white/80">
+                                  {nextAction}
+                                </p>
+                                <div className="mt-1 flex items-center gap-3">
+                                  <Link
+                                    href={buildInvestigationHref(selectedAlert.alert_id)}
+                                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white"
+                                  >
                                     打开调查 <Codicon name="arrow-right" size={12} />
                                   </Link>
-                                  <Link href={buildTraceHref(selectedAlert.alert_id)} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white">
+                                  <Link
+                                    href={buildTraceHref(selectedAlert.alert_id)}
+                                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white"
+                                  >
                                     查看链路 <Codicon name="arrow-right" size={12} />
                                   </Link>
-                                  <Link href={buildAgentHref(selectedAlert.primary_agent.agent_id)} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white">
+                                  <Link
+                                    href={buildAgentHref(selectedAlert.primary_agent.agent_id)}
+                                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white"
+                                  >
                                     主体画像 <Codicon name="organization" size={12} />
                                   </Link>
                                   <button
                                     type="button"
                                     onClick={() => setEventsOpen(true)}
-                                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white"
+                                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white"
                                   >
                                     原始事件流 <Codicon name="list-unordered" size={12} />
                                   </button>
@@ -1162,13 +1244,22 @@ export default function IncidentRail({
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="references" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">事实快照</span>
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    事实快照
+                                  </span>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-y-5 gap-x-4">
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-5 md:grid-cols-3">
                                   {factRows.map((row) => (
-                                    <div key={row.label} className="flex flex-col gap-1 min-w-0">
-                                      <span className="text-[10px] font-medium tracking-widest text-white/30 truncate uppercase">{row.label}</span>
-                                      <span className="text-base font-light tabular-nums tracking-tight text-white/80 truncate" title={String(row.value)}>{row.value}</span>
+                                    <div key={row.label} className="flex min-w-0 flex-col gap-1">
+                                      <span className="truncate text-[10px] font-medium tracking-widest text-white/30 uppercase">
+                                        {row.label}
+                                      </span>
+                                      <span
+                                        className="truncate text-base font-light tracking-tight text-white/80 tabular-nums"
+                                        title={String(row.value)}
+                                      >
+                                        {row.value}
+                                      </span>
                                     </div>
                                   ))}
                                 </div>
@@ -1179,19 +1270,34 @@ export default function IncidentRail({
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="shield" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">边界锚点 & 责任路径</span>
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    边界锚点 & 责任路径
+                                  </span>
                                 </div>
                                 <div className="flex flex-col gap-5">
-                                  <div className="flex flex-col gap-2 min-w-0">
-                                    <span className="text-[9px] tracking-[0.2em] text-white/20 uppercase">ANCHOR</span>
-                                    <strong className="text-sm font-light tracking-wide text-white/80 leading-relaxed break-words">{boundaryLabel}</strong>
-                                    <p className="text-xs text-white/40 font-light">第一处可归责边界，用于快速定位。</p>
+                                  <div className="flex min-w-0 flex-col gap-2">
+                                    <span className="text-[9px] tracking-[0.2em] text-white/20 uppercase">
+                                      ANCHOR
+                                    </span>
+                                    <strong className="text-sm leading-relaxed font-light tracking-wide break-words text-white/80">
+                                      {boundaryLabel}
+                                    </strong>
+                                    <p className="text-xs font-light text-white/40">
+                                      第一处可归责边界，用于快速定位。
+                                    </p>
                                   </div>
                                   <div className="h-px w-full bg-white/5" />
-                                  <div className="flex flex-col gap-2 min-w-0">
-                                    <span className="text-[9px] tracking-[0.2em] text-white/20 uppercase">PATH PREVIEW</span>
-                                    <AnimatedPathPreview nodes={selectedModel.pathNodes} fallback={pathPreview} />
-                                    <p className="text-xs text-white/40 font-light mt-1">主因果链已聚焦到当前事件。</p>
+                                  <div className="flex min-w-0 flex-col gap-2">
+                                    <span className="text-[9px] tracking-[0.2em] text-white/20 uppercase">
+                                      PATH PREVIEW
+                                    </span>
+                                    <AnimatedPathPreview
+                                      nodes={selectedModel.pathNodes}
+                                      fallback={pathPreview}
+                                    />
+                                    <p className="mt-1 text-xs font-light text-white/40">
+                                      主因果链已聚焦到当前事件。
+                                    </p>
                                   </div>
                                 </div>
                               </div>
@@ -1201,19 +1307,30 @@ export default function IncidentRail({
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="graph-line" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">归责链</span>
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    归责链
+                                  </span>
                                 </div>
                                 <div className="flex flex-col gap-2">
                                   {incidentNarrative.map((item, idx) => (
-                                    <motion.div 
-                                      key={item.id} 
+                                    <motion.div
+                                      key={item.id}
                                       className="group/label flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.01] px-4 py-3 transition-all hover:border-white/20 hover:bg-white/[0.04]"
                                       initial={{ opacity: 0, y: 8 }}
                                       animate={{ opacity: 1, y: 0 }}
-                                      transition={{ delay: 0.3 + idx * 0.06, type: "spring", stiffness: 200, damping: 20 }}
+                                      transition={{
+                                        delay: 0.3 + idx * 0.06,
+                                        type: 'spring',
+                                        stiffness: 200,
+                                        damping: 20,
+                                      }}
                                     >
-                                      <span className="text-sm font-light tracking-wide text-white/80 group-hover/label:text-white truncate pr-4">{item.label}</span>
-                                      <span className="shrink-0 text-[9px] font-medium uppercase tracking-widest text-white/30">{item.meta}</span>
+                                      <span className="truncate pr-4 text-sm font-light tracking-wide text-white/80 group-hover/label:text-white">
+                                        {item.label}
+                                      </span>
+                                      <span className="shrink-0 text-[9px] font-medium tracking-widest text-white/30 uppercase">
+                                        {item.meta}
+                                      </span>
                                     </motion.div>
                                   ))}
                                 </div>
@@ -1224,18 +1341,36 @@ export default function IncidentRail({
                       )}
 
                       {activeTool === 'evidence' && (
-                        <section className="incident-panel-flow w-full" aria-label="证据工作台" style={theaterSurfaceStyle}>
+                        <section
+                          className="incident-panel-flow w-full"
+                          aria-label="证据工作台"
+                          style={theaterSurfaceStyle}
+                        >
                           <div className="flex flex-col gap-4 pb-12">
                             <BentoCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex flex-wrap items-center gap-3">
-                                  <ToolbenchStatus icon={readinessIcon} label="证据就绪" value={readiness.label} />
-                                  <ToolbenchStatus icon="references" label="引用" value={`${selectedModel.evidenceRefs.length} 条`} />
+                                  <ToolbenchStatus
+                                    icon={readinessIcon}
+                                    label="证据就绪"
+                                    value={readiness.label}
+                                  />
+                                  <ToolbenchStatus
+                                    icon="references"
+                                    label="引用"
+                                    value={`${selectedModel.evidenceRefs.length} 条`}
+                                  />
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">{selectionSummary.eyebrow}</span>
-                                  <h2 className="text-2xl font-light leading-snug tracking-tight text-white/90">{selectionSummary.title}</h2>
-                                  <p className="mt-1 text-sm leading-relaxed text-white/50 font-light">{selectionSummary.description}</p>
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    {selectionSummary.eyebrow}
+                                  </span>
+                                  <h2 className="text-2xl leading-snug font-light tracking-tight text-white/90">
+                                    {selectionSummary.title}
+                                  </h2>
+                                  <p className="mt-1 text-sm leading-relaxed font-light text-white/50">
+                                    {selectionSummary.description}
+                                  </p>
                                 </div>
                               </div>
                             </BentoCard>
@@ -1244,16 +1379,31 @@ export default function IncidentRail({
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center justify-between">
                                   <div className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">落证完成度</span>
-                                    <small className="text-xs text-white/40 font-light">{exactEvidenceCount} 条 L1 精确 · {selectedModel.linkedEvidence.length} 条关联</small>
+                                    <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                      落证完成度
+                                    </span>
+                                    <small className="text-xs font-light text-white/40">
+                                      {exactEvidenceCount} 条 L1 精确 ·{' '}
+                                      {selectedModel.linkedEvidence.length} 条关联
+                                    </small>
                                   </div>
                                   <div className="flex items-baseline gap-1">
-                                    <strong className="text-5xl font-extralight tracking-tighter text-white/90 tabular-nums"><AnimatedNumber value={evidencePulse} /></strong>
+                                    <strong className="text-5xl font-extralight tracking-tighter text-white/90 tabular-nums">
+                                      <AnimatedNumber value={evidencePulse} />
+                                    </strong>
                                     <span className="text-lg font-light text-white/30">%</span>
                                   </div>
                                 </div>
-                                <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.03]" aria-hidden="true">
-                                  <motion.i className="block h-full rounded-full bg-gradient-to-r from-emerald-500/80 to-teal-400/80" initial={{ width: 0 }} animate={{ width: `${evidencePulse}%` }} transition={{ delay: 0.3, duration: 0.8, ease: 'easeOut' }} />
+                                <div
+                                  className="h-1 w-full overflow-hidden rounded-full bg-white/[0.03]"
+                                  aria-hidden="true"
+                                >
+                                  <motion.i
+                                    className="block h-full rounded-full bg-gradient-to-r from-emerald-500/80 to-teal-400/80"
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${evidencePulse}%` }}
+                                    transition={{ delay: 0.3, duration: 0.8, ease: 'easeOut' }}
+                                  />
                                 </div>
                               </div>
                             </BentoCard>
@@ -1261,14 +1411,25 @@ export default function IncidentRail({
                             <BentoCard className="p-6">
                               <div className="flex flex-col gap-4">
                                 <div className="flex items-center gap-2">
-                                  <Codicon name="sparkle-filled" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">核心落证句</span>
+                                  <Codicon
+                                    name="sparkle-filled"
+                                    size={14}
+                                    className="text-white/30"
+                                  />
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    核心落证句
+                                  </span>
                                 </div>
-                                <p className="text-sm font-light leading-relaxed text-white/80">
-                                  {primaryEvidence === '待补强' ? '当前仍缺少主证据。' : `${primaryEvidence} 正在托住结论。`}
+                                <p className="text-sm leading-relaxed font-light text-white/80">
+                                  {primaryEvidence === '待补强'
+                                    ? '当前仍缺少主证据。'
+                                    : `${primaryEvidence} 正在托住结论。`}
                                 </p>
-                                <div className="flex items-center gap-3 mt-1">
-                                  <Link href={buildInvestigationHref(selectedAlert.alert_id)} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white">
+                                <div className="mt-1 flex items-center gap-3">
+                                  <Link
+                                    href={buildInvestigationHref(selectedAlert.alert_id)}
+                                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white"
+                                  >
                                     打开调查 <Codicon name="arrow-right" size={12} />
                                   </Link>
                                 </div>
@@ -1279,13 +1440,22 @@ export default function IncidentRail({
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="references" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">核心指标</span>
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    核心指标
+                                  </span>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-y-5 gap-x-4">
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-5 md:grid-cols-4">
                                   {evidenceRows.slice(0, 4).map((row) => (
-                                    <div key={row.label} className="flex flex-col gap-1 min-w-0">
-                                      <span className="text-[10px] font-medium tracking-widest text-white/30 truncate uppercase">{row.label}</span>
-                                      <span className="text-base font-light tabular-nums tracking-tight text-white/80 truncate" title={String(row.value)}>{row.value}</span>
+                                    <div key={row.label} className="flex min-w-0 flex-col gap-1">
+                                      <span className="truncate text-[10px] font-medium tracking-widest text-white/30 uppercase">
+                                        {row.label}
+                                      </span>
+                                      <span
+                                        className="truncate text-base font-light tracking-tight text-white/80 tabular-nums"
+                                        title={String(row.value)}
+                                      >
+                                        {row.value}
+                                      </span>
                                     </div>
                                   ))}
                                 </div>
@@ -1296,11 +1466,18 @@ export default function IncidentRail({
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="references" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">落证结构</span>
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    落证结构
+                                  </span>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   {evidenceNarrative.map((item) => (
-                                    <span key={item.id} className="rounded-md border border-white/5 bg-white/[0.02] px-3 py-1.5 text-xs font-light text-white/70">{item.label}</span>
+                                    <span
+                                      key={item.id}
+                                      className="rounded-md border border-white/5 bg-white/[0.02] px-3 py-1.5 text-xs font-light text-white/70"
+                                    >
+                                      {item.label}
+                                    </span>
                                   ))}
                                 </div>
                               </div>
@@ -1310,16 +1487,37 @@ export default function IncidentRail({
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="search" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">证据清单</span>
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    证据清单
+                                  </span>
                                 </div>
                                 <div className="flex flex-col divide-y divide-white/[0.03]">
                                   {evidenceItems.map((item, idx) => (
-                                    <motion.div key={item.id} className="group/item flex flex-col gap-2 py-4 first:pt-0 last:pb-0" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 + idx * 0.08, type: "spring", stiffness: 200, damping: 20 }}>
+                                    <motion.div
+                                      key={item.id}
+                                      className="group/item flex flex-col gap-2 py-4 first:pt-0 last:pb-0"
+                                      initial={{ opacity: 0, y: 10 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      transition={{
+                                        delay: 0.4 + idx * 0.08,
+                                        type: 'spring',
+                                        stiffness: 200,
+                                        damping: 20,
+                                      }}
+                                    >
                                       <div className="flex items-center justify-between gap-4">
-                                        <span className="text-sm font-light tracking-wide text-white/80 group-hover/item:text-white break-words">{item.label}</span>
-                                        {item.meta ? <span className="shrink-0 rounded-full border border-white/5 bg-white/[0.02] px-2 py-0.5 text-[9px] font-medium uppercase tracking-widest text-white/50">{item.meta}</span> : null}
+                                        <span className="text-sm font-light tracking-wide break-words text-white/80 group-hover/item:text-white">
+                                          {item.label}
+                                        </span>
+                                        {item.meta ? (
+                                          <span className="shrink-0 rounded-full border border-white/5 bg-white/[0.02] px-2 py-0.5 text-[9px] font-medium tracking-widest text-white/50 uppercase">
+                                            {item.meta}
+                                          </span>
+                                        ) : null}
                                       </div>
-                                      <span className="text-xs font-light leading-relaxed text-white/40">{item.detail}</span>
+                                      <span className="text-xs leading-relaxed font-light text-white/40">
+                                        {item.detail}
+                                      </span>
                                     </motion.div>
                                   ))}
                                 </div>
@@ -1330,18 +1528,36 @@ export default function IncidentRail({
                       )}
 
                       {activeTool === 'trace' && (
-                        <section className="incident-panel-flow w-full" aria-label="链路工作台" style={theaterSurfaceStyle}>
+                        <section
+                          className="incident-panel-flow w-full"
+                          aria-label="链路工作台"
+                          style={theaterSurfaceStyle}
+                        >
                           <div className="flex flex-col gap-4 pb-12">
                             <BentoCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex flex-wrap items-center gap-3">
-                                  <ToolbenchStatus icon="graph-line" label="责任路径" value={`${selectedModel.pathEdges.length} 边`} />
-                                  <ToolbenchStatus icon="history" label="时间序列" value={`${selectedModel.timelineSteps.length} 步`} />
+                                  <ToolbenchStatus
+                                    icon="graph-line"
+                                    label="责任路径"
+                                    value={`${selectedModel.pathEdges.length} 边`}
+                                  />
+                                  <ToolbenchStatus
+                                    icon="history"
+                                    label="时间序列"
+                                    value={`${selectedModel.timelineSteps.length} 步`}
+                                  />
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">链路工作台</span>
-                                  <h2 className="text-2xl font-light leading-snug tracking-tight text-white/90">把越界动作压回一条可解释的责任链</h2>
-                                  <p className="mt-1 text-sm leading-relaxed text-white/50 font-light">{selectionSummary.description}</p>
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    链路工作台
+                                  </span>
+                                  <h2 className="text-2xl leading-snug font-light tracking-tight text-white/90">
+                                    把越界动作压回一条可解释的责任链
+                                  </h2>
+                                  <p className="mt-1 text-sm leading-relaxed font-light text-white/50">
+                                    {selectionSummary.description}
+                                  </p>
                                 </div>
                               </div>
                             </BentoCard>
@@ -1350,16 +1566,31 @@ export default function IncidentRail({
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center justify-between">
                                   <div className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">链路覆盖度</span>
-                                    <small className="text-xs text-white/40 font-light">{selectedModel.pathNodes.length} 节点 · {selectedModel.timelineSteps.length} 步</small>
+                                    <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                      链路覆盖度
+                                    </span>
+                                    <small className="text-xs font-light text-white/40">
+                                      {selectedModel.pathNodes.length} 节点 ·{' '}
+                                      {selectedModel.timelineSteps.length} 步
+                                    </small>
                                   </div>
                                   <div className="flex items-baseline gap-1">
-                                    <strong className="text-5xl font-extralight tracking-tighter text-white/90 tabular-nums"><CountUp value={tracePulse} /></strong>
+                                    <strong className="text-5xl font-extralight tracking-tighter text-white/90 tabular-nums">
+                                      <CountUp value={tracePulse} />
+                                    </strong>
                                     <span className="text-lg font-light text-white/30">%</span>
                                   </div>
                                 </div>
-                                <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.03]" aria-hidden="true">
-                                  <motion.i className="block h-full rounded-full bg-gradient-to-r from-blue-500/80 to-indigo-400/80" initial={{ width: 0 }} animate={{ width: `${tracePulse}%` }} transition={{ delay: 0.3, duration: 0.8, ease: 'easeOut' }} />
+                                <div
+                                  className="h-1 w-full overflow-hidden rounded-full bg-white/[0.03]"
+                                  aria-hidden="true"
+                                >
+                                  <motion.i
+                                    className="block h-full rounded-full bg-gradient-to-r from-blue-500/80 to-indigo-400/80"
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${tracePulse}%` }}
+                                    transition={{ delay: 0.3, duration: 0.8, ease: 'easeOut' }}
+                                  />
                                 </div>
                               </div>
                             </BentoCard>
@@ -1368,11 +1599,18 @@ export default function IncidentRail({
                               <div className="flex flex-col gap-4">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="zap" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">链路动作</span>
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    链路动作
+                                  </span>
                                 </div>
-                                <p className="text-sm font-light leading-relaxed text-white/80">优先核对第一条边界穿越，再确认委派边和污染传播边是否一致。</p>
-                                <div className="flex items-center gap-3 mt-1">
-                                  <Link href={buildTraceHref(selectedAlert.alert_id)} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white">
+                                <p className="text-sm leading-relaxed font-light text-white/80">
+                                  优先核对第一条边界穿越，再确认委派边和污染传播边是否一致。
+                                </p>
+                                <div className="mt-1 flex items-center gap-3">
+                                  <Link
+                                    href={buildTraceHref(selectedAlert.alert_id)}
+                                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium tracking-wide text-white/70 transition-all hover:bg-white/[0.06] hover:text-white"
+                                  >
                                     打开链路 <Codicon name="arrow-right" size={12} />
                                   </Link>
                                 </div>
@@ -1383,13 +1621,22 @@ export default function IncidentRail({
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="graph-line" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">核心指标</span>
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    核心指标
+                                  </span>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-y-5 gap-x-4">
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-5 md:grid-cols-4">
                                   {traceRows.slice(0, 4).map((row) => (
-                                    <div key={row.label} className="flex flex-col gap-1 min-w-0">
-                                      <span className="text-[10px] font-medium tracking-widest text-white/30 truncate uppercase">{row.label}</span>
-                                      <span className="text-base font-light tabular-nums tracking-tight text-white/80 truncate" title={String(row.value)}>{row.value}</span>
+                                    <div key={row.label} className="flex min-w-0 flex-col gap-1">
+                                      <span className="truncate text-[10px] font-medium tracking-widest text-white/30 uppercase">
+                                        {row.label}
+                                      </span>
+                                      <span
+                                        className="truncate text-base font-light tracking-tight text-white/80 tabular-nums"
+                                        title={String(row.value)}
+                                      >
+                                        {row.value}
+                                      </span>
                                     </div>
                                   ))}
                                 </div>
@@ -1400,19 +1647,30 @@ export default function IncidentRail({
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="git-commit" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">链路骨架</span>
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    链路骨架
+                                  </span>
                                 </div>
                                 <div className="flex flex-col gap-2">
                                   {traceNarrative.map((item, idx) => (
-                                    <motion.div 
-                                      key={item.id} 
+                                    <motion.div
+                                      key={item.id}
                                       className="group/label flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.01] px-4 py-3 transition-all hover:border-white/20 hover:bg-white/[0.04]"
                                       initial={{ opacity: 0, y: 8 }}
                                       animate={{ opacity: 1, y: 0 }}
-                                      transition={{ delay: 0.3 + idx * 0.06, type: "spring", stiffness: 200, damping: 20 }}
+                                      transition={{
+                                        delay: 0.3 + idx * 0.06,
+                                        type: 'spring',
+                                        stiffness: 200,
+                                        damping: 20,
+                                      }}
                                     >
-                                      <span className="text-sm font-light tracking-wide text-white/80 group-hover/label:text-white truncate pr-4">{item.label}</span>
-                                      <span className="shrink-0 text-[9px] font-medium uppercase tracking-widest text-white/30">{item.meta}</span>
+                                      <span className="truncate pr-4 text-sm font-light tracking-wide text-white/80 group-hover/label:text-white">
+                                        {item.label}
+                                      </span>
+                                      <span className="shrink-0 text-[9px] font-medium tracking-widest text-white/30 uppercase">
+                                        {item.meta}
+                                      </span>
                                     </motion.div>
                                   ))}
                                 </div>
@@ -1422,22 +1680,45 @@ export default function IncidentRail({
                             <BentoCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
-                                  <Codicon name="list-selection" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">链路与时间序列</span>
+                                  <Codicon
+                                    name="list-selection"
+                                    size={14}
+                                    className="text-white/30"
+                                  />
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    链路与时间序列
+                                  </span>
                                 </div>
                                 <div className="flex flex-col gap-2">
-                                  <span className="text-[9px] tracking-[0.2em] text-white/20 uppercase">PATH PREVIEW</span>
-                                  <AnimatedPathPreview nodes={selectedModel.pathNodes} fallback={pathPreview} />
+                                  <span className="text-[9px] tracking-[0.2em] text-white/20 uppercase">
+                                    PATH PREVIEW
+                                  </span>
+                                  <AnimatedPathPreview
+                                    nodes={selectedModel.pathNodes}
+                                    fallback={pathPreview}
+                                  />
                                 </div>
-                                <div className="h-px w-full bg-white/5 my-2" />
-                                <div className="flex flex-col gap-6 w-full relative">
-                                  <div className="flex flex-col gap-3 min-w-0 w-full">
-                                    <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">交互式责任网络</span>
-                                    <ResponsibilityMiniGraph nodes={traceFlowData.nodes} edges={traceFlowData.edges} alertId={selectedAlert.alert_id} />
+                                <div className="my-2 h-px w-full bg-white/5" />
+                                <div className="relative flex w-full flex-col gap-6">
+                                  <div className="flex w-full min-w-0 flex-col gap-3">
+                                    <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                      交互式责任网络
+                                    </span>
+                                    <ResponsibilityMiniGraph
+                                      nodes={traceFlowData.nodes}
+                                      edges={traceFlowData.edges}
+                                      alertId={selectedAlert.alert_id}
+                                    />
                                   </div>
-                                  <div className="flex flex-col gap-3 min-w-0 w-full mt-2">
-                                    <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">事件追踪流</span>
-                                    <SignalList items={timelineItems} emptyLabel="当前事件暂无运行时时间线步骤。" icon="history" />
+                                  <div className="mt-2 flex w-full min-w-0 flex-col gap-3">
+                                    <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                      事件追踪流
+                                    </span>
+                                    <SignalList
+                                      items={timelineItems}
+                                      emptyLabel="当前事件暂无运行时时间线步骤。"
+                                      icon="history"
+                                    />
                                   </div>
                                 </div>
                               </div>
@@ -1446,15 +1727,29 @@ export default function IncidentRail({
                             <BentoCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
-                                  <Codicon name="git-pull-request" size={14} className="text-white/30" />
-                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">委派与边界转移</span>
+                                  <Codicon
+                                    name="git-pull-request"
+                                    size={14}
+                                    className="text-white/30"
+                                  />
+                                  <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
+                                    委派与边界转移
+                                  </span>
                                 </div>
                                 <div className="flex flex-col gap-2">
                                   <div className="flex items-center justify-between">
-                                    <span className="text-[9px] tracking-[0.2em] text-white/20 uppercase">委派边</span>
-                                    <span className="text-[9px] font-medium uppercase tracking-widest text-white/30">{handoffEdges.length} 条</span>
+                                    <span className="text-[9px] tracking-[0.2em] text-white/20 uppercase">
+                                      委派边
+                                    </span>
+                                    <span className="text-[9px] font-medium tracking-widest text-white/30 uppercase">
+                                      {handoffEdges.length} 条
+                                    </span>
                                   </div>
-                                  <SignalList items={handoffItems} emptyLabel="当前路径没有挂接委派或权限转移边。" icon="git-pull-request" />
+                                  <SignalList
+                                    items={handoffItems}
+                                    emptyLabel="当前路径没有挂接委派或权限转移边。"
+                                    icon="git-pull-request"
+                                  />
                                 </div>
                               </div>
                             </BentoCard>

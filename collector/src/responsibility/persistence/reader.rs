@@ -2,9 +2,8 @@
 // PersistenceReader — independent read-only connection for querying persisted data.
 
 use crate::responsibility::types::alert_types::{
-    AgentRef, AlertAuthority, AlertDecision, AlertSeverity, BehaviorTimeline,
-    DisplayProfile, EngineSection, ResponsibilityAlert,
-    ResponsibilityClaimState, ResponsibilityClaimType,
+    AgentRef, AlertAuthority, AlertDecision, AlertSeverity, BehaviorTimeline, DisplayProfile,
+    EngineSection, ResponsibilityAlert, ResponsibilityClaimState, ResponsibilityClaimType,
 };
 use crate::responsibility::types::evidence_types::{
     Action, ActionCandidateType, CandidateDerivationMode, CorrelationEvidence, Intent,
@@ -12,27 +11,23 @@ use crate::responsibility::types::evidence_types::{
     NonLinkReason, NormalizedArgs,
 };
 use crate::responsibility::types::graph_types::{
-    GraphMetrics, ResponsibilityEdge, ResponsibilityEdgeType,
-    ResponsibilityNode, ResponsibilityNodeType,
+    ResponsibilityEdge, ResponsibilityEdgeType, ResponsibilityNode, ResponsibilityNodeType,
 };
 use crate::responsibility::types::identity_types::{
     AgentConfidence, AuthoritativeIdentity, IdentitySignal, ProvisionalIdentity,
 };
-use crate::responsibility::types::refinement::ScoreBreakdown;
-use crate::responsibility::types::replay_types::RunRecord;
 use crate::responsibility::types::ids::*;
 use crate::responsibility::types::phase::PhaseIndicator;
+use crate::responsibility::types::refinement::ScoreBreakdown;
+use crate::responsibility::types::replay_types::RunRecord;
 
-use rusqlite::{params, Connection, Result, OpenFlags};
+use rusqlite::{Connection, OpenFlags, Result, params};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Helper deserialization
 // ═══════════════════════════════════════════════════════════════════════════
 
-fn deser_json<T: serde::de::DeserializeOwned>(
-    val: &str,
-    field: &'static str,
-) -> Result<T> {
+fn deser_json<T: serde::de::DeserializeOwned>(val: &str, field: &'static str) -> Result<T> {
     serde_json::from_str(val).map_err(|e| {
         rusqlite::Error::FromSqlConversionFailure(
             0,
@@ -326,9 +321,13 @@ impl PersistenceReader {
                         classification_score: 0.0,
                         classification_route: String::new(),
                         score_breakdown: ScoreBreakdown {
-                            rule_score: 0.0, pattern_score: 0.0, boundary_score: 0.0,
-                            evidence_score: 0.0, role_score: 0.0, repetition_score: 0.0,
-            behavioral_score: 0.0,
+                            rule_score: 0.0,
+                            pattern_score: 0.0,
+                            boundary_score: 0.0,
+                            evidence_score: 0.0,
+                            role_score: 0.0,
+                            repetition_score: 0.0,
+                            behavioral_score: 0.0,
                             total: 0.0,
                         },
                         cusum_triggered: false,
@@ -339,7 +338,10 @@ impl PersistenceReader {
                     }
                 }),
                 timeline: deser_json(&timeline_raw, "timeline").unwrap_or_else(|_| {
-                    BehaviorTimeline { steps: vec![], total_duration_ms: 0 }
+                    BehaviorTimeline {
+                        steps: vec![],
+                        total_duration_ms: 0,
+                    }
                 }),
                 graph_snapshot: deser_json(&metrics_raw, "graph_snapshot").unwrap_or_default(),
                 phase: parse_phase(&phase_raw),
@@ -373,8 +375,11 @@ impl PersistenceReader {
                 confidence: row.get(4)?,
                 matched_fields: deser_json(&matched_raw, "matched_fields").unwrap_or_else(|_| {
                     NormalizedArgs {
-                        canonical_path: None, host: None, port: None,
-                        command: None, raw_args: vec![],
+                        canonical_path: None,
+                        host: None,
+                        port: None,
+                        command: None,
+                        raw_args: vec![],
                     }
                 }),
                 derivation_mode: parse_derivation_mode(
@@ -474,7 +479,10 @@ impl PersistenceReader {
 
 impl PersistenceReader {
     /// Get the full responsibility graph for a run (nodes + edges).
-    pub fn get_graph(&self, run_id: &str) -> Result<(Vec<ResponsibilityNode>, Vec<ResponsibilityEdge>)> {
+    pub fn get_graph(
+        &self,
+        run_id: &str,
+    ) -> Result<(Vec<ResponsibilityNode>, Vec<ResponsibilityEdge>)> {
         let nodes = self.get_graph_nodes(run_id)?;
         let edges = self.get_graph_edges(run_id)?;
         Ok((nodes, edges))
@@ -494,8 +502,7 @@ impl PersistenceReader {
                 node_id: NodeId::from(row.get::<_, String>(0)?),
                 node_type: parse_node_type(&row.get::<_, String>(1)?),
                 agent_id: row.get::<_, Option<String>>(2)?.map(AgentId::from),
-                resource: resource_raw
-                    .and_then(|r| serde_json::from_str(&r).ok()),
+                resource: resource_raw.and_then(|r| serde_json::from_str(&r).ok()),
                 evidence_refs: deser_json(&ev_refs_raw, "evidence_refs").unwrap_or_default(),
                 timestamp_ns: row.get::<_, i64>(5)? as u64,
                 phase: parse_phase(&phase_raw),
@@ -521,7 +528,7 @@ impl PersistenceReader {
                 evidence_refs: deser_json(&ev_refs_raw, "evidence_refs").unwrap_or_default(),
                 confidence: row.get(5)?,
                 phase: parse_phase(&phase_raw),
-        signal: None,
+                signal: None,
             })
         })?;
         rows.collect()
@@ -713,10 +720,16 @@ mod tests {
     fn test_list_runs() {
         let (_dir, path) = setup_db();
         let conn = open_responsibility_db(&path).unwrap();
-        conn.execute("INSERT INTO runs (run_id, started_at_ns) VALUES ('r1', 100)", [])
-            .unwrap();
-        conn.execute("INSERT INTO runs (run_id, started_at_ns) VALUES ('r2', 200)", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO runs (run_id, started_at_ns) VALUES ('r1', 100)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO runs (run_id, started_at_ns) VALUES ('r2', 200)",
+            [],
+        )
+        .unwrap();
         drop(conn);
 
         let reader = PersistenceReader::open(&path).unwrap();
@@ -752,8 +765,11 @@ mod tests {
     fn test_get_alerts_empty() {
         let (_dir, path) = setup_db();
         let conn = open_responsibility_db(&path).unwrap();
-        conn.execute("INSERT INTO runs (run_id, started_at_ns) VALUES ('r1', 0)", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO runs (run_id, started_at_ns) VALUES ('r1', 0)",
+            [],
+        )
+        .unwrap();
         drop(conn);
 
         let reader = PersistenceReader::open(&path).unwrap();
@@ -765,8 +781,11 @@ mod tests {
     fn test_get_evidence_empty() {
         let (_dir, path) = setup_db();
         let conn = open_responsibility_db(&path).unwrap();
-        conn.execute("INSERT INTO runs (run_id, started_at_ns) VALUES ('r1', 0)", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO runs (run_id, started_at_ns) VALUES ('r1', 0)",
+            [],
+        )
+        .unwrap();
         drop(conn);
 
         let reader = PersistenceReader::open(&path).unwrap();
@@ -778,8 +797,11 @@ mod tests {
     fn test_get_graph_empty() {
         let (_dir, path) = setup_db();
         let conn = open_responsibility_db(&path).unwrap();
-        conn.execute("INSERT INTO runs (run_id, started_at_ns) VALUES ('r1', 0)", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO runs (run_id, started_at_ns) VALUES ('r1', 0)",
+            [],
+        )
+        .unwrap();
         drop(conn);
 
         let reader = PersistenceReader::open(&path).unwrap();
@@ -792,8 +814,11 @@ mod tests {
     fn test_get_evaluation_data() {
         let (_dir, path) = setup_db();
         let conn = open_responsibility_db(&path).unwrap();
-        conn.execute("INSERT INTO runs (run_id, started_at_ns) VALUES ('r1', 0)", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO runs (run_id, started_at_ns) VALUES ('r1', 0)",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO responsibility_alerts (alert_id, timestamp_ns, display_profile, decision, severity, confidence, authority, primary_agent_id, phase, run_id)
              VALUES ('a1', 100, 'UnsafeByEngine', 'Unsafe', 'Warning', 0.9, 'Supporting', 'ag1', 'Provisional', 'r1')",

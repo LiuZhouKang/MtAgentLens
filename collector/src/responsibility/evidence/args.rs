@@ -18,7 +18,7 @@ use crate::responsibility::types::{ActionCandidateType, NormalizedArg};
 ///
 /// Maps known field names (`file_path`, `command`, `url`) to the
 /// corresponding NormalizedArg variant.
-pub fn extract_intent_args(tool_name: &str, tool_input: &serde_json::Value) -> Vec<NormalizedArg> {
+pub fn extract_intent_args(_tool_name: &str, tool_input: &serde_json::Value) -> Vec<NormalizedArg> {
     let mut args = Vec::new();
 
     // file_path → Path
@@ -78,10 +78,9 @@ pub fn extract_intent_args(tool_name: &str, tool_input: &serde_json::Value) -> V
         .get("url")
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
+        && let Some(url_arg) = parse_url(url_str)
     {
-        if let Some(url_arg) = parse_url(url_str) {
-            args.push(url_arg);
-        }
+        args.push(url_arg);
     }
 
     // "query" for WebSearch — may contain URLs
@@ -105,26 +104,17 @@ pub fn extract_intent_args(tool_name: &str, tool_input: &serde_json::Value) -> V
     }
 
     // "old_string" and "new_string" for Edit — may contain paths
-    if let Some(old_str) = tool_input
-        .get("old_string")
-        .and_then(|v| v.as_str())
-    {
+    if let Some(old_str) = tool_input.get("old_string").and_then(|v| v.as_str()) {
         args.push(NormalizedArg::Content(old_str.to_string()));
         extract_paths_from_text(old_str, &mut args);
     }
-    if let Some(new_str) = tool_input
-        .get("new_string")
-        .and_then(|v| v.as_str())
-    {
+    if let Some(new_str) = tool_input.get("new_string").and_then(|v| v.as_str()) {
         args.push(NormalizedArg::Content(new_str.to_string()));
         extract_paths_from_text(new_str, &mut args);
     }
 
     // Also check "content" for Write — may reference paths
-    if let Some(content) = tool_input
-        .get("content")
-        .and_then(|v| v.as_str())
-    {
+    if let Some(content) = tool_input.get("content").and_then(|v| v.as_str()) {
         args.push(NormalizedArg::Content(content.to_string()));
         extract_paths_from_text(content, &mut args);
     }
@@ -152,10 +142,10 @@ pub fn extract_action_args(
 
         ActionCandidateType::NetworkConnect | ActionCandidateType::NetworkSend => {
             // Parse address: "host:port" or "ip:port"
-            if let Some(addr) = raw_args.first() {
-                if let Some(url) = parse_addr(addr) {
-                    args.push(url);
-                }
+            if let Some(addr) = raw_args.first()
+                && let Some(url) = parse_addr(addr)
+            {
+                args.push(url);
             }
         }
 
@@ -168,18 +158,18 @@ pub fn extract_action_args(
             // Scan remaining argv for URL patterns (e.g. curl https://...)
             // so ProcessExec of network tools can produce Network-boundary PBC.
             for raw_arg in raw_args.iter().skip(1) {
-                if raw_arg.starts_with("http://") || raw_arg.starts_with("https://") {
-                    if let Some(url) = parse_url(raw_arg) {
-                        args.push(url);
-                    }
+                if (raw_arg.starts_with("http://") || raw_arg.starts_with("https://"))
+                    && let Some(url) = parse_url(raw_arg)
+                {
+                    args.push(url);
                 }
                 // host:port patterns in args
-                if let Some((_host, port_str)) = raw_arg.rsplit_once(':') {
-                    if port_str.chars().all(|c| c.is_ascii_digit()) && port_str.len() <= 5 {
-                        if let Some(url) = parse_addr(raw_arg) {
-                            args.push(url);
-                        }
-                    }
+                if let Some((_host, port_str)) = raw_arg.rsplit_once(':')
+                    && port_str.chars().all(|c| c.is_ascii_digit())
+                    && port_str.len() <= 5
+                    && let Some(url) = parse_addr(raw_arg)
+                {
+                    args.push(url);
                 }
             }
         }
@@ -292,13 +282,13 @@ fn parse_url(url_str: &str) -> Option<NormalizedArg> {
     // Split host:port/path
     let host_port = after_scheme.split('/').next().unwrap_or(after_scheme);
 
-    if let Some((host, port_str)) = host_port.rsplit_once(':') {
-        if let Ok(port) = port_str.parse::<u16>() {
-            return Some(NormalizedArg::Url {
-                host: host.to_string(),
-                port: Some(port),
-            });
-        }
+    if let Some((host, port_str)) = host_port.rsplit_once(':')
+        && let Ok(port) = port_str.parse::<u16>()
+    {
+        return Some(NormalizedArg::Url {
+            host: host.to_string(),
+            port: Some(port),
+        });
     }
 
     // No port
@@ -327,18 +317,18 @@ fn parse_addr(addr: &str) -> Option<NormalizedArg> {
 /// Extract URLs from text (for regex fallback in Intent extraction).
 fn extract_urls_from_text(text: &str, args: &mut Vec<NormalizedArg>) {
     for word in text.split_whitespace() {
-        if word.starts_with("http://") || word.starts_with("https://") {
-            if let Some(url) = parse_url(word) {
-                args.push(url);
-            }
+        if (word.starts_with("http://") || word.starts_with("https://"))
+            && let Some(url) = parse_url(word)
+        {
+            args.push(url);
         }
         // Also look for host:port patterns
-        if let Some((_host, port_str)) = word.rsplit_once(':') {
-            if port_str.chars().all(|c| c.is_ascii_digit()) && port_str.len() <= 5 {
-                if let Some(url) = parse_addr(word) {
-                    args.push(url);
-                }
-            }
+        if let Some((_host, port_str)) = word.rsplit_once(':')
+            && port_str.chars().all(|c| c.is_ascii_digit())
+            && port_str.len() <= 5
+            && let Some(url) = parse_addr(word)
+        {
+            args.push(url);
         }
     }
 }
@@ -365,7 +355,10 @@ mod tests {
         let args = extract_intent_args("Bash", &input);
 
         // Should have a Command (ls) and a Path (/etc/hosts)
-        assert!(args.iter().any(|a| matches!(a, NormalizedArg::Command(c) if c == "ls")));
+        assert!(
+            args.iter()
+                .any(|a| matches!(a, NormalizedArg::Command(c) if c == "ls"))
+        );
         assert!(
             args.iter()
                 .any(|a| matches!(a, NormalizedArg::Path(p) if p == "/etc/hosts"))
@@ -432,10 +425,8 @@ mod tests {
 
     #[test]
     fn test_extract_action_args_file_read() {
-        let args = extract_action_args(
-            &ActionCandidateType::FileRead,
-            &["/etc/passwd".to_string()],
-        );
+        let args =
+            extract_action_args(&ActionCandidateType::FileRead, &["/etc/passwd".to_string()]);
         assert!(
             args.iter()
                 .any(|a| matches!(a, NormalizedArg::Path(p) if p == "/etc/passwd"))

@@ -675,9 +675,19 @@ mod tests {
         // Verify file logging worked
         let log_path = std::path::Path::new(test_log_file);
         let mut ok = log_path.exists();
-        for _ in 0..10 { if ok { break; } std::thread::sleep(std::time::Duration::from_millis(10)); ok = log_path.exists(); }
-        if ok { let lc = fs::read_to_string(test_log_file).unwrap(); println!("Log lines: {}", lc.lines().count()); }
-        else { println!("Log not created (async flush)"); }
+        for _ in 0..10 {
+            if ok {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            ok = log_path.exists();
+        }
+        if ok {
+            let lc = fs::read_to_string(test_log_file).unwrap();
+            println!("Log lines: {}", lc.lines().count());
+        } else {
+            println!("Log not created (async flush)");
+        }
 
         // Verify performance characteristics
         let events_per_second = events.len() as f64 / elapsed.as_secs_f64();

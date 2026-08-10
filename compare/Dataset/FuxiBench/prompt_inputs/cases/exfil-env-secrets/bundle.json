@@ -29,5 +29,5 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "exfil-env-secrets",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "env/scenarios/backups/exfil-env-secrets.json"
+  "source_scenario_path": "env/scenarios/credential_theft/exfil-env-secrets.json"
 }

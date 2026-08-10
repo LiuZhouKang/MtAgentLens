@@ -39,9 +39,7 @@ pub struct ClaimProjector;
 
 impl ClaimProjector {
     /// Project a single alert.
-    pub fn project(
-        alert: &crate::responsibility::types::ResponsibilityAlert,
-    ) -> ProjectedAlert {
+    pub fn project(alert: &crate::responsibility::types::ResponsibilityAlert) -> ProjectedAlert {
         ProjectedAlert {
             alert_id: alert.alert_id.to_string(),
             agent_id: alert.primary_agent.agent_id.to_string(),
@@ -104,9 +102,9 @@ fn alert_authority_label(auth: &AlertAuthority) -> &'static str {
 mod tests {
     use super::*;
     use crate::responsibility::types::{
-        AgentId, AgentRef, AlertId, BehaviorTimeline, BehaviorTimelineEntry,
-        DisplayProfile, EngineSection, GraphMetrics, GraphSnapshot, PhaseIndicator,
-        ResponsibilityAlert, RuleVerdict, PatternVerdict, ScoreBreakdown,
+        AgentId, AgentRef, AlertId, BehaviorTimeline, BehaviorTimelineEntry, DisplayProfile,
+        EngineSection, GraphMetrics, GraphSnapshot, PatternVerdict, PhaseIndicator,
+        ResponsibilityAlert, RuleVerdict, ScoreBreakdown,
     };
 
     fn make_alert() -> ResponsibilityAlert {
@@ -150,7 +148,7 @@ mod tests {
                     evidence_score: 0.10,
                     role_score: 0.0,
                     repetition_score: 0.0,
-            behavioral_score: 0.0,
+                    behavioral_score: 0.0,
                     total: 0.75,
                 },
                 cusum_triggered: false,
@@ -222,7 +220,10 @@ mod tests {
         assert_eq!(projected.engine_route, "observer");
         assert_eq!(projected.timeline_step_count, 2);
         assert_eq!(projected.graph_node_count, 4); // 1 + 2 + 1
-        assert_eq!(projected.action_hint, Some("Immediate review required".to_string()));
+        assert_eq!(
+            projected.action_hint,
+            Some("Immediate review required".to_string())
+        );
     }
 
     #[test]
@@ -253,8 +254,17 @@ mod tests {
         assert_eq!(alert_severity_label(&AlertSeverity::Warning), "warning");
         assert_eq!(alert_severity_label(&AlertSeverity::Critical), "critical");
 
-        assert_eq!(alert_authority_label(&AlertAuthority::Authoritative), "authoritative");
-        assert_eq!(alert_authority_label(&AlertAuthority::Supporting), "supporting");
-        assert_eq!(alert_authority_label(&AlertAuthority::Unavailable), "unavailable");
+        assert_eq!(
+            alert_authority_label(&AlertAuthority::Authoritative),
+            "authoritative"
+        );
+        assert_eq!(
+            alert_authority_label(&AlertAuthority::Supporting),
+            "supporting"
+        );
+        assert_eq!(
+            alert_authority_label(&AlertAuthority::Unavailable),
+            "unavailable"
+        );
     }
 }

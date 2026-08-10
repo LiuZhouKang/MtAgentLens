@@ -21,9 +21,11 @@
 ### Task 1: 安装 dagre 布局库
 
 **Files:**
+
 - Modify: `frontend/package.json`
 
 **Interfaces:**
+
 - Consumes: 无
 - Produces: `dagre` + `@types/dagre` 可用依赖
 
@@ -36,7 +38,7 @@ cd frontend && npm install dagre @types/dagre
 - [ ] **Step 2: 验证安装**
 
 ```bash
-cd frontend && node -e "const dagre = require('dagre'); console.log('dagre OK:', typeof dagre.graphlib)" 
+cd frontend && node -e "const dagre = require('dagre'); console.log('dagre OK:', typeof dagre.graphlib)"
 ```
 
 ---
@@ -44,24 +46,26 @@ cd frontend && node -e "const dagre = require('dagre'); console.log('dagre OK:',
 ### Task 2: 创建 ResponsibilityNode 自定义节点组件
 
 **Files:**
+
 - Create: `frontend/components/ui/responsibility-node.tsx`
 
 **Interfaces:**
+
 - Consumes: `@xyflow/react` (Handle, Position, NodeProps, Node)
 - Produces: `ResponsibilityNodeData` 类型, `ResponsibilityNode` 组件 (nodeTypes: { responsibility: ResponsibilityNode })
 
 7种节点类型的颜色/图标映射表：
 
-| nodeType | color | icon |
-|----------|-------|------|
-| Agent | #60a5fa (blue) | organization |
-| Resource | #34d399 (emerald) | file |
-| PolicyBoundary | #f43f5e (rose) | shield |
-| Process | #fbbf24 (amber) | server-process |
-| ToolCall | #a78bfa (purple) | tools |
-| Credential | #fb923c (orange) | key |
-| Context | #22d3ee (cyan) | symbol-namespace |
-| default | #6b7280 (gray) | circle-filled |
+| nodeType       | color             | icon             |
+| -------------- | ----------------- | ---------------- |
+| Agent          | #60a5fa (blue)    | organization     |
+| Resource       | #34d399 (emerald) | file             |
+| PolicyBoundary | #f43f5e (rose)    | shield           |
+| Process        | #fbbf24 (amber)   | server-process   |
+| ToolCall       | #a78bfa (purple)  | tools            |
+| Credential     | #fb923c (orange)  | key              |
+| Context        | #22d3ee (cyan)    | symbol-namespace |
+| default        | #6b7280 (gray)    | circle-filled    |
 
 - [ ] **Step 1: 创建 responsibility-node.tsx**
 
@@ -99,7 +103,7 @@ export function ResponsibilityNode({ data, selected }: NodeProps<ResponsibilityN
       initial={{ opacity: 0, scale: 0.8, filter: 'blur(4px)' }}
       animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-      className="group relative flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border bg-[#141415]/90 backdrop-blur-md transition-all duration-300 min-w-[140px]"
+      className="group relative flex min-w-[140px] items-center gap-2.5 rounded-xl border bg-[#141415]/90 px-3.5 py-2.5 backdrop-blur-md transition-all duration-300"
       style={{
         borderColor: selected ? style.color : 'rgba(255,255,255,0.08)',
         boxShadow: selected
@@ -110,11 +114,11 @@ export function ResponsibilityNode({ data, selected }: NodeProps<ResponsibilityN
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-2 !h-2 !border !border-white/10 !bg-white/20"
+        className="!h-2 !w-2 !border !border-white/10 !bg-white/20"
       />
 
       <div
-        className="flex items-center justify-center w-8 h-8 rounded-lg border transition-all duration-300 shrink-0"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-all duration-300"
         style={{
           borderColor: `${style.color}33`,
           backgroundColor: `${style.color}10`,
@@ -123,12 +127,12 @@ export function ResponsibilityNode({ data, selected }: NodeProps<ResponsibilityN
         <Codicon name={style.icon} size={14} style={{ color: style.color }} />
       </div>
 
-      <div className="flex flex-col gap-0.5 min-w-0">
-        <strong className="text-xs font-medium tracking-wide text-white/80 truncate max-w-[120px]">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <strong className="max-w-[120px] truncate text-xs font-medium tracking-wide text-white/80">
           {data.label}
         </strong>
         <span
-          className="text-[9px] font-medium uppercase tracking-widest truncate"
+          className="truncate text-[9px] font-medium tracking-widest uppercase"
           style={{ color: `${style.color}99` }}
         >
           {style.label}
@@ -138,7 +142,7 @@ export function ResponsibilityNode({ data, selected }: NodeProps<ResponsibilityN
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-2 !h-2 !border !border-white/10 !bg-white/20"
+        className="!h-2 !w-2 !border !border-white/10 !bg-white/20"
       />
     </motion.div>
   );
@@ -156,24 +160,26 @@ cd frontend && npx tsc --noEmit components/ui/responsibility-node.tsx 2>&1 | hea
 ### Task 3: 创建 ResponsibilityEdge 自定义边组件
 
 **Files:**
+
 - Create: `frontend/components/ui/responsibility-edge.tsx`
 
 **Interfaces:**
+
 - Consumes: `@xyflow/react` (BaseEdge, EdgeLabelRenderer, getBezierPath, EdgeProps)
 - Produces: `ResponsibilityEdge` 组件 (edgeTypes: { responsibility: ResponsibilityEdge })
 
 7种边类型的颜色映射：
 
-| edgeType | color | dashArray | label |
-|----------|-------|-----------|-------|
-| IntentCausesAction | #60a5fa | none | 意图→动作 |
-| PolicyBoundaryCrossing | #f43f5e | 6 4 | 边界穿越 |
-| AgentDelegatesTo | #a78bfa | none | 委派至 |
-| AuthorityTransfer | #fbbf24 | none | 权限转移 |
-| Delegation | #8b5cf6 | 8 4 | 委派 |
-| TaintPropagation | #fb923c | 3 4 | 污点传播 |
-| ViolationProvenance | #ef4444 | 6 4 | 违规溯源 |
-| default | #6b7280 | none | 关联 |
+| edgeType               | color   | dashArray | label     |
+| ---------------------- | ------- | --------- | --------- |
+| IntentCausesAction     | #60a5fa | none      | 意图→动作 |
+| PolicyBoundaryCrossing | #f43f5e | 6 4       | 边界穿越  |
+| AgentDelegatesTo       | #a78bfa | none      | 委派至    |
+| AuthorityTransfer      | #fbbf24 | none      | 权限转移  |
+| Delegation             | #8b5cf6 | 8 4       | 委派      |
+| TaintPropagation       | #fb923c | 3 4       | 污点传播  |
+| ViolationProvenance    | #ef4444 | 6 4       | 违规溯源  |
+| default                | #6b7280 | none      | 关联      |
 
 - [ ] **Step 1: 创建 responsibility-edge.tsx**
 
@@ -262,7 +268,7 @@ export function ResponsibilityEdge({
       {/* Edge label */}
       <EdgeLabelRenderer>
         <div
-          className="absolute pointer-events-none nodrag nopan"
+          className="nodrag nopan pointer-events-none absolute"
           style={{
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
           }}
@@ -291,13 +297,16 @@ export function ResponsibilityEdge({
 ### Task 4: 创建 ResponsibilityNetwork 主组件
 
 **Files:**
+
 - Create: `frontend/components/ui/responsibility-network.tsx`
 
 **Interfaces:**
+
 - Consumes: `@xyflow/react` (ReactFlow, Background, BackgroundVariant, Controls, MiniMap, useNodesState, useEdgesState, Position, type Node, type Edge), `dagre`, `motion/react` (AnimatePresence)
 - Produces: `ResponsibilityNetwork` 组件
 
 dagre 布局参数:
+
 - rankdir: 'LR'
 - nodesep: 60
 - ranksep: 180
@@ -326,8 +335,14 @@ import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
 import { motion } from 'motion/react';
 
-import { ResponsibilityNode, type ResponsibilityNodeData } from '@/components/ui/responsibility-node';
-import { ResponsibilityEdge, type ResponsibilityEdgeData } from '@/components/ui/responsibility-edge';
+import {
+  ResponsibilityNode,
+  type ResponsibilityNodeData,
+} from '@/components/ui/responsibility-node';
+import {
+  ResponsibilityEdge,
+  type ResponsibilityEdgeData,
+} from '@/components/ui/responsibility-edge';
 
 // ── node types & edge types (stable references) ──
 const nodeTypes = { responsibility: ResponsibilityNode };
@@ -386,13 +401,11 @@ function buildDagreLayout(
 }
 
 // ── sync helper: only update when data truly changes ──
-function useStableSync<T>(
-  next: T[],
-  setter: (items: T[]) => void,
-  getKey: (item: T) => string,
-) {
+function useStableSync<T>(next: T[], setter: (items: T[]) => void, getKey: (item: T) => string) {
   const prevKey = useMemo(() => next.map(getKey).join('|'), [next, getKey]);
-  useEffect(() => { setter(next); }, [prevKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setter(next);
+  }, [prevKey]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 // ── props ──
@@ -430,7 +443,9 @@ export function ResponsibilityNetwork({
     () => buildDagreLayout(rawNodes, rawEdges),
     [
       rawNodes.map((n) => `${n.id}:${n.label}:${n.nodeType}`).join('|'),
-      rawEdges.map((e) => `${e.id}:${e.source}:${e.target}:${e.edgeType}:${e.confidence}`).join('|'),
+      rawEdges
+        .map((e) => `${e.id}:${e.source}:${e.target}:${e.edgeType}:${e.confidence}`)
+        .join('|'),
     ].join('::'),
   );
 
@@ -441,8 +456,7 @@ export function ResponsibilityNetwork({
       ...edge,
       style: {
         ...edge.style,
-        opacity:
-          edge.source === selectedNodeId || edge.target === selectedNodeId ? 1 : 0.12,
+        opacity: edge.source === selectedNodeId || edge.target === selectedNodeId ? 1 : 0.12,
         stroke:
           edge.source === selectedNodeId || edge.target === selectedNodeId
             ? undefined
@@ -490,7 +504,7 @@ export function ResponsibilityNetwork({
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="flex items-center justify-center border border-white/5 bg-white/[0.02] rounded-2xl w-full"
+        className="flex w-full items-center justify-center rounded-2xl border border-white/5 bg-white/[0.02]"
         style={{ height: `${height}px` }}
       >
         <div className="flex flex-col items-center gap-2">
@@ -507,7 +521,7 @@ export function ResponsibilityNetwork({
       initial={{ opacity: 0, y: 6, filter: 'blur(4px)' }}
       animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="relative w-full rounded-2xl border border-white/5 bg-[#141415]/50 overflow-hidden"
+      className="relative w-full overflow-hidden rounded-2xl border border-white/5 bg-[#141415]/50"
       style={{ height: `${height}px` }}
     >
       <ReactFlow
@@ -554,14 +568,14 @@ export function ResponsibilityNetwork({
             return colors[d?.nodeType ?? ''] ?? '#6b7280';
           }}
           maskColor="rgba(0, 0, 0, 0.3)"
-          className="!bg-[#141415]/80 !border-white/5 !rounded-xl !overflow-hidden"
+          className="!overflow-hidden !rounded-xl !border-white/5 !bg-[#141415]/80"
         />
         <Controls
           showZoom
           showFitView
           showInteractive={false}
           position="bottom-right"
-          className="!bg-[#141415]/80 !border-white/5 !rounded-xl !overflow-hidden"
+          className="!overflow-hidden !rounded-xl !border-white/5 !bg-[#141415]/80"
         />
         <Background
           variant={BackgroundVariant.Dots}
@@ -582,9 +596,11 @@ export function ResponsibilityNetwork({
 ### Task 5: 修改 incident-rail.tsx — 替换 TraceNetwork
 
 **Files:**
+
 - Modify: `frontend/components/command-center/incident-rail.tsx`
 
 **Interfaces:**
+
 - Consumes: `InvestigationModel` (已有)
 - Produces: `traceFlowData` 增强为包含 edge_id, confidence, edgeType（已有变量名不变）
 
@@ -616,13 +632,13 @@ import { ResponsibilityNetwork } from '@/components/ui/responsibility-network';
 
 ```typescript
 function buildReactFlowData(model: InvestigationModel) {
-  const nodes = model.pathNodes.map(node => ({
+  const nodes = model.pathNodes.map((node) => ({
     id: node.nodeId,
     label: node.label,
     nodeType: node.nodeType || 'NODE',
   }));
 
-  const edges = model.pathEdges.map(edge => ({
+  const edges = model.pathEdges.map((edge) => ({
     id: edge.edge_id,
     source: edge.source,
     target: edge.target,
@@ -667,6 +683,7 @@ cd frontend && npm run dev
 ```
 
 验证要点:
+
 - 侧边栏 → 链路 tab → "交互式责任网络" 卡片
 - 节点按类型着色显示（不同颜色+图标）
 - 边显示类型标签 + 置信度百分比

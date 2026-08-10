@@ -14,7 +14,7 @@
     }
   ],
   "attack_type": "C",
-  "category": "shadow_agent",
+  "category": "multi_agent_attack",
   "fixture": {
     "files": [
       {
@@ -87,5 +87,5 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "shadow-agent",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "env/scenarios/backups/shadow-agent.json"
+  "source_scenario_path": "env/scenarios/multi_agent_attack/subagents/shadow-agent.json"
 }

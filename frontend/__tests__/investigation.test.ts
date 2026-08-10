@@ -22,7 +22,7 @@ describe('investigation helpers', () => {
       ...demoAlerts[0],
       graph_snapshot: undefined,
       timeline: { steps: [], total_duration_ms: 0 },
-    } as unknown as typeof demoAlerts[0];
+    } as unknown as (typeof demoAlerts)[0];
 
     const refs = collectAlertEvidenceRefs(leanAlert, demoGraph);
 

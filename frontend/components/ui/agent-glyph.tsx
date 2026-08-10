@@ -42,7 +42,9 @@ function polygon(pts: Point[]): string {
 }
 
 function regularPolygon(sides: number, r: number, startDeg: number): string {
-  const pts = Array.from({ length: sides }, (_, i) => polar(CENTER, CENTER, r, startDeg + (i * 360) / sides));
+  const pts = Array.from({ length: sides }, (_, i) =>
+    polar(CENTER, CENTER, r, startDeg + (i * 360) / sides),
+  );
   return polygon(pts);
 }
 
@@ -57,7 +59,14 @@ function arcsPaths(rotation: number): string[] {
 }
 
 function diamondPaths(): string[] {
-  return [polygon([[CENTER, 4.6], [18.4, CENTER], [CENTER, 19.4], [5.6, CENTER]])];
+  return [
+    polygon([
+      [CENTER, 4.6],
+      [18.4, CENTER],
+      [CENTER, 19.4],
+      [5.6, CENTER],
+    ]),
+  ];
 }
 
 function barsPaths(): string[] {
@@ -68,7 +77,13 @@ function barsPaths(): string[] {
 }
 
 function trianglePaths(): string[] {
-  return [polygon([[CENTER, 4.6], [17.6, 17], [6.4, 17]])];
+  return [
+    polygon([
+      [CENTER, 4.6],
+      [17.6, 17],
+      [6.4, 17],
+    ]),
+  ];
 }
 
 function hexPaths(): string[] {
@@ -130,9 +145,7 @@ export default function AgentGlyph({ spec, size }: { spec: AgentGlyphSpec; size:
       strokeLinejoin="round"
       style={{ display: 'block', color: 'rgba(255, 255, 255, 0.92)' }}
     >
-      <g transform={`rotate(${spec.rotation} 12 12)`}>
-        {children}
-      </g>
+      <g transform={`rotate(${spec.rotation} 12 12)`}>{children}</g>
     </svg>
   );
 }

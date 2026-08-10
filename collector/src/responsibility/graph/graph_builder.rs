@@ -25,15 +25,15 @@ use crate::responsibility::graph::snapshot::FrozenGraph;
 use crate::responsibility::graph::taint::TaintTracker;
 use crate::responsibility::identity::{AuthoritativeResolution, IdentityProvider};
 use crate::responsibility::judgment::context_trust::ContextTrustEvaluator;
+use crate::responsibility::types::policy_types::PolicyJudgmentResult;
+use crate::responsibility::types::policy_types::ResponsibilityClaimState;
 use crate::responsibility::types::support_types::ResourceId;
 use crate::responsibility::types::{
-    Action, ActionCandidateType, AgentId, CorrelationEvidence, EdgeId, EvidenceId,
-    GraphRefinement, GraphRefinementType, GraphSnapshot, Intent, NodeId, NormalizedArg,
-    NormalizedResource, PhaseIndicator, ProcessId, ResponsibilityEdge,
-    ResponsibilityEdgeType, ResponsibilityNode, ResponsibilityNodeType, SubagentBoundary,
+    Action, ActionCandidateType, AgentId, CorrelationEvidence, EdgeId, EvidenceId, GraphRefinement,
+    GraphRefinementType, GraphSnapshot, Intent, NodeId, NormalizedArg, NormalizedResource,
+    PhaseIndicator, ResponsibilityEdge, ResponsibilityEdgeType, ResponsibilityNode,
+    ResponsibilityNodeType, SubagentBoundary,
 };
-use crate::responsibility::types::policy_types::{ResponsibilityClaimState, PolicyEvaluationResult};
-use crate::responsibility::types::policy_types::PolicyJudgmentResult;
 use std::collections::{HashMap, HashSet};
 
 // ─── GraphBuilder ──────────────────────────────────────────────────────────
@@ -95,8 +95,7 @@ impl GraphBuilder {
     /// Record a provisional PBC edge created without correlation evidence.
     /// These edges wait for handle() to upgrade them when evidence arrives.
     fn record_provisional_pbc(&mut self, source: NodeId, target: NodeId, edge_id: EdgeId) {
-        self.provisional_pbc_edges
-            .insert((source, target), edge_id);
+        self.provisional_pbc_edges.insert((source, target), edge_id);
     }
 
     // ── Phase 1: handle() ─────────────────────────────────────────────
@@ -230,8 +229,11 @@ impl GraphBuilder {
                         // Also remove any provisional edge that would have
                         // been upgraded — prevents cross-intent dedup from
                         // preserving edges that should be filtered.
-                        let key = (action_agent_node_id.clone().unwrap_or(src_node_id.clone()),
-                                   self.ensure_policy_boundary_node(res, ts, &phase, &mut delta).node_id);
+                        let key = (
+                            action_agent_node_id.clone().unwrap_or(src_node_id.clone()),
+                            self.ensure_policy_boundary_node(res, ts, &phase, &mut delta)
+                                .node_id,
+                        );
                         self.provisional_pbc_edges.remove(&key);
                         self.accumulated_delta.merge(delta.clone());
                         return delta;
@@ -272,11 +274,86 @@ impl GraphBuilder {
         // ── Step 5a: Content boundary (tool input text patterns) ─────
         if let Some(content_result) =
             crate::responsibility::judgment::content::evaluate_content_boundary(intent)
-        {
-            if matches!(
+            && matches!(
                 content_result.claim_state,
                 ResponsibilityClaimState::Observed | ResponsibilityClaimState::Ambiguous
+            )
+        {
+            let boundary_node = self.ensure_policy_boundary_node(
+                &NormalizedResource::ToolCall {
+                    tool_name: intent.tool_name.clone(),
+                    call_id: intent.intent_id.as_str().to_string(),
+                },
+                ts,
+                &phase,
+                &mut delta,
+            );
+            let src_5a = intent_agent_node_id.clone().unwrap_or(src_node_id.clone());
+            let tgt_5a = boundary_node.node_id.clone();
+            let pbc_key_5a = (src_5a.clone(), tgt_5a.clone());
+            if let Some(existing_id) = self.provisional_pbc_edges.remove(&pbc_key_5a) {
+                if let Some(edge) = self.graph.get_edge_mut(&existing_id) {
+                    edge.evidence_refs = vec![evidence.evidence_id.clone()];
+                    edge.confidence = evidence.confidence;
+                }
+            } else {
+                let pbc_edge = ResponsibilityEdge {
+                    edge_id: EdgeId::new(),
+                    edge_type: ResponsibilityEdgeType::PolicyBoundaryCrossing,
+                    source: src_5a,
+                    target: tgt_5a,
+                    evidence_refs: vec![evidence.evidence_id.clone()],
+                    confidence: evidence.confidence,
+                    phase: phase.clone(),
+                    signal: None,
+                };
+                self.graph.add_edge(pbc_edge.clone());
+                delta.new_edges.push(pbc_edge);
+            }
+            delta.new_nodes.push(boundary_node);
+
+            // Taint bridge: when content-boundary detects injection/
+            // forgery in a Write/Edit action, mark the target file as
+            // contaminated so cross-agent reads trigger taint-boundary PBC.
+            if matches!(
+                action.action_type,
+                ActionCandidateType::FileWrite | ActionCandidateType::FileOverwrite
             ) {
+                let file_path = extract_file_path(&action.normalized_args);
+                if !file_path.is_empty()
+                    && let Some(ref agent_id) = action_agent
+                {
+                    self.taint_tracker.mark_contaminated(
+                        agent_id.clone(),
+                        &file_path,
+                        action.timestamp_ns,
+                    );
+                }
+            }
+        }
+
+        // ── Step 5b: Delegation boundary (orchestration tool cross-check) ──
+        if matches!(
+            intent.tool_name.as_str(),
+            "TaskCreate" | "Agent" | "SendMessage" | "Task" | "Skill"
+        ) && intent_agent.is_some()
+            && action_agent.is_some()
+            && intent_agent != action_agent
+        {
+            // The is_some() guards above make both unwraps safe; keeping the
+            // flat structure here reads clearer than an if-let wrapper.
+            #[allow(clippy::unnecessary_unwrap)]
+            let del_result = crate::responsibility::judgment::policy::evaluate_delegation_boundary(
+                &intent_agent.as_ref().unwrap().to_string(),
+                &action_agent.as_ref().unwrap().to_string(),
+                &[], // delegation_records — populated in Phase 2
+            );
+            if del_result.matched
+                && matches!(
+                    del_result.claim_state,
+                    ResponsibilityClaimState::Observed | ResponsibilityClaimState::Ambiguous
+                )
+            {
                 let boundary_node = self.ensure_policy_boundary_node(
                     &NormalizedResource::ToolCall {
                         tool_name: intent.tool_name.clone(),
@@ -286,10 +363,10 @@ impl GraphBuilder {
                     &phase,
                     &mut delta,
                 );
-                let src_5a = intent_agent_node_id.clone().unwrap_or(src_node_id.clone());
-                let tgt_5a = boundary_node.node_id.clone();
-                let pbc_key_5a = (src_5a.clone(), tgt_5a.clone());
-                if let Some(existing_id) = self.provisional_pbc_edges.remove(&pbc_key_5a) {
+                let src_5b = intent_agent_node_id.clone().unwrap_or(src_node_id.clone());
+                let tgt_5b = boundary_node.node_id.clone();
+                let pbc_key_5b = (src_5b.clone(), tgt_5b.clone());
+                if let Some(existing_id) = self.provisional_pbc_edges.remove(&pbc_key_5b) {
                     if let Some(edge) = self.graph.get_edge_mut(&existing_id) {
                         edge.evidence_refs = vec![evidence.evidence_id.clone()];
                         edge.confidence = evidence.confidence;
@@ -298,8 +375,8 @@ impl GraphBuilder {
                     let pbc_edge = ResponsibilityEdge {
                         edge_id: EdgeId::new(),
                         edge_type: ResponsibilityEdgeType::PolicyBoundaryCrossing,
-                        source: src_5a,
-                        target: tgt_5a,
+                        source: src_5b,
+                        target: tgt_5b,
                         evidence_refs: vec![evidence.evidence_id.clone()],
                         confidence: evidence.confidence,
                         phase: phase.clone(),
@@ -309,149 +386,78 @@ impl GraphBuilder {
                     delta.new_edges.push(pbc_edge);
                 }
                 delta.new_nodes.push(boundary_node);
-
-                // Taint bridge: when content-boundary detects injection/
-                // forgery in a Write/Edit action, mark the target file as
-                // contaminated so cross-agent reads trigger taint-boundary PBC.
-                if matches!(action.action_type, ActionCandidateType::FileWrite | ActionCandidateType::FileOverwrite) {
-                    let file_path = extract_file_path(&action.normalized_args);
-                    if !file_path.is_empty() {
-                        if let Some(ref agent_id) = action_agent {
-                            self.taint_tracker.mark_contaminated(
-                                agent_id.clone(),
-                                &file_path,
-                                action.timestamp_ns,
-                            );
-                        }
-                    }
-                }
-            }
-        }
-
-        // ── Step 5b: Delegation boundary (orchestration tool cross-check) ──
-        if matches!(intent.tool_name.as_str(), "TaskCreate" | "Agent" | "SendMessage" | "Task" | "Skill") {
-            if intent_agent.is_some() && action_agent.is_some() && intent_agent != action_agent {
-                let del_result = crate::responsibility::judgment::policy::evaluate_delegation_boundary(
-                    &intent_agent.as_ref().unwrap().to_string(),
-                    &action_agent.as_ref().unwrap().to_string(),
-                    &[], // delegation_records — populated in Phase 2
-                );
-                if del_result.matched && matches!(
-                    del_result.claim_state,
-                    ResponsibilityClaimState::Observed | ResponsibilityClaimState::Ambiguous
-                ) {
-                    let boundary_node = self.ensure_policy_boundary_node(
-                        &NormalizedResource::ToolCall {
-                            tool_name: intent.tool_name.clone(),
-                            call_id: intent.intent_id.as_str().to_string(),
-                        },
-                        ts,
-                        &phase,
-                        &mut delta,
-                    );
-                    let src_5b = intent_agent_node_id.clone().unwrap_or(src_node_id.clone());
-                    let tgt_5b = boundary_node.node_id.clone();
-                    let pbc_key_5b = (src_5b.clone(), tgt_5b.clone());
-                    if let Some(existing_id) = self.provisional_pbc_edges.remove(&pbc_key_5b) {
-                        if let Some(edge) = self.graph.get_edge_mut(&existing_id) {
-                            edge.evidence_refs = vec![evidence.evidence_id.clone()];
-                            edge.confidence = evidence.confidence;
-                        }
-                    } else {
-                        let pbc_edge = ResponsibilityEdge {
-                            edge_id: EdgeId::new(),
-                            edge_type: ResponsibilityEdgeType::PolicyBoundaryCrossing,
-                            source: src_5b,
-                            target: tgt_5b,
-                            evidence_refs: vec![evidence.evidence_id.clone()],
-                            confidence: evidence.confidence,
-                            phase: phase.clone(),
-                            signal: None,
-                        };
-                        self.graph.add_edge(pbc_edge.clone());
-                        delta.new_edges.push(pbc_edge);
-                    }
-                    delta.new_nodes.push(boundary_node);
-                }
             }
         }
 
         // ── Step 6: Cross-agent file read → context_trust → TaintTracker ──
-        if let ActionCandidateType::FileRead = action.action_type {
-            if let (Some(writer_agent), Some(reader_agent)) =
-                (&intent_agent, &action_agent)
-            {
-                if writer_agent != reader_agent {
-                    let file_path = extract_file_path(&action.normalized_args);
-                    if !file_path.is_empty() {
-                        if let Some(taint_access) = self.taint_tracker.check_access(
-                            reader_agent,
+        if let ActionCandidateType::FileRead = action.action_type
+            && let (Some(writer_agent), Some(reader_agent)) = (&intent_agent, &action_agent)
+            && writer_agent != reader_agent
+        {
+            let file_path = extract_file_path(&action.normalized_args);
+            if !file_path.is_empty() {
+                if let Some(taint_access) =
+                    self.taint_tracker
+                        .check_access(reader_agent, &file_path, action.timestamp_ns)
+                    && let (Some(writer_node), Some(reader_node)) =
+                        (intent_agent_node_id.as_ref(), action_agent_node_id.as_ref())
+                {
+                    let taint_edge = ResponsibilityEdge {
+                        edge_id: EdgeId::new(),
+                        edge_type: ResponsibilityEdgeType::TaintPropagatesTo,
+                        source: (*writer_node).clone(),
+                        target: (*reader_node).clone(),
+                        evidence_refs: vec![evidence.evidence_id.clone()],
+                        confidence: 0.70,
+                        phase: phase.clone(),
+                        signal: None,
+                    };
+                    self.graph.add_edge(taint_edge.clone());
+                    delta.new_edges.push(taint_edge);
+
+                    delta.diagnostics.push(format!(
+                        "taint: {} contaminated {} -> {} accessed at {} (dt={}ns)",
+                        taint_access.contaminated_by,
+                        taint_access.artifact,
+                        reader_agent,
+                        taint_access.accessed_at_ns,
+                        taint_access.propagation_dt_ns,
+                    ));
+                }
+
+                let judgment = ContextTrustEvaluator::evaluate_artifact(
+                    reader_agent,
+                    writer_agent,
+                    &file_path,
+                    intent.timestamp_ns,
+                    action.timestamp_ns,
+                    &self.subagent_boundaries,
+                );
+
+                match judgment.result {
+                    PolicyJudgmentResult::Violation => {
+                        self.taint_tracker.mark_contaminated(
+                            writer_agent.clone(),
                             &file_path,
                             action.timestamp_ns,
-                        ) {
-                            if let (Some(writer_node), Some(reader_node)) = (
-                                intent_agent_node_id.as_ref(),
-                                action_agent_node_id.as_ref(),
-                            ) {
-                                let taint_edge = ResponsibilityEdge {
-                                    edge_id: EdgeId::new(),
-                                    edge_type: ResponsibilityEdgeType::TaintPropagatesTo,
-                                    source: (*writer_node).clone(),
-                                    target: (*reader_node).clone(),
-                                    evidence_refs: vec![evidence.evidence_id.clone()],
-                                    confidence: 0.70,
-                                    phase: phase.clone(),
-            signal: None,
-                                };
-                                self.graph.add_edge(taint_edge.clone());
-                                delta.new_edges.push(taint_edge);
-
-                                delta.diagnostics.push(format!(
-                                    "taint: {} contaminated {} -> {} accessed at {} (dt={}ns)",
-                                    taint_access.contaminated_by,
-                                    taint_access.artifact,
-                                    reader_agent,
-                                    taint_access.accessed_at_ns,
-                                    taint_access.propagation_dt_ns,
-                                ));
-                            }
-                        }
-
-                        let judgment = ContextTrustEvaluator::evaluate_artifact(
-                            reader_agent,
-                            writer_agent,
-                            &file_path,
-                            intent.timestamp_ns,
-                            action.timestamp_ns,
-                            &self.subagent_boundaries,
                         );
-
-                        match judgment.result {
-                            PolicyJudgmentResult::Violation => {
-                                self.taint_tracker.mark_contaminated(
-                                    writer_agent.clone(),
-                                    &file_path,
-                                    action.timestamp_ns,
-                                );
-                                delta.diagnostics.push(format!(
-                                    "context_trust violation: {} wrote, {} read {}",
-                                    writer_agent, reader_agent, file_path
-                                ));
-                            }
-                            PolicyJudgmentResult::Ambiguous => {
-                                self.taint_tracker.mark_contaminated(
-                                    writer_agent.clone(),
-                                    &file_path,
-                                    action.timestamp_ns,
-                                );
-                                delta.diagnostics.push(format!(
-                                    "context_trust ambiguous: {} -> {} via {}",
-                                    writer_agent, reader_agent, file_path
-                                ));
-                            }
-                            _ => {}
-                        }
+                        delta.diagnostics.push(format!(
+                            "context_trust violation: {} wrote, {} read {}",
+                            writer_agent, reader_agent, file_path
+                        ));
                     }
+                    PolicyJudgmentResult::Ambiguous => {
+                        self.taint_tracker.mark_contaminated(
+                            writer_agent.clone(),
+                            &file_path,
+                            action.timestamp_ns,
+                        );
+                        delta.diagnostics.push(format!(
+                            "context_trust ambiguous: {} -> {} via {}",
+                            writer_agent, reader_agent, file_path
+                        ));
+                    }
+                    _ => {}
                 }
             }
         }
@@ -482,42 +488,42 @@ impl GraphBuilder {
         // ── Content boundary ──
         if let Some(content_result) =
             crate::responsibility::judgment::content::evaluate_content_boundary(intent)
-        {
-            if matches!(
+            && matches!(
                 content_result.claim_state,
                 ResponsibilityClaimState::Observed | ResponsibilityClaimState::Ambiguous
-            ) {
-                let boundary_node = self.ensure_policy_boundary_node(
-                    &NormalizedResource::ToolCall {
-                        tool_name: intent.tool_name.clone(),
-                        call_id: intent.intent_id.as_str().to_string(),
-                    },
-                    timestamp_ns,
-                    &phase,
-                    &mut delta,
-                );
-                let pbc_src = agent_node_id
-                    .clone()
-                    .unwrap_or_else(|| self.create_placeholder_agent_node(timestamp_ns, &phase, &mut delta).node_id);
-                let pbc_tgt = boundary_node.node_id.clone();
-                let pbc_edge = ResponsibilityEdge {
-                    edge_id: EdgeId::new(),
-                    edge_type: ResponsibilityEdgeType::PolicyBoundaryCrossing,
-                    source: pbc_src.clone(),
-                    target: pbc_tgt.clone(),
-                    evidence_refs: vec![],
-                    confidence: 0.80,
-                    phase: phase.clone(),
-                    signal: None,
-                };
-                // Record as provisional — handle() will upgrade this edge
-                // when correlation evidence with the same (agent, boundary)
-                // arrives, binding evidence_refs and actual confidence.
-                self.record_provisional_pbc(pbc_src, pbc_tgt, pbc_edge.edge_id.clone());
-                self.graph.add_edge(pbc_edge.clone());
-                delta.new_edges.push(pbc_edge);
-                delta.new_nodes.push(boundary_node);
-            }
+            )
+        {
+            let boundary_node = self.ensure_policy_boundary_node(
+                &NormalizedResource::ToolCall {
+                    tool_name: intent.tool_name.clone(),
+                    call_id: intent.intent_id.as_str().to_string(),
+                },
+                timestamp_ns,
+                &phase,
+                &mut delta,
+            );
+            let pbc_src = agent_node_id.clone().unwrap_or_else(|| {
+                self.create_placeholder_agent_node(timestamp_ns, &phase, &mut delta)
+                    .node_id
+            });
+            let pbc_tgt = boundary_node.node_id.clone();
+            let pbc_edge = ResponsibilityEdge {
+                edge_id: EdgeId::new(),
+                edge_type: ResponsibilityEdgeType::PolicyBoundaryCrossing,
+                source: pbc_src.clone(),
+                target: pbc_tgt.clone(),
+                evidence_refs: vec![],
+                confidence: 0.80,
+                phase: phase.clone(),
+                signal: None,
+            };
+            // Record as provisional — handle() will upgrade this edge
+            // when correlation evidence with the same (agent, boundary)
+            // arrives, binding evidence_refs and actual confidence.
+            self.record_provisional_pbc(pbc_src, pbc_tgt, pbc_edge.edge_id.clone());
+            self.graph.add_edge(pbc_edge.clone());
+            delta.new_edges.push(pbc_edge);
+            delta.new_nodes.push(boundary_node);
         }
 
         self.accumulated_delta.merge(delta.clone());
@@ -557,19 +563,20 @@ impl GraphBuilder {
             };
 
             let legacy_resource = convert_normalized_to_legacy_resource(&resource);
-            let judgment = crate::responsibility::judgment::policy::evaluate_boundary_policy_with_resource(
-                &agent_id.to_string(),
-                &legacy_resource,
-                &[],
-                &HashSet::new(),
-            );
+            let judgment =
+                crate::responsibility::judgment::policy::evaluate_boundary_policy_with_resource(
+                    &agent_id.to_string(),
+                    &legacy_resource,
+                    &[],
+                    &HashSet::new(),
+                );
 
             // Skip workspace files — accessing project/tmp files is
             // normal agent behavior, not a security violation.
-            if let NormalizedResource::File { canonical_path } = &resource {
-                if is_workspace_path(canonical_path) {
-                    return None;
-                }
+            if let NormalizedResource::File { canonical_path } = &resource
+                && is_workspace_path(canonical_path)
+            {
+                return None;
             }
 
             if judgment.matched
@@ -579,8 +586,7 @@ impl GraphBuilder {
                 )
             {
                 let mut delta = GraphDelta::empty();
-                let agent_node =
-                    self.ensure_agent_node(&agent_id, ts, &phase, &mut delta);
+                let agent_node = self.ensure_agent_node(&agent_id, ts, &phase, &mut delta);
                 let boundary_node =
                     self.ensure_policy_boundary_node(&resource, ts, &phase, &mut delta);
 
@@ -637,9 +643,9 @@ impl GraphBuilder {
                 .graph
                 .all_edges()
                 .filter(|e| {
-                    affected_nodes.iter().any(|nid| {
-                        e.source == *nid || e.target == *nid
-                    })
+                    affected_nodes
+                        .iter()
+                        .any(|nid| e.source == *nid || e.target == *nid)
                 })
                 .map(|e| e.edge_id.clone())
                 .collect();
@@ -1010,22 +1016,26 @@ fn action_to_resource(action: &Action) -> Option<NormalizedResource> {
             // When a network tool (curl, wget, nc) is executed with a URL
             // argument, treat it as a Network resource so the network policy
             // evaluation can flag suspicious targets.
-            let cmd = action.normalized_args.iter().find_map(|arg| match arg {
-                NormalizedArg::Command(c) => Some(c.as_str()),
-                _ => None,
-            }).unwrap_or("");
+            let cmd = action
+                .normalized_args
+                .iter()
+                .find_map(|arg| match arg {
+                    NormalizedArg::Command(c) => Some(c.as_str()),
+                    _ => None,
+                })
+                .unwrap_or("");
             let is_net_tool = matches!(cmd, "curl" | "wget" | "nc" | "ncat");
-            if is_net_tool {
-                if let Some(url) = action.normalized_args.iter().find_map(|arg| match arg {
+            if is_net_tool
+                && let Some(url) = action.normalized_args.iter().find_map(|arg| match arg {
                     NormalizedArg::Url { host, port } => Some((host.clone(), *port)),
                     _ => None,
-                }) {
-                    return Some(NormalizedResource::Network {
-                        host: url.0,
-                        port: url.1.unwrap_or(443),
-                        scheme: "https".to_string(),
-                    });
-                }
+                })
+            {
+                return Some(NormalizedResource::Network {
+                    host: url.0,
+                    port: url.1.unwrap_or(443),
+                    scheme: "https".to_string(),
+                });
             }
             Some(NormalizedResource::Process {
                 process_id: action.process_id,
@@ -1048,11 +1058,7 @@ fn convert_normalized_to_legacy_resource(resource: &NormalizedResource) -> Resou
         NormalizedResource::File { canonical_path } => ResourceId::File {
             canonical_path: canonical_path.clone(),
         },
-        NormalizedResource::Network {
-            host,
-            port,
-            scheme,
-        } => ResourceId::Network {
+        NormalizedResource::Network { host, port, scheme } => ResourceId::Network {
             host: host.clone(),
             port: *port,
             scheme: Some(scheme.clone()),
@@ -1072,10 +1078,7 @@ fn convert_normalized_to_legacy_resource(resource: &NormalizedResource) -> Resou
             model: model.clone(),
             conversation_id: message_id.to_string(),
         },
-        NormalizedResource::ToolCall {
-            tool_name,
-            call_id,
-        } => ResourceId::ToolCall {
+        NormalizedResource::ToolCall { tool_name, call_id } => ResourceId::ToolCall {
             tool_name: tool_name.clone(),
             call_id: Some(call_id.clone()),
         },
@@ -1103,7 +1106,7 @@ mod tests {
     use super::*;
     use crate::responsibility::types::{
         ActionId, CandidateDerivationMode, IntentAuthoritySource, IntentClass, IntentId,
-        IntentParseState, MatchLevel, MessageId, NormalizedArgs, SignalClass,
+        IntentParseState, MatchLevel, MessageId, NormalizedArgs, ProcessId, SignalClass,
     };
 
     struct MockIdentity {
@@ -1171,9 +1174,7 @@ mod tests {
                 raw_args: vec!["/tmp/test.txt".to_string()],
             },
             derivation_mode: CandidateDerivationMode::Direct,
-            phase: PhaseIndicator::Provisional {
-                timestamp_ns: ts,
-            },
+            phase: PhaseIndicator::Provisional { timestamp_ns: ts },
             timestamp_ns: ts,
         }
     }
@@ -1187,8 +1188,12 @@ mod tests {
 
         let mut builder = GraphBuilder::with_default_config();
         let intent = make_intent(pid1, "Bash", 1000);
-        let action =
-            make_action(pid1, ActionCandidateType::FileRead, Some("/tmp/test.txt"), 2000);
+        let action = make_action(
+            pid1,
+            ActionCandidateType::FileRead,
+            Some("/tmp/test.txt"),
+            2000,
+        );
         let evidence = make_evidence(MatchLevel::L1Exact, 0.90, 2000);
 
         let delta = builder.handle(&evidence, &intent, &action, &identity);
@@ -1264,8 +1269,12 @@ mod tests {
 
         let mut builder = GraphBuilder::with_default_config();
         let intent = make_intent(pid1, "Bash", 1000);
-        let action =
-            make_action(pid1, ActionCandidateType::FileRead, Some("/tmp/test.txt"), 2000);
+        let action = make_action(
+            pid1,
+            ActionCandidateType::FileRead,
+            Some("/tmp/test.txt"),
+            2000,
+        );
         let evidence = make_evidence(MatchLevel::L1Exact, 0.90, 2000);
         builder.handle(&evidence, &intent, &action, &identity);
 

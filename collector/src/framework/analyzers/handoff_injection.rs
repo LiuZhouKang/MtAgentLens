@@ -9,9 +9,9 @@
 //! SSE text content. Supports configurable injection patterns.
 
 use super::{Analyzer, AnalyzerError};
-use crate::responsibility::types::support_types::HandoffInjectionRecord;
 use crate::framework::core::Event;
 use crate::framework::runners::EventStream;
+use crate::responsibility::types::support_types::HandoffInjectionRecord;
 use async_trait::async_trait;
 use futures::stream::{self, StreamExt};
 use serde_json::{Value, json};
@@ -286,7 +286,7 @@ fn detect_injections(
 fn detect_from_process(
     state: &mut InjectionDetectionState,
     event: &Event,
-    patterns: &[InjectionPattern],
+    _patterns: &[InjectionPattern],
 ) -> Vec<Event> {
     let event_name = event
         .data
@@ -496,7 +496,10 @@ fn detect_identity_confusion_correlation(
     // 2+ distinct agents read the shared verdict — boundary crossing without
     // authorship re-verification.
     if chain.len() >= 2 {
-        let dedupe = format!("identity_confusion:cross_agent:{}:{}", agent_root_pid, shared_path);
+        let dedupe = format!(
+            "identity_confusion:cross_agent:{}:{}",
+            agent_root_pid, shared_path
+        );
         if state.should_emit(&dedupe, event.timestamp, INJECTION_ALERT_COOLDOWN_NS) {
             correlation_events.push(build_identity_confusion_event(
                 event,
@@ -544,11 +547,7 @@ fn build_identity_confusion_event(
     propagation_chain: &[u32],
 ) -> Event {
     let agent_count = propagation_chain.len();
-    let severity = if agent_count >= 3 {
-        "critical"
-    } else {
-        "high"
-    };
+    let severity = if agent_count >= 3 { "critical" } else { "high" };
 
     Event::new_with_timestamp(
         source_event.timestamp,
@@ -1283,8 +1282,7 @@ mod tests {
 
         let unverified = output.iter().find(|e| {
             e.source == "handoff_injection"
-                && e.data.get("rule_id")
-                    == Some(&json!("unverified_acceptance_of_signed_verdict"))
+                && e.data.get("rule_id") == Some(&json!("unverified_acceptance_of_signed_verdict"))
         });
         assert!(
             unverified.is_some(),

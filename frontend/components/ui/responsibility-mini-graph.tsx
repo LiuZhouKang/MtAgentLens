@@ -54,8 +54,13 @@ const NODE_DEFAULT_ICON = 'circle-filled';
 // ═══════════════════════════════════════════════════════════
 
 interface LayoutNode {
-  id: string; label: string; nodeType: string;
-  x: number; y: number; w: number; h: number;
+  id: string;
+  label: string;
+  nodeType: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 const NODE_W = 120;
@@ -84,8 +89,13 @@ function computeLayout(
   const layoutNodes: LayoutNode[] = nodes.map((n) => {
     const dn = g.node(n.id);
     return {
-      id: n.id, label: n.label, nodeType: n.nodeType,
-      x: dn.x - NODE_W / 2, y: dn.y - NODE_H / 2, w: NODE_W, h: NODE_H,
+      id: n.id,
+      label: n.label,
+      nodeType: n.nodeType,
+      x: dn.x - NODE_W / 2,
+      y: dn.y - NODE_H / 2,
+      w: NODE_W,
+      h: NODE_H,
     };
   });
 
@@ -98,7 +108,9 @@ function computeLayout(
 
   return {
     layoutNodes: layoutNodes.map((n) => ({
-      ...n, x: n.x - minX + MARGIN, y: n.y - minY + MARGIN,
+      ...n,
+      x: n.x - minX + MARGIN,
+      y: n.y - minY + MARGIN,
     })),
     bounds: { w: maxX - minX + MARGIN * 2, h: maxY - minY + MARGIN * 2 },
   };
@@ -108,7 +120,9 @@ function abbreviate(label: string, maxLen = 14): string {
   if (label.length <= maxLen) return label;
   return `${label.slice(0, maxLen - 1)}…`;
 }
-function clamp(v: number, lo: number, hi: number) { return Math.min(hi, Math.max(lo, v)); }
+function clamp(v: number, lo: number, hi: number) {
+  return Math.min(hi, Math.max(lo, v));
+}
 
 // ═══════════════════════════════════════════════════════════
 // BeamEdge — MagicUI identical motion.linearGradient technique
@@ -154,9 +168,10 @@ const BeamEdge: FC<BeamEdgeProps> = ({ d, color, width, opacity, duration, anima
           id={gradientId}
           gradientUnits="userSpaceOnUse"
           initial={{ x1: '0%', x2: '0%', y1: '0%', y2: '0%' }}
-          animate={animate
-            ? { x1: ['10%', '110%'], x2: ['0%', '100%'], y1: ['0%', '0%'], y2: ['0%', '0%'] }
-            : { x1: '10%', x2: '0%', y1: '0%', y2: '0%' }
+          animate={
+            animate
+              ? { x1: ['10%', '110%'], x2: ['0%', '100%'], y1: ['0%', '0%'], y2: ['0%', '0%'] }
+              : { x1: '10%', x2: '0%', y1: '0%', y2: '0%' }
           }
           transition={{
             duration,
@@ -180,7 +195,13 @@ const BeamEdge: FC<BeamEdgeProps> = ({ d, color, width, opacity, duration, anima
 // ═══════════════════════════════════════════════════════════
 
 export type MiniGraphNode = { id: string; label: string; nodeType: string };
-export type MiniGraphEdge = { id: string; source: string; target: string; edgeType: string; confidence: number };
+export type MiniGraphEdge = {
+  id: string;
+  source: string;
+  target: string;
+  edgeType: string;
+  confidence: number;
+};
 
 type Props = { nodes: MiniGraphNode[]; edges: MiniGraphEdge[]; alertId?: string };
 
@@ -196,10 +217,7 @@ const SCALE_MAX = 6;
 export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const { layoutNodes, bounds } = useMemo(
-    () => computeLayout(nodes, edges),
-    [nodes, edges],
-  );
+  const { layoutNodes, bounds } = useMemo(() => computeLayout(nodes, edges), [nodes, edges]);
 
   const nodePosMap = useMemo(() => {
     const m = new Map<string, LayoutNode>();
@@ -217,7 +235,9 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
   const [zoom, setZoom] = useState(fitScale);
 
   useEffect(() => {
-    setPanX(0); setPanY(0); setZoom(fitScale);
+    setPanX(0);
+    setPanY(0);
+    setZoom(fitScale);
   }, [fitScale]);
 
   const stageRef = useRef<HTMLDivElement>(null);
@@ -235,7 +255,9 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
   // ── pan / zoom handlers ──
 
   const resetView = useCallback(() => {
-    setPanX(0); setPanY(0); setZoom(fitScale);
+    setPanX(0);
+    setPanY(0);
+    setZoom(fitScale);
   }, [fitScale]);
 
   const zoomBy = useCallback((factor: number) => {
@@ -276,12 +298,17 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
     setPanY((py) => py + dy);
   }, []);
 
-  const handlePointerUp = useCallback(() => { draggingRef.current = false; }, []);
+  const handlePointerUp = useCallback(() => {
+    draggingRef.current = false;
+  }, []);
 
-  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button, a, [role="button"]')) return;
-    resetView();
-  }, [resetView]);
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if ((e.target as HTMLElement).closest('button, a, [role="button"]')) return;
+      resetView();
+    },
+    [resetView],
+  );
 
   // ── selection ──
 
@@ -339,7 +366,7 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
     );
   }
 
-  const selectedNode = selectedId ? nodes.find((n) => n.id === selectedId) ?? null : null;
+  const selectedNode = selectedId ? (nodes.find((n) => n.id === selectedId) ?? null) : null;
   const nodeCount = nodes.length;
   const edgeCount = edges.length;
   const traceHref = alertId ? buildTraceHref(alertId) : '/traces';
@@ -372,7 +399,7 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
               重置视图
             </button>
           )}
-          <span className="text-[10px] font-medium tabular-nums text-white/30 w-10 text-right">
+          <span className="w-10 text-right text-[10px] font-medium text-white/30 tabular-nums">
             {scalePercent}%
           </span>
         </div>
@@ -381,11 +408,14 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
       {/* ── graph stage ── */}
       <div
         ref={stageRef}
-        className="relative w-full select-none touch-none overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0a0a0f]"
+        className="relative w-full touch-none overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0a0a0f] select-none"
         style={{ height: `${STAGE_H}px` }}
       >
         {/* subtle dot grid — MagicUI-inspired background texture */}
-        <svg className="pointer-events-none absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+        <svg
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <defs>
             <pattern id="mg-dots" x="0" y="0" width="22" height="22" patternUnits="userSpaceOnUse">
               <circle cx="11" cy="11" r="0.7" fill="#ffffff" opacity="0.04" />
@@ -415,7 +445,8 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
             {edges.map((e) => {
               const edgeType = e.edgeType ?? '';
               const color = EDGE_TYPE_COLORS[edgeType] ?? EDGE_DEFAULT_COLOR;
-              const isBoundary = edgeType === 'PolicyBoundaryCrossing' || edgeType === 'ViolationProvenance';
+              const isBoundary =
+                edgeType === 'PolicyBoundaryCrossing' || edgeType === 'ViolationProvenance';
               const isConnected = !selectedId || connectedEdgeIds.has(e.id);
               const curvature = isBoundary ? 50 : 28;
               const d = buildBeamPath(e.source, e.target, curvature);
@@ -450,13 +481,22 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
                 tabIndex={0}
                 aria-label={`${n.nodeType}: ${n.label}`}
                 aria-pressed={isSelected}
-                onClick={(evt) => { evt.stopPropagation(); onNodeClick(n.id); }}
-                onKeyDown={(evt) => {
-                  if (evt.key === 'Enter' || evt.key === ' ') { evt.preventDefault(); onNodeClick(n.id); }
+                onClick={(evt) => {
+                  evt.stopPropagation();
+                  onNodeClick(n.id);
                 }}
-                className="absolute flex items-center gap-2.5 rounded-xl border cursor-pointer transition-shadow duration-200"
+                onKeyDown={(evt) => {
+                  if (evt.key === 'Enter' || evt.key === ' ') {
+                    evt.preventDefault();
+                    onNodeClick(n.id);
+                  }
+                }}
+                className="absolute flex cursor-pointer items-center gap-2.5 rounded-xl border transition-shadow duration-200"
                 style={{
-                  left: n.x, top: n.y, width: n.w, height: n.h,
+                  left: n.x,
+                  top: n.y,
+                  width: n.w,
+                  height: n.h,
                   backgroundColor: isSelected ? `${color}10` : '#141418',
                   borderColor: isSelected ? `${color}50` : 'rgba(255,255,255,0.08)',
                   boxShadow: isSelected
@@ -473,7 +513,7 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
               >
                 {/* colored icon badge */}
                 <span
-                  className="flex items-center justify-center w-6 h-6 rounded-lg shrink-0 ml-2"
+                  className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
                   style={{
                     backgroundColor: isSelected ? `${color}20` : `${color}0f`,
                     border: `1px solid ${isSelected ? `${color}45` : `${color}20`}`,
@@ -484,7 +524,7 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
                 </span>
                 {/* label */}
                 <span
-                  className="text-[11px] font-medium text-white/85 truncate flex-1 pr-2.5 select-none"
+                  className="flex-1 truncate pr-2.5 text-[11px] font-medium text-white/85 select-none"
                   title={n.label}
                 >
                   {abbreviate(n.label)}
@@ -495,11 +535,11 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
         </div>
 
         {/* ── zoom controls ── */}
-        <div className="absolute bottom-3 right-3 flex items-center gap-0.5 z-20">
+        <div className="absolute right-3 bottom-3 z-20 flex items-center gap-0.5">
           <button
             type="button"
             onClick={() => zoomBy(1 / 1.3)}
-            className="flex items-center justify-center w-7 h-7 rounded-lg border border-white/10 bg-[#141418]/90 text-white/40 transition hover:border-white/20 hover:text-white/70"
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-[#141418]/90 text-white/40 transition hover:border-white/20 hover:text-white/70"
             aria-label="缩小"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -509,22 +549,39 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
           <button
             type="button"
             onClick={() => zoomBy(1.3)}
-            className="flex items-center justify-center w-7 h-7 rounded-lg border border-white/10 bg-[#141418]/90 text-white/40 transition hover:border-white/20 hover:text-white/70"
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-[#141418]/90 text-white/40 transition hover:border-white/20 hover:text-white/70"
             aria-label="放大"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M3 7h8M7 3v8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              <path
+                d="M3 7h8M7 3v8"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
           <button
             type="button"
             onClick={resetView}
-            className="flex items-center justify-center w-7 h-7 rounded-lg border border-white/10 bg-[#141418]/90 text-white/40 transition hover:border-white/20 hover:text-white/70"
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-[#141418]/90 text-white/40 transition hover:border-white/20 hover:text-white/70"
             aria-label="重置视图"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M1.5 4.5V1.5H4.5M10.5 7.5V10.5H7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M2 6.5a4 4 0 0 0 6.8 2.8l1.7 1.7M10 5.5a4 4 0 0 0-6.8-2.8L1.5 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d="M1.5 4.5V1.5H4.5M10.5 7.5V10.5H7.5"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M2 6.5a4 4 0 0 0 6.8 2.8l1.7 1.7M10 5.5a4 4 0 0 0-6.8-2.8L1.5 1"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
         </div>
@@ -533,14 +590,14 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
       {/* ── selected node detail ── */}
       {selectedNode && (
         <div
-          className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-xs border"
+          className="flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-xs"
           style={{
             backgroundColor: `${NODE_TYPE_COLORS[selectedNode.nodeType] ?? NODE_DEFAULT_COLOR}0c`,
             borderColor: `${NODE_TYPE_COLORS[selectedNode.nodeType] ?? NODE_DEFAULT_COLOR}20`,
           }}
         >
           <span
-            className="flex items-center justify-center w-5 h-5 rounded-md shrink-0"
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md"
             style={{
               backgroundColor: `${NODE_TYPE_COLORS[selectedNode.nodeType] ?? NODE_DEFAULT_COLOR}18`,
               color: NODE_TYPE_COLORS[selectedNode.nodeType] ?? NODE_DEFAULT_COLOR,
@@ -548,11 +605,11 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
           >
             <Codicon name={NODE_TYPE_ICONS[selectedNode.nodeType] ?? NODE_DEFAULT_ICON} size={11} />
           </span>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+          <span className="text-[10px] font-semibold tracking-wider text-white/45 uppercase">
             {selectedNode.nodeType}
           </span>
           <span className="text-xs font-medium text-white/80">{selectedNode.label}</span>
-          <span className="text-[10px] text-white/30 ml-auto">
+          <span className="ml-auto text-[10px] text-white/30">
             {edges.filter((e) => e.source === selectedId || e.target === selectedId).length} 条关联
           </span>
         </div>
@@ -563,10 +620,10 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
         {Array.from(new Set(nodes.map((n) => n.nodeType))).map((type) => (
           <div key={type} className="flex items-center gap-1.5">
             <span
-              className="w-2 h-2 rounded-full shrink-0"
+              className="h-2 w-2 shrink-0 rounded-full"
               style={{ backgroundColor: NODE_TYPE_COLORS[type] ?? NODE_DEFAULT_COLOR }}
             />
-            <span className="text-[9px] font-semibold uppercase tracking-wider text-white/30">
+            <span className="text-[9px] font-semibold tracking-wider text-white/30 uppercase">
               {type === 'PolicyBoundary' ? 'Boundary' : type}
             </span>
           </div>
@@ -578,9 +635,17 @@ export function ResponsibilityMiniGraph({ nodes, edges, alertId }: Props) {
         href={traceHref}
         className="group flex items-center justify-center gap-2 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium text-white/45 transition-all hover:border-white/12 hover:bg-white/[0.05] hover:text-white/75"
       >
-        <Codicon name="graph-line" size={13} className="text-white/25 group-hover:text-white/50 transition-colors" />
+        <Codicon
+          name="graph-line"
+          size={13}
+          className="text-white/25 transition-colors group-hover:text-white/50"
+        />
         <span>在完整页面中打开交互式责任网络</span>
-        <Codicon name="link-external" size={11} className="text-white/15 group-hover:text-white/40 transition-colors" />
+        <Codicon
+          name="link-external"
+          size={11}
+          className="text-white/15 transition-colors group-hover:text-white/40"
+        />
       </Link>
     </div>
   );

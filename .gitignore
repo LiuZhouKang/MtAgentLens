@@ -65,8 +65,8 @@ cc-bos/
 设计/
 演示视频/
 
-# Competition submission files (uploaded manually)
-MtAgentLens初赛演示视频.mp4
+# 决赛演示视频（体积过大，仅网盘分发，不进入仓库）
+MtAgentLens决赛演示视频.mp4
 
 # Sensitive files
 .env
@@ -105,7 +105,3 @@ compare/models/
 # Collector local models
 collector/models/
 web/
-
-# Competition submission files (uploaded manually)
-初赛ppt.pptx
-看月亮-proj32-设计开发文档.pdf

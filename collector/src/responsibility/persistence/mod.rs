@@ -5,13 +5,17 @@
 // (causal_schema, jsonl_writer, responsibility_schema, schema, sqlite_writer)
 // remain for backward compatibility but should not be extended.
 
+pub mod reader;
 pub mod schema;
 pub mod writer;
-pub mod reader;
 
-pub use schema::{run_migrations, open_responsibility_db, open_responsibility_db_read_only, SCHEMA_DDL};
-pub use writer::{PersistenceWriter, PersistRecord, WriterConfig, ProcessMetadata, TlsSession, BindingType};
-pub use reader::{PersistenceReader, EvaluationData, RefinementCounts};
+pub use reader::{EvaluationData, PersistenceReader, RefinementCounts};
+pub use schema::{
+    SCHEMA_DDL, open_responsibility_db, open_responsibility_db_read_only, run_migrations,
+};
+pub use writer::{
+    BindingType, PersistRecord, PersistenceWriter, ProcessMetadata, TlsSession, WriterConfig,
+};
 
 // Re-export old modules for existing callers
 mod causal_schema;

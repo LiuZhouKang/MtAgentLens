@@ -1,14 +1,14 @@
-use std::fs;
 use async_trait::async_trait;
-use serde::Deserialize;
-use hyper::body::Bytes;
 use http_body_util::{BodyExt, Full};
+use hyper::body::Bytes;
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
+use serde::Deserialize;
+use std::fs;
 
 use crate::responsibility::observer::llm::ObserverLLM;
-use crate::responsibility::observer::types::{ObserverInput, ObserverOutput, ObserverError};
 use crate::responsibility::observer::system_prompt::OBSERVER_SYSTEM_PROMPT;
+use crate::responsibility::observer::types::{ObserverError, ObserverInput, ObserverOutput};
 
 #[derive(Debug)]
 pub enum ObserverProviderError {
@@ -38,8 +38,12 @@ pub struct ObserverProviderConfig {
     pub max_retries: u32,
 }
 
-fn default_timeout() -> u64 { 30000 }
-fn default_retries() -> u32 { 3 }
+fn default_timeout() -> u64 {
+    30000
+}
+fn default_retries() -> u32 {
+    3
+}
 
 pub struct ObserverLLMProvider {
     config: ObserverProviderConfig,
@@ -60,16 +64,17 @@ impl ObserverLLMProvider {
                 .ok()
                 .filter(|v| !v.is_empty())
                 .unwrap_or_else(|| "https://api.deepseek.com/anthropic".into()),
-            auth_token: std::env::var("ANTHROPIC_AUTH_TOKEN")
-                .map_err(|_| ObserverProviderError::ConfigError("ANTHROPIC_AUTH_TOKEN not set".into()))?,
+            auth_token: std::env::var("ANTHROPIC_AUTH_TOKEN").map_err(|_| {
+                ObserverProviderError::ConfigError("ANTHROPIC_AUTH_TOKEN not set".into())
+            })?,
             // deepseek-v4-flash: 最低成本, 足够分类仲裁.
             // Filter empty strings: sudo --preserve-env may pass empty MODEL.
             model: std::env::var("MODEL")
                 .ok()
                 .filter(|v| !v.is_empty())
                 .unwrap_or_else(|| "deepseek-v4-flash".into()),
-            timeout_ms: 15000,   // 15s 快速失败
-            max_retries: 1,      // 单次重试
+            timeout_ms: 15000, // 15s 快速失败
+            max_retries: 1,    // 单次重试
         };
         Ok(Self { config })
     }
@@ -85,7 +90,11 @@ impl ObserverProvider for ObserverLLMProvider {
         &self,
         input: &ObserverInput,
     ) -> Result<ObserverOutput, ObserverProviderError> {
-        let prompt = ObserverLLM::build_compact_prompt(&input.signature, &input.prior, input.content_signals.as_ref());
+        let prompt = ObserverLLM::build_compact_prompt(
+            &input.signature,
+            &input.prior,
+            input.content_signals.as_ref(),
+        );
 
         // Build request body for Anthropic-compatible API (DeepSeek).
         // Token budget:
@@ -139,13 +148,20 @@ impl ObserverProvider for ObserverLLMProvider {
         .map_err(|e| ObserverProviderError::ApiError(e.to_string()))?;
 
         let status = resp.status();
-        let body_bytes = resp.into_body().collect().await
+        let body_bytes = resp
+            .into_body()
+            .collect()
+            .await
             .map_err(|e| ObserverProviderError::ApiError(e.to_string()))?
             .to_bytes();
 
         if !status.is_success() {
             let text = String::from_utf8_lossy(&body_bytes);
-            return Err(ObserverProviderError::ApiError(format!("HTTP {}: {}", status.as_u16(), text)));
+            return Err(ObserverProviderError::ApiError(format!(
+                "HTTP {}: {}",
+                status.as_u16(),
+                text
+            )));
         }
 
         let raw: serde_json::Value = serde_json::from_slice(&body_bytes)
@@ -158,13 +174,16 @@ impl ObserverProvider for ObserverLLMProvider {
         let text = content_blocks
             .and_then(|blocks| {
                 // 1. Try to find a block with type="text" that has a "text" field
-                blocks.iter()
-                    .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("text")
-                              && b.get("text").is_some())
-                // 2. Try any block with a "text" field
-                .or_else(|| blocks.iter().find(|b| b.get("text").is_some()))
-                // 3. Fall back to first block
-                .or_else(|| blocks.first())
+                blocks
+                    .iter()
+                    .find(|b| {
+                        b.get("type").and_then(|t| t.as_str()) == Some("text")
+                            && b.get("text").is_some()
+                    })
+                    // 2. Try any block with a "text" field
+                    .or_else(|| blocks.iter().find(|b| b.get("text").is_some()))
+                    // 3. Fall back to first block
+                    .or_else(|| blocks.first())
             })
             .and_then(|block| block["text"].as_str())
             .unwrap_or("{}");
@@ -172,11 +191,10 @@ impl ObserverProvider for ObserverLLMProvider {
         // Debug: uncomment to see raw API response
         // eprintln!("[observer] raw response: {}", String::from_utf8_lossy(&body_bytes[..body_bytes.len().min(500)]));
 
-        ObserverLLM::parse_and_validate(text)
-            .map_err(|e| match e {
-                ObserverError::InjectionDetected => ObserverProviderError::InjectionDetected,
-                ObserverError::SelfReportedAttack => ObserverProviderError::InjectionDetected,
-                _ => ObserverProviderError::ValidationError(format!("{:?}", e)),
-            })
+        ObserverLLM::parse_and_validate(text).map_err(|e| match e {
+            ObserverError::InjectionDetected => ObserverProviderError::InjectionDetected,
+            ObserverError::SelfReportedAttack => ObserverProviderError::InjectionDetected,
+            _ => ObserverProviderError::ValidationError(format!("{:?}", e)),
+        })
     }
 }

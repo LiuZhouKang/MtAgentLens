@@ -11,17 +11,17 @@
 //   SSE/HTTP  → evidence (IntentExtractor + EvidenceCorrelator)
 //   Syscall   → evidence (ActionClassifier + EvidenceCorrelator)
 
+use crate::framework::Event;
 use crate::responsibility::evidence::action_classifier::ActionClassifier;
 use crate::responsibility::evidence::correlator::EvidenceCorrelator;
 use crate::responsibility::evidence::intent_extractor::IntentExtractor;
 use crate::responsibility::identity::resolver::IdentityResolver;
 use crate::responsibility::runtime::buffer::GraphDeltaBuffer;
 use crate::responsibility::signals::SignalGraph;
+use crate::responsibility::types::Intent;
 use crate::responsibility::types::alert_types::BehaviorTimelineEntry;
 use crate::responsibility::types::evidence_types::IntentAuthoritySource;
-use crate::responsibility::types::Intent;
 use crate::responsibility::types::ids::{MessageId, ProcessId, TlsSessionId};
-use crate::framework::Event;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Diagnostic counters for EvidenceIntent processing.
@@ -74,10 +74,7 @@ pub fn dispatch_event(
     let result = DispatchResult::default();
 
     // ── Phase 1: Determine event type ──────────────────────────────────
-    let event_type = event
-        .data
-        .get("event")
-        .and_then(|v| v.as_str());
+    let event_type = event.data.get("event").and_then(|v| v.as_str());
 
     let route = classify_event(event, event_type);
 
@@ -96,32 +93,36 @@ pub fn dispatch_event(
             }
             _ => {
                 // TLS events: ssl_*/tls_* sources or events with connection_id
-                if event.source.contains("ssl") || event.source.contains("tls")
-                   || event.data.get("connection_id").is_some()
+                if (event.source.contains("ssl")
+                    || event.source.contains("tls")
+                    || event.data.get("connection_id").is_some())
+                    && let Some(process_id) = extract_process_id(event)
                 {
-                    if let Some(process_id) = extract_process_id(event) {
-                        // Resolve the correct ProcessId BEFORE observe_tls.
-                        // TLS events carry start_time_ns=0. Without this fix,
-                        // the signal graph stores ProcessId(pid,0) in its TLS
-                        // map, which never matches ProcessId(pid,real_start)
-                        // from the EXEC event. This breaks process-tree queries
-                        // and downstream identity resolution (union-find).
-                        let snapshot = signal_graph.snapshot();
-                        let resolved_pid = resolve_process_id(process_id, &snapshot);
-                        let tls_id = event.data.get("connection_id")
-                            .or_else(|| event.data.get("tls_session"))
-                            .and_then(|v| v.as_str())
-                            .map(|s| TlsSessionId::from(s))
-                            .unwrap_or_else(TlsSessionId::new);
-                        signal_graph.observe_tls(resolved_pid, tls_id, event.timestamp);
-                    }
+                    // Resolve the correct ProcessId BEFORE observe_tls.
+                    // TLS events carry start_time_ns=0. Without this fix,
+                    // the signal graph stores ProcessId(pid,0) in its TLS
+                    // map, which never matches ProcessId(pid,real_start)
+                    // from the EXEC event. This breaks process-tree queries
+                    // and downstream identity resolution (union-find).
+                    let snapshot = signal_graph.snapshot();
+                    let resolved_pid = resolve_process_id(process_id, &snapshot);
+                    let tls_id = event
+                        .data
+                        .get("connection_id")
+                        .or_else(|| event.data.get("tls_session"))
+                        .and_then(|v| v.as_str())
+                        .map(TlsSessionId::from)
+                        .unwrap_or_else(TlsSessionId::new);
+                    signal_graph.observe_tls(resolved_pid, tls_id, event.timestamp);
                 }
             }
         }
 
         // After signal update, resolve identity
         let snapshot = signal_graph.snapshot();
-        if let Some(process_id) = extract_process_id(event).map(|pid| resolve_process_id(pid, &snapshot)) {
+        if let Some(process_id) =
+            extract_process_id(event).map(|pid| resolve_process_id(pid, &snapshot))
+        {
             let _identity = identity_resolver.resolve_provisional(process_id, &snapshot);
 
             let desc = describe_signal_event(event, event_type);
@@ -157,9 +158,12 @@ pub fn dispatch_event(
     // json_content is a simplified {command, description} summary that lacks the
     // standard type: "tool_use" envelope, making it invisible to the SSE parser.
     let sse_body: Option<String> = reconstruct_sse_from_events(event);
-    let body_candidate: Option<&str> = event.data.get("body").and_then(|v| v.as_str())
+    let body_candidate: Option<&str> = event
+        .data
+        .get("body")
+        .and_then(|v| v.as_str())
         .or_else(|| event.data.get("content").and_then(|v| v.as_str()))
-        .or_else(|| sse_body.as_deref())
+        .or(sse_body.as_deref())
         .or_else(|| event.data.get("json_content").and_then(|v| v.as_str()))
         .or_else(|| event.data.get("text_content").and_then(|v| v.as_str()))
         .or_else(|| event.data.get("data").and_then(|v| v.as_str()));
@@ -170,49 +174,47 @@ pub fn dispatch_event(
     let is_evidence_route = matches!(route, RouteTarget::EvidenceIntent);
     let has_payload = body_candidate.is_some_and(|b| !b.is_empty());
 
-    if is_evidence_route || has_payload {
-        if let Some(body) = body_candidate {
-            DIAG_EVIDENCE_ATTEMPTED.fetch_add(1, Ordering::Relaxed);
+    if (is_evidence_route || has_payload)
+        && let Some(body) = body_candidate
+    {
+        DIAG_EVIDENCE_ATTEMPTED.fetch_add(1, Ordering::Relaxed);
 
-            let snapshot = signal_graph.snapshot();
-            let process_id = resolve_process_id(
-                extract_or_default_process_id(event), &snapshot);
+        let snapshot = signal_graph.snapshot();
+        let process_id = resolve_process_id(extract_or_default_process_id(event), &snapshot);
 
-            let message_id = event
-                .data
-                .get("message_id")
-                .and_then(|v| v.as_str())
-                .map(|s| MessageId::from(s))
-                .unwrap_or_else(MessageId::new);
+        let message_id = event
+            .data
+            .get("message_id")
+            .and_then(|v| v.as_str())
+            .map(MessageId::from)
+            .unwrap_or_else(MessageId::new);
 
-            let msg_id_for_extract = message_id.clone();
-            let intents = IntentExtractor::extract(
-                body,
-                IntentAuthoritySource::SseResponseToolUse,
-                process_id,
-                msg_id_for_extract,
-                event.timestamp,
-            );
+        let msg_id_for_extract = message_id.clone();
+        let intents = IntentExtractor::extract(
+            body,
+            IntentAuthoritySource::SseResponseToolUse,
+            process_id,
+            msg_id_for_extract,
+            event.timestamp,
+        );
 
-            // Also extract user messages from request bodies so the
-            // ContentBoundary can detect injection patterns in the
-            // initial task prompt.
-            let user_prompt_intents = extract_request_user_messages(
-                body, process_id, message_id, event.timestamp,
-            );
+        // Also extract user messages from request bodies so the
+        // ContentBoundary can detect injection patterns in the
+        // initial task prompt.
+        let user_prompt_intents =
+            extract_request_user_messages(body, process_id, message_id, event.timestamp);
 
-            let total_intents = intents.len() + user_prompt_intents.len();
-            if total_intents > 0 {
-                DIAG_EVIDENCE_INTENTS.fetch_add(total_intents as u64, Ordering::Relaxed);
-            }
+        let total_intents = intents.len() + user_prompt_intents.len();
+        if total_intents > 0 {
+            DIAG_EVIDENCE_INTENTS.fetch_add(total_intents as u64, Ordering::Relaxed);
+        }
 
-            for intent in intents.into_iter().chain(user_prompt_intents) {
-                let intent_clone = intent.clone();
-                buffer.push_intent(intent_clone);
-                let evidence_list = evidence_correlator.on_intent(intent, &snapshot);
-                for ev in evidence_list {
-                    buffer.push_evidence(ev);
-                }
+        for intent in intents.into_iter().chain(user_prompt_intents) {
+            let intent_clone = intent.clone();
+            buffer.push_intent(intent_clone);
+            let evidence_list = evidence_correlator.on_intent(intent, &snapshot);
+            for ev in evidence_list {
+                buffer.push_evidence(ev);
             }
         }
     }
@@ -222,10 +224,24 @@ pub fn dispatch_event(
     // EXEC/FILE_OPEN/etc. events that classify_event() routes to Signals
     // (early return). This ensures process events produce actions even
     // when they also go through the Signals path.
-    let has_actionable_event = event.data.get("event").and_then(|v| v.as_str())
-        .map(|e| matches!(e, "EXEC" | "PROCESS_EXEC" | "FILE_OPEN" | "FILE_DELETE"
-            | "FILE_WRITE" | "FILE_TRUNCATE" | "FILE_RENAME"
-            | "NETWORK_CONNECT" | "NETWORK_SEND"))
+    let has_actionable_event = event
+        .data
+        .get("event")
+        .and_then(|v| v.as_str())
+        .map(|e| {
+            matches!(
+                e,
+                "EXEC"
+                    | "PROCESS_EXEC"
+                    | "FILE_OPEN"
+                    | "FILE_DELETE"
+                    | "FILE_WRITE"
+                    | "FILE_TRUNCATE"
+                    | "FILE_RENAME"
+                    | "NETWORK_CONNECT"
+                    | "NETWORK_SEND"
+            )
+        })
         .unwrap_or(false);
 
     static DIAG_EV_ACT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -238,38 +254,35 @@ pub fn dispatch_event(
 
     if matches!(route, RouteTarget::EvidenceAction) || has_actionable_event {
         let snapshot = signal_graph.snapshot();
-        let process_id = resolve_process_id(
-            extract_or_default_process_id(event), &snapshot);
+        let process_id = resolve_process_id(extract_or_default_process_id(event), &snapshot);
 
-        if let Some((syscall_name, raw_args)) = parse_process_event_to_syscall(event) {
-            if let Some(action) = ActionClassifier::classify(
-                &syscall_name,
-                &raw_args,
-                process_id,
-                event.timestamp,
-            ) {
-                // Filter BPF/eBPF self-access noise: paths under /sys/kernel/
-                // are the BPF programs reading trace event IDs, not agent actions.
-                let is_bpf_noise = action.normalized_args.iter().any(|a| {
-                    if let crate::responsibility::types::NormalizedArg::Path(p) = a {
-                        p.starts_with("/sys/kernel/")
-                    } else { false }
-                });
-                // Only keep actions from processes with agent ancestry.
-                // A process has agent ancestry if it (or an ancestor) has TLS
-                // sessions. This filters out system noise from unrelated
-                // processes that happen to be captured by BPF.
-                let has_agent = snapshot.has_agent_ancestry(process_id);
-                if !is_bpf_noise && has_agent {
-                    DIAG_ACTIONS_PRODUCED.fetch_add(1, Ordering::Relaxed);
-                    let action_clone = action.clone();
-                    buffer.push_action(action_clone);
+        if let Some((syscall_name, raw_args)) = parse_process_event_to_syscall(event)
+            && let Some(action) =
+                ActionClassifier::classify(&syscall_name, &raw_args, process_id, event.timestamp)
+        {
+            // Filter BPF/eBPF self-access noise: paths under /sys/kernel/
+            // are the BPF programs reading trace event IDs, not agent actions.
+            let is_bpf_noise = action.normalized_args.iter().any(|a| {
+                if let crate::responsibility::types::NormalizedArg::Path(p) = a {
+                    p.starts_with("/sys/kernel/")
+                } else {
+                    false
                 }
-                if has_agent {
-                    let evidence_list = evidence_correlator.on_action(action, &snapshot);
-                    for ev in evidence_list {
-                        buffer.push_evidence(ev);
-                    }
+            });
+            // Only keep actions from processes with agent ancestry.
+            // A process has agent ancestry if it (or an ancestor) has TLS
+            // sessions. This filters out system noise from unrelated
+            // processes that happen to be captured by BPF.
+            let has_agent = snapshot.has_agent_ancestry(process_id);
+            if !is_bpf_noise && has_agent {
+                DIAG_ACTIONS_PRODUCED.fetch_add(1, Ordering::Relaxed);
+                let action_clone = action.clone();
+                buffer.push_action(action_clone);
+            }
+            if has_agent {
+                let evidence_list = evidence_correlator.on_action(action, &snapshot);
+                for ev in evidence_list {
+                    buffer.push_evidence(ev);
                 }
             }
         }
@@ -316,9 +329,8 @@ fn classify_event(event: &Event, event_type: Option<&str>) -> RouteTarget {
     }
     if let Some(evt) = event.data.get("event").and_then(|v| v.as_str()) {
         match evt {
-            "FILE_OPEN" | "FILE_DELETE" | "FILE_WRITE" | "FILE_TRUNCATE"
-            | "FILE_RENAME" | "NETWORK_CONNECT" | "NETWORK_SEND"
-            | "EXEC" | "PROCESS_EXEC" => {
+            "FILE_OPEN" | "FILE_DELETE" | "FILE_WRITE" | "FILE_TRUNCATE" | "FILE_RENAME"
+            | "NETWORK_CONNECT" | "NETWORK_SEND" | "EXEC" | "PROCESS_EXEC" => {
                 return RouteTarget::EvidenceAction;
             }
             _ => {}
@@ -459,12 +471,17 @@ fn extract_or_default_process_id(event: &Event) -> ProcessId {
 /// Events from HTTP layers have start_time_ns=0. The SignalGraph has the real
 /// start_time from the EXEC event. Without this correction, process tree
 /// correlation (can_correlate) always fails.
-pub fn resolve_process_id(pid: ProcessId, snapshot: &crate::responsibility::signals::SignalSnapshot) -> ProcessId {
-    if pid.start_time_ns != 0 { return pid; }
+pub fn resolve_process_id(
+    pid: ProcessId,
+    snapshot: &crate::responsibility::signals::SignalSnapshot,
+) -> ProcessId {
+    if pid.start_time_ns != 0 {
+        return pid;
+    }
     // Find the real start_time_ns from the snapshot. Intent events from HTTP
     // layer have start_time_ns=0. The snapshot's process HashMap is keyed by
     // ProcessId(pid, real_start) — we need to find by PID alone.
-    for (proc_id, _meta) in snapshot.processes.iter() {
+    for proc_id in snapshot.processes.keys() {
         if proc_id.pid == pid.pid {
             return *proc_id;
         }
@@ -487,7 +504,11 @@ fn parse_process_event_to_syscall(event: &Event) -> Option<(String, Vec<String>)
             .data
             .get("args")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|a| a.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|a| a.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
         return Some((name.to_string(), args));
     }
@@ -496,41 +517,78 @@ fn parse_process_event_to_syscall(event: &Event) -> Option<(String, Vec<String>)
     match event.data.get("event").and_then(|v| v.as_str()) {
         // File operations
         Some("FILE_OPEN") => {
-            let path = event.data.get("filepath").and_then(|v| v.as_str()).unwrap_or("");
-            let flags = event.data.get("flags")
+            let path = event
+                .data
+                .get("filepath")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let flags = event
+                .data
+                .get("flags")
                 .and_then(|v| v.as_i64())
                 .map(|f| f.to_string())
                 .unwrap_or_else(|| "0".to_string());
             Some(("openat".to_string(), vec![path.to_string(), flags]))
         }
         Some("FILE_DELETE") => {
-            let path = event.data.get("filepath").and_then(|v| v.as_str()).unwrap_or("");
+            let path = event
+                .data
+                .get("filepath")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             Some(("unlink".to_string(), vec![path.to_string()]))
         }
         Some("FILE_WRITE") | Some("FILE_TRUNCATE") | Some("FILE_RENAME") => {
-            let path = event.data.get("filepath").and_then(|v| v.as_str()).unwrap_or("");
+            let path = event
+                .data
+                .get("filepath")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             Some(("write".to_string(), vec![path.to_string()]))
         }
 
         // Network operations
         Some("NETWORK_CONNECT") => {
-            let host = event.data.get("host").and_then(|v| v.as_str()).unwrap_or("");
+            let host = event
+                .data
+                .get("host")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let port = event.data.get("port").and_then(|v| v.as_u64()).unwrap_or(0);
             Some(("connect".to_string(), vec![format!("{}:{}", host, port)]))
         }
         Some("NETWORK_SEND") => {
-            let host = event.data.get("host").and_then(|v| v.as_str()).unwrap_or("");
+            let host = event
+                .data
+                .get("host")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let port = event.data.get("port").and_then(|v| v.as_u64()).unwrap_or(0);
             Some(("sendto".to_string(), vec![format!("{}:{}", host, port)]))
         }
 
         // Process operations
         Some("EXEC") | Some("PROCESS_EXEC") => {
-            let filename = event.data.get("filename").and_then(|v| v.as_str()).unwrap_or("");
-            let comm = event.data.get("comm").and_then(|v| v.as_str()).unwrap_or("");
-            let full_cmd = event.data.get("full_command").and_then(|v| v.as_str()).unwrap_or("");
+            let filename = event
+                .data
+                .get("filename")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let comm = event
+                .data
+                .get("comm")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let full_cmd = event
+                .data
+                .get("full_command")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let argv0 = if !filename.is_empty() { filename } else { comm };
-            Some(("execve".to_string(), vec![argv0.to_string(), full_cmd.to_string()]))
+            Some((
+                "execve".to_string(),
+                vec![argv0.to_string(), full_cmd.to_string()],
+            ))
         }
 
         _ => None,
@@ -591,5 +649,10 @@ fn extract_request_user_messages(
         return Vec::new();
     }
     let messages_str = serde_json::to_string(&messages).unwrap_or_default();
-    IntentExtractor::extract_from_request(&messages_str, process_id, message_id.clone(), timestamp_ns)
+    IntentExtractor::extract_from_request(
+        &messages_str,
+        process_id,
+        message_id.clone(),
+        timestamp_ns,
+    )
 }

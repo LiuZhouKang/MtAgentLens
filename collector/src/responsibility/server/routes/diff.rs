@@ -3,7 +3,7 @@
 // operation-level diff between two runs.
 
 use crate::responsibility::persistence::reader::PersistenceReader;
-use crate::responsibility::replay::run_diff::{diff_runs, RunDiff};
+use crate::responsibility::replay::run_diff::{RunDiff, diff_runs};
 use crate::responsibility::server::api::{ApiError, ApiResponse};
 use hyper::{Request, Response, body::Bytes};
 use serde::Serialize;
@@ -55,8 +55,11 @@ pub fn get_diff<B>(
         Some(before_id) => match reader.get_run(before_id) {
             Ok(Some(r)) => r,
             Ok(None) => {
-                return ApiError::new("before_run_not_found", format!("Baseline run '{before_id}' not found"))
-                    .into_response(hyper::StatusCode::NOT_FOUND);
+                return ApiError::new(
+                    "before_run_not_found",
+                    format!("Baseline run '{before_id}' not found"),
+                )
+                .into_response(hyper::StatusCode::NOT_FOUND);
             }
             Err(e) => {
                 return ApiError::internal(format!("Failed to get baseline run: {e}"))

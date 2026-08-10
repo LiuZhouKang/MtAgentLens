@@ -26,7 +26,7 @@ CASES = [
         "scenario_id": "collusion-ring",
         "db_path": str(
             COMPARE_DIR
-            / "Dataset/FuxiBench/traces/agent_teams/collusion-ring/responsibility.db"
+            / "Dataset/FuxiBench/traces/multi_agent_attack/collusion-ring/responsibility.db"
         ),
         "topology": "hub-and-spoke",
         "title": "Case Study 3.1: Collusion Ring",
@@ -40,7 +40,7 @@ CASES = [
         "scenario_id": "delegation-chain",
         "db_path": str(
             COMPARE_DIR
-            / "Dataset/FuxiBench/traces/subagents/delegation-chain/responsibility.db"
+            / "Dataset/FuxiBench/traces/multi_agent_attack/delegation-chain/responsibility.db"
         ),
         "topology": "chain",
         "title": "Case Study 3.2: Delegation Chain",
@@ -53,7 +53,7 @@ CASES = [
         "scenario_id": "handoff-injection",
         "db_path": str(
             COMPARE_DIR
-            / "Dataset/FuxiBench/traces/agent_teams/handoff-injection/responsibility.db"
+            / "Dataset/FuxiBench/traces/multi_agent_attack/handoff-injection/responsibility.db"
         ),
         "topology": "communication-injection",
         "title": "Case Study 3.3: Handoff Injection",

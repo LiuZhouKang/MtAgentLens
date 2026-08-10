@@ -14,13 +14,9 @@ type Props = {
  * but zero triggered alerts" (common for monitoring sessions — report the
  * consumable counts instead of claiming nothing was loaded).
  */
-export default function AlertEmptyState({
-  dataSource,
-  graphNodeCount,
-  evidenceCount,
-}: Props) {
+export default function AlertEmptyState({ dataSource, graphNodeCount, evidenceCount }: Props) {
   // Backend runs (kind 'run') carry no `label` — use the run id.
-  const label = dataSource?.kind === 'run' ? dataSource.runId : dataSource?.label ?? '';
+  const label = dataSource?.kind === 'run' ? dataSource.runId : (dataSource?.label ?? '');
   const message = dataSource
     ? graphNodeCount > 0
       ? `当前数据源「${label}」未检测到告警（已解析 ${graphNodeCount} 节点 · ${evidenceCount} 条证据）`

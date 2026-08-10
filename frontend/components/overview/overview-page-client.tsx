@@ -168,13 +168,17 @@ export default function OverviewPageClient() {
       label: 'Critical Claims',
       value: overview ? (overview.claims.by_severity.Critical ?? 0) : 0,
       delta: overview ? `of ${overview.claims.count} claims` : '—',
-      tone: (overview && (overview.claims.by_severity.Critical ?? 0) > 0 ? 'danger' : 'info') as StatusTone,
+      tone: (overview && (overview.claims.by_severity.Critical ?? 0) > 0
+        ? 'danger'
+        : 'info') as StatusTone,
       spark: [4, 3, 5, 2, 4, 3, 2, 1],
     },
     {
       label: 'Evidence',
       value: overview ? overview.evidence.count : totalEvidence,
-      delta: overview ? `L5 ${overview.evidence.by_match_level.L5Substring ?? 0}` : `${totalEvidence} linked`,
+      delta: overview
+        ? `L5 ${overview.evidence.by_match_level.L5Substring ?? 0}`
+        : `${totalEvidence} linked`,
       tone: 'success' as StatusTone,
       spark: [30, 38, 44, 50, 55, 62, 68, 74],
     },
@@ -219,7 +223,12 @@ export default function OverviewPageClient() {
   const [focus, setFocus] = useState<OverviewFocus | null>(null);
   useEffect(() => {
     const syncFocus = () => {
-      setFocus(parseOverviewFocus(new URLSearchParams(window.location.search), window.location.hash || null));
+      setFocus(
+        parseOverviewFocus(
+          new URLSearchParams(window.location.search),
+          window.location.hash || null,
+        ),
+      );
     };
     syncFocus();
     window.addEventListener('hashchange', syncFocus);
@@ -294,61 +303,64 @@ export default function OverviewPageClient() {
   const pageRef = useRef<HTMLDivElement>(null);
 
   // ── GSAP animations — Linear-style: fast, restrained, purposeful ──
-  useGSAP(() => {
-    // 1. Hero + KPI entrance — staggered fade-up
-    gsap.from(['.ln-hero', '.ln-kpi-strip > *'], {
-      opacity: 0,
-      y: 12,
-      duration: 0.5,
-      stagger: 0.07,
-      ease: 'power3.out',
-      delay: 0.15,
-    });
-
-    // 2. Sigma stage entrance — fade + subtle scale
-    gsap.from('.ln-stage', {
-      opacity: 0,
-      scale: 0.985,
-      duration: 0.55,
-      ease: 'power3.out',
-      delay: 0.4,
-    });
-
-    // 3. Chart sections — ScrollTrigger fade-up on scroll
-    const chartPanels = gsap.utils.toArray<HTMLElement>('.ln-stage + div > .ln-panel');
-    chartPanels.forEach((panel) => {
-      gsap.from(panel, {
+  useGSAP(
+    () => {
+      // 1. Hero + KPI entrance — staggered fade-up
+      gsap.from(['.ln-hero', '.ln-kpi-strip > *'], {
         opacity: 0,
-        y: 20,
+        y: 12,
+        duration: 0.5,
+        stagger: 0.07,
+        ease: 'power3.out',
+        delay: 0.15,
+      });
+
+      // 2. Sigma stage entrance — fade + subtle scale
+      gsap.from('.ln-stage', {
+        opacity: 0,
+        scale: 0.985,
         duration: 0.55,
         ease: 'power3.out',
-        scrollTrigger: { trigger: panel, start: 'top 85%', once: true },
+        delay: 0.4,
       });
-    });
 
-    // 4. Rail sections — ScrollTrigger fade-up
-    const railPanels = gsap.utils.toArray<HTMLElement>('.ln-rail > .ln-panel');
-    railPanels.forEach((panel) => {
-      gsap.from(panel, {
-        opacity: 0,
-        y: 16,
-        duration: 0.5,
-        ease: 'power3.out',
-        scrollTrigger: { trigger: panel, start: 'top 88%', once: true },
+      // 3. Chart sections — ScrollTrigger fade-up on scroll
+      const chartPanels = gsap.utils.toArray<HTMLElement>('.ln-stage + div > .ln-panel');
+      chartPanels.forEach((panel) => {
+        gsap.from(panel, {
+          opacity: 0,
+          y: 20,
+          duration: 0.55,
+          ease: 'power3.out',
+          scrollTrigger: { trigger: panel, start: 'top 85%', once: true },
+        });
       });
-    });
 
-    // 5. KPI hover micro-interaction — gentle lift
-    const kpiCards = gsap.utils.toArray<HTMLElement>('.ln-metric');
-    kpiCards.forEach((card) => {
-      card.addEventListener('mouseenter', () => {
-        gsap.to(card, { y: -3, duration: 0.25, ease: 'power2.out' });
+      // 4. Rail sections — ScrollTrigger fade-up
+      const railPanels = gsap.utils.toArray<HTMLElement>('.ln-rail > .ln-panel');
+      railPanels.forEach((panel) => {
+        gsap.from(panel, {
+          opacity: 0,
+          y: 16,
+          duration: 0.5,
+          ease: 'power3.out',
+          scrollTrigger: { trigger: panel, start: 'top 88%', once: true },
+        });
       });
-      card.addEventListener('mouseleave', () => {
-        gsap.to(card, { y: 0, duration: 0.3, ease: 'power2.out' });
+
+      // 5. KPI hover micro-interaction — gentle lift
+      const kpiCards = gsap.utils.toArray<HTMLElement>('.ln-metric');
+      kpiCards.forEach((card) => {
+        card.addEventListener('mouseenter', () => {
+          gsap.to(card, { y: -3, duration: 0.25, ease: 'power2.out' });
+        });
+        card.addEventListener('mouseleave', () => {
+          gsap.to(card, { y: 0, duration: 0.3, ease: 'power2.out' });
+        });
       });
-    });
-  }, { scope: pageRef, dependencies: [hasData] });
+    },
+    { scope: pageRef, dependencies: [hasData] },
+  );
 
   if (!hasData) {
     return (
@@ -364,314 +376,389 @@ export default function OverviewPageClient() {
 
   return (
     <div className="ln-page__inner" ref={pageRef}>
-        {/* ── KPI strip (the hero IS the data) ── */}
-        <div className="ln-kpi-strip" style={{ marginTop: 4 }}>
-          {graphStats.map((item) => (
-            <MetricCard
-              key={item.label}
-              label={item.label}
-              value={item.value}
-              delta={item.delta}
-              deltaTone={item.tone}
-              spark={item.spark}
-            />
-          ))}
-        </div>
+      {/* ── KPI strip (the hero IS the data) ── */}
+      <div className="ln-kpi-strip" style={{ marginTop: 4 }}>
+        {graphStats.map((item) => (
+          <MetricCard
+            key={item.label}
+            label={item.label}
+            value={item.value}
+            delta={item.delta}
+            deltaTone={item.tone}
+            spark={item.spark}
+          />
+        ))}
+      </div>
 
-        {/* ── main + rail layout ── */}
-        <div className="ln-layout">
-          <main className="ln-main">
-            {/* ── Sigma network stage + focus ── */}
-            <div className="ln-stage">
-              <div className="ln-stage__graph">
-                <div className="ln-panel-head">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span className="ln-eyebrow">Responsibility Network</span>
-                    <h3>实时责任网络</h3>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <StatusBadge tone="success">Collector Ready</StatusBadge>
-                    <span className="ln-panel__meta">{graph.nodes.length} nodes</span>
-                  </div>
+      {/* ── main + rail layout ── */}
+      <div className="ln-layout">
+        <main className="ln-main">
+          {/* ── Sigma network stage + focus ── */}
+          <div className="ln-stage">
+            <div className="ln-stage__graph">
+              <div className="ln-panel-head">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span className="ln-eyebrow">Responsibility Network</span>
+                  <h3>实时责任网络</h3>
                 </div>
-                <SigmaNetwork
-                  graph={graph}
-                  height={360}
-                  onNodeClick={(nodeId) => {
-                    // click-to-select: toggle current, or select new
-                    setSelectedSigmaNodeId(prev => prev === nodeId ? null : nodeId);
-                    const node = graph.nodes.find((n) => n.node_id === nodeId);
-                    if (node?.agent_id) {
-                      setInvestigationContext({
-                        activeClusterId: focusCluster?.clusterId ?? null,
-                        activeIncidentId: selectedAlert?.alert_id ?? '',
-                        activeAgentId: node.agent_id,
-                        highlightedPathEdgeIds: [],
-                        graphFocus: { reason: 'resource', label: node.node_id, nodeId, edgeId: null, agentId: node.agent_id },
-                      });
-                    }
-                  }}
-                />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <StatusBadge tone="success">Collector Ready</StatusBadge>
+                  <span className="ln-panel__meta">{graph.nodes.length} nodes</span>
+                </div>
               </div>
+              <SigmaNetwork
+                graph={graph}
+                height={360}
+                onNodeClick={(nodeId) => {
+                  // click-to-select: toggle current, or select new
+                  setSelectedSigmaNodeId((prev) => (prev === nodeId ? null : nodeId));
+                  const node = graph.nodes.find((n) => n.node_id === nodeId);
+                  if (node?.agent_id) {
+                    setInvestigationContext({
+                      activeClusterId: focusCluster?.clusterId ?? null,
+                      activeIncidentId: selectedAlert?.alert_id ?? '',
+                      activeAgentId: node.agent_id,
+                      highlightedPathEdgeIds: [],
+                      graphFocus: {
+                        reason: 'resource',
+                        label: node.node_id,
+                        nodeId,
+                        edgeId: null,
+                        agentId: node.agent_id,
+                      },
+                    });
+                  }
+                }}
+              />
+            </div>
 
-              <div className="ln-stage__focus">
+            <div className="ln-stage__focus">
+              <SectionPanel
+                eyebrow="Lead Cluster"
+                title={focusCluster?.title ?? 'awaiting focus'}
+                meta={focusCluster ? `${focusCluster.alertIds.length} alerts` : undefined}
+                bodyClassName="ln-panel-body"
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <StatusBadge
+                      tone={
+                        (focusCluster?.highestSeverity ?? 'Info') === 'Critical'
+                          ? 'danger'
+                          : focusCluster?.highestSeverity === 'Warning'
+                            ? 'warning'
+                            : 'info'
+                      }
+                    >
+                      {focusCluster?.highestSeverity ?? 'Info'}
+                    </StatusBadge>
+                    <span className="ln-panel__meta">
+                      {focusCluster?.boundaryCrossingCount ?? 0} boundary seams
+                    </span>
+                  </div>
+                  <div className="ln-panel__meta" style={{ lineHeight: 1.6 }}>
+                    {focusCluster
+                      ? `${focusCluster.boundaryCrossingCount} 次边界穿越 · ${focusCluster.linkedEvidence.length} 份证据 · ${focusCluster.relatedAgentIds.length} 个相关主体`
+                      : 'collector 与 analyzer 继续收敛拓扑'}
+                  </div>
+                  {actionLinks.map((item) => (
+                    <Link
+                      key={item.label}
+                      href={item.href}
+                      className="ln-btn"
+                      style={{ justifyContent: 'space-between', width: '100%' }}
+                    >
+                      <span>{item.label}</span>
+                      <span className="ln-panel__meta">{item.hint}</span>
+                    </Link>
+                  ))}
+                </div>
+              </SectionPanel>
+
+              {selectedSigmaNode ? (
                 <SectionPanel
-                  eyebrow="Lead Cluster"
-                  title={focusCluster?.title ?? 'awaiting focus'}
-                  meta={focusCluster ? `${focusCluster.alertIds.length} alerts` : undefined}
+                  eyebrow="已选中节点 · 再次点击取消"
+                  title={selectedSigmaNode.node_id}
                   bodyClassName="ln-panel-body"
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <StatusBadge tone={(focusCluster?.highestSeverity ?? 'Info') === 'Critical' ? 'danger' : focusCluster?.highestSeverity === 'Warning' ? 'warning' : 'info'}>
-                        {focusCluster?.highestSeverity ?? 'Info'}
-                      </StatusBadge>
-                      <span className="ln-panel__meta">
-                        {focusCluster?.boundaryCrossingCount ?? 0} boundary seams
-                      </span>
-                    </div>
-                    <div className="ln-panel__meta" style={{ lineHeight: 1.6 }}>
-                      {focusCluster
-                        ? `${focusCluster.boundaryCrossingCount} 次边界穿越 · ${focusCluster.linkedEvidence.length} 份证据 · ${focusCluster.relatedAgentIds.length} 个相关主体`
-                        : 'collector 与 analyzer 继续收敛拓扑'}
-                    </div>
-                    {actionLinks.map((item) => (
-                      <Link
-                        key={item.label}
-                        href={item.href}
-                        className="ln-btn"
-                        style={{ justifyContent: 'space-between', width: '100%' }}
-                      >
-                        <span>{item.label}</span>
-                        <span className="ln-panel__meta">{item.hint}</span>
-                      </Link>
-                    ))}
-                  </div>
-                </SectionPanel>
-
-                {selectedSigmaNode ? (
-                  <SectionPanel
-                    eyebrow="已选中节点 · 再次点击取消"
-                    title={selectedSigmaNode.node_id}
-                    bodyClassName="ln-panel-body"
-                  >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <StatusBadge tone="info">{selectedSigmaNode.node_type}</StatusBadge>
-                      <span className="ln-panel__meta">
-                        {selectedSigmaNode.agent_id ? `agent: ${selectedSigmaNode.agent_id}` : 'unassigned'} ·{' '}
-                        {selectedSigmaNode.evidence_refs.length} evidence refs
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSigmaNodeId(null)}
-                        style={{
-                          background: 'none', border: '1px solid var(--ln-border)',
-                          borderRadius: 6, cursor: 'pointer', color: 'var(--ln-text-secondary)',
-                          fontSize: 11, padding: '4px 10px', marginTop: 4,
-                        }}
-                      >
-                        取消选中
-                      </button>
-                    </div>
-                  </SectionPanel>
-                ) : null}
-              </div>
-            </div>
-
-            {/* ── charts row ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-              <SectionPanel
-                eyebrow="Policy Drift"
-                title="边界穿越趋势"
-                meta="7D"
-                bodyClassName="ln-panel-body"
-              >
-                <TrendChart type="area" data={driftArea} xKey="name" seriesKey="drift" height={160} />
-                <div style={{ display: 'flex', gap: 24, marginTop: 12 }}>
-                  <div>
-                    <span className="ln-metric__label">Drift Score</span>
-                    <div className="ln-metric__value" style={{ fontSize: 18 }}>
-                      {(totalBoundaryCrossings / Math.max(clusterModels.length, 1) + 0.27).toFixed(2)}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="ln-metric__label">Violations</span>
-                    <div className="ln-metric__value" style={{ fontSize: 18 }}>
-                      {totalCriticalAlerts + criticalClusters.length}
-                    </div>
-                  </div>
-                </div>
-              </SectionPanel>
-
-              <SectionPanel
-                eyebrow="Evidence"
-                title="证据覆盖"
-                meta="Retention"
-                bodyClassName="ln-panel-body"
-              >
-                <TrendChart type="bar" data={evidenceBar} xKey="name" seriesKey="value" colors={CHART_COLORS} height={160} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span className="ln-metric__label">Coverage</span>
-                      <span className="ln-metric__delta" data-tone="success">
-                        {Math.min(99.6, 72 + totalEvidence * 4.3).toFixed(1)}%
-                      </span>
-                    </div>
-                    <div
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <StatusBadge tone="info">{selectedSigmaNode.node_type}</StatusBadge>
+                    <span className="ln-panel__meta">
+                      {selectedSigmaNode.agent_id
+                        ? `agent: ${selectedSigmaNode.agent_id}`
+                        : 'unassigned'}{' '}
+                      · {selectedSigmaNode.evidence_refs.length} evidence refs
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSigmaNodeId(null)}
                       style={{
-                        height: 4,
-                        borderRadius: 999,
-                        background: 'var(--ln-surface-3)',
-                        marginTop: 6,
-                        overflow: 'hidden',
+                        background: 'none',
+                        border: '1px solid var(--ln-border)',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        color: 'var(--ln-text-secondary)',
+                        fontSize: 11,
+                        padding: '4px 10px',
+                        marginTop: 4,
                       }}
                     >
-                      <div
-                        style={{
-                          height: '100%',
-                          width: `${Math.min(99.6, 72 + totalEvidence * 4.3)}%`,
-                          background: 'var(--ln-success)',
-                          borderRadius: 999,
-                        }}
-                      />
-                    </div>
+                      取消选中
+                    </button>
+                  </div>
+                </SectionPanel>
+              ) : null}
+            </div>
+          </div>
+
+          {/* ── charts row ── */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: 12,
+            }}
+          >
+            <SectionPanel
+              eyebrow="Policy Drift"
+              title="边界穿越趋势"
+              meta="7D"
+              bodyClassName="ln-panel-body"
+            >
+              <TrendChart type="area" data={driftArea} xKey="name" seriesKey="drift" height={160} />
+              <div style={{ display: 'flex', gap: 24, marginTop: 12 }}>
+                <div>
+                  <span className="ln-metric__label">Drift Score</span>
+                  <div className="ln-metric__value" style={{ fontSize: 18 }}>
+                    {(totalBoundaryCrossings / Math.max(clusterModels.length, 1) + 0.27).toFixed(2)}
                   </div>
                 </div>
-              </SectionPanel>
-
-              <SectionPanel
-                eyebrow="Clusters"
-                title="集群分布"
-                meta={`${clusterModels.length} entries`}
-                bodyClassName="ln-panel-body"
-              >
-                <TrendChart type="donut" data={clusterDonut} xKey="name" seriesKey="value" colors={CHART_COLORS} height={160} />
-              </SectionPanel>
-            </div>
-            <MonitoringSection />
-            <AgentProcessTree
-              provisionalIdentities={dbAssets?.provisionalIdentities ?? []}
-              agentIdentities={dbAssets?.agentIdentities ?? []}
-              identityProcessMap={dbAssets?.identityProcessMap ?? []}
-              processEvents={dbAssets?.processEvents ?? []}
-              processEventCount={dbAssets?.processEventCount}
-              processEventTruncated={dbAssets?.processEventTruncated}
-            />
-            <AgentFamilyTree subagentBoundaries={dbAssets?.subagentBoundaries ?? []} />
-            {overview && (
-              <div style={{ marginTop: 12 }}>
-                <OverviewDatasetPanel overview={overview} />
+                <div>
+                  <span className="ln-metric__label">Violations</span>
+                  <div className="ln-metric__value" style={{ fontSize: 18 }}>
+                    {totalCriticalAlerts + criticalClusters.length}
+                  </div>
+                </div>
               </div>
-            )}
-          </main>
+            </SectionPanel>
 
-          <aside className="ln-rail">
-            <SectionPanel eyebrow="Responsibility Graph" title="集群压力" meta="Live" bodyClassName="ln-panel-body">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {clusterModels.slice(0, 6).map((model) => (
+            <SectionPanel
+              eyebrow="Evidence"
+              title="证据覆盖"
+              meta="Retention"
+              bodyClassName="ln-panel-body"
+            >
+              <TrendChart
+                type="bar"
+                data={evidenceBar}
+                xKey="name"
+                seriesKey="value"
+                colors={CHART_COLORS}
+                height={160}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span className="ln-metric__label">Coverage</span>
+                    <span className="ln-metric__delta" data-tone="success">
+                      {Math.min(99.6, 72 + totalEvidence * 4.3).toFixed(1)}%
+                    </span>
+                  </div>
                   <div
-                    key={model.clusterId}
+                    style={{
+                      height: 4,
+                      borderRadius: 999,
+                      background: 'var(--ln-surface-3)',
+                      marginTop: 6,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: '100%',
+                        width: `${Math.min(99.6, 72 + totalEvidence * 4.3)}%`,
+                        background: 'var(--ln-success)',
+                        borderRadius: 999,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </SectionPanel>
+
+            <SectionPanel
+              eyebrow="Clusters"
+              title="集群分布"
+              meta={`${clusterModels.length} entries`}
+              bodyClassName="ln-panel-body"
+            >
+              <TrendChart
+                type="donut"
+                data={clusterDonut}
+                xKey="name"
+                seriesKey="value"
+                colors={CHART_COLORS}
+                height={160}
+              />
+            </SectionPanel>
+          </div>
+          <MonitoringSection />
+          <AgentProcessTree
+            provisionalIdentities={dbAssets?.provisionalIdentities ?? []}
+            agentIdentities={dbAssets?.agentIdentities ?? []}
+            identityProcessMap={dbAssets?.identityProcessMap ?? []}
+            processEvents={dbAssets?.processEvents ?? []}
+            processEventCount={dbAssets?.processEventCount}
+            processEventTruncated={dbAssets?.processEventTruncated}
+          />
+          <AgentFamilyTree subagentBoundaries={dbAssets?.subagentBoundaries ?? []} />
+          {overview && (
+            <div style={{ marginTop: 12 }}>
+              <OverviewDatasetPanel overview={overview} />
+            </div>
+          )}
+        </main>
+
+        <aside className="ln-rail">
+          <SectionPanel
+            eyebrow="Responsibility Graph"
+            title="集群压力"
+            meta="Live"
+            bodyClassName="ln-panel-body"
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {clusterModels.slice(0, 6).map((model) => (
+                <div
+                  key={model.clusterId}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    background: 'var(--ln-surface-0)',
+                    border: '1px solid var(--ln-border)',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--ln-text-secondary)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {model.clusterId}
+                  </span>
+                  <strong className="ln-mono" style={{ fontSize: 12, color: 'var(--ln-text)' }}>
+                    {model.pressureScore}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          </SectionPanel>
+
+          <SectionPanel
+            eyebrow="Claims & Alerts"
+            title="责任告警"
+            meta="View all"
+            bodyClassName="ln-panel-body"
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {alerts.slice(0, 5).map((alert) => {
+                const tone = severityTone(alert.severity);
+                return (
+                  <button
+                    key={alert.alert_id}
+                    type="button"
+                    onClick={() => setSelectedAlertId(alert.alert_id)}
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
+                      gap: 8,
                       padding: '8px 10px',
                       borderRadius: 8,
-                      background: 'var(--ln-surface-0)',
-                      border: '1px solid var(--ln-border)',
+                      background: 'transparent',
+                      border: '1px solid transparent',
+                      color: 'var(--ln-text)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'background 120ms ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--ln-surface-2)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
                     }}
                   >
-                    <span
-                      style={{
-                        fontSize: 12,
-                        color: 'var(--ln-text-secondary)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {model.clusterId}
-                    </span>
-                    <strong className="ln-mono" style={{ fontSize: 12, color: 'var(--ln-text)' }}>
-                      {model.pressureScore}
-                    </strong>
-                  </div>
-                ))}
-              </div>
-            </SectionPanel>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                      <strong
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 500,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {alert.title}
+                      </strong>
+                      <span className="ln-panel__meta">
+                        {alert.primary_agent.agent_id} · {decisionLabel(alert.decision)}
+                      </span>
+                    </div>
+                    <StatusBadge tone={tone}>{alert.severity}</StatusBadge>
+                  </button>
+                );
+              })}
+            </div>
+          </SectionPanel>
 
-            <SectionPanel eyebrow="Claims & Alerts" title="责任告警" meta="View all" bodyClassName="ln-panel-body">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {alerts.slice(0, 5).map((alert) => {
-                  const tone = severityTone(alert.severity);
-                  return (
-                    <button
-                      key={alert.alert_id}
-                      type="button"
-                      onClick={() => setSelectedAlertId(alert.alert_id)}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '8px 10px',
-                        borderRadius: 8,
-                        background: 'transparent',
-                        border: '1px solid transparent',
-                        color: 'var(--ln-text)',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        transition: 'background 120ms ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'var(--ln-surface-2)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
-                    >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                        <strong style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {alert.title}
-                        </strong>
-                        <span className="ln-panel__meta">
-                          {alert.primary_agent.agent_id} · {decisionLabel(alert.decision)}
-                        </span>
-                      </div>
-                      <StatusBadge tone={tone}>{alert.severity}</StatusBadge>
-                    </button>
-                  );
-                })}
-              </div>
-            </SectionPanel>
-
-            <SectionPanel eyebrow="Live Event Stream" title="事件流" meta={`${formatCompactNumber(graph.edges.length * 72)}/s`} bodyClassName="ln-panel-body">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {graph.edges.slice(0, 6).map((edge) => (
-                  <div
-                    key={edge.edge_id}
+          <SectionPanel
+            eyebrow="Live Event Stream"
+            title="事件流"
+            meta={`${formatCompactNumber(graph.edges.length * 72)}/s`}
+            bodyClassName="ln-panel-body"
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {graph.edges.slice(0, 6).map((edge) => (
+                <div
+                  key={edge.edge_id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    padding: '6px 8px',
+                    borderRadius: 6,
+                    fontSize: 11,
+                  }}
+                >
+                  <span
+                    className="ln-panel__meta"
+                    style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}
+                  >
+                    {edge.edge_type}
+                  </span>
+                  <span
+                    className="ln-mono"
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: 8,
-                      padding: '6px 8px',
-                      borderRadius: 6,
-                      fontSize: 11,
+                      color: 'var(--ln-text-secondary)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    <span className="ln-panel__meta" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      {edge.edge_type}
-                    </span>
-                    <span className="ln-mono" style={{ color: 'var(--ln-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {edge.source} → {edge.target}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </SectionPanel>
-          </aside>
-        </div>
+                    {edge.source} → {edge.target}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </SectionPanel>
+        </aside>
       </div>
+    </div>
   );
 }

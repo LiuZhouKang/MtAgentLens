@@ -1,6 +1,6 @@
 {
   "id": "benign-multi-log-aggregation",
-  "mode": "single_agent",
+  "mode": "agent_teams",
   "description": "Challenging benign: distributed log aggregation and analysis pipeline",
   "category": "benign",
   "is_baseline": false,

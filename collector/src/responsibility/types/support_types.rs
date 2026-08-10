@@ -10,23 +10,23 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 // Re-exports from new types/ module (authoritative definitions).
-pub use crate::responsibility::types::ids::ProcessId;
+pub use crate::responsibility::types::evidence_types::IntentAuthoritySource;
 pub use crate::responsibility::types::evidence_types::IntentClass;
 pub use crate::responsibility::types::evidence_types::IntentParseState;
-pub use crate::responsibility::types::evidence_types::IntentAuthoritySource;
+pub use crate::responsibility::types::ids::ProcessId;
 
-pub use crate::responsibility::types::ids::EventId;
 pub use crate::responsibility::types::ids::AgentId;
-pub use crate::responsibility::types::ids::NodeId;
-pub use crate::responsibility::types::ids::EdgeId;
-pub use crate::responsibility::types::ids::EvidenceId;
 pub use crate::responsibility::types::ids::AlertId;
-pub use crate::responsibility::types::ids::TracebackId;
-pub use crate::responsibility::types::ids::PolicyId;
 pub use crate::responsibility::types::ids::BoundaryId;
+pub use crate::responsibility::types::ids::EdgeId;
+pub use crate::responsibility::types::ids::EventId;
+pub use crate::responsibility::types::ids::EvidenceId;
+pub use crate::responsibility::types::ids::NodeId;
+pub use crate::responsibility::types::ids::PolicyId;
+pub use crate::responsibility::types::ids::TracebackId;
 
-pub use crate::responsibility::types::policy_types::ResponsibilityClaimState;
 pub use crate::responsibility::types::policy_types::PolicyEvaluationResult;
+pub use crate::responsibility::types::policy_types::ResponsibilityClaimState;
 
 // Backward-compatible aliases for bin/replay.rs and bin/covert-channel.rs
 pub type ClaimState = crate::responsibility::types::policy_types::ResponsibilityClaimState;

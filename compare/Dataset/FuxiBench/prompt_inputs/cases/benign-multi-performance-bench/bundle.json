@@ -32,5 +32,5 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-multi-performance-bench",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "env/scenarios/benign-multi-performance-bench.json"
+  "source_scenario_path": "env/scenarios/benign/benign-multi-performance-bench.json"
 }

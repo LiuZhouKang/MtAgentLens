@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use super::ids::*;
+use serde::{Deserialize, Serialize};
 
 // ═══ Phase 1: Provisional Identity ═══
 
@@ -32,7 +32,10 @@ pub struct AuthoritativeIdentity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AgentConfidence { Authoritative, Inferred }
+pub enum AgentConfidence {
+    Authoritative,
+    Inferred,
+}
 
 // ═══ Subagent Boundary ═══
 
@@ -67,4 +70,7 @@ pub struct UnresolvedDiagnostic {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum UnresolvedReason { NoPositiveSignal, NoProcessLineage }
+pub enum UnresolvedReason {
+    NoPositiveSignal,
+    NoProcessLineage,
+}

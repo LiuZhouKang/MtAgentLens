@@ -5,15 +5,12 @@
 // HandoffStoreData, except POST /api/handoff/probe which triggers a
 // diagnostic probe.
 
-use crate::responsibility::server::api::{ApiError, ApiResponse, Authority};
+use crate::responsibility::server::api::{ApiError, ApiResponse};
 use crate::responsibility::server::handoff_store::{
-    DependencyEdge, HandoffEventsResponse, HandoffObsMetrics, HandoffProbeRequest,
-    HandoffProbeResponse, SharedHandoffStore,
+    HandoffProbeRequest, HandoffProbeResponse, SharedHandoffStore,
 };
 use hyper::{Method, Response, StatusCode, body::Bytes};
 use serde::Serialize;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// Helper: serialize any T to JSON bytes (for hyper response body).
 fn json_bytes<T: Serialize>(data: &T) -> Vec<u8> {
@@ -142,9 +139,7 @@ pub async fn route_handoff_request(
         (Method::GET, "dependency-edges") => get_dependency_edges(store).await,
 
         // POST /api/handoff/probe
-        (Method::POST, "probe") => {
-            handle_probe(store, body).await
-        }
+        (Method::POST, "probe") => handle_probe(store, body).await,
 
         _ => error_response(
             StatusCode::NOT_FOUND,
@@ -221,7 +216,7 @@ async fn get_dependency_edges(store: SharedHandoffStore) -> Response<Bytes> {
 }
 
 /// POST /api/handoff/probe
-async fn handle_probe(store: SharedHandoffStore, body_bytes: &[u8]) -> Response<Bytes> {
+async fn handle_probe(_store: SharedHandoffStore, body_bytes: &[u8]) -> Response<Bytes> {
     // Parse the request body
     let probe_req: HandoffProbeRequest = match serde_json::from_slice(body_bytes) {
         Ok(req) => req,
@@ -281,6 +276,9 @@ async fn handle_probe(store: SharedHandoffStore, body_bytes: &[u8]) -> Response<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::responsibility::server::handoff_store::DependencyEdge;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
 
     fn seeded_store() -> SharedHandoffStore {
         let store = crate::responsibility::server::handoff_store::create_handoff_store(true);
@@ -390,13 +388,7 @@ mod tests {
     #[tokio::test]
     async fn test_404_unknown_handoff_route() {
         let store = seeded_store();
-        let resp = route_handoff_request(
-            &Method::GET,
-            b"",
-            store,
-            "/unknown",
-            None,
-        ).await;
+        let resp = route_handoff_request(&Method::GET, b"", store, "/unknown", None).await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 

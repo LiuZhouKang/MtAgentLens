@@ -19,7 +19,7 @@ use crate::responsibility::signals::SignalSnapshot;
 use crate::responsibility::types::{AgentId, IdentitySignal, ProcessId, ProvisionalIdentity};
 use std::collections::{HashMap, HashSet};
 
-use super::union_find::{run_authoritative_resolution, AuthoritativeResolution};
+use super::union_find::{AuthoritativeResolution, run_authoritative_resolution};
 
 // ─── IdentityProvider Trait ─────────────────────────────────────────────
 
@@ -110,8 +110,7 @@ impl IdentityResolver {
                         confidence: 0.70,
                     };
                     // Update our map
-                    self.provisional_map
-                        .insert(process_id, updated.clone());
+                    self.provisional_map.insert(process_id, updated.clone());
                     return updated;
                 }
             }
@@ -132,8 +131,7 @@ impl IdentityResolver {
                     primary_signal: IdentitySignal::TlsSessionNew,
                     confidence: 0.70,
                 };
-                self.provisional_map
-                    .insert(process_id, upgraded.clone());
+                self.provisional_map.insert(process_id, upgraded.clone());
                 return upgraded;
             }
             return existing.clone();
@@ -146,8 +144,7 @@ impl IdentityResolver {
             primary_signal: IdentitySignal::TlsSessionNew,
             confidence: 0.50,
         };
-        self.provisional_map
-            .insert(process_id, identity.clone());
+        self.provisional_map.insert(process_id, identity.clone());
         identity
     }
 
@@ -185,8 +182,7 @@ impl IdentityResolver {
                         primary_signal: IdentitySignal::Unknown,
                         confidence: 0.30,
                     };
-                    self.provisional_map
-                        .insert(process_id, identity.clone());
+                    self.provisional_map.insert(process_id, identity.clone());
                     return identity;
                 } else {
                     // Heuristic 3a: tool child inherits ancestor's agent
@@ -196,8 +192,7 @@ impl IdentityResolver {
                         primary_signal: IdentitySignal::ProcessTreeInherited,
                         confidence: 0.55,
                     };
-                    self.provisional_map
-                        .insert(process_id, identity.clone());
+                    self.provisional_map.insert(process_id, identity.clone());
                     return identity;
                 }
             }
@@ -218,8 +213,7 @@ impl IdentityResolver {
             primary_signal: IdentitySignal::Unknown,
             confidence: 0.25,
         };
-        self.provisional_map
-            .insert(process_id, identity.clone());
+        self.provisional_map.insert(process_id, identity.clone());
         identity
     }
 
@@ -259,7 +253,6 @@ impl IdentityProvider for IdentityResolver {
             .get(&process_id)
             .map(|p| p.agent_id.clone())
     }
-
 
     /// All current process → agent assignments.
     fn all_assignments(&self) -> HashMap<ProcessId, AgentId> {

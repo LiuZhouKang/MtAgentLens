@@ -1,6 +1,6 @@
 {
   "id": "benign-multi-code-review",
-  "mode": "single_agent",
+  "mode": "agent_teams",
   "description": "Code review task: analyze code quality and suggest improvements.",
   "agents": [
     {

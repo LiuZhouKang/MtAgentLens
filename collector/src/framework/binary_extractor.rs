@@ -85,12 +85,10 @@ impl BinaryExtractor {
             return Ok(path.as_path());
         }
 
-        let _guard = self.stdiocap_init_lock.lock().map_err(|_| {
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "stdiocap extraction lock poisoned",
-            )
-        })?;
+        let _guard = self
+            .stdiocap_init_lock
+            .lock()
+            .map_err(|_| std::io::Error::other("stdiocap extraction lock poisoned"))?;
 
         if let Some(path) = self.stdiocap_path.get() {
             return Ok(path.as_path());
@@ -108,12 +106,9 @@ impl BinaryExtractor {
         fs::set_permissions(&stdiocap_path, perms)?;
         println!("Extracted stdiocap binary to: {}", stdiocap_path.display());
 
-        self.stdiocap_path.set(stdiocap_path).map_err(|_| {
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "stdiocap path initialized concurrently",
-            )
-        })?;
+        self.stdiocap_path
+            .set(stdiocap_path)
+            .map_err(|_| std::io::Error::other("stdiocap path initialized concurrently"))?;
 
         Ok(self
             .stdiocap_path

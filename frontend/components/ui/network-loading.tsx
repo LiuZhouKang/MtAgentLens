@@ -7,19 +7,16 @@
  * an abstract, minimal arrangement of nodes and edges that subtly pulses —
  * telegraphing "a graph is being built here" without literal animation clutter.
  */
-export default function NetworkLoading({
-  nodes,
-  edges,
-}: {
-  nodes: number;
-  edges: number;
-}) {
+export default function NetworkLoading({ nodes, edges }: { nodes: number; edges: number }) {
   return (
     <div
       style={{
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        minHeight: 280, gap: 16,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 280,
+        gap: 16,
         background: 'radial-gradient(circle at 50% 44%, rgba(94,106,210,0.04), transparent 60%)',
       }}
     >
@@ -37,8 +34,12 @@ export default function NetworkLoading({
           <svg
             key={`e${i}`}
             style={{
-              position: 'absolute', left: 0, top: 0,
-              width: 120, height: 88, overflow: 'visible',
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: 120,
+              height: 88,
+              overflow: 'visible',
               opacity: 0.18,
               animation: `mtl-edge-fill 2.2s ease-in-out ${i * 0.2}s infinite`,
               willChange: 'opacity',
@@ -50,15 +51,25 @@ export default function NetworkLoading({
 
         {/* Nodes — small dots at connection points */}
         {[
-          [18, 34], [40, 18], [62, 20],
-          [88, 33], [98, 48], [82, 60],
-          [62, 68], [40, 52], [30, 58],
+          [18, 34],
+          [40, 18],
+          [62, 20],
+          [88, 33],
+          [98, 48],
+          [82, 60],
+          [62, 68],
+          [40, 52],
+          [30, 58],
         ].map(([x, y], i) => (
           <div
             key={`n${i}`}
             style={{
-              position: 'absolute', left: x - 3, top: y - 3,
-              width: 6, height: 6, borderRadius: '50%',
+              position: 'absolute',
+              left: x - 3,
+              top: y - 3,
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
               background: i % 3 === 0 ? '#fbbf24' : i % 3 === 1 ? '#5e6ad2' : '#f97316',
               boxShadow:
                 i % 3 === 0
@@ -76,7 +87,10 @@ export default function NetworkLoading({
       {/* ── Labels ── */}
       <div
         style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 6,
         }}
       >
         <span

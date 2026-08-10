@@ -11,10 +11,8 @@
 // All output flows through this module so formatting decisions
 // are centralized and consistent across the codebase.
 
-use serde::{Deserialize, Serialize};
-use crate::responsibility::types::alert_types::ResponsibilityAlert;
 use crate::responsibility::types::ids::AgentId;
-use crate::responsibility::scoring::progressive::DimIndex;
+use serde::{Deserialize, Serialize};
 
 // ── Output Format ────────────────────────────────────────────────────────
 
@@ -114,12 +112,21 @@ impl OutputWriter {
     fn format_text(&self, summary: &EvaluationSummary) -> String {
         let mut out = String::new();
         out.push_str(&format!("Session: {}\n", summary.session_id));
-        out.push_str(&format!("Duration: {}ms | Events: {} | Intents: {} | Actions: {}\n",
-            summary.run_duration_ms, summary.total_events, summary.total_intents, summary.total_actions));
-        out.push_str(&format!("Graph: {} PBC edges | {} claims | {} alerts\n",
-            summary.pbc_edge_count, summary.claim_count, summary.alert_count));
-        out.push_str(&format!("Observer calls: {} | Route: {} | Final score: {:.3}\n",
-            summary.observer_calls, summary.classification_route, summary.final_score));
+        out.push_str(&format!(
+            "Duration: {}ms | Events: {} | Intents: {} | Actions: {}\n",
+            summary.run_duration_ms,
+            summary.total_events,
+            summary.total_intents,
+            summary.total_actions
+        ));
+        out.push_str(&format!(
+            "Graph: {} PBC edges | {} claims | {} alerts\n",
+            summary.pbc_edge_count, summary.claim_count, summary.alert_count
+        ));
+        out.push_str(&format!(
+            "Observer calls: {} | Route: {} | Final score: {:.3}\n",
+            summary.observer_calls, summary.classification_route, summary.final_score
+        ));
 
         for agent in &summary.per_agent_scores {
             out.push_str(&format!(
@@ -135,8 +142,12 @@ impl OutputWriter {
         for alert in &summary.alerts {
             out.push_str(&format!(
                 "  ALERT {}: {} | {} | {} | conf={:.2} | claims={}\n",
-                alert.alert_id, alert.subject, alert.decision,
-                alert.severity, alert.confidence, alert.claims,
+                alert.alert_id,
+                alert.subject,
+                alert.decision,
+                alert.severity,
+                alert.confidence,
+                alert.claims,
             ));
         }
 
@@ -146,29 +157,56 @@ impl OutputWriter {
     fn format_metrics(&self, summary: &EvaluationSummary) -> String {
         let mut out = String::new();
         let prefix = "mtagentlens_responsibility";
-        out.push_str(&format!("# HELP {}_events_total Total events processed.\n", prefix));
+        out.push_str(&format!(
+            "# HELP {}_events_total Total events processed.\n",
+            prefix
+        ));
         out.push_str(&format!("# TYPE {}_events_total counter\n", prefix));
-        out.push_str(&format!("{}_events_total {}\n", prefix, summary.total_events));
+        out.push_str(&format!(
+            "{}_events_total {}\n",
+            prefix, summary.total_events
+        ));
 
-        out.push_str(&format!("# HELP {}_pbc_edges PolicyBoundaryCrossing edges.\n", prefix));
+        out.push_str(&format!(
+            "# HELP {}_pbc_edges PolicyBoundaryCrossing edges.\n",
+            prefix
+        ));
         out.push_str(&format!("# TYPE {}_pbc_edges gauge\n", prefix));
-        out.push_str(&format!("{}_pbc_edges {}\n", prefix, summary.pbc_edge_count));
+        out.push_str(&format!(
+            "{}_pbc_edges {}\n",
+            prefix, summary.pbc_edge_count
+        ));
 
         out.push_str(&format!("# HELP {}_claims_total Total claims.\n", prefix));
         out.push_str(&format!("# TYPE {}_claims_total counter\n", prefix));
-        out.push_str(&format!("{}_claims_total {}\n", prefix, summary.claim_count));
+        out.push_str(&format!(
+            "{}_claims_total {}\n",
+            prefix, summary.claim_count
+        ));
 
         out.push_str(&format!("# HELP {}_alerts_total Total alerts.\n", prefix));
         out.push_str(&format!("# TYPE {}_alerts_total counter\n", prefix));
-        out.push_str(&format!("{}_alerts_total {}\n", prefix, summary.alert_count));
+        out.push_str(&format!(
+            "{}_alerts_total {}\n",
+            prefix, summary.alert_count
+        ));
 
-        out.push_str(&format!("# HELP {}_final_score Final classification score.\n", prefix));
+        out.push_str(&format!(
+            "# HELP {}_final_score Final classification score.\n",
+            prefix
+        ));
         out.push_str(&format!("# TYPE {}_final_score gauge\n", prefix));
-        out.push_str(&format!("{}_final_score {:.3}\n", prefix, summary.final_score));
+        out.push_str(&format!(
+            "{}_final_score {:.3}\n",
+            prefix, summary.final_score
+        ));
 
         for agent in &summary.per_agent_scores {
             let labels = format!("agent_id=\"{}\"", agent.agent_id);
-            out.push_str(&format!("{}_fused_score{{{}}} {:.3}\n", prefix, labels, agent.fused_score));
+            out.push_str(&format!(
+                "{}_fused_score{{{}}} {:.3}\n",
+                prefix, labels, agent.fused_score
+            ));
         }
 
         out
@@ -207,13 +245,18 @@ impl EvaluationSummary {
         agent_id: &AgentId,
         fused_score: f64,
         dims: &[f64; 6],
-        is_unsafe: bool,
+        _is_unsafe: bool,
     ) -> ScoreOutput {
         let cal_p = crate::responsibility::scoring::fusion::platt_sigmoid(fused_score);
-        let risk_level = if cal_p > 0.82 { "critical" }
-            else if cal_p > 0.65 { "high" }
-            else if cal_p > 0.45 { "medium" }
-            else { "low" };
+        let risk_level = if cal_p > 0.82 {
+            "critical"
+        } else if cal_p > 0.65 {
+            "high"
+        } else if cal_p > 0.45 {
+            "medium"
+        } else {
+            "low"
+        };
 
         ScoreOutput {
             agent_id: agent_id.to_string(),

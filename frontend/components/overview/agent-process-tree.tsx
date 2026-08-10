@@ -33,12 +33,22 @@ function ProcessTree({ node, agentId }: { node: ProcessTreeNode; agentId: string
         type="button"
         onClick={() => setExpanded(!expanded)}
         style={{
-          display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none',
-          cursor: 'pointer', padding: '3px 0', color: 'var(--ln-text)', fontSize: T.sm, textAlign: 'left',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          padding: '3px 0',
+          color: 'var(--ln-text)',
+          fontSize: T.sm,
+          textAlign: 'left',
         }}
       >
         <span style={{ color: 'var(--ln-text-muted)', width: 12 }}>{expanded ? '▾' : '▸'}</span>
-        <span style={{ fontFamily: 'var(--ln-mono)', color: 'var(--ln-text)', minWidth: 42 }}>{node.pid}</span>
+        <span style={{ fontFamily: 'var(--ln-mono)', color: 'var(--ln-text)', minWidth: 42 }}>
+          {node.pid}
+        </span>
         <span style={{ color: 'var(--ln-text-secondary)' }}>{node.comm}</span>
         {!isOwn && <span className="ln-panel__meta">跨 agent</span>}
       </button>
@@ -109,7 +119,9 @@ export default function AgentProcessTree({
       bodyClassName="ln-panel-body"
     >
       {empty ? (
-        <div style={{ fontSize: T.sm, color: 'var(--ln-text-muted)' }}>导入含进程表的 .db 后此处有数据</div>
+        <div style={{ fontSize: T.sm, color: 'var(--ln-text-muted)' }}>
+          导入含进程表的 .db 后此处有数据
+        </div>
       ) : agents.length === 0 ? (
         <div style={{ fontSize: T.sm, color: 'var(--ln-text-muted)' }}>无进程身份数据</div>
       ) : (
@@ -129,39 +141,86 @@ export default function AgentProcessTree({
                   type="button"
                   onClick={() => setExpandedAgent(open ? null : agent.agentId)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
-                    background: 'none', border: 'none', cursor: 'pointer', padding: '7px 10px',
-                    color: 'var(--ln-text)', fontSize: T.sm,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    textAlign: 'left',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '7px 10px',
+                    color: 'var(--ln-text)',
+                    fontSize: T.sm,
                   }}
                 >
                   <span style={{ color: 'var(--ln-text-muted)' }}>{open ? '▾' : '▸'}</span>
-                  <span style={{ fontFamily: 'var(--ln-mono)', color: 'var(--ln-text)', fontWeight: 600 }}>
+                  <span
+                    style={{
+                      fontFamily: 'var(--ln-mono)',
+                      color: 'var(--ln-text)',
+                      fontWeight: 600,
+                    }}
+                  >
                     {agent.agentId}
                   </span>
                   <span
                     style={{
-                      fontSize: T.xs, padding: '2px 6px', borderRadius: 999, fontWeight: 600,
-                      fontFamily: 'var(--ln-mono)', background: `${statusColor(agent.status)}16`,
+                      fontSize: T.xs,
+                      padding: '2px 6px',
+                      borderRadius: 999,
+                      fontWeight: 600,
+                      fontFamily: 'var(--ln-mono)',
+                      background: `${statusColor(agent.status)}16`,
                       color: statusColor(agent.status),
                     }}
                   >
                     {statusLabel(agent.status)}
                   </span>
-                  <span style={{ fontSize: T.xs, color: 'var(--ln-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span
+                    style={{
+                      fontSize: T.xs,
+                      color: 'var(--ln-text-muted)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {agent.primarySignal ?? '—'}
                   </span>
-                  <span style={{ marginLeft: 'auto', fontSize: T.xs, fontFamily: 'var(--ln-mono)', color: 'var(--ln-text-muted)', flexShrink: 0 }}>
+                  <span
+                    style={{
+                      marginLeft: 'auto',
+                      fontSize: T.xs,
+                      fontFamily: 'var(--ln-mono)',
+                      color: 'var(--ln-text-muted)',
+                      flexShrink: 0,
+                    }}
+                  >
                     {agent.confidence != null ? `${Math.round(agent.confidence * 100)}%` : '—'}
                     {agent.orphanPids.length > 0 && ` · ${agent.orphanPids.length} 孤儿`}
                   </span>
                 </button>
                 {open && (
-                  <div style={{ padding: '2px 10px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div
+                    style={{
+                      padding: '2px 10px 10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 4,
+                    }}
+                  >
                     {agent.roots.length === 0 ? (
-                      <div style={{ fontSize: T.xs, color: 'var(--ln-text-muted)' }}>无进程事件记录</div>
+                      <div style={{ fontSize: T.xs, color: 'var(--ln-text-muted)' }}>
+                        无进程事件记录
+                      </div>
                     ) : (
                       agent.roots.map((root) => (
-                        <ProcessTree key={`${root.pid}:${root.start_time_ns}`} node={root} agentId={agent.agentId} />
+                        <ProcessTree
+                          key={`${root.pid}:${root.start_time_ns}`}
+                          node={root}
+                          agentId={agent.agentId}
+                        />
                       ))
                     )}
                   </div>

@@ -1,18 +1,18 @@
+use crate::responsibility::claims::ClaimSeverity;
+use crate::responsibility::classification::pattern_matcher::GraphPatternMatch;
 use crate::responsibility::classification::rule_engine::RuleEngine;
-use crate::responsibility::classification::rules::{RuleDecision, RuleHit};
+use crate::responsibility::classification::rules::RuleHit;
 use crate::responsibility::classification::scoring::{
-    build_observer_signature, compute_score, compute_score_breakdown,
-    heuristic_decide, route_score, RouteSelection,
+    RouteSelection, build_observer_signature, compute_score, compute_score_breakdown,
+    heuristic_decide, route_score,
 };
 use crate::responsibility::classification::types::{
-    AlertAuthority, CachePrior, CacheTTL, ClassificationConfig, ClassificationResult, ContentSignals,
-    ObserverDecision, ObserverOutput, Route,
+    AlertAuthority, CachePrior, CacheTTL, ClassificationConfig, ClassificationResult,
+    ContentSignals, ObserverDecision, ObserverOutput, Route,
 };
-use crate::responsibility::claims::ClaimSeverity;
-use crate::responsibility::types::evidence_types::CorrelationEvidence;
-use crate::responsibility::classification::pattern_matcher::GraphPatternMatch;
 use crate::responsibility::graph::ResponsibilityGraph;
 use crate::responsibility::observer::provider::ObserverProvider;
+use crate::responsibility::types::evidence_types::CorrelationEvidence;
 
 /// ClassificationEngine: the central classification coordinator.
 ///
@@ -89,9 +89,21 @@ impl ClassificationEngine {
         let (_rule_decision, rule_hits) = self.rules.evaluate(graph);
 
         // Layer 2: Scoring (v14: intent_count passed for sub_score_role PBC/intent sigmoid)
-        let score = compute_score(&rule_hits, patterns, graph, evidence_records, repetition_count, intent_count);
+        let score = compute_score(
+            &rule_hits,
+            patterns,
+            graph,
+            evidence_records,
+            repetition_count,
+            intent_count,
+        );
         let breakdown = compute_score_breakdown(
-            &rule_hits, patterns, graph, evidence_records, repetition_count, intent_count,
+            &rule_hits,
+            patterns,
+            graph,
+            evidence_records,
+            repetition_count,
+            intent_count,
         );
 
         // Layer 3: Route (with force_observer override)
@@ -126,7 +138,7 @@ impl ClassificationEngine {
                     cusum_dimensions: vec![],
                     progressive_fused: 0.0,
                     observer_trigger_reason: String::new(),
-            deberta_score: 0.0,
+                    deberta_score: 0.0,
                 };
                 (result, Route::DirectSafe(output))
             }
@@ -147,24 +159,33 @@ impl ClassificationEngine {
                     cusum_dimensions: vec![],
                     progressive_fused: 0.0,
                     observer_trigger_reason: String::new(),
-            deberta_score: 0.0,
+                    deberta_score: 0.0,
                 };
                 (result, Route::DirectUnsafe(output))
             }
             RouteSelection::ToObserver => {
                 // Build observer signature for LLM arbitration
-                let signature = build_observer_signature(
-                    graph,
-                    evidence_records,
-                    &rule_hits,
-                    patterns,
-                    score,
-                );
+                let signature =
+                    build_observer_signature(graph, evidence_records, &rule_hits, patterns, score);
 
                 // If observer is available, call it
                 if let Some(obs) = observer {
-                    let content = if intent_descriptions.is_empty() { None } else { Some(ContentSignals { resource_paths_touched: intent_descriptions.to_vec(), credential_patterns_detected: 0, unexpected_file_sources: vec![], handoff_depth: 0, constraint_count_diff: 0 }) };
-                    let obs_input = crate::responsibility::classification::types::ObserverInput { signature: signature.clone(), content_signals: content, prior: cache_prior };
+                    let content = if intent_descriptions.is_empty() {
+                        None
+                    } else {
+                        Some(ContentSignals {
+                            resource_paths_touched: intent_descriptions.to_vec(),
+                            credential_patterns_detected: 0,
+                            unexpected_file_sources: vec![],
+                            handoff_depth: 0,
+                            constraint_count_diff: 0,
+                        })
+                    };
+                    let obs_input = crate::responsibility::classification::types::ObserverInput {
+                        signature: signature.clone(),
+                        content_signals: content,
+                        prior: cache_prior,
+                    };
 
                     match obs.evaluate(&obs_input).await {
                         Ok(obs_output) => {
@@ -172,8 +193,12 @@ impl ClassificationEngine {
                             let confidence = obs_output.confidence;
                             let reasoning = obs_output.reasoning.clone();
 
-                            eprintln!("[classify] Observer LLM: {} confidence={:.3} — \"{}\"",
-                                decision.as_str(), confidence, reasoning);
+                            eprintln!(
+                                "[classify] Observer LLM: {} confidence={:.3} — \"{}\"",
+                                decision.as_str(),
+                                confidence,
+                                reasoning
+                            );
 
                             // Observer arbitration: decision determines direction,
                             // confidence controls magnitude, static score is the foundation.
@@ -183,8 +208,15 @@ impl ClassificationEngine {
                                     // When base score is near zero (PBC=0 attacks detected
                                     // purely by Observer), give Observer more weight.
                                     let obs_weight: f32 = if score < 0.1 { 0.5 } else { 0.3 };
-                                    let blended = score * (1.0 - obs_weight) + confidence * obs_weight;
-                                    if blended < 0.15 { 0.15 } else if blended > 0.99 { 0.99 } else { blended }
+                                    let blended =
+                                        score * (1.0 - obs_weight) + confidence * obs_weight;
+                                    if blended < 0.15 {
+                                        0.15
+                                    } else if blended > 0.99 {
+                                        0.99
+                                    } else {
+                                        blended
+                                    }
                                 }
                                 ObserverDecision::Safe => {
                                     // Observer overrides — pull score toward safe.
@@ -212,7 +244,7 @@ impl ClassificationEngine {
                                 cusum_dimensions: vec![],
                                 progressive_fused: 0.0,
                                 observer_trigger_reason: reasoning,
-            deberta_score: 0.0,
+                                deberta_score: 0.0,
                             };
 
                             let obs_route = match decision {
@@ -221,29 +253,31 @@ impl ClassificationEngine {
                                     Route::DirectSafe(obs_output)
                                 }
                             };
-                            return (result, obs_route);
+                            (result, obs_route)
                         }
                         Err(e) => {
                             // Observer failed — log the error and fall back to heuristic.
                             // The runtime counts this as an observer_attempt (route starts with "observer").
-                            eprintln!("[classify] Observer LLM call failed: {:?} — falling back to heuristic (score={:.3})",
-                                e, score);
+                            eprintln!(
+                                "[classify] Observer LLM call failed: {:?} — falling back to heuristic (score={:.3})",
+                                e, score
+                            );
                             let fallback = heuristic_decide(score);
                             let result = ClassificationResult {
                                 score,
                                 route: "observer_failed".into(),
                                 score_breakdown: breakdown,
-                    cusum_triggered: false,
-                    cusum_dimensions: vec![],
-                    progressive_fused: 0.0,
-                    observer_trigger_reason: format!("Observer failed: {:?}", e),
-            deberta_score: 0.0,
+                                cusum_triggered: false,
+                                cusum_dimensions: vec![],
+                                progressive_fused: 0.0,
+                                observer_trigger_reason: format!("Observer failed: {:?}", e),
+                                deberta_score: 0.0,
                             };
                             let obs_route = match fallback.decision {
                                 ObserverDecision::Unsafe => Route::DirectUnsafe(fallback),
                                 _ => Route::DirectSafe(fallback),
                             };
-                            return (result, obs_route);
+                            (result, obs_route)
                         }
                     }
                 } else {
@@ -253,11 +287,12 @@ impl ClassificationEngine {
                         score,
                         route: "heuristic_fallback".into(),
                         score_breakdown: breakdown,
-                    cusum_triggered: false,
-                    cusum_dimensions: vec![],
-                    progressive_fused: 0.0,
-                    observer_trigger_reason: "Observer unavailable — heuristic fallback".to_string(),
-            deberta_score: 0.0,
+                        cusum_triggered: false,
+                        cusum_dimensions: vec![],
+                        progressive_fused: 0.0,
+                        observer_trigger_reason: "Observer unavailable — heuristic fallback"
+                            .to_string(),
+                        deberta_score: 0.0,
                     };
                     let obs_route = match fallback.decision {
                         ObserverDecision::Unsafe => Route::DirectUnsafe(fallback),
@@ -290,9 +325,21 @@ impl ClassificationEngine {
         let (_rule_decision, rule_hits) = self.rules.evaluate(graph);
 
         // Layer 2: Scoring (v14)
-        let score = compute_score(&rule_hits, patterns, graph, evidence_records, repetition_count, intent_count);
+        let score = compute_score(
+            &rule_hits,
+            patterns,
+            graph,
+            evidence_records,
+            repetition_count,
+            intent_count,
+        );
         let breakdown = compute_score_breakdown(
-            &rule_hits, patterns, graph, evidence_records, repetition_count, intent_count,
+            &rule_hits,
+            patterns,
+            graph,
+            evidence_records,
+            repetition_count,
+            intent_count,
         );
 
         // Layer 3: Phase 2 route (fail-closed)
@@ -309,11 +356,11 @@ impl ClassificationEngine {
                 score,
                 route: "direct_unsafe".into(),
                 score_breakdown: breakdown,
-                    cusum_triggered: false,
-                    cusum_dimensions: vec![],
-                    progressive_fused: 0.0,
-                    observer_trigger_reason: String::new(),
-            deberta_score: 0.0,
+                cusum_triggered: false,
+                cusum_dimensions: vec![],
+                progressive_fused: 0.0,
+                observer_trigger_reason: String::new(),
+                deberta_score: 0.0,
             };
             (result, Route::DirectUnsafe(output))
         } else if score < self.config.threshold_safe {
@@ -329,11 +376,11 @@ impl ClassificationEngine {
                 score,
                 route: "direct_safe".into(),
                 score_breakdown: breakdown,
-                    cusum_triggered: false,
-                    cusum_dimensions: vec![],
-                    progressive_fused: 0.0,
-                    observer_trigger_reason: String::new(),
-            deberta_score: 0.0,
+                cusum_triggered: false,
+                cusum_dimensions: vec![],
+                progressive_fused: 0.0,
+                observer_trigger_reason: String::new(),
+                deberta_score: 0.0,
             };
             (result, Route::DirectSafe(output))
         } else {
@@ -350,11 +397,11 @@ impl ClassificationEngine {
                 score,
                 route: "fail_closed_unsafe".into(),
                 score_breakdown: breakdown,
-                    cusum_triggered: false,
-                    cusum_dimensions: vec![],
-                    progressive_fused: 0.0,
-                    observer_trigger_reason: String::new(),
-            deberta_score: 0.0,
+                cusum_triggered: false,
+                cusum_dimensions: vec![],
+                progressive_fused: 0.0,
+                observer_trigger_reason: String::new(),
+                deberta_score: 0.0,
             };
             (result, Route::DirectUnsafe(output))
         }
@@ -382,13 +429,15 @@ impl ClassificationEngine {
             evidence_cited: vec![],
             rule_verdicts: rule_hits
                 .iter()
-                .map(|h| crate::responsibility::classification::types::RuleVerdict {
-                    rule_id: h.rule_id.clone(),
-                    description: format!("{:?}", h.decision),
-                    matched_resource: h.matched_resource.clone(),
-                    llm_agreed: None,
-                    llm_comment: None,
-                })
+                .map(
+                    |h| crate::responsibility::classification::types::RuleVerdict {
+                        rule_id: h.rule_id.clone(),
+                        description: format!("{:?}", h.decision),
+                        matched_resource: h.matched_resource.clone(),
+                        llm_agreed: None,
+                        llm_comment: None,
+                    },
+                )
                 .collect(),
             pattern_verdicts: vec![],
         }
@@ -406,14 +455,14 @@ impl Default for ClassificationEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::responsibility::types::{
-        ActionId, AgentId, EdgeId, EvidenceId, IntentId, NodeId, NormalizedResource,
-        PhaseIndicator, ResponsibilityEdge, ResponsibilityEdgeType,
-        ResponsibilityNode, ResponsibilityNodeType,
-    };
     use crate::responsibility::graph::ResponsibilityGraph;
     use crate::responsibility::types::evidence_types::{
         CandidateDerivationMode, CorrelationEvidence, MatchLevel, NormalizedArgs,
+    };
+    use crate::responsibility::types::{
+        ActionId, AgentId, EdgeId, EvidenceId, IntentId, NodeId, NormalizedResource,
+        PhaseIndicator, ResponsibilityEdge, ResponsibilityEdgeType, ResponsibilityNode,
+        ResponsibilityNodeType,
     };
 
     fn make_node(
@@ -473,7 +522,12 @@ mod tests {
 
     fn make_safe_graph() -> ResponsibilityGraph {
         let mut g = ResponsibilityGraph::default();
-        g.add_node(make_node("a1", ResponsibilityNodeType::Agent, Some("agent-1"), None));
+        g.add_node(make_node(
+            "a1",
+            ResponsibilityNodeType::Agent,
+            Some("agent-1"),
+            None,
+        ));
         g.add_node(make_node(
             "r1",
             ResponsibilityNodeType::Resource,
@@ -482,13 +536,23 @@ mod tests {
                 canonical_path: "/home/lzk/mtagentlens/src/main.rs".into(),
             }),
         ));
-        g.add_edge(make_edge("e1", ResponsibilityEdgeType::IntentCausesAction, "a1", "r1"));
+        g.add_edge(make_edge(
+            "e1",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "a1",
+            "r1",
+        ));
         g
     }
 
     fn make_unsafe_graph() -> ResponsibilityGraph {
         let mut g = ResponsibilityGraph::default();
-        g.add_node(make_node("a1", ResponsibilityNodeType::Agent, Some("agent-1"), None));
+        g.add_node(make_node(
+            "a1",
+            ResponsibilityNodeType::Agent,
+            Some("agent-1"),
+            None,
+        ));
         g.add_node(make_node(
             "r1",
             ResponsibilityNodeType::Resource,
@@ -497,13 +561,23 @@ mod tests {
                 canonical_path: "/etc/shadow".into(),
             }),
         ));
-        g.add_edge(make_edge("e1", ResponsibilityEdgeType::PolicyBoundaryCrossing, "a1", "r1"));
+        g.add_edge(make_edge(
+            "e1",
+            ResponsibilityEdgeType::PolicyBoundaryCrossing,
+            "a1",
+            "r1",
+        ));
         g
     }
 
     fn make_ambiguous_graph() -> ResponsibilityGraph {
         let mut g = ResponsibilityGraph::default();
-        g.add_node(make_node("a1", ResponsibilityNodeType::Agent, Some("agent-1"), None));
+        g.add_node(make_node(
+            "a1",
+            ResponsibilityNodeType::Agent,
+            Some("agent-1"),
+            None,
+        ));
         g.add_node(make_node(
             "r1",
             ResponsibilityNodeType::Resource,
@@ -529,8 +603,7 @@ mod tests {
         let graph = make_safe_graph();
         let evidence = vec![make_evidence(0.3, MatchLevel::L5Substring)];
 
-        let (result, _route) =
-            engine.classify_authoritative(&graph, &[], &evidence, 0, 0);
+        let (result, _route) = engine.classify_authoritative(&graph, &[], &evidence, 0, 0);
 
         // Safe graph with low-confidence evidence should get low score
         assert!(result.score < 0.15);
@@ -543,8 +616,7 @@ mod tests {
         let graph = make_unsafe_graph();
         let evidence = vec![make_evidence(0.9, MatchLevel::L1Exact)];
 
-        let (result, _route) =
-            engine.classify_authoritative(&graph, &[], &evidence, 0, 0);
+        let (result, _route) = engine.classify_authoritative(&graph, &[], &evidence, 0, 0);
 
         // Shadow access + high evidence should be high score
         assert!(result.score > 0.10);
@@ -556,8 +628,7 @@ mod tests {
         let graph = make_ambiguous_graph();
         let evidence = vec![make_evidence(0.5, MatchLevel::L3Containment)];
 
-        let (result, route) =
-            engine.classify_authoritative(&graph, &[], &evidence, 0, 0);
+        let (result, route) = engine.classify_authoritative(&graph, &[], &evidence, 0, 0);
 
         // Phase 2: ambiguous score falls between thresholds → routes to ToObserver
         // for semantic analysis, or DirectUnsafe depending on the scoring grid.
@@ -583,8 +654,7 @@ mod tests {
         let graph = make_unsafe_graph();
         let evidence = vec![make_evidence(0.9, MatchLevel::L1Exact)];
 
-        let (result, _route) =
-            engine.classify_authoritative(&graph, &[], &evidence, 0, 0);
+        let (result, _route) = engine.classify_authoritative(&graph, &[], &evidence, 0, 0);
 
         let sb = &result.score_breakdown;
         assert!(sb.rule_score >= 0.0);
@@ -604,7 +674,22 @@ mod tests {
         let evidence = vec![];
 
         let (_result, route) = engine
-            .classify_provisional(&graph, &[], &evidence, None, 0, false, CachePrior { l2_hit: false, l2_prior_anomaly_rate: None, l3_hit: false, l3_fleet_anomaly_rate: None }, &[], 0)
+            .classify_provisional(
+                &graph,
+                &[],
+                &evidence,
+                None,
+                0,
+                false,
+                CachePrior {
+                    l2_hit: false,
+                    l2_prior_anomaly_rate: None,
+                    l3_hit: false,
+                    l3_fleet_anomaly_rate: None,
+                },
+                &[],
+                0,
+            )
             .await;
 
         match route {
@@ -621,14 +706,50 @@ mod tests {
         let engine = ClassificationEngine::new();
         let graph = make_unsafe_graph();
         let evidence = vec![make_evidence(0.9, MatchLevel::L1Exact)];
-        let mock_out = ObserverOutput { decision: ObserverDecision::Unsafe, severity: ClaimSeverity::Critical, confidence: 0.85, cache_ttl: CacheTTL::Task, authority: AlertAuthority::Authoritative, reasoning: "evidence: /etc/shadow accessed with L1 confidence".into(), attacked_flag: false, evidence_cited: vec!["/etc/shadow".into()], rule_verdicts: vec![], pattern_verdicts: vec![] };
+        let mock_out = ObserverOutput {
+            decision: ObserverDecision::Unsafe,
+            severity: ClaimSeverity::Critical,
+            confidence: 0.85,
+            cache_ttl: CacheTTL::Task,
+            authority: AlertAuthority::Authoritative,
+            reasoning: "evidence: /etc/shadow accessed with L1 confidence".into(),
+            attacked_flag: false,
+            evidence_cited: vec!["/etc/shadow".into()],
+            rule_verdicts: vec![],
+            pattern_verdicts: vec![],
+        };
         let mock = MockObserverProvider::with_responses(vec![mock_out]);
         let intents = vec!["Bash: cat /etc/shadow".to_string()];
-        let prior = CachePrior { l2_hit: true, l2_prior_anomaly_rate: Some(0.15), l3_hit: false, l3_fleet_anomaly_rate: None };
-        let (result, _route) = engine.classify_provisional(&graph, &[], &evidence, Some(&mock), 0, true, prior, &intents, 2).await;
+        let prior = CachePrior {
+            l2_hit: true,
+            l2_prior_anomaly_rate: Some(0.15),
+            l3_hit: false,
+            l3_fleet_anomaly_rate: None,
+        };
+        let (result, _route) = engine
+            .classify_provisional(
+                &graph,
+                &[],
+                &evidence,
+                Some(&mock),
+                0,
+                true,
+                prior,
+                &intents,
+                2,
+            )
+            .await;
         assert!(result.score > 0.0, "Observer should adjust score");
-        assert!(result.route.starts_with("observer_"), "Route: {}", result.route);
-        assert!(mock.call_count() >= 1, "Observer should be called, count={}", mock.call_count());
+        assert!(
+            result.route.starts_with("observer_"),
+            "Route: {}",
+            result.route
+        );
+        assert!(
+            mock.call_count() >= 1,
+            "Observer should be called, count={}",
+            mock.call_count()
+        );
     }
 
     #[tokio::test]
@@ -636,13 +757,59 @@ mod tests {
         use crate::responsibility::observer::mock::MockObserverProvider;
         let engine = ClassificationEngine::new();
         let mut graph = make_unsafe_graph();
-        graph.add_node(make_node("r2", ResponsibilityNodeType::Resource, Some("agent-1"), Some(NormalizedResource::Network { host: "evil.com".into(), port: 4444, scheme: "https".into() })));
-        graph.add_edge(make_edge("e2", ResponsibilityEdgeType::PolicyBoundaryCrossing, "a1", "r2"));
+        graph.add_node(make_node(
+            "r2",
+            ResponsibilityNodeType::Resource,
+            Some("agent-1"),
+            Some(NormalizedResource::Network {
+                host: "evil.com".into(),
+                port: 4444,
+                scheme: "https".into(),
+            }),
+        ));
+        graph.add_edge(make_edge(
+            "e2",
+            ResponsibilityEdgeType::PolicyBoundaryCrossing,
+            "a1",
+            "r2",
+        ));
         let evidence = vec![make_evidence(0.9, MatchLevel::L1Exact)];
-        let mock_out = ObserverOutput { decision: ObserverDecision::Safe, severity: ClaimSeverity::Info, confidence: 0.9, cache_ttl: CacheTTL::Task, authority: AlertAuthority::Authoritative, reasoning: "workspace-safe".into(), attacked_flag: false, evidence_cited: vec![], rule_verdicts: vec![], pattern_verdicts: vec![] };
+        let mock_out = ObserverOutput {
+            decision: ObserverDecision::Safe,
+            severity: ClaimSeverity::Info,
+            confidence: 0.9,
+            cache_ttl: CacheTTL::Task,
+            authority: AlertAuthority::Authoritative,
+            reasoning: "workspace-safe".into(),
+            attacked_flag: false,
+            evidence_cited: vec![],
+            rule_verdicts: vec![],
+            pattern_verdicts: vec![],
+        };
         let mock = MockObserverProvider::with_responses(vec![mock_out]);
-        let (result, _route) = engine.classify_provisional(&graph, &[], &evidence, Some(&mock), 0, true, CachePrior { l2_hit: false, l2_prior_anomaly_rate: None, l3_hit: false, l3_fleet_anomaly_rate: None }, &[], 0).await;
-        assert!(result.score < 0.5, "Safe Observer should reduce score, got {}", result.score);
+        let (result, _route) = engine
+            .classify_provisional(
+                &graph,
+                &[],
+                &evidence,
+                Some(&mock),
+                0,
+                true,
+                CachePrior {
+                    l2_hit: false,
+                    l2_prior_anomaly_rate: None,
+                    l3_hit: false,
+                    l3_fleet_anomaly_rate: None,
+                },
+                &[],
+                0,
+            )
+            .await;
+        assert!(
+            result.score < 0.5,
+            "Safe Observer should reduce score, got {}",
+            result.score
+        );
         assert!(mock.call_count() >= 1);
     }
 }

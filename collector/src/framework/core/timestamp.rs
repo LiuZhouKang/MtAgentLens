@@ -21,27 +21,25 @@ pub fn get_boot_time_secs() -> i64 {
         // Try to read from /proc/stat (most reliable)
         if let Ok(content) = fs::read_to_string("/proc/stat") {
             for line in content.lines() {
-                if line.starts_with("btime ") {
-                    if let Some(btime_str) = line.split_whitespace().nth(1) {
-                        if let Ok(btime) = btime_str.parse::<i64>() {
-                            return btime;
-                        }
-                    }
+                if line.starts_with("btime ")
+                    && let Some(btime_str) = line.split_whitespace().nth(1)
+                    && let Ok(btime) = btime_str.parse::<i64>()
+                {
+                    return btime;
                 }
             }
         }
 
         // Fallback: calculate from uptime
-        if let Ok(uptime_str) = fs::read_to_string("/proc/uptime") {
-            if let Some(uptime_secs_str) = uptime_str.split_whitespace().next() {
-                if let Ok(uptime_secs) = uptime_secs_str.parse::<f64>() {
-                    let now_secs = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs() as i64;
-                    return now_secs - uptime_secs as i64;
-                }
-            }
+        if let Ok(uptime_str) = fs::read_to_string("/proc/uptime")
+            && let Some(uptime_secs_str) = uptime_str.split_whitespace().next()
+            && let Ok(uptime_secs) = uptime_secs_str.parse::<f64>()
+        {
+            let now_secs = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as i64;
+            return now_secs - uptime_secs as i64;
         }
 
         // Last resort: return current time (will be incorrect but won't crash)

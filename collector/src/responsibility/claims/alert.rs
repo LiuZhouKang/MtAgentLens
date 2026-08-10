@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-use serde::{Deserialize, Serialize};
-use crate::responsibility::classification::types::{
-    AlertAuthority, DisplayProfile, ObserverDecision, ObserverOutput, RuleVerdict,
-    PatternVerdict, ScoreBreakdown,
-};
 use crate::responsibility::claims::ClaimSeverity;
+use crate::responsibility::classification::types::{
+    AlertAuthority, DisplayProfile, ObserverDecision, ObserverOutput, PatternVerdict, RuleVerdict,
+    ScoreBreakdown,
+};
+use serde::{Deserialize, Serialize};
 
 // ── Redesigned Alert Data Types ──────────────────────────────────────
 

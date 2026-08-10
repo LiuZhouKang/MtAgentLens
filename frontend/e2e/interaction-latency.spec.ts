@@ -104,7 +104,7 @@ async function measureInteractionLatency(
 
 test.describe('interaction latency audit', () => {
   test('sidebar workbench switching responds within 100ms on the home page', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('/console', { waitUntil: 'domcontentloaded' });
 
     // 预热：先展开面板，度量稳态切换（冷启动展开会被首屏 3D 渲染/模型计算争抢主线程）
     const incidentBtn = page.getByRole('button', { name: '打开事件工作台' });
@@ -125,7 +125,9 @@ test.describe('interaction latency audit', () => {
     expect(duration).toBeLessThanOrEqual(100);
   });
 
-  test('sidebar workbench switching responds within 100ms on the investigation page', async ({ page }) => {
+  test('sidebar workbench switching responds within 100ms on the investigation page', async ({
+    page,
+  }) => {
     await page.goto('/investigations', { waitUntil: 'domcontentloaded' });
 
     // 预热：先展开面板，度量稳态切换（冷启动展开会被首屏模型计算争抢主线程）
@@ -146,5 +148,4 @@ test.describe('interaction latency audit', () => {
 
     expect(duration).toBeLessThanOrEqual(100);
   });
-
 });

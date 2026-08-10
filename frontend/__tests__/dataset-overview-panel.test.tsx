@@ -5,14 +5,25 @@ import type { DatasetOverview } from '@/lib/types';
 import OverviewDatasetPanel from '@/components/overview/dataset-overview-panel';
 
 const overview: DatasetOverview = {
-  run: { run_id: 'run-1', started_at_ns: 1_000_000, ended_at_ns: 9_000_000, scenario_id: 'scenario-x', mode: 'record', collector_version: '0.1.0' },
+  run: {
+    run_id: 'run-1',
+    started_at_ns: 1_000_000,
+    ended_at_ns: 9_000_000,
+    scenario_id: 'scenario-x',
+    mode: 'record',
+    collector_version: '0.1.0',
+  },
   snapshots: { count: 55 },
   graph: { nodes: 1461, edges: 3300 },
   alerts: { count: 13 },
   evidence: { count: 1823, by_match_level: { L5Substring: 830 } },
   claims: { count: 3, by_type: { TaintedContextUse: 3 }, by_severity: { Critical: 3 } },
   tracebacks: { count: 22 },
-  intents: { count: 23, by_tool_name: { Bash: 9 }, by_authority_source: { SseResponseToolUse: 20 } },
+  intents: {
+    count: 23,
+    by_tool_name: { Bash: 9 },
+    by_authority_source: { SseResponseToolUse: 20 },
+  },
   actions: { count: 474, by_action_type: { FileRead: 424 }, by_signal_class: { HighSignal: 100 } },
   pollution: { count: 219 },
   policy_evaluations: { count: 755, violations: 12 },

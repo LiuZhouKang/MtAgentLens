@@ -18,7 +18,8 @@ describe('M5 why-facets 真实 db 集成', () => {
 
     // 前置：真实 db 的三表行数与告警 involved_agents 符合校准假设
     expect(dbImport.alerts.map((a) => a.involved_agents.map((x) => x.agent_id))).toEqual([
-      ['agent-a'], ['agent-a'],
+      ['agent-a'],
+      ['agent-a'],
     ]);
     expect(dbImport.dbAssets.pollutionEvents).toHaveLength(3);
     expect(dbImport.dbAssets.policyEvaluations).toHaveLength(6);
@@ -40,7 +41,8 @@ describe('M5 why-facets 真实 db 集成', () => {
     expect(why.alertFacets['alert-2']).toEqual(['pollution', 'policy']);
 
     expect(why.pollution.bySource).toEqual([
-      { agentId: 'agent-a', count: 2 }, { agentId: 'agent-b', count: 1 },
+      { agentId: 'agent-a', count: 2 },
+      { agentId: 'agent-b', count: 1 },
     ]);
     expect(why.pollution.hubAgents).toEqual(['agent-a', 'agent-b']);
     expect(why.pollution.multiHopCount).toBe(1);
@@ -48,13 +50,17 @@ describe('M5 why-facets 真实 db 集成', () => {
     expect(why.pollution.avgHops).toBe(1.0);
 
     expect(why.policy.byJudgment).toEqual([
-      { result: 'Compliant', count: 4 }, { result: 'Allow', count: 1 }, { result: 'Violation', count: 1 },
+      { result: 'Compliant', count: 4 },
+      { result: 'Allow', count: 1 },
+      { result: 'Violation', count: 1 },
     ]);
     expect(why.policy.violationCount).toBe(1);
     expect(why.policy.violationRate).toBeCloseTo(1 / 6, 5);
 
     expect(why.diagnostic.byReason).toEqual([
-      { reason: 'BelowConfidenceCutoff', count: 2 }, { reason: 'AmbiguousMatch', count: 1 }, { reason: 'NoArgumentMatch', count: 1 },
+      { reason: 'BelowConfidenceCutoff', count: 2 },
+      { reason: 'AmbiguousMatch', count: 1 },
+      { reason: 'NoArgumentMatch', count: 1 },
     ]);
     expect(why.diagnostic.byIntentId).toEqual([
       { intentId: 'int-2', toolName: 'Read', count: 2 },

@@ -14,8 +14,7 @@ pub fn list_alerts<B>(
 ) -> Response<Bytes> {
     match reader.get_alerts(run_id) {
         Ok(alerts) => ApiResponse::authoritative(alerts).into_response(),
-        Err(e) => ApiError::internal(format!("Failed to get alerts: {e}")).into_response(
-            hyper::StatusCode::INTERNAL_SERVER_ERROR,
-        ),
+        Err(e) => ApiError::internal(format!("Failed to get alerts: {e}"))
+            .into_response(hyper::StatusCode::INTERNAL_SERVER_ERROR),
     }
 }

@@ -6,8 +6,8 @@
 
 use crate::responsibility::graph::ResponsibilityGraph;
 use crate::responsibility::types::{
-    EdgeId, NodeId, ResponsibilityClaim, ResponsibilityEdgeType,
-    ResponsibilityNodeType, ResponsibilityTraceback, TracebackId,
+    EdgeId, NodeId, ResponsibilityClaim, ResponsibilityEdgeType, ResponsibilityNodeType,
+    ResponsibilityTraceback, TracebackId,
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -53,11 +53,11 @@ impl TracebackBuilder {
         // pointing from this agent to resource nodes.
         let outgoing = graph.outgoing_from(&agent_node_id);
         for edge_id in outgoing.iter() {
-            if let Some(edge) = graph.get_edge(edge_id) {
-                if edge.edge_type == ResponsibilityEdgeType::IntentCausesAction {
-                    chain_nodes.push(edge.target.clone());
-                    chain_edges.push(edge_id.clone());
-                }
+            if let Some(edge) = graph.get_edge(edge_id)
+                && edge.edge_type == ResponsibilityEdgeType::IntentCausesAction
+            {
+                chain_nodes.push(edge.target.clone());
+                chain_edges.push(edge_id.clone());
             }
         }
 
@@ -70,13 +70,16 @@ impl TracebackBuilder {
 
         // Generate explanation summary.
         let explanation_summary = generate_explanation(
-            graph, claim, &chain_nodes, &chain_edges, &root_cause_node_id,
+            graph,
+            claim,
+            &chain_nodes,
+            &chain_edges,
+            &root_cause_node_id,
         );
 
         // Compute chain confidence from the collected edges.
-        let chain_confidence = compute_chain_confidence(
-            graph, &chain_edges, boundary_edge.confidence,
-        );
+        let chain_confidence =
+            compute_chain_confidence(graph, &chain_edges, boundary_edge.confidence);
 
         Some(ResponsibilityTraceback {
             traceback_id: TracebackId::new(),
@@ -119,10 +122,10 @@ fn find_boundary_edge_for_claim(
 
     for edge in &pbc_edges {
         let mut score: u32 = 0;
-        if let Some(source_node) = graph.get_node(&edge.source) {
-            if source_node.agent_id.as_ref() == Some(&claim.subject) {
-                score += 2;
-            }
+        if let Some(source_node) = graph.get_node(&edge.source)
+            && source_node.agent_id.as_ref() == Some(&claim.subject)
+        {
+            score += 2;
         }
         for ev_ref in &edge.evidence_refs {
             if claim.evidence_refs.contains(ev_ref) {
@@ -152,18 +155,18 @@ fn find_root_cause_agent_node(
 ) -> Option<NodeId> {
     // Iterate in reverse (from deepest/earliest to most recent).
     for node_id in chain_node_ids.iter().rev() {
-        if let Some(node) = graph.get_node(node_id) {
-            if node.node_type == ResponsibilityNodeType::Agent {
-                return Some(node_id.clone());
-            }
+        if let Some(node) = graph.get_node(node_id)
+            && node.node_type == ResponsibilityNodeType::Agent
+        {
+            return Some(node_id.clone());
         }
     }
     // Fallback: any agent node in the chain.
     for node_id in chain_node_ids {
-        if let Some(node) = graph.get_node(node_id) {
-            if node.node_type == ResponsibilityNodeType::Agent {
-                return Some(node_id.clone());
-            }
+        if let Some(node) = graph.get_node(node_id)
+            && node.node_type == ResponsibilityNodeType::Agent
+        {
+            return Some(node_id.clone());
         }
     }
     None
@@ -184,11 +187,21 @@ fn generate_explanation(
 
     // Claim header.
     let claim_type_label = match claim.claim_type {
-        crate::responsibility::types::ResponsibilityClaimType::PolicyViolation => "Policy Violation",
-        crate::responsibility::types::ResponsibilityClaimType::ResponsibilityAnomaly => "Responsibility Anomaly",
-        crate::responsibility::types::ResponsibilityClaimType::SuspiciousDelegation => "Suspicious Delegation",
-        crate::responsibility::types::ResponsibilityClaimType::TaintedContextUse => "Tainted Context Use",
-        crate::responsibility::types::ResponsibilityClaimType::UnauthorizedCapabilityUse => "Unauthorized Capability Use",
+        crate::responsibility::types::ResponsibilityClaimType::PolicyViolation => {
+            "Policy Violation"
+        }
+        crate::responsibility::types::ResponsibilityClaimType::ResponsibilityAnomaly => {
+            "Responsibility Anomaly"
+        }
+        crate::responsibility::types::ResponsibilityClaimType::SuspiciousDelegation => {
+            "Suspicious Delegation"
+        }
+        crate::responsibility::types::ResponsibilityClaimType::TaintedContextUse => {
+            "Tainted Context Use"
+        }
+        crate::responsibility::types::ResponsibilityClaimType::UnauthorizedCapabilityUse => {
+            "Unauthorized Capability Use"
+        }
         crate::responsibility::types::ResponsibilityClaimType::BlockedAttempt => "Blocked Attempt",
     };
 
@@ -246,7 +259,11 @@ fn node_label_for_display(graph: &ResponsibilityGraph, node_id: &NodeId) -> Stri
             } else if let Some(ref resource) = node.resource {
                 format!("Resource({:?})", resource)
             } else {
-                format!("{:?}({})", node.node_type, truncate_id(node_id.as_str(), 12))
+                format!(
+                    "{:?}({})",
+                    node.node_type,
+                    truncate_id(node_id.as_str(), 12)
+                )
             }
         }
         None => format!("<unknown:{}>", truncate_id(node_id.as_str(), 12)),
@@ -294,11 +311,7 @@ fn compute_chain_confidence(
 // ═════════════════════════════════════════════════════════════════════════════
 
 fn truncate_id(s: &str, max_len: usize) -> &str {
-    if s.len() > max_len {
-        &s[..max_len]
-    } else {
-        s
-    }
+    if s.len() > max_len { &s[..max_len] } else { s }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -371,7 +384,10 @@ mod tests {
         }
     }
 
-    fn make_claim(subject: &str, evidence_refs: Vec<crate::responsibility::types::EvidenceId>) -> ResponsibilityClaim {
+    fn make_claim(
+        subject: &str,
+        evidence_refs: Vec<crate::responsibility::types::EvidenceId>,
+    ) -> ResponsibilityClaim {
         ResponsibilityClaim {
             claim_id: ClaimId::new(),
             claim_type: ResponsibilityClaimType::PolicyViolation,
@@ -459,7 +475,11 @@ mod tests {
         let claim = make_claim("agent-root", vec![]);
 
         let traceback = TracebackBuilder::build(&claim, &g).unwrap();
-        assert!(traceback.explanation_summary.contains("Traceback for claim"));
+        assert!(
+            traceback
+                .explanation_summary
+                .contains("Traceback for claim")
+        );
         assert!(traceback.explanation_summary.contains("Causal chain"));
         assert!(traceback.explanation_summary.contains("Root cause"));
         assert!(traceback.explanation_summary.contains("Agent(agent-root)"));

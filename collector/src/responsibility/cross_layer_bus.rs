@@ -22,10 +22,10 @@
 //                                              │
 //                                    broadcast::Sender<ResponsibilityAlert> → SSE → Frontend
 
+use crate::responsibility::types::alert_types::ResponsibilityAlert;
+use crate::responsibility::types::ids::{AgentId, ClaimId, EdgeId};
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use crate::responsibility::types::ids::{AgentId, AlertId, ClaimId, EdgeId, ProcessId};
-use crate::responsibility::types::alert_types::ResponsibilityAlert;
 
 // ── Event Envelope ───────────────────────────────────────────────────────
 
@@ -136,7 +136,12 @@ impl CrossLayerBus {
         let (classification_tx, _) = broadcast::channel(256);
         let (claims_tx, _) = broadcast::channel(256);
         let (alert_tx, _) = broadcast::channel(256);
-        Self { scoring_tx, classification_tx, claims_tx, alert_tx }
+        Self {
+            scoring_tx,
+            classification_tx,
+            claims_tx,
+            alert_tx,
+        }
     }
 
     /// Create a bus wrapping a pre-existing alert channel.
@@ -147,7 +152,12 @@ impl CrossLayerBus {
         let (scoring_tx, _) = broadcast::channel(256);
         let (classification_tx, _) = broadcast::channel(256);
         let (claims_tx, _) = broadcast::channel(256);
-        Self { scoring_tx, classification_tx, claims_tx, alert_tx }
+        Self {
+            scoring_tx,
+            classification_tx,
+            claims_tx,
+            alert_tx,
+        }
     }
 
     /// Publish a scoring signal to all scoring subscribers.

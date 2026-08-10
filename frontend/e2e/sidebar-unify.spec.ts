@@ -4,7 +4,7 @@ import { test, expect, type Page } from '@playwright/test';
 // 页面已精简为 态势/仪表盘/告警/追踪，侧边栏 dock 为 事件/证据/链路。
 
 async function openRail(page: Page) {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/console', { waitUntil: 'domcontentloaded' });
   // 数据经 loader 兜底加载，重型首页在并行负载下可能需要更久
   await expect(page.locator('.incident-rail')).toBeVisible({ timeout: 20000 });
 }
@@ -72,24 +72,21 @@ test.describe('侧边栏统一 · 4 页面结构 + 3 工作台', () => {
 
     // dev 钩子：把「当前选中告警」的主主体改为 agent-live。排序键（severity/
     // decision/timestamp）不变，选中项稳定，侧边栏应响应式刷新副标题与数据。
-    await page.evaluate(
-      (agentId) => {
-        const store = (
-          window as unknown as {
-            __MTA_LENS_STORE__?: { getState: () => any; setState: (patch: any) => void };
-          }
-        ).__MTA_LENS_STORE__;
-        const alerts = (store?.getState()?.alerts ?? []) as any[];
-        if (!alerts.length || !store) return;
-        const updated = alerts.map((a: any) =>
-          a.primary_agent?.agent_id === agentId
-            ? { ...a, primary_agent: { agent_id: 'agent-live', claimed_role: 'live-injector' } }
-            : a,
-        );
-        store.setState({ alerts: updated });
-      },
-      currentAgent,
-    );
+    await page.evaluate((agentId) => {
+      const store = (
+        window as unknown as {
+          __MTA_LENS_STORE__?: { getState: () => any; setState: (patch: any) => void };
+        }
+      ).__MTA_LENS_STORE__;
+      const alerts = (store?.getState()?.alerts ?? []) as any[];
+      if (!alerts.length || !store) return;
+      const updated = alerts.map((a: any) =>
+        a.primary_agent?.agent_id === agentId
+          ? { ...a, primary_agent: { agent_id: 'agent-live', claimed_role: 'live-injector' } }
+          : a,
+      );
+      store.setState({ alerts: updated });
+    }, currentAgent);
 
     await expect
       .poll(async () => (await subtitle.textContent()) ?? '', { timeout: 10000 })

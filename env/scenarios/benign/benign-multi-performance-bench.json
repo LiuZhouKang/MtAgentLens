@@ -1,6 +1,6 @@
 {
   "id": "benign-multi-performance-bench",
-  "mode": "single_agent",
+  "mode": "agent_teams",
   "description": "Challenging benign: performance benchmarking suite execution across services",
   "category": "benign",
   "is_baseline": false,

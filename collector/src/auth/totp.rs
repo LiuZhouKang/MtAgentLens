@@ -62,7 +62,7 @@ pub fn validate_totp(secret: &str, code: &str) -> bool {
         // wrapping: u64::MAX ≡ -1 (mod 2^64), so wrapping_add(u64::MAX) = wrapping_sub(1)
         let check_counter = counter.wrapping_add(offset);
         let expected = compute_totp(&decoded, check_counter, TOTP_DIGITS);
-        result = result | constant_time_compare(code, &expected);
+        result |= constant_time_compare(code, &expected);
     }
     result
 }
@@ -124,7 +124,7 @@ fn base32_encode(input: &[u8]) -> String {
     }
 
     // Pad to multiple of 8
-    while output.len() % 8 != 0 {
+    while !output.len().is_multiple_of(8) {
         output.push('=');
     }
     output
@@ -453,15 +453,15 @@ mod tests {
     fn gap_ut01_base32_roundtrip() {
         // decode(encode(x)) == x for various byte lengths
         let inputs: Vec<&[u8]> = vec![
-            &b""[..],                               // empty
-            &b"f"[..],                              // 1 byte
-            &b"fo"[..],                             // 2 bytes
-            &b"foo"[..],                            // 3 bytes
-            &b"foob"[..],                           // 4 bytes
-            &b"fooba"[..],                          // 5 bytes
-            &b"foobar"[..],                         // 6 bytes
-            &[0u8; 16][..],                         // all zeros
-            &[0xffu8; 16][..],                      // all ones
+            &b""[..],                                             // empty
+            &b"f"[..],                                            // 1 byte
+            &b"fo"[..],                                           // 2 bytes
+            &b"foo"[..],                                          // 3 bytes
+            &b"foob"[..],                                         // 4 bytes
+            &b"fooba"[..],                                        // 5 bytes
+            &b"foobar"[..],                                       // 6 bytes
+            &[0u8; 16][..],                                       // all zeros
+            &[0xffu8; 16][..],                                    // all ones
             &b"The quick brown fox jumps over the lazy dog."[..], // long input
         ];
         for input in inputs {
@@ -478,11 +478,20 @@ mod tests {
     #[test]
     fn gap_ut01b_base32_invalid_input_rejected() {
         // decode should return None for invalid base32 strings
-        assert!(base32_decode("!!!!!").is_none(), "exclamation marks rejected");
-        assert!(base32_decode("12345").is_none(), "digits not in base32 rejected");
+        assert!(
+            base32_decode("!!!!!").is_none(),
+            "exclamation marks rejected"
+        );
+        assert!(
+            base32_decode("12345").is_none(),
+            "digits not in base32 rejected"
+        );
         // Whitespace is filtered before decoding, so "ABC DEF" is treated as "ABCDEF"
         // which IS valid base32. The code intentionally strips whitespace for resilience.
-        assert!(base32_decode("ABC DEF").is_some(), "whitespace is stripped, so this should decode");
+        assert!(
+            base32_decode("ABC DEF").is_some(),
+            "whitespace is stripped, so this should decode"
+        );
     }
 
     // ---- GAP-UT02 (B4): compute_totp deterministic behavior ----
@@ -507,8 +516,17 @@ mod tests {
         // All counters produce exactly 6-digit strings
         for c in 0..10 {
             let code = compute_totp(secret_bytes, c, TOTP_DIGITS);
-            assert_eq!(code.len(), 6, "TOTP code must be exactly {} digits", TOTP_DIGITS);
-            assert!(code.chars().all(|ch| ch.is_ascii_digit()), "TOTP code must be numeric: '{}'", code);
+            assert_eq!(
+                code.len(),
+                6,
+                "TOTP code must be exactly {} digits",
+                TOTP_DIGITS
+            );
+            assert!(
+                code.chars().all(|ch| ch.is_ascii_digit()),
+                "TOTP code must be numeric: '{}'",
+                code
+            );
         }
     }
 

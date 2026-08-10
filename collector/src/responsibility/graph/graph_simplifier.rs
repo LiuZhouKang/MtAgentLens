@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::responsibility::evidence::{CorrelationEvidence, MatchLevel};
+use crate::responsibility::evidence::CorrelationEvidence;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimplifiedNode {
@@ -89,7 +89,7 @@ pub fn simplify(links: &[CorrelationEvidence]) -> SimplifiedGraph {
         })
         .collect();
 
-    nodes.sort_by(|a, b| a.first_ns.cmp(&b.first_ns));
+    nodes.sort_by_key(|a| a.first_ns);
 
     let node_count = nodes.len();
     let compressed_ratio = if total > 0 {
@@ -142,6 +142,7 @@ fn build_summary(nodes: &[SimplifiedNode], total: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::responsibility::evidence::correlator_legacy::MatchLevel;
     use serde_json::json;
 
     fn mk_link(id: &str, agent: &str, ts: u64, kind: &str, target: &str) -> CorrelationEvidence {

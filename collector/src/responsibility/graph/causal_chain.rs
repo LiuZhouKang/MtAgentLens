@@ -8,7 +8,7 @@
 // back to the root cause.
 
 use crate::responsibility::graph::graph::ResponsibilityGraph;
-use crate::responsibility::types::{EdgeId, NodeId, ResponsibilityEdgeType, AgentId};
+use crate::responsibility::types::{AgentId, EdgeId, NodeId, ResponsibilityEdgeType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -52,11 +52,7 @@ impl CausalChainTracer {
     /// At each step, chooses the highest-confidence incoming causal edge
     /// (boosted for IntentCausesAction +0.20, AgentDelegatesTo +0.15).
     /// Stops on cycle, max depth, or no more causal edges.
-    pub fn trace(
-        &self,
-        graph: &ResponsibilityGraph,
-        target: NodeId,
-    ) -> Option<CausalChain> {
+    pub fn trace(&self, graph: &ResponsibilityGraph, target: NodeId) -> Option<CausalChain> {
         if !graph.has_node(&target) {
             return None;
         }
@@ -67,10 +63,10 @@ impl CausalChainTracer {
         let mut involved_agents: HashSet<AgentId> = HashSet::new();
         let mut current = target.clone();
 
-        if let Some(node) = graph.get_node(&current) {
-            if let Some(ref agent) = node.agent_id {
-                involved_agents.insert(agent.clone());
-            }
+        if let Some(node) = graph.get_node(&current)
+            && let Some(ref agent) = node.agent_id
+        {
+            involved_agents.insert(agent.clone());
         }
         visited.insert(current.clone());
         chain_nodes.push(current.clone());
@@ -100,11 +96,13 @@ impl CausalChainTracer {
                         None => break,
                     };
                     let prev = edge.source.clone();
-                    if visited.contains(&prev) { break; }
-                    if let Some(node) = graph.get_node(&prev) {
-                        if let Some(ref agent) = node.agent_id {
-                            involved_agents.insert(agent.clone());
-                        }
+                    if visited.contains(&prev) {
+                        break;
+                    }
+                    if let Some(node) = graph.get_node(&prev)
+                        && let Some(ref agent) = node.agent_id
+                    {
+                        involved_agents.insert(agent.clone());
                     }
                     visited.insert(prev.clone());
                     chain_nodes.push(prev.clone());
@@ -123,30 +121,38 @@ impl CausalChainTracer {
         let confidence = if chain_edges.is_empty() {
             1.0
         } else {
-            chain_edges.iter()
+            chain_edges
+                .iter()
                 .filter_map(|eid| graph.get_edge(eid))
                 .map(|e| e.confidence)
-                .sum::<f32>() / chain_edges.len() as f32
+                .sum::<f32>()
+                / chain_edges.len() as f32
         };
 
         let description = if depth == 0 {
-            format!("Node {} is a root cause (no incoming causal edges).", root_node_id)
+            format!(
+                "Node {} is a root cause (no incoming causal edges).",
+                root_node_id
+            )
         } else {
             let mut parts: Vec<String> = Vec::new();
             for i in 0..chain_nodes.len() {
                 parts.push(format_node(graph, &chain_nodes[i]));
-                if i < chain_edges.len() {
-                    if let Some(edge) = graph.get_edge(&chain_edges[i]) {
-                        parts.push(format!(" --[{:?}]→ ", edge.edge_type));
-                    }
+                if i < chain_edges.len()
+                    && let Some(edge) = graph.get_edge(&chain_edges[i])
+                {
+                    parts.push(format!(" --[{:?}]→ ", edge.edge_type));
                 }
             }
             parts.concat()
         };
 
         Some(CausalChain {
-            root_node_id, chain_nodes, chain_edges,
-            confidence, description,
+            root_node_id,
+            chain_nodes,
+            chain_edges,
+            confidence,
+            description,
             involved_agents: involved_agents.into_iter().collect(),
             depth,
         })
@@ -154,21 +160,25 @@ impl CausalChainTracer {
 
     /// Trace chains for all nodes belonging to `agent`.
     pub fn trace_agent(&self, graph: &ResponsibilityGraph, agent: &AgentId) -> Vec<CausalChain> {
-        graph.nodes_for_agent(agent).iter()
+        graph
+            .nodes_for_agent(agent)
+            .iter()
             .filter_map(|nid| self.trace(graph, nid.clone()))
             .collect()
     }
 
     /// Find the deepest chain in the graph.
     pub fn deepest_chain(&self, graph: &ResponsibilityGraph) -> Option<CausalChain> {
-        graph.all_nodes()
+        graph
+            .all_nodes()
             .filter_map(|n| self.trace(graph, n.node_id.clone()))
             .max_by_key(|c| c.depth)
     }
 
     /// Find all chains with depth >= min_depth.
     pub fn deep_chains(&self, graph: &ResponsibilityGraph, min_depth: usize) -> Vec<CausalChain> {
-        graph.all_nodes()
+        graph
+            .all_nodes()
             .filter_map(|n| self.trace(graph, n.node_id.clone()))
             .filter(|c| c.depth >= min_depth)
             .collect()
@@ -176,7 +186,9 @@ impl CausalChainTracer {
 }
 
 impl Default for CausalChainTracer {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn format_node(graph: &ResponsibilityGraph, node_id: &NodeId) -> String {
@@ -206,19 +218,31 @@ mod tests {
 
     fn n(id: &str, nt: ResponsibilityNodeType, agent: Option<&str>) -> ResponsibilityNode {
         ResponsibilityNode {
-            node_id: NodeId::from(id), node_type: nt,
+            node_id: NodeId::from(id),
+            node_type: nt,
             agent_id: agent.map(|a| AgentId::from(a)),
-            resource: None, evidence_refs: Vec::new(), timestamp_ns: 1000,
+            resource: None,
+            evidence_refs: Vec::new(),
+            timestamp_ns: 1000,
             phase: PhaseIndicator::Provisional { timestamp_ns: 1000 },
         }
     }
-    fn e(id: &str, et: ResponsibilityEdgeType, src: &str, tgt: &str, conf: f32) -> ResponsibilityEdge {
+    fn e(
+        id: &str,
+        et: ResponsibilityEdgeType,
+        src: &str,
+        tgt: &str,
+        conf: f32,
+    ) -> ResponsibilityEdge {
         ResponsibilityEdge {
-            edge_id: EdgeId::from(id), edge_type: et,
-            source: NodeId::from(src), target: NodeId::from(tgt),
-            evidence_refs: Vec::new(), confidence: conf,
+            edge_id: EdgeId::from(id),
+            edge_type: et,
+            source: NodeId::from(src),
+            target: NodeId::from(tgt),
+            evidence_refs: Vec::new(),
+            confidence: conf,
             phase: PhaseIndicator::Provisional { timestamp_ns: 1000 },
-        signal: None,
+            signal: None,
         }
     }
 
@@ -228,9 +252,23 @@ mod tests {
         g.add_node(n("root", ResponsibilityNodeType::Agent, Some("a1")));
         g.add_node(n("mid", ResponsibilityNodeType::Resource, None));
         g.add_node(n("leaf", ResponsibilityNodeType::Resource, None));
-        g.add_edge(e("e1", ResponsibilityEdgeType::IntentCausesAction, "root", "mid", 0.9));
-        g.add_edge(e("e2", ResponsibilityEdgeType::IntentCausesAction, "mid", "leaf", 0.8));
-        let chain = CausalChainTracer::new().trace(&g, NodeId::from("leaf")).unwrap();
+        g.add_edge(e(
+            "e1",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "root",
+            "mid",
+            0.9,
+        ));
+        g.add_edge(e(
+            "e2",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "mid",
+            "leaf",
+            0.8,
+        ));
+        let chain = CausalChainTracer::new()
+            .trace(&g, NodeId::from("leaf"))
+            .unwrap();
         assert_eq!(chain.root_node_id, NodeId::from("root"));
         assert_eq!(chain.depth, 2);
         assert_eq!(chain.chain_nodes.len(), 3);
@@ -242,16 +280,34 @@ mod tests {
         let mut g = ResponsibilityGraph::new(GraphConfig::default());
         g.add_node(n("a", ResponsibilityNodeType::Agent, Some("a1")));
         g.add_node(n("b", ResponsibilityNodeType::Resource, None));
-        g.add_edge(e("e1", ResponsibilityEdgeType::IntentCausesAction, "a", "b", 0.9));
-        g.add_edge(e("e2", ResponsibilityEdgeType::IntentCausesAction, "b", "a", 0.7));
-        let chain = CausalChainTracer::new().trace(&g, NodeId::from("b")).unwrap();
+        g.add_edge(e(
+            "e1",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "a",
+            "b",
+            0.9,
+        ));
+        g.add_edge(e(
+            "e2",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "b",
+            "a",
+            0.7,
+        ));
+        let chain = CausalChainTracer::new()
+            .trace(&g, NodeId::from("b"))
+            .unwrap();
         assert_eq!(chain.depth, 1);
     }
 
     #[test]
     fn test_missing_node() {
         let g = ResponsibilityGraph::new(GraphConfig::default());
-        assert!(CausalChainTracer::new().trace(&g, NodeId::from("nonexistent")).is_none());
+        assert!(
+            CausalChainTracer::new()
+                .trace(&g, NodeId::from("nonexistent"))
+                .is_none()
+        );
     }
 
     #[test]
@@ -260,8 +316,20 @@ mod tests {
         g.add_node(n("n1", ResponsibilityNodeType::Agent, Some("a1")));
         g.add_node(n("n2", ResponsibilityNodeType::Resource, None));
         g.add_node(n("n3", ResponsibilityNodeType::Resource, None));
-        g.add_edge(e("e1", ResponsibilityEdgeType::IntentCausesAction, "n1", "n2", 0.9));
-        g.add_edge(e("e2", ResponsibilityEdgeType::IntentCausesAction, "n2", "n3", 0.8));
+        g.add_edge(e(
+            "e1",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "n1",
+            "n2",
+            0.9,
+        ));
+        g.add_edge(e(
+            "e2",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "n2",
+            "n3",
+            0.8,
+        ));
         let deepest = CausalChainTracer::new().deepest_chain(&g).unwrap();
         assert_eq!(deepest.depth, 2);
     }
@@ -272,9 +340,23 @@ mod tests {
         g.add_node(n("a1", ResponsibilityNodeType::Agent, Some("agent-1")));
         g.add_node(n("a2", ResponsibilityNodeType::Agent, Some("agent-2")));
         g.add_node(n("r1", ResponsibilityNodeType::Resource, None));
-        g.add_edge(e("e1", ResponsibilityEdgeType::AgentDelegatesTo, "a1", "a2", 0.85));
-        g.add_edge(e("e2", ResponsibilityEdgeType::IntentCausesAction, "a2", "r1", 0.9));
-        let chain = CausalChainTracer::new().trace(&g, NodeId::from("r1")).unwrap();
+        g.add_edge(e(
+            "e1",
+            ResponsibilityEdgeType::AgentDelegatesTo,
+            "a1",
+            "a2",
+            0.85,
+        ));
+        g.add_edge(e(
+            "e2",
+            ResponsibilityEdgeType::IntentCausesAction,
+            "a2",
+            "r1",
+            0.9,
+        ));
+        let chain = CausalChainTracer::new()
+            .trace(&g, NodeId::from("r1"))
+            .unwrap();
         assert!(chain.involved_agents.contains(&AgentId::from("agent-1")));
         assert!(chain.involved_agents.contains(&AgentId::from("agent-2")));
     }

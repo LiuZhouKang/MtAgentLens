@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
 
 const routes = [
   {
-    path: '/',
+    path: '/console',
     assert: async (page: import('@playwright/test').Page) => {
       await expect(page.getByRole('link', { name: '态势', exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: '打开事件工作台' })).toBeVisible();
@@ -72,7 +72,8 @@ test.describe('cross-browser compatibility smoke', () => {
           if (error.includes('favicon')) return false;
           if (/404/.test(error)) return false;
           // "Failed to load resource" 且该失败可归因于 /api/* 回退路径 → 预期降级
-          if (error.includes('Failed to load resource') && failedApiResources.size > 0) return false;
+          if (error.includes('Failed to load resource') && failedApiResources.size > 0)
+            return false;
           return true;
         }),
       ).toEqual([]);

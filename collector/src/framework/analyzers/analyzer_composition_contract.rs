@@ -44,13 +44,9 @@
 //!                   call on_start()
 //! ```
 
-use crate::framework::analyzers::pipeline_contract::{
-    PipelineStage, SharedStateKey, SharedStateStore,
-};
+use crate::framework::analyzers::pipeline_contract::{PipelineStage, SharedStateStore};
 use crate::framework::core::Event;
-use crate::framework::runners::EventStream;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Analyzer Lifecycle Hooks
@@ -606,7 +602,10 @@ mod tests {
         let result = non_preserving.satisfies(&input);
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.violated_properties.contains(&"length_preserving".to_string()));
+        assert!(
+            err.violated_properties
+                .contains(&"length_preserving".to_string())
+        );
     }
 
     #[test]
@@ -642,10 +641,16 @@ mod tests {
         let contract = ContextPollutionContract::default();
         assert_eq!(contract.min_propagation_agents, 3);
         assert_eq!(contract.propagation_window_ns, 30_000_000_000);
-        assert!(contract.monitored_paths.contains(&"team_policy.md".to_string()));
-        assert!(contract
-            .acceptance_markers
-            .contains(&"POLICY OVERRIDE (urgent)".to_string()));
+        assert!(
+            contract
+                .monitored_paths
+                .contains(&"team_policy.md".to_string())
+        );
+        assert!(
+            contract
+                .acceptance_markers
+                .contains(&"POLICY OVERRIDE (urgent)".to_string())
+        );
     }
 
     // ── AlertEnrichmentContract Tests ───────────────────────────────────

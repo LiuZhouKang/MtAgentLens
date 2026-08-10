@@ -102,12 +102,7 @@ impl AuditSummary {
 
         // Evidence confidence
         let avg_confidence = if eval.evidence_count > 0 {
-            result
-                .evidence
-                .iter()
-                .map(|e| e.confidence)
-                .sum::<f32>()
-                / eval.evidence_count as f32
+            result.evidence.iter().map(|e| e.confidence).sum::<f32>() / eval.evidence_count as f32
         } else {
             0.0
         };
@@ -220,14 +215,14 @@ impl AuditSummary {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::responsibility::graph::snapshot::FrozenGraph;
     use crate::responsibility::replay::executor::{
         EvaluationMetrics, RefinementBundle, ReplayResult,
     };
-    use crate::responsibility::graph::snapshot::FrozenGraph;
     use crate::responsibility::types::{
-        AlertDecision, AlertId, AlertSeverity, DisplayProfile, EngineSection,
-        GraphMetrics, GraphRefinementType, GraphSnapshot, IdentityRefinement,
-        IdentityRefinementType, PhaseIndicator, ResponsibilityAlert, ScoreBreakdown,
+        AlertDecision, AlertId, AlertSeverity, DisplayProfile, EngineSection, GraphMetrics,
+        GraphRefinementType, GraphSnapshot, IdentityRefinement, IdentityRefinementType,
+        PhaseIndicator, ResponsibilityAlert, ScoreBreakdown,
     };
 
     fn make_minimal_replay_result() -> ReplayResult {
@@ -273,14 +268,12 @@ mod tests {
         };
 
         let refinements = RefinementBundle {
-            identity: vec![
-                IdentityRefinement {
-                    phase1_agent_id: crate::responsibility::types::AgentId::from("a1"),
-                    phase2_agent_id: crate::responsibility::types::AgentId::from("a1-auth"),
-                    refinement_type: IdentityRefinementType::Confirmed,
-                    reason: "test".into(),
-                },
-            ],
+            identity: vec![IdentityRefinement {
+                phase1_agent_id: crate::responsibility::types::AgentId::from("a1"),
+                phase2_agent_id: crate::responsibility::types::AgentId::from("a1-auth"),
+                refinement_type: IdentityRefinementType::Confirmed,
+                reason: "test".into(),
+            }],
             ..Default::default()
         };
 

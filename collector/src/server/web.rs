@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 eunomia-bpf org.
 
+use crate::framework::analyzers::pipeline_contract::{PipelineStage, StageMetrics};
+use crate::framework::core::Event;
 use crate::responsibility::api_contracts::{
     ACCOUNTABILITY_TRACEBACK_AVAILABLE, ACCOUNTABILITY_TRACEBACK_UNAVAILABLE,
     AUTHORITY_AUTHORITATIVE, AUTHORITY_SUPPORTING, CORRELATION_EVIDENCE_AUTHORITY,
@@ -12,10 +14,8 @@ use crate::responsibility::claims::accountability_evidence::accountability_evide
 use crate::responsibility::evidence::{CorrelationEvidence, root_cause};
 use crate::responsibility::graph::graph_simplifier;
 use crate::responsibility::persistence::schema::open_db_read_only;
-use crate::framework::analyzers::pipeline_contract::{PipelineStage, StageMetrics};
-use crate::framework::core::Event;
 use crate::server::api_types::{
-    HealthResponse, HealthStatus, StageMetricsSnapshot, HEALTH_SCHEMA_VERSION,
+    HEALTH_SCHEMA_VERSION, HealthResponse, HealthStatus, StageMetricsSnapshot,
 };
 use crate::server::assets::FrontendAssets;
 use http_body_util::Full;
@@ -140,7 +140,13 @@ impl WebServer {
             tokio::spawn(async move {
                 let io = TokioIo::new(stream);
                 let service = service_fn(move |req| {
-                    handle_request(req, assets.clone(), event_sender.clone(), log_file.clone(), hs.clone())
+                    handle_request(
+                        req,
+                        assets.clone(),
+                        event_sender.clone(),
+                        log_file.clone(),
+                        hs.clone(),
+                    )
                 });
 
                 if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
@@ -681,7 +687,7 @@ async fn serve_run_summary_api(
         }
     };
 
-    let alerts_db_path = resolve_alerts_db_path(run_dir);
+    let _alerts_db_path = resolve_alerts_db_path(run_dir);
     let causal_db_path = resolve_correlation_evidence_db_path(run_dir);
     if let Some(path) = causal_db_path.as_ref() {
         match load_accountability_audit_summary(path, run_id) {
@@ -1063,7 +1069,7 @@ async fn serve_run_snapshots_api(
             let snapshot_id: String = row.get(0)?;
             let timestamp_ns: i64 = row.get(1)?;
             let agent_id: String = row.get(2)?;
-            let evidence_ids_json: String = row.get(3)?;
+            let _evidence_ids_json: String = row.get(3)?;
             let evidence_ids_json: String = row.get(4)?;
             let policy_ids_json: String = row.get(5)?;
             let boundary_ids_json: String = row.get(6)?;
@@ -1155,7 +1161,7 @@ async fn serve_run_snapshot_by_id_api(
                 let snapshot_id: String = row.get(0)?;
                 let timestamp_ns: i64 = row.get(1)?;
                 let agent_id: String = row.get(2)?;
-                let evidence_ids: Vec<String> =
+                let _evidence_ids: Vec<String> =
                     serde_json::from_str(&row.get::<_, String>(3)?).unwrap_or_default();
                 let evidence_ids: Vec<String> =
                     serde_json::from_str(&row.get::<_, String>(4)?).unwrap_or_default();
@@ -1520,7 +1526,7 @@ fn sqlite_row_to_snapshot_json(row: &rusqlite::Row) -> rusqlite::Result<serde_js
     let snapshot_id: String = row.get(0)?;
     let timestamp_ns: i64 = row.get(1)?;
     let agent_id: String = row.get(2)?;
-    let evidence_ids_json: String = row.get(3)?;
+    let _evidence_ids_json: String = row.get(3)?;
     let evidence_ids_json: String = row.get(4)?;
     let policy_ids_json: String = row.get(5)?;
     let boundary_ids_json: String = row.get(6)?;
@@ -1629,7 +1635,7 @@ async fn serve_run_agent_snapshots_api(
     };
 
     let rows: Vec<serde_json::Value> = stmt
-        .query_map([agent_id], |row| sqlite_row_to_snapshot_json(row))
+        .query_map([agent_id], sqlite_row_to_snapshot_json)
         .unwrap()
         .filter_map(Result::ok)
         .collect();
@@ -1686,7 +1692,7 @@ async fn serve_run_agent_snapshot_chain_api(
     };
 
     let rows: Vec<serde_json::Value> = stmt
-        .query_map([agent_id], |row| sqlite_row_to_snapshot_json(row))
+        .query_map([agent_id], sqlite_row_to_snapshot_json)
         .unwrap()
         .filter_map(Result::ok)
         .collect();
@@ -2064,7 +2070,10 @@ async fn serve_alerts_api(
     let Some(db_path) = db_path else {
         return Ok(not_found_json(json_error(
             "db_unavailable",
-            run_dir.file_name().and_then(|s| s.to_str()).unwrap_or("unknown"),
+            run_dir
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown"),
             "database",
         )));
     };
@@ -2072,7 +2081,9 @@ async fn serve_alerts_api(
     let conn = match Connection::open(&db_path) {
         Ok(c) => c,
         Err(e) => {
-            return Ok(internal_error_json(format!("failed to open alerts DB: {e}")));
+            return Ok(internal_error_json(format!(
+                "failed to open alerts DB: {e}"
+            )));
         }
     };
 
@@ -2080,7 +2091,7 @@ async fn serve_alerts_api(
         "SELECT alert_id, agent_id, timestamp_ns, display_profile, decision, severity,
                 confidence, authority, reasoning, title, summary, action_hint
          FROM responsibility_alerts
-         ORDER BY timestamp_ns DESC"
+         ORDER BY timestamp_ns DESC",
     ) {
         Ok(s) => s,
         Err(_) => {
@@ -2120,7 +2131,9 @@ fn resolve_responsibility_db_path(run_dir: &Path) -> Option<PathBuf> {
     if let Some(path) = resolve_artifact_from_summary(run_dir, "responsibility_db") {
         return Some(path);
     }
-    let nested = run_dir.join("collector").join("collector.responsibility.db");
+    let nested = run_dir
+        .join("collector")
+        .join("collector.responsibility.db");
     if nested.is_file() {
         return Some(nested);
     }
@@ -2148,7 +2161,10 @@ fn resolve_responsibility_db_path(run_dir: &Path) -> Option<PathBuf> {
 async fn serve_run_db_api(
     run_dir: &Path,
 ) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
-    let run_id = run_dir.file_name().and_then(|s| s.to_str()).unwrap_or("unknown");
+    let run_id = run_dir
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("unknown");
     let Some(db_path) = resolve_responsibility_db_path(run_dir) else {
         return Ok(not_found_json(json_error(
             "db_unavailable",
@@ -2187,11 +2203,11 @@ fn resolve_db_for_alerts(run_dir: &Path) -> Option<PathBuf> {
         Ok(entries) => entries
             .filter_map(|e| e.ok())
             .map(|e| e.path())
-            .filter(|p| p.extension().map_or(false, |ext| ext == "db"))
+            .filter(|p| p.extension().is_some_and(|ext| ext == "db"))
             .filter(|p| {
                 p.file_name()
                     .and_then(|n| n.to_str())
-                    .map_or(false, |n| n.contains("alerts"))
+                    .is_some_and(|n| n.contains("alerts"))
             })
             .collect(),
         Err(_) => return None,
@@ -2288,7 +2304,7 @@ async fn serve_correlation_evidence_api(
     })))
 }
 
-fn alert_accountability_evidence<'a>(evidence: &'a Value) -> &'a Value {
+fn alert_accountability_evidence(evidence: &Value) -> &Value {
     evidence.get("accountability_evidence").unwrap_or(evidence)
 }
 
@@ -2446,13 +2462,11 @@ fn attach_alert_consistency_warnings(
             {
                 warnings.push(serde_json::json!({"code": "accountability_evidence_agent_mismatch", "severity": "warning"}));
             }
-            if let Some(payload_evidence_id) = accountability_payload_evidence_id(&evidence) {
-                if let Some(ids) = causal_evidence_ids {
-                    if !ids.iter().filter_map(Value::as_str).any(|id| id == payload_evidence_id) {
+            if let Some(payload_evidence_id) = accountability_payload_evidence_id(&evidence)
+                && let Some(ids) = causal_evidence_ids
+                    && !ids.iter().filter_map(Value::as_str).any(|id| id == payload_evidence_id) {
                         warnings.push(serde_json::json!({"code": "accountability_evidence_correlation_evidence_mismatch", "severity": "warning", "evidence_id": payload_evidence_id}));
                     }
-                }
-            }
             match causal_evidence_ids {
                 Some(ids) if ids.is_empty() => {
                     warnings.push(serde_json::json!({"code": "correlation_evidence_empty", "severity": "warning"}));
@@ -2934,7 +2948,7 @@ fn load_latest_accountability_snapshot(db_path: &Path) -> Option<serde_json::Val
              ORDER BY timestamp_ns DESC LIMIT 1",
             [],
             |row| {
-                let evidence_ids: Vec<String> =
+                let _evidence_ids: Vec<String> =
                     serde_json::from_str(&row.get::<_, String>(3)?).unwrap_or_default();
                 let evidence_ids: Vec<String> =
                     serde_json::from_str(&row.get::<_, String>(4)?).unwrap_or_default();
@@ -3410,7 +3424,10 @@ fn serve_health(health_state: Option<&Arc<Mutex<HealthState>>>) -> Response<Full
 
             for (stage, metrics) in &guard.stage_metrics {
                 let stage_name = format!("{:?}", stage);
-                stages_map.insert(stage_name, StageMetricsSnapshot::from_stage_metrics(metrics));
+                stages_map.insert(
+                    stage_name,
+                    StageMetricsSnapshot::from_stage_metrics(metrics),
+                );
             }
 
             let uptime = guard.started_at.elapsed().as_secs();
@@ -3565,9 +3582,9 @@ mod tests {
         serve_alerts_api, serve_correlation_evidence_api, serve_events_api,
         serve_run_agent_snapshot_chain_api, serve_run_agent_snapshots_api, serve_run_db_api,
         serve_run_evaluation_api, serve_run_events_api, serve_run_graph_analysis_api,
-        serve_run_snapshot_by_id_api, serve_run_snapshot_chain_api, serve_run_snapshot_cross_diff_api,
-        serve_run_snapshot_diff_api, serve_run_snapshots_api, serve_run_summary_api,
-        serve_runs_index_api,
+        serve_run_snapshot_by_id_api, serve_run_snapshot_chain_api,
+        serve_run_snapshot_cross_diff_api, serve_run_snapshot_diff_api, serve_run_snapshots_api,
+        serve_run_summary_api, serve_runs_index_api,
     };
     use crate::server::assets::FrontendAssets;
     use http_body_util::{BodyExt, Empty};
@@ -3947,11 +3964,7 @@ mod tests {
         let collector_dir = fixture.run_dir().join("collector");
         std::fs::create_dir_all(&collector_dir).unwrap();
         let db_bytes = b"SQLite format 3\x00fake-db-content-abc123";
-        std::fs::write(
-            collector_dir.join("collector.responsibility.db"),
-            db_bytes,
-        )
-        .unwrap();
+        std::fs::write(collector_dir.join("collector.responsibility.db"), db_bytes).unwrap();
 
         let response = serve_run_db_api(fixture.run_dir()).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -4238,7 +4251,6 @@ mod tests {
                 "action_hint": "investigate the privilege escalation immediately"
             }),
         ]);
-
 
         let response = serve_alerts_api(fixture.run_dir()).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -8374,7 +8386,13 @@ mod tests {
                 .serve_connection(
                     TokioIo::new(server_io),
                     service_fn(move |req| {
-                        handle_request(req, server_assets.clone(), server_sender.clone(), None, None)
+                        handle_request(
+                            req,
+                            server_assets.clone(),
+                            server_sender.clone(),
+                            None,
+                            None,
+                        )
                     }),
                 )
                 .await

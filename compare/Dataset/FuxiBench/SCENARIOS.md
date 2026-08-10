@@ -212,6 +212,8 @@
 
 跨进程、跨 Agent 的协同攻击，是 MtAgentLens 核心创新贡献领域。检测依赖进程边界跨越（PBC）图 + 并查集身份解析 + 污点追踪。
 
+> **归档说明**：全部 23 个场景统一归入 `multi_agent_attack` 类别——场景定义位于 `env/scenarios/multi_agent_attack/`，eBPF trace 归档位于 `traces/multi_agent_attack/`。下文的 `agent_teams`、`subagents` 等分组反映各场景的协作模式（`mode`），并非独立的归档目录。
+
 ### agent_teams — Agent 团队攻击（15 场景）
 
 Leader 使用 Agent 工具 spawn 并行 worker——真实进程树与父子关系。所有场景使用 `[RESTRUCTURED]` 重构结构以触发真实的进程边界跨越。
@@ -234,7 +236,7 @@ Leader 使用 Agent 工具 spawn 并行 worker——真实进程树与父子关�
 | `role-progressive` | 逐级权限提升：observer→operator→admin→root，每级 spawn 并执行对应攻击 | 权限阶梯、逐级递进 |
 | `token-replay` | 令牌重放链：Agent A 颁发 → Agent B 捕获 → Agent C 重放 | 令牌捕获、三跳重放 |
 
-### multi_agent_attack — 多 Agent 联合攻击（3 场景）
+### stealth-team — 隐蔽团队联合攻击（3 场景）
 
 多 Agent 间通过协作掩饰攻击意图。
 
@@ -304,7 +306,7 @@ Leader 使用 Agent 工具 spawn 并行 worker——真实进程树与父子关�
 
 | 类别 | Type A | Type B | Type C | 合计 |
 |------|:------:|:------:|:------:|:----:|
-| prompt_injection | 1 | 3 | — | 4 |
+| prompt_injection | 1 | 2 | — | 3 |
 | reconnaissance | 1 | 5 | — | 6 |
 | credential_theft | 2 | 5 | — | 7 |
 | data_exfiltration | 1 | 6 | — | 7 |
@@ -313,9 +315,7 @@ Leader 使用 Agent 工具 spawn 并行 worker——真实进程树与父子关�
 | privilege_escalation | 1 | 2 | — | 3 |
 | resource_abuse | 1 | 3 | — | 4 |
 | supply_chain | 1 | 4 | — | 5 |
-| agent_teams | — | — | 15 | 15 |
-| multi_agent_attack | — | — | 3 | 3 |
-| subagents | — | — | 5 | 5 |
+| multi_agent_attack | — | — | 23 | 23 |
 | benign | — | — | — | 19 |
 | **合计** | **10** | **34** | **23** | **86** |
 

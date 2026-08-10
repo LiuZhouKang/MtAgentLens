@@ -85,10 +85,10 @@ impl CanonicalizeCache {
         let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
 
         // Evict LRU entry if at capacity
-        if self.cache.len() >= self.max_size {
-            if let Some(lru) = self.access_order.pop() {
-                self.cache.remove(&lru);
-            }
+        if self.cache.len() >= self.max_size
+            && let Some(lru) = self.access_order.pop()
+        {
+            self.cache.remove(&lru);
         }
 
         self.cache.insert(path.to_path_buf(), canonical.clone());
@@ -192,12 +192,18 @@ impl FileAccessAuditAnalyzer {
     ///
     /// Uses `Path::starts_with` against pre-resolved workspace roots.
     /// Symlinks are canonicalized via the LRU cache behind the mutex.
-    fn resolve_boundary(filepath: &str, workspace_roots: &[PathBuf], state: &Arc<Mutex<FileAccessAuditState>>) -> &'static str {
+    fn resolve_boundary(
+        filepath: &str,
+        workspace_roots: &[PathBuf],
+        state: &Arc<Mutex<FileAccessAuditState>>,
+    ) -> &'static str {
         let path = Path::new(filepath);
         let inside = {
             let mut guard = state.lock().expect("FileAccessAuditState lock poisoned");
             let resolved = guard.canonicalize_cache.get_or_resolve(path);
-            let inside = workspace_roots.iter().any(|root| resolved.starts_with(root));
+            let inside = workspace_roots
+                .iter()
+                .any(|root| resolved.starts_with(root));
 
             // Log first 10 boundary decisions for operator verification
             if guard.boundary_log_count < 10 {
@@ -216,19 +222,30 @@ impl FileAccessAuditAnalyzer {
     }
 
     /// Classify risk level for a file access.
-    fn classify_risk(access_type: FileAccessType, filepath: &str, boundary: &str, config: &FileAccessAuditConfig) -> (&'static str, Option<String>) {
+    fn classify_risk(
+        access_type: FileAccessType,
+        filepath: &str,
+        boundary: &str,
+        config: &FileAccessAuditConfig,
+    ) -> (&'static str, Option<String>) {
         // High risk: writes to system directories
         if access_type == FileAccessType::Write && config.flag_system_writes {
             for sys_dir in SYSTEM_WRITE_DIRS {
                 if filepath.starts_with(sys_dir) {
-                    return ("high", Some(format!("Write to system directory: {}", sys_dir)));
+                    return (
+                        "high",
+                        Some(format!("Write to system directory: {}", sys_dir)),
+                    );
                 }
             }
         }
 
         // Medium risk: any access outside workspace
         if boundary == "outside" {
-            return ("medium", Some("Access outside workspace boundary".to_string()));
+            return (
+                "medium",
+                Some("Access outside workspace boundary".to_string()),
+            );
         }
 
         // Low risk: all other access
@@ -236,7 +253,12 @@ impl FileAccessAuditAnalyzer {
     }
 
     /// Process a single FILE_OPEN event from the process source.
-    fn process_file_open(event: &Event, config: &FileAccessAuditConfig, workspace_roots: &[PathBuf], state: &Arc<Mutex<FileAccessAuditState>>) -> Vec<Event> {
+    fn process_file_open(
+        event: &Event,
+        config: &FileAccessAuditConfig,
+        workspace_roots: &[PathBuf],
+        state: &Arc<Mutex<FileAccessAuditState>>,
+    ) -> Vec<Event> {
         let filepath = event
             .data
             .get("filepath")
@@ -251,19 +273,24 @@ impl FileAccessAuditAnalyzer {
 
         let access_type = Self::classify_access_type(filepath, flags);
         let boundary = Self::resolve_boundary(filepath, workspace_roots, state);
-        let (risk_level, risk_reason) = Self::classify_risk(access_type, filepath, boundary, config);
-        let severity = if boundary == "outside" { "warn" } else { "info" };
+        let (risk_level, risk_reason) =
+            Self::classify_risk(access_type, filepath, boundary, config);
+        let severity = if boundary == "outside" {
+            "warn"
+        } else {
+            "info"
+        };
 
         // Build the file_context from available eBPF fields
         let file_context = KernelFileContext {
             path: filepath.to_string(),
-            inode: None,        // not emitted by current eBPF probe
-            size: None,         // not emitted by current eBPF probe
+            inode: None, // not emitted by current eBPF probe
+            size: None,  // not emitted by current eBPF probe
             mode: event.data.get("flags").and_then(Value::as_u64).unwrap_or(0) as u32,
-            uid: None,          // not emitted by current eBPF probe
-            gid: None,          // not emitted by current eBPF probe
-            atime: None,        // not emitted by current eBPF probe
-            mtime: None,        // not emitted by current eBPF probe
+            uid: None,   // not emitted by current eBPF probe
+            gid: None,   // not emitted by current eBPF probe
+            atime: None, // not emitted by current eBPF probe
+            mtime: None, // not emitted by current eBPF probe
         };
 
         // Build the file_access audit event
@@ -449,7 +476,10 @@ mod tests {
 
         let output: Vec<Event> = stream.collect().await;
         let original = output.iter().find(|e| e.source == "process");
-        assert!(original.is_some(), "original process event should be in output");
+        assert!(
+            original.is_some(),
+            "original process event should be in output"
+        );
         assert_eq!(output.len(), 2, "should emit original + file_access events");
     }
 

@@ -1,6 +1,15 @@
 'use client';
 
-import { Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import {
+  Suspense,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import gsap from 'gsap';
@@ -14,7 +23,9 @@ import { useAlertModels } from '@/lib/use-alert-models';
 import { useAppStore } from '@/lib/store';
 import type { ResponsibilityAlert } from '@/lib/types';
 
-function formatPercent(v: number) { return `${Math.round(v * 100)}%`; }
+function formatPercent(v: number) {
+  return `${Math.round(v * 100)}%`;
+}
 function formatRuntimeAge(ts: number, anchor: number) {
   const d = Math.max(0, Math.round((anchor - ts) / 1_000_000));
   if (d < 1000) return `${d} ms 前`;
@@ -34,7 +45,7 @@ function decisionLabel(d: ResponsibilityAlert['decision']) {
 }
 
 const TABS = [
-  { href: '/', label: '态势' },
+  { href: '/console', label: '态势' },
   { href: '/overview', label: '仪表盘' },
   { href: '/investigations', label: '告警' },
   { href: '/traces', label: '追踪' },
@@ -77,7 +88,8 @@ function PageTab({ href, label, active }: { href: string; label: string; active:
 function MainShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const isHome = pathname === '/';
+  // The console home (态势) moved to /console when the landing claimed the root.
+  const isHome = pathname === '/console';
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   // ── Route-transition loading overlay ──
@@ -102,8 +114,8 @@ function MainShell({ children }: { children: React.ReactNode }) {
       const anchor = (e.target as HTMLElement).closest('a[href]') as HTMLAnchorElement | null;
       if (!anchor) return;
       const href = anchor.getAttribute('href');
-      if (!href || !href.startsWith('/')) return;      // internal page nav only
-      if (href.startsWith('/#')) return;               // hash anchors — let Next handle
+      if (!href || !href.startsWith('/')) return; // internal page nav only
+      if (href.startsWith('/#')) return; // hash anchors — let Next handle
       if (anchor.target === '_blank') return;
       // Same page (incl. query-only like ?alert=...) → native nav, no loader
       if (new URL(href, window.location.href).pathname === pathname) return;
@@ -135,13 +147,17 @@ function MainShell({ children }: { children: React.ReactNode }) {
     loaderTimerRef.current = null;
     setShowLoader(false);
     if (contentRef.current) {
-      gsap.fromTo(contentRef.current, { opacity: 0, y: 10 }, {
-        opacity: 1,
-        y: 0,
-        duration: 0.45,
-        ease: 'power2.out',
-        clearProps: 'transform,opacity',
-      });
+      gsap.fromTo(
+        contentRef.current,
+        { opacity: 0, y: 10 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.45,
+          ease: 'power2.out',
+          clearProps: 'transform,opacity',
+        },
+      );
     }
   }, []);
 
@@ -183,7 +199,10 @@ function MainShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setPaletteOpen(true); }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setPaletteOpen(true);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -232,37 +251,80 @@ function MainShell({ children }: { children: React.ReactNode }) {
     localStorage.setItem('mtlens:rail-width', String(Math.round(w)));
   }, []);
 
-return (
-    <div className="linear-root ln-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+  return (
+    <div
+      className="linear-root ln-page"
+      style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}
+    >
       {/* Top bar — brand logo + page tabs + ⌘K */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        height: 32, padding: '0 10px', flexShrink: 0,
-        position: 'relative', zIndex: 1000,
-        background: 'rgba(1,1,2,0.82)', backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        gap: 6,
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          height: 32,
+          padding: '0 10px',
+          flexShrink: 0,
+          position: 'relative',
+          zIndex: 1000,
+          background: 'rgba(1,1,2,0.82)',
+          backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          gap: 6,
+        }}
+      >
         {/* brand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <MtlLogo size={18} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#fafafa', letterSpacing: '-0.02em' }}>MtAgentLens</span>
+          <span
+            style={{ fontSize: 12, fontWeight: 600, color: '#fafafa', letterSpacing: '-0.02em' }}
+          >
+            MtAgentLens
+          </span>
         </div>
 
         {/* page tabs */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, justifyContent: 'center' }} aria-label="页面导航">
-          {TABS.map(tab => {
-            const active = tab.href === '/' ? pathname === '/' : pathname.startsWith(tab.href);
+        <nav
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            flex: 1,
+            justifyContent: 'center',
+          }}
+          aria-label="页面导航"
+        >
+          {TABS.map((tab) => {
+            const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
             return <PageTab key={tab.href} href={tab.href} active={active} label={tab.label} />;
           })}
         </nav>
 
         <RunSelector />
-        <button type="button" onClick={() => setPaletteOpen(true)} style={{ padding: '0 5px', borderRadius: 3, border: '1px solid rgba(255,255,255,0.08)', background: 'none', fontSize: 9, fontFamily: 'var(--ln-mono, monospace)', color: 'rgba(255,255,255,0.25)', lineHeight: '16px', flexShrink: 0, cursor: 'pointer' }}>⌘K</button>
+        <button
+          type="button"
+          onClick={() => setPaletteOpen(true)}
+          style={{
+            padding: '0 5px',
+            borderRadius: 3,
+            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'none',
+            fontSize: 9,
+            fontFamily: 'var(--ln-mono, monospace)',
+            color: 'rgba(255,255,255,0.25)',
+            lineHeight: '16px',
+            flexShrink: 0,
+            cursor: 'pointer',
+          }}
+        >
+          ⌘K
+        </button>
       </div>
 
       {/* Content area */}
-      <div style={{ display: 'flex', flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden' }}>
+      <div
+        style={{ display: 'flex', flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden' }}
+      >
         {hasData && (
           <div
             style={
@@ -303,9 +365,22 @@ return (
                 className="incident-rail"
                 data-theme="apple-pro"
                 aria-label="事件调查控制轨"
-                style={{ position: 'relative', top: 'auto', left: 'auto', width: 58, height: '100%' }}
+                style={{
+                  position: 'relative',
+                  top: 'auto',
+                  left: 'auto',
+                  width: 58,
+                  height: '100%',
+                }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100%',
+                  }}
+                >
                   <LoadingIndicator size={32} label="构建中" />
                 </div>
               </aside>
@@ -313,7 +388,9 @@ return (
           </div>
         )}
         <div
-          ref={(el) => { contentRef.current = el as HTMLDivElement; }}
+          ref={(el) => {
+            contentRef.current = el as HTMLDivElement;
+          }}
           style={
             isHome
               ? { position: 'absolute', inset: 0 }

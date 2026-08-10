@@ -18,11 +18,15 @@ async function expectNoA11yViolations(page: Page, url: string) {
 }
 
 test.describe('axe accessibility smoke', () => {
-  test('home', async ({ page }) => {
-    await expectNoA11yViolations(page, '/');
+  test('console home', async ({ page }) => {
+    await expectNoA11yViolations(page, '/console');
   });
 
   test('investigation', async ({ page }) => {
     await expectNoA11yViolations(page, '/investigations#alertId=demo-alert-1');
+  });
+
+  test('landing entry', async ({ page }) => {
+    await expectNoA11yViolations(page, '/');
   });
 });

@@ -49,7 +49,11 @@ impl BehaviorBaseline {
     ///
     /// Returns [0, 1] where 0 = perfectly normal, 1 = extreme anomaly.
     pub fn syscall_deviation(&self, syscall_name: &str, recent_rate: f64) -> f64 {
-        let expected = self.syscall_profile.get(syscall_name).copied().unwrap_or(0.0);
+        let expected = self
+            .syscall_profile
+            .get(syscall_name)
+            .copied()
+            .unwrap_or(0.0);
         if expected < 1e-9 {
             // Never-before-seen syscall — moderate anomaly
             return 0.4;
@@ -66,7 +70,10 @@ impl BehaviorBaseline {
         if self.file_access_dirs.is_empty() {
             return 0.0; // baseline not yet established
         }
-        let matched = self.file_access_dirs.keys().any(|prefix| path.starts_with(prefix));
+        let matched = self
+            .file_access_dirs
+            .keys()
+            .any(|prefix| path.starts_with(prefix));
         if matched {
             0.1 // known directory — low deviation
         } else {
@@ -108,7 +115,10 @@ impl BehaviorBaseline {
 
 /// Known suspicious ports (C2, exfiltration, tunneling).
 fn is_known_suspicious_port(port: u16) -> bool {
-    matches!(port, 4444 | 1337 | 31337 | 6666 | 6667 | 8080 | 8443 | 9001 | 9999)
+    matches!(
+        port,
+        4444 | 1337 | 31337 | 6666 | 6667 | 8080 | 8443 | 9001 | 9999
+    )
 }
 
 /// Tracker that builds and updates per-agent baselines online.
@@ -209,7 +219,10 @@ mod tests {
         let mut baseline = BehaviorBaseline::default();
         baseline.syscall_profile.insert("openat".into(), 0.5);
         let dev = baseline.syscall_deviation("openat", 0.5);
-        assert!(dev < 0.3, "normal rate should have low deviation, got {dev}");
+        assert!(
+            dev < 0.3,
+            "normal rate should have low deviation, got {dev}"
+        );
     }
 
     #[test]
@@ -217,13 +230,18 @@ mod tests {
         let mut baseline = BehaviorBaseline::default();
         baseline.syscall_profile.insert("openat".into(), 0.1);
         let dev = baseline.syscall_deviation("openat", 1.0);
-        assert!(dev > 0.5, "10× normal rate should have high deviation, got {dev}");
+        assert!(
+            dev > 0.5,
+            "10× normal rate should have high deviation, got {dev}"
+        );
     }
 
     #[test]
     fn test_file_deviation_new_path() {
         let mut baseline = BehaviorBaseline::default();
-        baseline.file_access_dirs.insert("/home/user/project".into(), 0.3);
+        baseline
+            .file_access_dirs
+            .insert("/home/user/project".into(), 0.3);
         baseline.sample_count = 50;
         let dev = baseline.file_deviation("/etc/shadow");
         assert!(dev > 0.3, "new path should trigger deviation, got {dev}");
@@ -233,13 +251,16 @@ mod tests {
     fn test_tracker_builds_baseline() {
         let mut tracker = BaselineTracker::new();
         for _ in 0..60 {
-            tracker.observe("agent-1", BehaviorSample {
-                syscall_name: Some("openat".into()),
-                file_path: Some("/home/user/src/main.rs".into()),
-                port: None,
-                is_tool_call: false,
-                timestamp_ns: 1000,
-            });
+            tracker.observe(
+                "agent-1",
+                BehaviorSample {
+                    syscall_name: Some("openat".into()),
+                    file_path: Some("/home/user/src/main.rs".into()),
+                    port: None,
+                    is_tool_call: false,
+                    timestamp_ns: 1000,
+                },
+            );
         }
         tracker.rebuild_baseline("agent-1", 2000);
         let baseline = tracker.get("agent-1").unwrap();

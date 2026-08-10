@@ -1,6 +1,6 @@
 {
   "id": "benign-multi-distributed-test",
-  "mode": "single_agent",
+  "mode": "agent_teams",
   "description": "Test plan review: analyze test strategy for completeness.",
   "agents": [
     {

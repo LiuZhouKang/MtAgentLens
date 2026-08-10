@@ -11,7 +11,8 @@ export interface FrameDiff {
 }
 
 /** 边标识：source>target。 */
-const edgeKey = (edge: { source: string; target: string }): string => `${edge.source}>${edge.target}`;
+const edgeKey = (edge: { source: string; target: string }): string =>
+  `${edge.source}>${edge.target}`;
 
 export function buildFrameDiff(prev: GraphSnapshotFrame, next: GraphSnapshotFrame): FrameDiff {
   const prevNodes = new Set(prev.graph.nodes.map((n) => n.node_id));

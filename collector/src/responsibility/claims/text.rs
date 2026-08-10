@@ -5,8 +5,7 @@
 
 use crate::responsibility::graph::ResponsibilityGraph;
 use crate::responsibility::types::{
-    AgentId, DisplayProfile, ResponsibilityClaim, ResponsibilityClaimState,
-    ResponsibilityClaimType,
+    AgentId, DisplayProfile, ResponsibilityClaim, ResponsibilityClaimState, ResponsibilityClaimType,
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -29,7 +28,7 @@ impl AlertBuilderText {
                     DisplayProfile::ObserverJudged => {
                         "Observer review complete — no claims generated".to_string()
                     }
-                }
+                };
             }
         };
 
@@ -101,7 +100,12 @@ impl AlertBuilderText {
             .count();
         let capability_count = claims
             .iter()
-            .filter(|c| matches!(c.claim_type, ResponsibilityClaimType::UnauthorizedCapabilityUse))
+            .filter(|c| {
+                matches!(
+                    c.claim_type,
+                    ResponsibilityClaimType::UnauthorizedCapabilityUse
+                )
+            })
             .count();
 
         let mut detail = String::new();
@@ -161,7 +165,9 @@ impl AlertBuilderText {
         // Add competing explanation context.
         let has_competing = claims.iter().any(|c| !c.competing_explanations.is_empty());
         if has_competing {
-            parts.push("Competing explanations exist for some claims — review is recommended.".to_string());
+            parts.push(
+                "Competing explanations exist for some claims — review is recommended.".to_string(),
+            );
         }
 
         // Confidence assessment.
@@ -175,7 +181,9 @@ impl AlertBuilderText {
         } else if avg_confidence > 0.50 {
             parts.push("Moderate confidence — further investigation may be warranted.".to_string());
         } else {
-            parts.push("Low confidence — these claims are tentative and require verification.".to_string());
+            parts.push(
+                "Low confidence — these claims are tentative and require verification.".to_string(),
+            );
         }
 
         parts.join(" ")
@@ -269,11 +277,7 @@ fn claim_state_label(cs: &ResponsibilityClaimState) -> &'static str {
 fn truncate_agent(agent_id: &AgentId) -> &str {
     let s: &str = agent_id.as_str();
     // Show at most the first 12 characters for display.
-    if s.len() > 12 {
-        &s[..12]
-    } else {
-        s
-    }
+    if s.len() > 12 { &s[..12] } else { s }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -318,8 +322,7 @@ mod tests {
             0.75,
             "agent-abc123",
         );
-        let title =
-            AlertBuilderText::generate_title(Some(&claim), &DisplayProfile::SafeBaseline);
+        let title = AlertBuilderText::generate_title(Some(&claim), &DisplayProfile::SafeBaseline);
         assert!(title.contains("Baseline safe"));
         assert!(title.contains("agent-abc123"));
         assert!(title.contains("75%"));
@@ -333,8 +336,7 @@ mod tests {
             0.90,
             "agent-xyz",
         );
-        let title =
-            AlertBuilderText::generate_title(Some(&claim), &DisplayProfile::UnsafeByEngine);
+        let title = AlertBuilderText::generate_title(Some(&claim), &DisplayProfile::UnsafeByEngine);
         assert!(title.contains("Engine alert"));
         assert!(title.contains("agent-xyz"));
         assert!(title.contains("Tainted Context Use"));
@@ -348,8 +350,7 @@ mod tests {
             0.60,
             "agent-delegate",
         );
-        let title =
-            AlertBuilderText::generate_title(Some(&claim), &DisplayProfile::ObserverJudged);
+        let title = AlertBuilderText::generate_title(Some(&claim), &DisplayProfile::ObserverJudged);
         assert!(title.contains("Observer reviewed"));
         assert!(title.contains("Suspicious Delegation"));
     }
@@ -357,7 +358,10 @@ mod tests {
     #[test]
     fn test_generate_title_none_claim() {
         let title = AlertBuilderText::generate_title(None, &DisplayProfile::SafeBaseline);
-        assert_eq!(title, "Agent activity observed — no policy violations detected");
+        assert_eq!(
+            title,
+            "Agent activity observed — no policy violations detected"
+        );
     }
 
     #[test]

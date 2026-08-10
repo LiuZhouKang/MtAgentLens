@@ -306,16 +306,35 @@ mod tests {
         let mut analyzer = ObservabilityMetricsAnalyzer::new_observer();
 
         let events = vec![
-            Event::new("ssl".to_string(), 1001, "python".to_string(), json!({"msg": "a"})),
-            Event::new("ssl".to_string(), 1001, "python".to_string(), json!({"msg": "b"})),
-            Event::new("process".to_string(), 2002, "bash".to_string(), json!({"msg": "c"})),
+            Event::new(
+                "ssl".to_string(),
+                1001,
+                "python".to_string(),
+                json!({"msg": "a"}),
+            ),
+            Event::new(
+                "ssl".to_string(),
+                1001,
+                "python".to_string(),
+                json!({"msg": "b"}),
+            ),
+            Event::new(
+                "process".to_string(),
+                2002,
+                "bash".to_string(),
+                json!({"msg": "c"}),
+            ),
         ];
         let stream: EventStream = Box::pin(stream::iter(events));
 
         let output = analyzer.process(stream).await.unwrap();
         let collected: Vec<_> = output.collect().await;
 
-        assert_eq!(collected.len(), 3, "observer mode passes all events through");
+        assert_eq!(
+            collected.len(),
+            3,
+            "observer mode passes all events through"
+        );
         assert_eq!(analyzer.total_events_observed(), 3);
 
         let per_source = analyzer.per_source_counts();
@@ -326,15 +345,30 @@ mod tests {
     #[tokio::test]
     async fn test_emission_mode_injects_summary_events() {
         let mut analyzer = ObservabilityMetricsAnalyzer::new(
-            true,                  // emit summaries
+            true,                      // emit summaries
             Duration::from_millis(50), // fast tick for test
             128,
         );
 
         let events = vec![
-            Event::new("ssl".to_string(), 1001, "python".to_string(), json!({"msg": "x"})),
-            Event::new("ssl".to_string(), 1001, "python".to_string(), json!({"msg": "y"})),
-            Event::new("process".to_string(), 2002, "bash".to_string(), json!({"msg": "z"})),
+            Event::new(
+                "ssl".to_string(),
+                1001,
+                "python".to_string(),
+                json!({"msg": "x"}),
+            ),
+            Event::new(
+                "ssl".to_string(),
+                1001,
+                "python".to_string(),
+                json!({"msg": "y"}),
+            ),
+            Event::new(
+                "process".to_string(),
+                2002,
+                "bash".to_string(),
+                json!({"msg": "z"}),
+            ),
         ];
         let stream: EventStream = Box::pin(stream::iter(events));
 
@@ -388,14 +422,7 @@ mod tests {
         let mut analyzer = ObservabilityMetricsAnalyzer::new_observer();
 
         let events: Vec<Event> = (0..10)
-            .map(|i| {
-                Event::new(
-                    "test".to_string(),
-                    i,
-                    "test".to_string(),
-                    json!({"idx": i}),
-                )
-            })
+            .map(|i| Event::new("test".to_string(), i, "test".to_string(), json!({"idx": i})))
             .collect();
 
         let stream: EventStream = Box::pin(stream::iter(events));
@@ -403,10 +430,6 @@ mod tests {
 
         let rate = analyzer.current_rate();
         // With 10 events fired in quick succession, rate should be positive.
-        assert!(
-            rate >= 0.0,
-            "rate should be non-negative, got {}",
-            rate
-        );
+        assert!(rate >= 0.0, "rate should be non-negative, got {}", rate);
     }
 }

@@ -72,8 +72,8 @@ impl ClaimId {
     /// Deterministic ClaimId from the logical composite key.
     /// Same (subject, policy, boundary, claim_type) → same id every time.
     pub fn from_key(parts: &[&str]) -> Self {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
         let mut h = DefaultHasher::new();
         for p in parts {
             p.hash(&mut h);

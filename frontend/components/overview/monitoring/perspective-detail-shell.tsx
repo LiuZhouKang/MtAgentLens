@@ -1,20 +1,25 @@
-'use client'
+'use client';
 
-import type { PerspectiveKey, MonitoringState } from '@/lib/monitoring/monitoring-types'
-import { PERSPECTIVE_META } from './perspective-config'
-import { renderPerspectiveView } from './perspective-views'
+import type { PerspectiveKey, MonitoringState } from '@/lib/monitoring/monitoring-types';
+import { PERSPECTIVE_META } from './perspective-config';
+import { renderPerspectiveView } from './perspective-views';
 
 type Props = {
-  perspectiveKey: PerspectiveKey
-  monitoring: MonitoringState
-  onBack: () => void
-  onFocusAgent: (agentId: string) => void
-}
+  perspectiveKey: PerspectiveKey;
+  monitoring: MonitoringState;
+  onBack: () => void;
+  onFocusAgent: (agentId: string) => void;
+};
 
 /** 详情工作台统一外壳：面包屑 + 标题/描述 + 摘要统计行 + 视图内容。 */
-export function PerspectiveDetailShell({ perspectiveKey, monitoring, onBack, onFocusAgent }: Props) {
-  const meta = PERSPECTIVE_META[perspectiveKey]
-  const h = monitoring.health[perspectiveKey]
+export function PerspectiveDetailShell({
+  perspectiveKey,
+  monitoring,
+  onBack,
+  onFocusAgent,
+}: Props) {
+  const meta = PERSPECTIVE_META[perspectiveKey];
+  const h = monitoring.health[perspectiveKey];
 
   return (
     <div aria-label={`${meta.label}详情`}>
@@ -24,9 +29,17 @@ export function PerspectiveDetailShell({ perspectiveKey, monitoring, onBack, onF
         </button>
         <span className="ln-eyebrow">运行监控 / {meta.label}</span>
       </div>
-      <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ln-text-muted)', lineHeight: 1.6 }}>{meta.description}</p>
+      <p
+        style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ln-text-muted)', lineHeight: 1.6 }}
+      >
+        {meta.description}
+      </p>
       {h.available ? (
-        <div role="group" aria-label="摘要统计" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+        <div
+          role="group"
+          aria-label="摘要统计"
+          style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}
+        >
           {h.signals.map((s, i) => (
             <span key={i} className="ln-badge" data-tone={i === 0 ? 'info' : 'muted'}>
               {s}
@@ -40,5 +53,5 @@ export function PerspectiveDetailShell({ perspectiveKey, monitoring, onBack, onF
       )}
       {renderPerspectiveView(perspectiveKey, monitoring, onFocusAgent)}
     </div>
-  )
+  );
 }

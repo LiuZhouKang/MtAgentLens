@@ -53,7 +53,13 @@ const NODE_LABEL_LIMIT = 60;
 // Blend a hex color toward white (amount 0..1) for neighbor highlight
 function lightenColor(hex: string, amount: number): string {
   const c = hex.replace('#', '');
-  const full = c.length === 3 ? c.split('').map((x) => x + x).join('') : c;
+  const full =
+    c.length === 3
+      ? c
+          .split('')
+          .map((x) => x + x)
+          .join('')
+      : c;
   const r = parseInt(full.slice(0, 2), 16);
   const g = parseInt(full.slice(2, 4), 16);
   const b = parseInt(full.slice(4, 6), 16);
@@ -64,7 +70,13 @@ function lightenColor(hex: string, amount: number): string {
 // Blend a hex color toward black (amount 0..1) for non-neighbor dim
 function dimColor(hex: string, amount: number): string {
   const c = hex.replace('#', '');
-  const full = c.length === 3 ? c.split('').map((x) => x + x).join('') : c;
+  const full =
+    c.length === 3
+      ? c
+          .split('')
+          .map((x) => x + x)
+          .join('')
+      : c;
   const r = parseInt(full.slice(0, 2), 16);
   const g = parseInt(full.slice(2, 4), 16);
   const b = parseInt(full.slice(4, 6), 16);
@@ -75,7 +87,13 @@ function dimColor(hex: string, amount: number): string {
 // Minimal render shape — raw graph and LOD summary both convert into it, so the
 // builder never depends on the (heavier) full ResponsibilityNode type.
 type RenderNode = { id: string; node_type: string };
-type RenderEdge = { source: string; target: string; edge_type: string; edge_id: string; confidence: number };
+type RenderEdge = {
+  source: string;
+  target: string;
+  edge_type: string;
+  edge_id: string;
+  confidence: number;
+};
 type RenderGraph = { nodes: RenderNode[]; edges: RenderEdge[] };
 
 function toRenderGraph(graph: GraphData): RenderGraph {
@@ -157,8 +175,16 @@ export function SigmaNetwork({
 
   // Cache data identity — avoid O(n log n) sort on every render
   const dataKey = useMemo(
-    () => renderGraph.nodes.map((n) => n.id).sort().join(',') + '|' +
-      renderGraph.edges.map((e) => e.edge_id).sort().join(','),
+    () =>
+      renderGraph.nodes
+        .map((n) => n.id)
+        .sort()
+        .join(',') +
+      '|' +
+      renderGraph.edges
+        .map((e) => e.edge_id)
+        .sort()
+        .join(','),
     [renderGraph],
   );
   const dataKeyRef = useRef(dataKey);
@@ -221,7 +247,8 @@ export function SigmaNetwork({
         );
         const rest = edgeSource
           .filter(
-            (e) => e.edge_type !== 'PolicyBoundaryCrossing' && e.edge_type !== 'ViolationProvenance',
+            (e) =>
+              e.edge_type !== 'PolicyBoundaryCrossing' && e.edge_type !== 'ViolationProvenance',
           )
           .sort((a, b) => b.confidence - a.confidence);
         edgeSource = [...critical, ...rest].slice(0, EDGE_RENDER_BUDGET);
@@ -266,15 +293,29 @@ export function SigmaNetwork({
 
       // guarantee coords
       g.forEachNode((node, attr) => {
-        if (typeof attr.x !== 'number' || !Number.isFinite(attr.x)) attr.x = (Math.random() - 0.5) * 0.5;
-        if (typeof attr.y !== 'number' || !Number.isFinite(attr.y)) attr.y = (Math.random() - 0.5) * 0.5;
+        if (typeof attr.x !== 'number' || !Number.isFinite(attr.x))
+          attr.x = (Math.random() - 0.5) * 0.5;
+        if (typeof attr.y !== 'number' || !Number.isFinite(attr.y))
+          attr.y = (Math.random() - 0.5) * 0.5;
       });
 
       // normalize to [-1, 1]
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      g.forEachNode((_n, attr) => { minX = Math.min(minX, attr.x); maxX = Math.max(maxX, attr.x); minY = Math.min(minY, attr.y); maxY = Math.max(maxY, attr.y); });
-      const rx = Math.max(maxX - minX, 1), ry = Math.max(maxY - minY, 1);
-      g.forEachNode((_n, attr) => { attr.x = ((attr.x - minX) / rx - 0.5) * 2; attr.y = ((attr.y - minY) / ry - 0.5) * 2; });
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
+      g.forEachNode((_n, attr) => {
+        minX = Math.min(minX, attr.x);
+        maxX = Math.max(maxX, attr.x);
+        minY = Math.min(minY, attr.y);
+        maxY = Math.max(maxY, attr.y);
+      });
+      const rx = Math.max(maxX - minX, 1),
+        ry = Math.max(maxY - minY, 1);
+      g.forEachNode((_n, attr) => {
+        attr.x = ((attr.x - minX) / rx - 0.5) * 2;
+        attr.y = ((attr.y - minY) / ry - 0.5) * 2;
+      });
 
       // highlight edges by original edge_id (multi-graph keys differ)
       const highlightList = highlightedRef.current;
@@ -337,14 +378,28 @@ export function SigmaNetwork({
             return { ...data, color: '#ffffff', size: (data.size ?? 5) * 1.4, label: data.label };
           }
           if (hoverNeighborSet.has(node)) {
-            return { ...data, color: lightenColor(data.color ?? NODE_DEFAULT, 0.22), size: (data.size ?? 5) * 1.1 };
+            return {
+              ...data,
+              color: lightenColor(data.color ?? NODE_DEFAULT, 0.22),
+              size: (data.size ?? 5) * 1.1,
+            };
           }
         }
         if (neighborSet.has(node)) {
-          return { ...data, color: lightenColor(data.color ?? NODE_DEFAULT, 0.35), size: (data.size ?? 5) * 1.15, label: data.label };
+          return {
+            ...data,
+            color: lightenColor(data.color ?? NODE_DEFAULT, 0.35),
+            size: (data.size ?? 5) * 1.15,
+            label: data.label,
+          };
         }
         if (isDragging) {
-          return { ...data, color: dimColor(data.color ?? NODE_DEFAULT, 0.35), size: (data.size ?? 5) * 0.85, label: '' };
+          return {
+            ...data,
+            color: dimColor(data.color ?? NODE_DEFAULT, 0.35),
+            size: (data.size ?? 5) * 0.85,
+            label: '',
+          };
         }
         return data;
       });
@@ -444,9 +499,13 @@ export function SigmaNetwork({
     };
 
     // Defer heavy work to idle — never block the main thread on mount
-    const idle = (window as any).requestIdleCallback ??
-      ((cb: () => void) => setTimeout(cb, 50));
-    const idleHandle = idle(() => { buildGraph(); }, { timeout: 400 });
+    const idle = (window as any).requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 50));
+    const idleHandle = idle(
+      () => {
+        buildGraph();
+      },
+      { timeout: 400 },
+    );
 
     return () => {
       cancelled = true;
@@ -488,7 +547,8 @@ export function SigmaNetwork({
       {!built && (
         <div
           style={{
-            position: 'absolute', inset: 0,
+            position: 'absolute',
+            inset: 0,
             zIndex: 2,
           }}
         >
@@ -512,10 +572,26 @@ export function SigmaNetwork({
             maxWidth: 220,
           }}
         >
-          <div style={{ color: '#fafafa', fontWeight: 500, fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div
+            style={{
+              color: '#fafafa',
+              fontWeight: 500,
+              fontSize: 11,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
             {hoverInfo.label}
           </div>
-          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontFamily: 'var(--ln-mono, monospace)', marginTop: 2 }}>
+          <div
+            style={{
+              color: 'rgba(255,255,255,0.45)',
+              fontSize: 10,
+              fontFamily: 'var(--ln-mono, monospace)',
+              marginTop: 2,
+            }}
+          >
             {hoverInfo.type}
           </div>
         </div>

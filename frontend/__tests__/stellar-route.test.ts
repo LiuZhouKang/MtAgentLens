@@ -37,9 +37,7 @@ describe('stellar route helpers', () => {
 
   it('builds agent hrefs with hash-based deep links', () => {
     expect(buildAgentHref('agent-security')).toBe('/overview#agentId=agent-security');
-    expect(buildAgentHref('agent/security role')).toBe(
-      '/overview#agentId=agent%2Fsecurity%20role',
-    );
+    expect(buildAgentHref('agent/security role')).toBe('/overview#agentId=agent%2Fsecurity%20role');
   });
 
   it('falls back to the overview root when no agent id is provided', () => {

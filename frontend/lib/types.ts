@@ -205,8 +205,12 @@ export interface Action {
 // ═══ Claim & Overview Types ═══
 
 export type ClaimType =
-  | 'PolicyViolation' | 'AccountabilityAnomaly' | 'SuspiciousDelegation'
-  | 'TaintedContextUse' | 'UnauthorizedCapabilityUse' | 'BlockedAttempt';
+  | 'PolicyViolation'
+  | 'AccountabilityAnomaly'
+  | 'SuspiciousDelegation'
+  | 'TaintedContextUse'
+  | 'UnauthorizedCapabilityUse'
+  | 'BlockedAttempt';
 
 /** 实测 22 条 claim_state 分布：Inferred 18 / Confirmed 3 / Ambiguous 1。未知值由渲染侧灰显兜底。 */
 export type ClaimState = 'Inferred' | 'Confirmed' | 'Ambiguous';
@@ -260,8 +264,16 @@ export interface DatasetOverview {
   evidence: { count: number; by_match_level: Record<string, number> };
   claims: { count: number; by_type: Record<string, number>; by_severity: Record<string, number> };
   tracebacks: { count: number };
-  intents: { count: number; by_tool_name: Record<string, number>; by_authority_source: Record<string, number> };
-  actions: { count: number; by_action_type: Record<string, number>; by_signal_class: Record<string, number> };
+  intents: {
+    count: number;
+    by_tool_name: Record<string, number>;
+    by_authority_source: Record<string, number>;
+  };
+  actions: {
+    count: number;
+    by_action_type: Record<string, number>;
+    by_signal_class: Record<string, number>;
+  };
   pollution: { count: number };
   /** count=评估总数，violations=judgment_json.result === 'Violation' 的真实违规数 */
   policy_evaluations: { count: number; violations: number };
@@ -273,7 +285,13 @@ export interface DatasetOverview {
   message_bindings: { count: number };
   delegation_records: { count: number };
   subagent_boundaries: { count: number };
-  refinements: { claim: number; classification: number; evidence: number; graph: number; identity: number };
+  refinements: {
+    claim: number;
+    classification: number;
+    evidence: number;
+    graph: number;
+    identity: number;
+  };
   non_link_diagnostics: { count: number };
 }
 
@@ -320,7 +338,7 @@ export interface ContextPollutionEvent {
   pollution_id: number;
   source_agent_id: string;
   contaminated_artifact: string;
-  propagation_path: string[];      // propagation_path_json，agent 序列
+  propagation_path: string[]; // propagation_path_json，agent 序列
   detected_at_ns: number;
   run_id: string | null;
 }
@@ -331,7 +349,7 @@ export interface PolicyEvaluation {
   boundary: string;
   subject_agent_id: string;
   judgment: { result?: string; [k: string]: unknown } | null;
-  resource: NormalizedArgs | null;  // resource_json；非 NormalizedArgs 形态时 null
+  resource: NormalizedArgs | null; // resource_json；非 NormalizedArgs 形态时 null
   evidence_refs: string[];
   confidence: number;
   reason: string;
@@ -354,7 +372,7 @@ export interface AgentIdentity {
   process_ids: Array<{ pid: number; start_time_ns: number }>;
   message_ids: string[];
   tls_sessions: string[];
-  confidence: string;              // 'Authoritative' 等
+  confidence: string; // 'Authoritative' 等
   provisional_refs: string[];
   run_id: string | null;
 }
@@ -363,7 +381,7 @@ export interface AgentIdentity {
 export interface ProvisionalIdentity {
   agent_id: string;
   process_ids: Array<{ pid: number; start_time_ns: number }>;
-  primary_signal: string;          // 'TlsSessionNew' 等
+  primary_signal: string; // 'TlsSessionNew' 等
   confidence: number;
   run_id: string | null;
 }
@@ -384,7 +402,7 @@ export interface ProcessEvent {
   parent_start_time_ns: number | null;
   comm: string;
   timestamp_ns: number;
-  agent_id: string | null;         // JOIN 标注；无映射时 null
+  agent_id: string | null; // JOIN 标注；无映射时 null
 }
 
 /** tls_sessions 全行 + 身份标注 */
@@ -393,7 +411,7 @@ export interface TlsSession {
   pid: number;
   start_time_ns: number;
   timestamp_ns: number;
-  agent_id: string | null;         // JOIN 标注
+  agent_id: string | null; // JOIN 标注
 }
 
 /** subagent_boundaries 全行 */
@@ -413,6 +431,6 @@ export interface SubagentBoundary {
 export interface GraphSnapshotFrame {
   snapshot_id: string;
   timestamp_ns: number;
-  graph: GraphData;                // 提取时即解析（loadDatabase 关闭 db 后无法再懒加载）
+  graph: GraphData; // 提取时即解析（loadDatabase 关闭 db 后无法再懒加载）
   metrics: GraphMetrics | null;
 }

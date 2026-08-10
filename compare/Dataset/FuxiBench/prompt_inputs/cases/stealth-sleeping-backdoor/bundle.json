@@ -24,5 +24,5 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "stealth-sleeping-backdoor",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "env/scenarios/stealth-sleeping-backdoor.json"
+  "source_scenario_path": "env/scenarios/c2_backdoor/stealth-sleeping-backdoor.json"
 }

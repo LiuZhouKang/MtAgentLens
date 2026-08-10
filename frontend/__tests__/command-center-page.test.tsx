@@ -11,7 +11,8 @@ import type { GraphMetrics, GraphSnapshotFrame } from '@/lib/types';
 // Mock the WebGL 3D stage (jsdom has no WebGL) and capture its callbacks so the
 // tests can simulate graph interactions.
 const stageState: {
-  onNodeClick: ((info: { id: string; node_type: string; agent_id: string; desc: string }) => void) | null;
+  onNodeClick:
+    ((info: { id: string; node_type: string; agent_id: string; desc: string }) => void) | null;
   onBackgroundClick: (() => void) | null;
 } = { onNodeClick: null, onBackgroundClick: null };
 
@@ -27,7 +28,13 @@ vi.mock('@/components/ui/mtagentlens-graph-stage', () => ({
 }));
 
 vi.mock('@/components/command-center/node-detail-panel', () => ({
-  default: function MockNodeDetailPanel({ nodeId, onClose }: { nodeId: string; onClose: () => void }) {
+  default: function MockNodeDetailPanel({
+    nodeId,
+    onClose,
+  }: {
+    nodeId: string;
+    onClose: () => void;
+  }) {
     return (
       <div data-testid="node-detail" onClick={onClose}>
         detail:{nodeId}
@@ -44,8 +51,13 @@ vi.mock('@/components/ui/command-palette', () => ({
 
 // M4 时间演化：构造 2 帧 dbAssets 供 scrubber 测试（其余字段置空即可）。
 const snapMetrics: GraphMetrics = {
-  node_counts: {}, edge_counts: {}, agent_count: 0, cross_agent_edges: 0,
-  delegation_depth: 0, taint_chains: 0, avg_confidence: 0,
+  node_counts: {},
+  edge_counts: {},
+  agent_count: 0,
+  cross_agent_edges: 0,
+  delegation_depth: 0,
+  taint_chains: 0,
+  avg_confidence: 0,
 };
 
 const snapFrame = (id: string, nodeId: string, ts: number): GraphSnapshotFrame => ({
@@ -53,7 +65,15 @@ const snapFrame = (id: string, nodeId: string, ts: number): GraphSnapshotFrame =
   timestamp_ns: ts,
   graph: {
     nodes: [
-      { node_id: nodeId, node_type: 'Agent', agent_id: nodeId, resource: null, evidence_refs: [], timestamp_ns: ts, phase: { Provisional: { timestamp_ns: ts } } },
+      {
+        node_id: nodeId,
+        node_type: 'Agent',
+        agent_id: nodeId,
+        resource: null,
+        evidence_refs: [],
+        timestamp_ns: ts,
+        phase: { Provisional: { timestamp_ns: ts } },
+      },
     ],
     edges: [],
   },

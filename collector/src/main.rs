@@ -12,8 +12,8 @@ use std::time::Duration;
 use tokio::signal;
 use tokio::sync::broadcast;
 
-mod responsibility;
 mod framework;
+mod responsibility;
 mod server;
 
 #[allow(unused_imports)]
@@ -23,12 +23,10 @@ use framework::analyzers::file_access_audit_contract::FileAccessAuditConfig;
 
 use framework::{
     analyzers::{
-        AuthHeaderRemover, ConnectionBuffer, FileLogger, HTTPFilter,
-        SecuritySignoffAnalyzer, SecuritySignoffConfig,
-        HTTPParser, HandoffInjectionAnalyzer, MultiAgentAnomalyAnalyzer, OutputAnalyzer,
-        SSEProcessor, SSLFilter,
-        TimestampNormalizer, print_global_http_filter_metrics,
-        print_global_ssl_filter_metrics,
+        AuthHeaderRemover, ConnectionBuffer, FileLogger, HTTPFilter, HTTPParser,
+        HandoffInjectionAnalyzer, MultiAgentAnomalyAnalyzer, OutputAnalyzer, SSEProcessor,
+        SSLFilter, SecuritySignoffAnalyzer, SecuritySignoffConfig, TimestampNormalizer,
+        print_global_http_filter_metrics, print_global_ssl_filter_metrics,
     },
     binary_extractor::BinaryExtractor,
     runners::{
@@ -36,8 +34,8 @@ use framework::{
     },
 };
 
-use crate::responsibility::runtime::runtime::{ResponsibilityRuntime, RuntimeConfig};
 use crate::responsibility::persistence::PersistenceWriter;
+use crate::responsibility::runtime::runtime::{ResponsibilityRuntime, RuntimeConfig};
 use crate::responsibility::types::alert_types::ResponsibilityAlert;
 
 use server::WebServer;
@@ -45,10 +43,7 @@ use server::WebServer;
 static SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 fn convert_runner_error(e: RunnerError) -> Box<dyn std::error::Error + Send + Sync> {
-    Box::new(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        e.to_string(),
-    ))
+    Box::new(std::io::Error::other(e.to_string()))
 }
 
 async fn setup_signal_handler() {
@@ -1103,10 +1098,8 @@ async fn run_trace(
             if let Some(uid_filter) = ssl_uid {
                 ssl_args.extend(["-u".to_string(), uid_filter.to_string()]);
             }
-            if !skip_ssl_comm_filter {
-                if let Some(comm_filter) = comm {
-                    ssl_args.extend(["-c".to_string(), comm_filter.to_string()]);
-                }
+            if !skip_ssl_comm_filter && let Some(comm_filter) = comm {
+                ssl_args.extend(["-c".to_string(), comm_filter.to_string()]);
             }
             if ssl_handshake {
                 ssl_args.push("--handshake".to_string());
@@ -1290,7 +1283,11 @@ async fn run_trace(
                 }
                 loaded.unwrap_or_else(|| {
                     println!("! Observer: config not found, using Mock (zero-token dev mode)");
-                    Box::new(crate::responsibility::observer::mock::MockObserverProvider::with_responses(vec![]))
+                    Box::new(
+                        crate::responsibility::observer::mock::MockObserverProvider::with_responses(
+                            vec![],
+                        ),
+                    )
                 })
             }
         };
@@ -1306,10 +1303,14 @@ async fn run_trace(
                 std::path::PathBuf::from("collector/models/deberta"),
                 std::path::PathBuf::from("models/deberta"),
             ];
-            candidates.into_iter().find(|p| p.join("model.onnx").exists())
+            candidates
+                .into_iter()
+                .find(|p| p.join("model.onnx").exists())
                 .unwrap_or_else(|| std::path::PathBuf::from("collector/models/deberta"))
         });
-    let classifier = match crate::responsibility::judgment::classifier::OnnxClassifier::try_new(&classifier_model_dir) {
+    let classifier = match crate::responsibility::judgment::classifier::OnnxClassifier::try_new(
+        &classifier_model_dir,
+    ) {
         Ok(Some(c)) => {
             println!("✓ DeBERTa classifier: Layer 3 prompt injection detection enabled");
             Some(std::sync::Arc::new(c))
@@ -1325,12 +1326,8 @@ async fn run_trace(
     };
     runtime_config.classifier = classifier;
 
-    let runtime = ResponsibilityRuntime::new(
-        runtime_config,
-        persistence_writer,
-        alert_tx,
-        observer,
-    );
+    let runtime =
+        ResponsibilityRuntime::new(runtime_config, persistence_writer, alert_tx, observer);
     agent = agent.add_global_analyzer(Box::new(runtime));
     println!("✓ Responsibility runtime enabled (Phase 1 streaming + Phase 2 batch)");
 
@@ -1350,17 +1347,18 @@ async fn run_trace(
             std::path::PathBuf::from("/tmp"),
         ],
     )));
-    #[allow(clippy::print_stdout)]
+
     println!("✓ File access audit analyzer enabled");
 
-    agent = agent.add_global_analyzer(Box::new(
-        SecuritySignoffAnalyzer::new(SecuritySignoffConfig::default()),
-    ));
+    agent = agent.add_global_analyzer(Box::new(SecuritySignoffAnalyzer::new(
+        SecuritySignoffConfig::default(),
+    )));
     println!("✓ Security signoff tracking enabled");
 
-
     if disable_responsibility_observer {
-        println!("! Responsibility Observer LLM disabled — using heuristic fallback (ablation A4 mode)");
+        println!(
+            "! Responsibility Observer LLM disabled — using heuristic fallback (ablation A4 mode)"
+        );
     } else {
         println!("✓ Responsibility Observer LLM enabled");
     }

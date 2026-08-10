@@ -82,7 +82,11 @@ impl PipelineStage {
             Self::CausalLinking => &[Self::Preprocessing],
             Self::InjectionDetection => &[Self::Preprocessing],
             Self::AnomalyDetection => &[Self::Preprocessing],
-            Self::AlertEnrichment => &[Self::CausalLinking, Self::InjectionDetection, Self::AnomalyDetection],
+            Self::AlertEnrichment => &[
+                Self::CausalLinking,
+                Self::InjectionDetection,
+                Self::AnomalyDetection,
+            ],
             Self::Output => &[Self::AlertEnrichment],
         }
     }
@@ -435,9 +439,9 @@ impl ContextPollutionEvidence {
     /// Compute the overall severity based on propagation scope.
     pub fn severity(&self) -> &'static str {
         match self.propagation_count {
-            0..=1 => "medium",   // isolated injection, no propagation
-            2 => "high",         // pairwise propagation
-            _ => "critical",     // team-scale (3+ agents)
+            0..=1 => "medium", // isolated injection, no propagation
+            2 => "high",       // pairwise propagation
+            _ => "critical",   // team-scale (3+ agents)
         }
     }
 
@@ -658,22 +662,38 @@ impl PipelineOrchestratorState {
 /// 3. Shared state is wired between analyzers that need it
 pub trait PipelineBuilder: Send + Sync {
     /// Add a preprocessing analyzer (SSE merge, HTTP parse, timestamp normalize).
-    fn add_preprocessor(&mut self, analyzer: Box<dyn crate::framework::analyzers::Analyzer>) -> &mut Self;
+    fn add_preprocessor(
+        &mut self,
+        analyzer: Box<dyn crate::framework::analyzers::Analyzer>,
+    ) -> &mut Self;
 
     /// Add the causal link analyzer.
-    fn add_causal_link(&mut self, analyzer: Box<dyn crate::framework::analyzers::Analyzer>) -> &mut Self;
+    fn add_causal_link(
+        &mut self,
+        analyzer: Box<dyn crate::framework::analyzers::Analyzer>,
+    ) -> &mut Self;
 
     /// Add the handoff injection analyzer.
-    fn add_injection_detector(&mut self, analyzer: Box<dyn crate::framework::analyzers::Analyzer>) -> &mut Self;
+    fn add_injection_detector(
+        &mut self,
+        analyzer: Box<dyn crate::framework::analyzers::Analyzer>,
+    ) -> &mut Self;
 
     /// Add the multi-agent anomaly analyzer.
-    fn add_anomaly_detector(&mut self, analyzer: Box<dyn crate::framework::analyzers::Analyzer>) -> &mut Self;
+    fn add_anomaly_detector(
+        &mut self,
+        analyzer: Box<dyn crate::framework::analyzers::Analyzer>,
+    ) -> &mut Self;
 
     /// Add the alert enrichment analyzer.
-    fn add_alert_enricher(&mut self, analyzer: Box<dyn crate::framework::analyzers::Analyzer>) -> &mut Self;
+    fn add_alert_enricher(
+        &mut self,
+        analyzer: Box<dyn crate::framework::analyzers::Analyzer>,
+    ) -> &mut Self;
 
     /// Add output analyzers (file logger, web SSE, console).
-    fn add_output(&mut self, analyzer: Box<dyn crate::framework::analyzers::Analyzer>) -> &mut Self;
+    fn add_output(&mut self, analyzer: Box<dyn crate::framework::analyzers::Analyzer>)
+    -> &mut Self;
 
     /// Wire shared state between analyzers. Must be called after all analyzers
     /// are added but before `build()`.
@@ -748,17 +768,12 @@ pub trait PipelineOrchestrator: Send + Sync {
 }
 
 /// Stage-level health status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum StageStatus {
+    #[default]
     Healthy,
     Degraded,
     Error,
-}
-
-impl Default for StageStatus {
-    fn default() -> Self {
-        StageStatus::Healthy
-    }
 }
 
 impl StageStatus {
@@ -772,7 +787,7 @@ impl StageStatus {
 }
 
 /// Per-stage metrics snapshot.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StageMetrics {
     pub events_processed: u64,
     pub events_emitted: u64,
@@ -780,19 +795,6 @@ pub struct StageMetrics {
     pub avg_latency_us: u64,
     pub buffer_size: usize,
     pub status: StageStatus,
-}
-
-impl Default for StageMetrics {
-    fn default() -> Self {
-        Self {
-            events_processed: 0,
-            events_emitted: 0,
-            errors: 0,
-            avg_latency_us: 0,
-            buffer_size: 0,
-            status: StageStatus::default(),
-        }
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -944,9 +946,7 @@ mod tests {
 
     #[test]
     fn test_context_pollution_evidence_lifecycle() {
-        let mut evidence = ContextPollutionEvidence::new(
-            "agent-teams-context-pollution".into(),
-        );
+        let mut evidence = ContextPollutionEvidence::new("agent-teams-context-pollution".into());
 
         assert_eq!(evidence.phase, ContextPollutionPhase::InjectionSource);
         assert!(!evidence.is_complete());

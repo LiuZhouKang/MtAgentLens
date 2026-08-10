@@ -65,7 +65,8 @@ export default function GraphTimeScrubber() {
   if (len <= 1) return null;
 
   const frame = frames[clamped];
-  const delta = clamped > 0 ? summarizeFrameChange(buildFrameDiff(frames[clamped - 1], frame)) : '—';
+  const delta =
+    clamped > 0 ? summarizeFrameChange(buildFrameDiff(frames[clamped - 1], frame)) : '—';
 
   return (
     <div
@@ -74,7 +75,7 @@ export default function GraphTimeScrubber() {
       className="pointer-events-auto fixed bottom-5 left-1/2 z-[60] -translate-x-1/2"
     >
       <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-black/50 px-5 py-3 shadow-2xl backdrop-blur-xl">
-        <span className="font-mono text-[11px] tabular-nums text-white/70">
+        <span className="font-mono text-[11px] text-white/70 tabular-nums">
           {clamped + 1} / {len}
         </span>
 
@@ -106,7 +107,9 @@ export default function GraphTimeScrubber() {
                     background: active ? '#7dd3fc' : 'rgba(255,255,255,0.35)',
                   }}
                   animate={active && !reduceMotion ? { scale: [1, 1.4, 1] } : undefined}
-                  transition={active && !reduceMotion ? { duration: 1.2, repeat: Infinity } : undefined}
+                  transition={
+                    active && !reduceMotion ? { duration: 1.2, repeat: Infinity } : undefined
+                  }
                 />
               </button>
             );
@@ -139,10 +142,10 @@ export default function GraphTimeScrubber() {
         </button>
 
         <div className="flex flex-col gap-0.5">
-          <span className="font-mono text-[10px] tabular-nums text-white/50">
+          <span className="font-mono text-[10px] text-white/50 tabular-nums">
             {formatRelativeTs(frame.timestamp_ns, frames[0].timestamp_ns)}
           </span>
-          <span className="font-mono text-[10px] tabular-nums text-cyan-300/80">{delta}</span>
+          <span className="font-mono text-[10px] text-cyan-300/80 tabular-nums">{delta}</span>
         </div>
       </div>
     </div>

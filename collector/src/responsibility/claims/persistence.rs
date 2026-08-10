@@ -3,7 +3,7 @@ use crate::responsibility::claims::{
 };
 use crate::responsibility::evidence::EvidenceRecordNew;
 use crate::responsibility::types::ResponsibilityTraceback;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use std::sync::{Arc, Mutex};
 
 /// Writes accountability artifacts to the responsibility DB:
@@ -28,10 +28,10 @@ impl ResponsibilityWriter {
         claim_id: &str,
         alert_id: &str,
         agent_id: &str,
-        decision: &str,
+        _decision: &str,
         severity: &str,
         confidence: f32,
-        reasoning: &str,
+        _reasoning: &str,
         traceback_id: &str,
     ) -> rusqlite::Result<()> {
         let conn = self.conn.lock().unwrap();
@@ -43,7 +43,14 @@ impl ResponsibilityWriter {
               involved_agent_ids_json)
              VALUES (?1, 'accountability_anomaly', ?2, '', '', ?3,
               '[]', '[]', 'observed', ?4, ?5, '[]', ?6, '[]')",
-            params![claim_id, agent_id, alert_id, severity, confidence, traceback_id],
+            params![
+                claim_id,
+                agent_id,
+                alert_id,
+                severity,
+                confidence,
+                traceback_id
+            ],
         )?;
         Ok(())
     }
@@ -107,17 +114,19 @@ impl ResponsibilityWriter {
               root_cause_node_id, explanation_summary, confidence)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
-                traceback_id, claim_id, nodes_json, edges_json,
-                root_cause_id, explanation, confidence,
+                traceback_id,
+                claim_id,
+                nodes_json,
+                edges_json,
+                root_cause_id,
+                explanation,
+                confidence,
             ],
         )?;
         Ok(())
     }
 
-    pub fn write_traceback(
-        &self,
-        traceback: &ResponsibilityTraceback,
-    ) -> rusqlite::Result<()> {
+    pub fn write_traceback(&self, traceback: &ResponsibilityTraceback) -> rusqlite::Result<()> {
         let conn = self.conn.lock().unwrap();
         let chain_node_ids_json = serde_json::to_string(&traceback.chain_node_ids)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
@@ -143,10 +152,7 @@ impl ResponsibilityWriter {
 
     // ── Evidence records ──────────────────────────────────────────────
 
-    pub fn write_evidence(
-        &self,
-        records: &[EvidenceRecordNew],
-    ) -> rusqlite::Result<()> {
+    pub fn write_evidence(&self, records: &[EvidenceRecordNew]) -> rusqlite::Result<()> {
         if records.is_empty() {
             return Ok(());
         }
@@ -225,12 +231,9 @@ fn evidence_type_str(t: &crate::responsibility::evidence::EvidenceType) -> &'sta
     }
 }
 
-fn directness_str(
-    d: &crate::responsibility::evidence::EvidenceDirectnessNew,
-) -> &'static str {
+fn directness_str(d: &crate::responsibility::evidence::EvidenceDirectnessNew) -> &'static str {
     match d {
         crate::responsibility::evidence::EvidenceDirectnessNew::Direct => "direct",
         crate::responsibility::evidence::EvidenceDirectnessNew::Inferred => "inferred",
-        _ => "other",
     }
 }

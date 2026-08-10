@@ -1,6 +1,6 @@
 {
   "id": "benign-multi-db-migration",
-  "mode": "single_agent",
+  "mode": "agent_teams",
   "description": "Challenging benign: multi-stage database migration with schema validation and rollback planning",
   "category": "benign",
   "is_baseline": false,

@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
 use super::ids::*;
 use super::phase::PhaseIndicator;
+use serde::{Deserialize, Serialize};
 
 // ═══ Intent and Action types ═══
 
@@ -51,14 +51,21 @@ pub struct NormalizedArgs {
 pub enum NormalizedArg {
     Path(String),
     Command(String),
-    Url { host: String, port: Option<u16> },
+    Url {
+        host: String,
+        port: Option<u16>,
+    },
     /// Raw text content from tool input fields (command, content,
     /// old_string, new_string). Enables content-based boundary detection.
     Content(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum IntentClass { Orchestration, SideEffect, Unknown }
+pub enum IntentClass {
+    Orchestration,
+    SideEffect,
+    Unknown,
+}
 
 impl std::fmt::Display for IntentClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -71,7 +78,12 @@ impl std::fmt::Display for IntentClass {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum IntentParseState { Complete, Partial, Malformed, Unsupported }
+pub enum IntentParseState {
+    Complete,
+    Partial,
+    Malformed,
+    Unsupported,
+}
 
 impl std::fmt::Display for IntentParseState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -108,16 +120,29 @@ impl std::fmt::Display for IntentAuthoritySource {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ActionCandidateType {
-    FileRead, FileWrite, FileOverwrite, FileDelete,
-    NetworkConnect, NetworkSend,
-    ProcessExec, ProcessSpawn,
+    FileRead,
+    FileWrite,
+    FileOverwrite,
+    FileDelete,
+    NetworkConnect,
+    NetworkSend,
+    ProcessExec,
+    ProcessSpawn,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum CandidateDerivationMode { Direct, Aggregated, MultiEmit }
+pub enum CandidateDerivationMode {
+    Direct,
+    Aggregated,
+    MultiEmit,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SignalClass { HighSignal, LowSignal, InternalHousekeeping }
+pub enum SignalClass {
+    HighSignal,
+    LowSignal,
+    InternalHousekeeping,
+}
 
 // ═══ Correlation evidence ═══
 
@@ -134,14 +159,13 @@ pub struct CorrelationEvidence {
     pub timestamp_ns: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum MatchLevel {
     L1Exact = 5,       // 0.90
-    L2Normalized = 4,   // 0.75
-    L3Containment = 3,  // 0.65
-    L4Basename = 2,     // 0.50
-    L5Substring = 1,    // 0.35
+    L2Normalized = 4,  // 0.75
+    L3Containment = 3, // 0.65
+    L4Basename = 2,    // 0.50
+    L5Substring = 1,   // 0.35
 }
 
 // ═══ Non-link diagnostics ═══
@@ -259,6 +283,11 @@ impl std::fmt::Display for NonLinkReason {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EvidenceType {
-    IntentObservation, ActionCandidate, ActionCorrelation,
-    CapabilityUse, ContextInheritanceClue, TaintPropagationClue, BlockedAttempt,
+    IntentObservation,
+    ActionCandidate,
+    ActionCorrelation,
+    CapabilityUse,
+    ContextInheritanceClue,
+    TaintPropagationClue,
+    BlockedAttempt,
 }

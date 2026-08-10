@@ -9,8 +9,8 @@
 
 use std::collections::VecDeque;
 
-use crate::responsibility::scoring::progressive::NUM_DIMS;
 use crate::responsibility::scoring::fusion::platt_multi;
+use crate::responsibility::scoring::progressive::NUM_DIMS;
 
 /// Multi-feature Platt calibrator.
 ///
@@ -105,13 +105,17 @@ impl CalibrationMonitor {
     pub fn new(max_window: usize, n_bins: usize, ece_threshold: f64) -> Self {
         Self {
             predictions: VecDeque::new(),
-            max_window, n_bins, ece_threshold,
+            max_window,
+            n_bins,
+            ece_threshold,
             calibrator: MultiFeatureCalibrator::new(),
         }
     }
 
     /// Access the calibrator for prediction.
-    pub fn calibrator(&self) -> &MultiFeatureCalibrator { &self.calibrator }
+    pub fn calibrator(&self) -> &MultiFeatureCalibrator {
+        &self.calibrator
+    }
 
     /// Feed the most recent prediction's dimension scores into the calibrator
     /// for online SGD update. The pseudo-label comes from the last record() call.
@@ -165,8 +169,12 @@ impl CalibrationMonitor {
 mod tests {
     use super::*;
 
-    fn zeros() -> [f64; NUM_DIMS] { [0.0; NUM_DIMS] }
-    fn ones() -> [f64; NUM_DIMS] { [0.9; NUM_DIMS] }
+    fn zeros() -> [f64; NUM_DIMS] {
+        [0.0; NUM_DIMS]
+    }
+    fn ones() -> [f64; NUM_DIMS] {
+        [0.9; NUM_DIMS]
+    }
 
     #[test]
     fn test_calibrator_default_predict_in_range() {
@@ -191,7 +199,10 @@ mod tests {
             cal.online_update(&ones(), true, 0.01);
         }
         let p = cal.predict(&ones());
-        assert!(p > 0.8, "after training, high dims should give high probability, got {p}");
+        assert!(
+            p > 0.8,
+            "after training, high dims should give high probability, got {p}"
+        );
     }
 
     #[test]
@@ -205,7 +216,10 @@ mod tests {
             mon.record(0.8, false);
         }
         let ece = mon.ece();
-        assert!(ece < 0.05, "perfect calibration should have low ECE, got {ece}");
+        assert!(
+            ece < 0.05,
+            "perfect calibration should have low ECE, got {ece}"
+        );
     }
 
     #[test]

@@ -17,27 +17,28 @@
 
 ### 1. 侧边栏工具集：5 → 3（事件 / 证据 / 链路）
 
-| 原工具 | 去向 |
-|--------|------|
-| 事件 (incident) | **保留**——当前告警总览（主体/判定/权限在事实快照中已有） |
-| 证据 (evidence) | **保留**——证据链工作台 |
-| 链路 (trace) | **保留**——责任链路工作台，**并入委派**（委派边本就是路径边，增加"委派与边界转移"卡片） |
-| 主体 (agent) | **并入事件**——主体信息已内聚在事件视图；增加"主体画像"二级链接 → `/overview#agentId=` |
-| 委派 (handoff) | **并入链路**——委派/边界转移 SignalList 移入链路视图 |
+| 原工具          | 去向                                                                                   |
+| --------------- | -------------------------------------------------------------------------------------- |
+| 事件 (incident) | **保留**——当前告警总览（主体/判定/权限在事实快照中已有）                               |
+| 证据 (evidence) | **保留**——证据链工作台                                                                 |
+| 链路 (trace)    | **保留**——责任链路工作台，**并入委派**（委派边本就是路径边，增加"委派与边界转移"卡片） |
+| 主体 (agent)    | **并入事件**——主体信息已内聚在事件视图；增加"主体画像"二级链接 → `/overview#agentId=`  |
+| 委派 (handoff)  | **并入链路**——委派/边界转移 SignalList 移入链路视图                                    |
 
 ### 2. 路由重定向（一处改、全局生效）
 
-| 构建器 | 新目标 | 理由 |
-|--------|--------|------|
-| `buildAgentHref(id)` | `/overview#agentId=<id>` | 仪表盘已有 agent 风险/图形焦点机制 |
-| `buildClusterHref(id)` | `/overview#clusterId=<id>` | 仪表盘已有责任集群摘要 |
-| fuxibench "打开拓扑" | `/overview` | 拓扑/集群语义收敛到仪表盘 |
+| 构建器                 | 新目标                     | 理由                               |
+| ---------------------- | -------------------------- | ---------------------------------- |
+| `buildAgentHref(id)`   | `/overview#agentId=<id>`   | 仪表盘已有 agent 风险/图形焦点机制 |
+| `buildClusterHref(id)` | `/overview#clusterId=<id>` | 仪表盘已有责任集群摘要             |
+| fuxibench "打开拓扑"   | `/overview`                | 拓扑/集群语义收敛到仪表盘          |
 
 自动修复全部消费者：`incident-rail`、`node-detail-panel`、`investigation-context-bar`、`command-linking`。
 
 ### 3. overview 支持 `#agentId` / `#clusterId` 焦点参数
 
 overview 焦点链已由 `selectedAlertId` 驱动。新增 hash 解析：
+
 - `#agentId=<id>` → 选中 `primary_agent.agent_id === id` 的首条告警
 - `#clusterId=<id>` → 选中该集群的 leadAlertId
 - 复用现有 `selectedAlertId → selectedCluster → focusCluster → graphFocus` 链条，**零新增状态**。

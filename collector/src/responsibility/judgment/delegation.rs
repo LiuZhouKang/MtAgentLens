@@ -48,6 +48,12 @@ pub struct DelegationTracker {
     known_delegations: HashMap<String, HashSet<String>>,
 }
 
+impl Default for DelegationTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DelegationTracker {
     pub fn new() -> Self {
         Self {

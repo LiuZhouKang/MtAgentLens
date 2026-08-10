@@ -27,6 +27,7 @@
 ## 3. 研究结论（agentsight 借鉴 + 全网顶级标准）
 
 ### 3.1 agentsight 可借鉴机制
+
 - **Hash 稳定配色**（`categoricalColor(name)`）：同一实体名永远映射同一颜色，用户形成"颜色记忆"。比"按出现顺序分配"稳定得多。
 - **多维视觉标记映射**（`BlockAdapters.tsx`）：每个类型不是单一颜色，而是「渐变背景 + 左侧彩条 + 语义图标 + 标签」的组合。
 - 结论：agentsight 未做按 agent 品牌/角色区分、未做因果连线——这正是本方案差异化增强的方向。
@@ -34,25 +35,30 @@
 ### 3.2 全网检索确立的标准
 
 **稳定哈希**
+
 - 必须用显式哈希（FNV-1a / djb2），不能依赖运行时随机哈希。
 - 哈希 → **调色板索引**（而非直接哈希→RGB）：产出更专业、可控的颜色。
 - 参考：agentsight `colors.ts`、`@marko19907/string-to-color`、NVIDIA HEAVY.AI 跨图颜色一致性。
 
 **暗色主题分类色板**
+
 - 亮色系 Okabe-Ito / Tol Bright / Tableau 10 为蓝本，但暗底需**更亮、更高饱和**（Set1 / Carto Bold 方向）。
 - 分类色 ≤10 种为宜。
 
 **WCAG 暗底对比度（关键修正）**
+
 - 亮饱和色在近黑背景上常**达不到 4.5:1**（亮橙色实测仅 2.8:1 即失败）——对比度是亮度比，不是感知强度。
 - 修正法：锁色相、提亮度；正文/组件需 4.5:1，大号展示文本 3:1，头像白字需 ≥4.5:1。
 - Anthropic 暗底（#141413）参考对：橙 #d97757（4.9:1）、蓝 #6a9bcc（6.2:1）、绿 #788c5d（4.7:1）——即"近黑底 + 中高亮度色"组合才是安全方向。
 
 **头像无障碍（设计系统标准）**
+
 - `role="img"` + `aria-label={name}`；非交互，不做键盘焦点。
 - 首字母派生：按词拆分取首字母、大写、最多 2 字符；空值回退占位。
 - 邻近已显示完整名称时可视作装饰 `aria-hidden`（本方案头像在 ID 旁，故保留 `aria-label` 提供唯一可读名，不重复朗读）。
 
 **Linear 官方设计系统（本项目已对齐）**
+
 - Canvas 近黑 `#010102`（与本项目 `--ln-bg` 完全一致）；表面梯度 `#0f1011 / #141516 / #18191a / #28282c`。
 - **官方头像做法：为用户头像提供"更多样的一组颜色"**——印证 monogram 多色方案。
 - 徽章：中性 pill（`#d0d6e0` 文本 + 9999px 圆角 + 1px 细边框）、subtle badge（`rgba(255,255,255,0.05)` 底）。
@@ -80,6 +86,7 @@ frontend/components/ui/agent-avatar.tsx  ← 极小组件
 ```
 
 **关键约束：**
+
 - 所有函数**纯函数、无副作用、无随机**——同一 agent 跨页面/刷新/渲染顺序恒为同色同字。
 - `agentInitials` 与 `agentColor` 各自独立派生，颜色碰撞（哈希取模可能同色）由首字母二次消歧，仍可辨识。
 - 不引全局状态、不建 Context——渲染处直接 `agentColor(id)` 派生即可。
@@ -95,12 +102,12 @@ frontend/components/ui/agent-avatar.tsx  ← 极小组件
 
 ### 4.3 追踪页责任链路四个触点
 
-| 触点 | 升级内容 |
-|------|----------|
-| 分组头 | `AgentAvatar`（渐变圆+首字母）+ agent 专属色 ID + 角色徽章 pill + span 计数 + 该 agent 最高严重度点 + 左侧专属色边条；替换原统一蓝色 `Server` 图标 |
+| 触点              | 升级内容                                                                                                                                                                                                          |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 分组头            | `AgentAvatar`（渐变圆+首字母）+ agent 专属色 ID + 角色徽章 pill + span 计数 + 该 agent 最高严重度点 + 左侧专属色边条；替换原统一蓝色 `Server` 图标                                                                |
 | 事件行（SpanRow） | 标题前加 **7px agent 专属色圆点**（保留 kind 图标表示事件语义；真实数据单 agent 巨量 span 下重复头像纯属噪音，故用色点而非头像）；选中高亮沿用事件 kind 色；Critical/Unsafe → 时间条加红色光晕 + 行左侧红色警示条 |
-| 展开详情 | "主体"行升级为 Agent 身份卡：头像 + ID + 角色徽章 + 聚合（spans / 证据数 / 最高严重度） |
-| 右侧详情面板 | 顶部加 Agent 身份块（头像 + ID + 角色 + 聚合），一眼锁定"谁、什么角色" |
+| 展开详情          | "主体"行升级为 Agent 身份卡：头像 + ID + 角色徽章 + 聚合（spans / 证据数 / 最高严重度）                                                                                                                           |
+| 右侧详情面板      | 顶部加 Agent 身份块（头像 + ID + 角色 + 聚合），一眼锁定"谁、什么角色"                                                                                                                                            |
 
 ### 4.4 共享组件统一
 
@@ -112,16 +119,16 @@ frontend/components/ui/agent-avatar.tsx  ← 极小组件
 
 ### 5.1 Agent 分类色板（暗底验证通过）
 
-| 色 | 值 | 相对 #010102 对比度 |
-|----|-----|--------------------|
-| 蓝 | `#7aa2ff` | ≈8.1:1 |
-| 橙 | `#ffb454` | ≈11.3:1 |
-| 绿 | `#3ddc97` | ≈11.4:1 |
-| 玫瑰 | `#ff6b9d` | ≈7.6:1 |
-| 天青 | `#56ccf2` | ≈11.0:1 |
-| 珊瑚 | `#ff8a5c` | ≈8.7:1 |
-| 紫 | `#b48ef5` | ≈7.8:1 |
-| 灰 | `#9aa5b1` | ≈8.0:1 |
+| 色   | 值        | 相对 #010102 对比度 |
+| ---- | --------- | ------------------- |
+| 蓝   | `#7aa2ff` | ≈8.1:1              |
+| 橙   | `#ffb454` | ≈11.3:1             |
+| 绿   | `#3ddc97` | ≈11.4:1             |
+| 玫瑰 | `#ff6b9d` | ≈7.6:1              |
+| 天青 | `#56ccf2` | ≈11.0:1             |
+| 珊瑚 | `#ff8a5c` | ≈8.7:1              |
+| 紫   | `#b48ef5` | ≈7.8:1              |
+| 灰   | `#9aa5b1` | ≈8.0:1              |
 
 所有色 ≥7.5:1，远超正文 4.5:1 标准。色板源自 Okabe-Ito / Tol Bright / Tableau 10 蓝本，按暗底提亮。
 
@@ -163,13 +170,13 @@ frontend/components/ui/agent-avatar.tsx  ← 极小组件
 
 ## 7. 测试策略（TDD 先行）
 
-| 测试文件 | 断言 |
-|----------|------|
-| `__tests__/agent-identity.test.ts`（新） | `fnv1a` 确定性；`agentColor` 稳定且 ∈ 色板、demo 三 agent 色互异；`agentInitials`（"agent-security"→"S" / "agent-frontend"→"F" / "agent-builder"→"B" / 空→"?" / 多词→前两词首字母）；`darkenHex` 全部色板项白字对比度 ≥4.5:1；`agentGradient` 返回二元组 |
-| `__tests__/agent-avatar.test.tsx`（新） | 渲染首字母；`aria-label` = agentId；`role="img"`；size 生效；空值回退 "?" |
-| `__tests__/trace-workbench.test.ts`（扩展） | `actorRoles` 映射正确（demo alert：security-auditor / frontend-developer）；事件 `actorRole` 填充；`summarizeActorEvents` 聚合正确 |
-| `__tests__/traces-page-client.test.tsx`（扩展） | 分组头渲染角色徽章文本（如 "security-auditor"）与 `AgentAvatar`（getByLabelText）；事件行含迷你头像 |
-| `e2e/compatibility-smoke.spec.ts`（扩展） | /traces 断言角色徽章可见、无水平溢出 |
+| 测试文件                                        | 断言                                                                                                                                                                                                                                                     |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `__tests__/agent-identity.test.ts`（新）        | `fnv1a` 确定性；`agentColor` 稳定且 ∈ 色板、demo 三 agent 色互异；`agentInitials`（"agent-security"→"S" / "agent-frontend"→"F" / "agent-builder"→"B" / 空→"?" / 多词→前两词首字母）；`darkenHex` 全部色板项白字对比度 ≥4.5:1；`agentGradient` 返回二元组 |
+| `__tests__/agent-avatar.test.tsx`（新）         | 渲染首字母；`aria-label` = agentId；`role="img"`；size 生效；空值回退 "?"                                                                                                                                                                                |
+| `__tests__/trace-workbench.test.ts`（扩展）     | `actorRoles` 映射正确（demo alert：security-auditor / frontend-developer）；事件 `actorRole` 填充；`summarizeActorEvents` 聚合正确                                                                                                                       |
+| `__tests__/traces-page-client.test.tsx`（扩展） | 分组头渲染角色徽章文本（如 "security-auditor"）与 `AgentAvatar`（getByLabelText）；事件行含迷你头像                                                                                                                                                      |
+| `e2e/compatibility-smoke.spec.ts`（扩展）       | /traces 断言角色徽章可见、无水平溢出                                                                                                                                                                                                                     |
 
 回归门禁：`vitest` 全绿 + `tsc --noEmit` + `eslint` + `npm run build` + Playwright e2e（chromium）。
 
@@ -182,9 +189,9 @@ frontend/components/ui/agent-avatar.tsx  ← 极小组件
 
 ## 9. 风险与缓解
 
-| 风险 | 缓解 |
-|------|------|
-| 哈希取模致同色 | 首字母 + 角色徽章 + 文本 ID 多重编码消歧；`AGENT_COLOR_OVERRIDES` 对已知 demo agent 赋 curated 色（已验证三 agent 均互异且主安全 agent 用玫瑰红突出） |
-| 头像在暗底模糊 | 1px 深色描边 + 暗化底 + 白字，测试断言 ≥4.5:1 |
-| 改动破坏现有测试 | 关键中文标签（"责任链路"等）不动；新增断言只增不改；全量回归门禁 |
-| 虚拟列表行高变化 | 复用已有 `VirtualList` dynamic 模式（行高内容驱动），头像尺寸固定不改变行高 |
+| 风险             | 缓解                                                                                                                                                  |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 哈希取模致同色   | 首字母 + 角色徽章 + 文本 ID 多重编码消歧；`AGENT_COLOR_OVERRIDES` 对已知 demo agent 赋 curated 色（已验证三 agent 均互异且主安全 agent 用玫瑰红突出） |
+| 头像在暗底模糊   | 1px 深色描边 + 暗化底 + 白字，测试断言 ≥4.5:1                                                                                                         |
+| 改动破坏现有测试 | 关键中文标签（"责任链路"等）不动；新增断言只增不改；全量回归门禁                                                                                      |
+| 虚拟列表行高变化 | 复用已有 `VirtualList` dynamic 模式（行高内容驱动），头像尺寸固定不改变行高                                                                           |

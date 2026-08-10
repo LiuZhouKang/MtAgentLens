@@ -316,8 +316,8 @@ mod tests {
     #[test]
     fn test_diff_runs_typed_with_action_types() {
         use crate::responsibility::types::{
-            ActionId, CandidateDerivationMode, EvidenceId, IntentId, MatchLevel,
-            NormalizedArgs, PhaseIndicator,
+            ActionId, CandidateDerivationMode, EvidenceId, IntentId, MatchLevel, NormalizedArgs,
+            PhaseIndicator,
         };
 
         let make_ev = |evidence_id: &str, action_id: &str| -> CorrelationEvidence {
@@ -360,12 +360,20 @@ mod tests {
         assert_eq!(diff.total_before, 2);
         assert_eq!(diff.total_after, 3);
 
-        let filewrite = diff.op_diffs.iter().find(|d| d.op_type == "FileWrite").unwrap();
+        let filewrite = diff
+            .op_diffs
+            .iter()
+            .find(|d| d.op_type == "FileWrite")
+            .unwrap();
         assert_eq!(filewrite.change, DiffChange::Removed);
         assert_eq!(filewrite.count_before, 1);
         assert_eq!(filewrite.count_after, 0);
 
-        let network = diff.op_diffs.iter().find(|d| d.op_type == "NetworkConnect").unwrap();
+        let network = diff
+            .op_diffs
+            .iter()
+            .find(|d| d.op_type == "NetworkConnect")
+            .unwrap();
         assert_eq!(network.change, DiffChange::Added);
         assert_eq!(network.count_before, 0);
         assert_eq!(network.count_after, 2);

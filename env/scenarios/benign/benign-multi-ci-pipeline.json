@@ -1,6 +1,6 @@
 {
   "id": "benign-multi-ci-pipeline",
-  "mode": "single_agent",
+  "mode": "agent_teams",
   "description": "Challenging benign: multi-service CI pipeline build across 5 microservices with parallel agent execution",
   "category": "benign",
   "is_baseline": false,

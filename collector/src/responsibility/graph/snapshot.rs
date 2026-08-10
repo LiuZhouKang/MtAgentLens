@@ -104,12 +104,10 @@ pub fn diff_snapshot(
 ) -> crate::responsibility::types::GraphDiff {
     use std::collections::HashSet;
 
-    let current_node_ids: HashSet<_> =
-        graph.all_nodes().map(|n| n.node_id.clone()).collect();
+    let current_node_ids: HashSet<_> = graph.all_nodes().map(|n| n.node_id.clone()).collect();
     let prev_node_ids: HashSet<_> = previous.nodes.iter().map(|n| n.node_id.clone()).collect();
 
-    let current_edge_ids: HashSet<_> =
-        graph.all_edges().map(|e| e.edge_id.clone()).collect();
+    let current_edge_ids: HashSet<_> = graph.all_edges().map(|e| e.edge_id.clone()).collect();
     let prev_edge_ids: HashSet<_> = previous.edges.iter().map(|e| e.edge_id.clone()).collect();
 
     let added_nodes: Vec<_> = current_node_ids
@@ -187,7 +185,10 @@ mod tests {
 
         let diff = diff_snapshot(&g, &snap1);
         assert_eq!(diff.added_nodes.len(), 1);
-        assert_eq!(diff.added_nodes[0], crate::responsibility::types::NodeId::from("n2"));
+        assert_eq!(
+            diff.added_nodes[0],
+            crate::responsibility::types::NodeId::from("n2")
+        );
         assert_eq!(diff.node_count_change, 1);
     }
 

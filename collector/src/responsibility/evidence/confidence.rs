@@ -158,10 +158,10 @@ mod tests {
     fn test_l1_immediate_same_process_no_competition() {
         let confidence = compute_confidence(
             &MatchLevel::L1Exact,
-            0,              // immediate
-            0,              // same process
+            0, // immediate
+            0, // same process
             &SignalClass::HighSignal,
-            0,              // no competition
+            0, // no competition
         );
         // 0.90 + 0.03 (high signal) = 0.93
         assert!((confidence - 0.93).abs() < 0.01);
@@ -187,7 +187,7 @@ mod tests {
             60_000_000_000, // 60 seconds (saturated)
             5,              // deep tree distance
             &SignalClass::LowSignal,
-            3,              // 3 competing matches
+            3, // 3 competing matches
         );
         // 0.35 - 0.25 - 0.15 - (3*0.04=0.12) = -0.17 → clamped to MIN_CONFIDENCE
         assert!((confidence - MIN_CONFIDENCE).abs() < 0.01);
@@ -257,20 +257,10 @@ mod tests {
 
     #[test]
     fn test_signal_class_bonus() {
-        let conf_high = compute_confidence(
-            &MatchLevel::L5Substring,
-            0,
-            0,
-            &SignalClass::HighSignal,
-            0,
-        );
-        let conf_low = compute_confidence(
-            &MatchLevel::L5Substring,
-            0,
-            0,
-            &SignalClass::LowSignal,
-            0,
-        );
+        let conf_high =
+            compute_confidence(&MatchLevel::L5Substring, 0, 0, &SignalClass::HighSignal, 0);
+        let conf_low =
+            compute_confidence(&MatchLevel::L5Substring, 0, 0, &SignalClass::LowSignal, 0);
         assert!(conf_high > conf_low);
     }
 
@@ -288,13 +278,8 @@ mod tests {
 
     #[test]
     fn test_clamp_to_max() {
-        let confidence = compute_confidence(
-            &MatchLevel::L1Exact,
-            0,
-            0,
-            &SignalClass::HighSignal,
-            0,
-        );
+        let confidence =
+            compute_confidence(&MatchLevel::L1Exact, 0, 0, &SignalClass::HighSignal, 0);
         assert!(confidence <= MAX_CONFIDENCE);
     }
 

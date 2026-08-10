@@ -1,9 +1,9 @@
-pub mod types;
-pub mod rules;
-pub mod rule_engine;
-pub mod pattern_matcher;
-pub mod scoring;
 pub mod engine;
+pub mod pattern_matcher;
+pub mod rule_engine;
+pub mod rules;
+pub mod scoring;
+pub mod types;
 
 // ── Core classification API ──────────────────────────────────────────
 
@@ -17,18 +17,16 @@ pub use rule_engine::RuleEngine;
 
 // Standalone scoring functions
 pub use scoring::{
-    build_observer_signature, compute_score, compute_score_breakdown,
-    heuristic_decide, route_score, RouteSelection,
+    RouteSelection, build_observer_signature, compute_score, compute_score_breakdown,
+    heuristic_decide, route_score,
 };
 
 // Types
 pub use types::{
-    AlertAuthority, CachePrior, CacheTTL, ClassificationConfig,
-    ClassificationResult, ContentSignals, CorrelationSignal, DisplayProfile,
-    EvidenceSignature, GraphSignature, ObserverDecision, ObserverError,
-    ObserverInput, ObserverOutput, ObserverSignature, PatternSignal,
-    PatternVerdict, ResourceSignal, RoleSignal, Route, RuleHitSignal,
-    RuleVerdict,
+    AlertAuthority, CachePrior, CacheTTL, ClassificationConfig, ClassificationResult,
+    ContentSignals, CorrelationSignal, DisplayProfile, EvidenceSignature, GraphSignature,
+    ObserverDecision, ObserverError, ObserverInput, ObserverOutput, ObserverSignature,
+    PatternSignal, PatternVerdict, ResourceSignal, RoleSignal, Route, RuleHitSignal, RuleVerdict,
 };
 
 // Rules
@@ -36,7 +34,7 @@ pub use rules::{RuleDecision, RuleHit, SafetyRule};
 
 // Pattern matcher
 pub use pattern_matcher::{
-    default_templates, GraphPatternMatch, GraphPatternMatcher, GraphPatternTemplate,
+    GraphPatternMatch, GraphPatternMatcher, GraphPatternTemplate, default_templates,
 };
 
 // ObserverLLM now canonical at crate::responsibility::observer::llm::ObserverLLM

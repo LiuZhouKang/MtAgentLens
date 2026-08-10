@@ -25,7 +25,7 @@
 
 use crate::framework::core::Event;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Role Claim Verification
@@ -260,11 +260,7 @@ impl IdentityConfusionState {
 
     pub fn severity(&self) -> &'static str {
         if self.is_confused() {
-            if self.cross_agent {
-                "critical"
-            } else {
-                "high"
-            }
+            if self.cross_agent { "critical" } else { "high" }
         } else {
             "info"
         }
@@ -295,10 +291,7 @@ pub trait SignoffChainValidator: Send + Sync {
     ///
     /// Returns `Ok(())` if the chain is valid, or `Err(SignoffChainViolation)`
     /// with details on which rule was violated.
-    fn validate_chain(
-        &self,
-        chain: &SignoffChain,
-    ) -> Result<(), SignoffChainViolation>;
+    fn validate_chain(&self, chain: &SignoffChain) -> Result<(), SignoffChainViolation>;
 
     /// Validate a single sign-off link.
     fn validate_link(
@@ -400,10 +393,7 @@ pub trait RoleHijackEventBuilder {
     ) -> Event;
 
     /// Build a role_hijack event for identity confusion.
-    fn build_identity_confusion_event(
-        &self,
-        state: &IdentityConfusionState,
-    ) -> Event;
+    fn build_identity_confusion_event(&self, state: &IdentityConfusionState) -> Event;
 
     /// Build a role_hijack event for a signoff chain violation.
     fn build_chain_violation_event(
@@ -441,14 +431,24 @@ mod tests {
 
     #[test]
     fn test_role_claim_acting_detection() {
-        let claim = RoleClaim::new(100, "security-performance-auditor (acting)".into(), 1000, "http_body".into());
+        let claim = RoleClaim::new(
+            100,
+            "security-performance-auditor (acting)".into(),
+            1000,
+            "http_body".into(),
+        );
         assert!(claim.is_acting);
         assert_eq!(claim.canonical_role, "security-performance-auditor");
     }
 
     #[test]
     fn test_role_claim_non_acting() {
-        let claim = RoleClaim::new(100, "security-performance-auditor".into(), 1000, "http_body".into());
+        let claim = RoleClaim::new(
+            100,
+            "security-performance-auditor".into(),
+            1000,
+            "http_body".into(),
+        );
         assert!(!claim.is_acting);
         assert_eq!(claim.canonical_role, "security-performance-auditor");
     }
@@ -456,10 +456,22 @@ mod tests {
     #[test]
     fn test_verdict_severity() {
         assert_eq!(RoleVerificationVerdict::Verified.severity(), "info");
-        assert_eq!(RoleVerificationVerdict::UnauthorizedRole.severity(), "critical");
-        assert_eq!(RoleVerificationVerdict::ActingRoleNotPermitted.severity(), "critical");
-        assert_eq!(RoleVerificationVerdict::IdentityConfusion.severity(), "high");
-        assert_eq!(RoleVerificationVerdict::InsufficientEvidence.severity(), "warning");
+        assert_eq!(
+            RoleVerificationVerdict::UnauthorizedRole.severity(),
+            "critical"
+        );
+        assert_eq!(
+            RoleVerificationVerdict::ActingRoleNotPermitted.severity(),
+            "critical"
+        );
+        assert_eq!(
+            RoleVerificationVerdict::IdentityConfusion.severity(),
+            "high"
+        );
+        assert_eq!(
+            RoleVerificationVerdict::InsufficientEvidence.severity(),
+            "warning"
+        );
     }
 
     #[test]
@@ -467,8 +479,16 @@ mod tests {
         let config = RoleHijackConfig::default();
         assert!(!config.allow_acting_roles);
         assert!(config.require_artifact_read);
-        assert!(config.monitored_artifact_paths.contains(&"security_signoff.md".to_string()));
-        assert!(config.monitored_artifact_paths.contains(&"approval_probe.txt".to_string()));
+        assert!(
+            config
+                .monitored_artifact_paths
+                .contains(&"security_signoff.md".to_string())
+        );
+        assert!(
+            config
+                .monitored_artifact_paths
+                .contains(&"approval_probe.txt".to_string())
+        );
     }
 
     #[test]
@@ -524,6 +544,9 @@ mod tests {
             severity: "critical".into(),
         };
         assert_eq!(violation.severity, "critical");
-        assert_eq!(violation.violated_rule, ViolatedRule::ActingRoleNotPermitted);
+        assert_eq!(
+            violation.violated_rule,
+            ViolatedRule::ActingRoleNotPermitted
+        );
     }
 }

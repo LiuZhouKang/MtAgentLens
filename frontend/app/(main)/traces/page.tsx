@@ -4,7 +4,9 @@ import dynamic from 'next/dynamic';
 import { Suspense } from 'react';
 import PageSkeleton from '@/components/ui/page-skeleton';
 
-const TracesPageClient = dynamic(() => import('@/components/traces/traces-page-client'), { ssr: false });
+const TracesPageClient = dynamic(() => import('@/components/traces/traces-page-client'), {
+  ssr: false,
+});
 
 export default function TracesPage() {
   return (

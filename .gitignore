@@ -3,6 +3,9 @@
 collector/build/
 agentsight
 
+# GitHub Actions（本平台为 GitLab，不使用 GitHub CI）
+.github/
+
 # Dependencies
 node_modules/
 .venv/

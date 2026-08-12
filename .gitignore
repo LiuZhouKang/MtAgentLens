@@ -6,7 +6,7 @@ agentsight
 # GitHub Actions（本平台为 GitLab，不使用 GitHub CI）
 .github/
 
-# 演示视频（体积大，仅本地保留，不入库；成品放 决赛文档/assets/video/）
+# 演示视频原始录屏与完整版（体积大，仅本地保留，不入库）
 demo.webm
 docs/demo-full.mp4
 

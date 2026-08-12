@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1096" style="max-width:1920px;font-family:'Microsoft YaHei','SimHei',Arial,sans-serif">
+  <defs>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4a8ec9" /></marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#c46262" /></marker>
+    <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-opacity="0.06" /></filter>
+  </defs>
+  <rect width="1920" height="1096" fill="#fcfcfc" />
+
+  <!-- title removed -->
+
+  <g filter="url(#sh)">
+  <rect x="320" y="32" width="1280" height="76" rx="16" fill="#edf3f8" stroke="#b0c8dd" stroke-width="2" />
+  <text x="960" y="80" text-anchor="middle" font-size="32" font-weight="700" fill="#3a5f80">AgentScoreState: 每 Agent 独立维护 6 维渐进状态</text>
+  </g>
+
+  
+  <g filter="url(#sh)">
+  <rect x="72" y="148" width="560" height="176" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.2" />
+  <text x="108" y="200" font-size="32" font-weight="700" fill="#3a5f80">D1 边界密度</text>
+  <text x="122" y="248" font-size="26" fill="#8aa0b6">EWMA</text>
+  <rect x="200" y="220" width="104" height="34" rx="8" fill="#edf6ff" stroke="#b2d3f0" stroke-width="1.6" />
+  <text x="252" y="244" text-anchor="middle" font-size="24" fill="#4a8ec9">0.42</text>
+  <text x="396" y="248" font-size="26" fill="#8aa0b6">CUSUM</text>
+  <rect x="488" y="220" width="104" height="34" rx="8" fill="#fff8f0" stroke="#e6cfa8" stroke-width="1.6" />
+  <text x="540" y="244" text-anchor="middle" font-size="24" fill="#c4792b">1.23</text>
+  <text x="108" y="292" font-size="26" fill="#8aa0b6">PBC 边稀疏度 · δ=0.30</text>
+  </g>
+
+  <g filter="url(#sh)">
+  <rect x="680" y="148" width="560" height="176" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.2" />
+  <text x="716" y="200" font-size="32" font-weight="700" fill="#3a5f80">D2 内容敏感度</text>
+  <text x="730" y="248" font-size="26" fill="#8aa0b6">EWMA</text>
+  <rect x="808" y="220" width="104" height="34" rx="8" fill="#edf6ff" stroke="#b2d3f0" stroke-width="1.6" />
+  <text x="860" y="244" text-anchor="middle" font-size="24" fill="#4a8ec9">0.18</text>
+  <text x="1004" y="248" font-size="26" fill="#8aa0b6">CUSUM</text>
+  <rect x="1096" y="220" width="104" height="34" rx="8" fill="#fff8f0" stroke="#e6cfa8" stroke-width="1.6" />
+  <text x="1148" y="244" text-anchor="middle" font-size="24" fill="#c4792b">0.05</text>
+  <text x="716" y="292" font-size="26" fill="#8aa0b6">文件/命令敏感度 · δ=0.40</text>
+  </g>
+
+  <g filter="url(#sh)">
+  <rect x="1288" y="148" width="560" height="176" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.2" />
+  <text x="1324" y="200" font-size="32" font-weight="700" fill="#3a5f80">D3 规则命中</text>
+  <text x="1338" y="248" font-size="26" fill="#8aa0b6">EWMA</text>
+  <rect x="1416" y="220" width="104" height="34" rx="8" fill="#edf6ff" stroke="#b2d3f0" stroke-width="1.6" />
+  <text x="1468" y="244" text-anchor="middle" font-size="24" fill="#4a8ec9">0.55</text>
+  <text x="1612" y="248" font-size="26" fill="#8aa0b6">CUSUM</text>
+  <rect x="1704" y="220" width="104" height="34" rx="8" fill="#fff8f0" stroke="#e6cfa8" stroke-width="1.6" />
+  <text x="1756" y="244" text-anchor="middle" font-size="24" fill="#c4792b">2.81</text>
+  <text x="1324" y="292" font-size="26" fill="#8aa0b6">PolicyJudgment 加权 · δ=0.20</text>
+  </g>
+
+  
+  <g filter="url(#sh)">
+  <rect x="72" y="372" width="560" height="176" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.2" />
+  <text x="108" y="424" font-size="32" font-weight="700" fill="#3a5f80">D4 时序异常</text>
+  <text x="122" y="472" font-size="26" fill="#8aa0b6">EWMA</text>
+  <rect x="200" y="444" width="104" height="34" rx="8" fill="#edf6ff" stroke="#b2d3f0" stroke-width="1.6" />
+  <text x="252" y="468" text-anchor="middle" font-size="24" fill="#4a8ec9">0.31</text>
+  <text x="396" y="472" font-size="26" fill="#8aa0b6">CUSUM</text>
+  <rect x="488" y="444" width="104" height="34" rx="8" fill="#fff8f0" stroke="#e6cfa8" stroke-width="1.6" />
+  <text x="540" y="468" text-anchor="middle" font-size="24" fill="#c4792b">0.00</text>
+  <text x="108" y="516" font-size="26" fill="#8aa0b6">跨周期时序偏差 · δ=0.30</text>
+  </g>
+
+  <g filter="url(#sh)">
+  <rect x="680" y="372" width="560" height="176" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.2" />
+  <text x="716" y="424" font-size="32" font-weight="700" fill="#3a5f80">D5 跨上下文</text>
+  <text x="730" y="472" font-size="26" fill="#8aa0b6">EWMA</text>
+  <rect x="808" y="444" width="104" height="34" rx="8" fill="#edf6ff" stroke="#b2d3f0" stroke-width="1.6" />
+  <text x="860" y="468" text-anchor="middle" font-size="24" fill="#4a8ec9">0.12</text>
+  <text x="1004" y="472" font-size="26" fill="#8aa0b6">CUSUM</text>
+  <rect x="1096" y="444" width="104" height="34" rx="8" fill="#fff8f0" stroke="#e6cfa8" stroke-width="1.6" />
+  <text x="1148" y="468" text-anchor="middle" font-size="24" fill="#c4792b">0.00</text>
+  <text x="716" y="516" font-size="26" fill="#8aa0b6">跨源证据一致性 · δ=0.25</text>
+  </g>
+
+  <g filter="url(#sh)">
+  <rect x="1288" y="372" width="560" height="176" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.2" />
+  <text x="1324" y="424" font-size="32" font-weight="700" fill="#3a5f80">D6 行为基线</text>
+  <text x="1338" y="472" font-size="26" fill="#8aa0b6">EWMA</text>
+  <rect x="1416" y="444" width="104" height="34" rx="8" fill="#edf6ff" stroke="#b2d3f0" stroke-width="1.6" />
+  <text x="1468" y="468" text-anchor="middle" font-size="24" fill="#4a8ec9">—</text>
+  <text x="1612" y="472" font-size="26" fill="#8aa0b6">CUSUM</text>
+  <rect x="1704" y="444" width="104" height="34" rx="8" fill="#fff8f0" stroke="#e6cfa8" stroke-width="1.6" />
+  <text x="1756" y="468" text-anchor="middle" font-size="24" fill="#c4792b">—</text>
+  <text x="1324" y="516" font-size="26" fill="#8aa0b6">BaselineTracker ≥50样 · δ=0.35</text>
+  </g>
+
+  <line x1="960" y1="548" x2="960" y2="644" stroke="#4a8ec9" stroke-width="3.6" marker-end="url(#ab)" />
+
+  <text x="1160" y="584" font-size="26" fill="#7d99b3">每周期: ewma = 0.10×score + 0.90×ewma_old</text>
+  <text x="1160" y="620" font-size="26" fill="#7d99b3">cusum = max(0, cusum + (score−ewma) − δ)</text>
+
+  <g filter="url(#sh)">
+  <rect x="120" y="644" width="1680" height="120" rx="16" fill="#fef6f6" stroke="#e6c0c0" stroke-width="2.4" />
+  <text x="960" y="696" text-anchor="middle" font-size="34" font-weight="700" fill="#8b3030">智能升级: CUSUM 漂移检测 → force_observer = true</text>
+  <text x="960" y="740" text-anchor="middle" font-size="26" fill="#b06060">条件: ≥2 维 CUSUM &gt; 2.5h 且 consecutive ≥ 3 | (D1 或 D2) + 其他任一维 | D1 EWMA&gt;0.5 且 D5 EWMA&lt;0.2</text>
+  </g>
+
+  <line x1="960" y1="764" x2="960" y2="836" stroke="#c46262" stroke-width="3.6" marker-end="url(#ar)" />
+
+  <g filter="url(#sh)">
+  <rect x="320" y="836" width="520" height="108" rx="16" fill="#f5faf7" stroke="#a8d4b6" stroke-width="2.4" />
+  <text x="580" y="888" text-anchor="middle" font-size="32" font-weight="700" fill="#3d704a">CUSUM 未触发</text>
+  <text x="580" y="928" text-anchor="middle" font-size="26" fill="#6a9e7a">正常累积 · 时间衰减裁剪</text>
+  </g>
+
+  <g filter="url(#sh)">
+  <rect x="1080" y="836" width="520" height="108" rx="16" fill="#fdf6f6" stroke="#e6b8b8" stroke-width="2.4" />
+  <text x="1340" y="888" text-anchor="middle" font-size="32" font-weight="700" fill="#8b3030">CUSUM 触发</text>
+  <text x="1340" y="928" text-anchor="middle" font-size="26" fill="#b06060">设置 force_observer → Observer 仲裁</text>
+  </g>
+
+  <text x="580" y="996" text-anchor="middle" font-size="26" fill="#999">时间衰减: 半衰期 300s · event_scores 缓冲上限 200 · 超 600s 裁剪</text>
+  <text x="1340" y="996" text-anchor="middle" font-size="26" fill="#999">α = 0.10 慢速跟踪 · δ 每维独立 (0.20-0.40) · consecutive ≥ 3</text>
+</svg>

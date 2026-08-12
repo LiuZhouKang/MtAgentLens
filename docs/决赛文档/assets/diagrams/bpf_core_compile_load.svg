@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1060" style="max-width:1920px;font-family:'Microsoft YaHei','SimHei',Arial,sans-serif">
+  <defs>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4a8ec9"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5a9e6f"/></marker>
+    <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-opacity="0.06"/></filter>
+  </defs>
+  <rect width="1920" height="1060" fill="#fcfcfc"/>
+
+<!-- title removed -->
+
+  <!-- LEFT: COMPILE TIME -->
+  <rect x="80" y="24" width="800" height="860" rx="20" fill="#f8fafc" stroke="#d0dbe6" stroke-width="2"/>
+  <rect x="80" y="24" width="800" height="80" rx="20" fill="#edf3f8"/>
+  <rect x="80" y="64" width="800" height="40" fill="#edf3f8"/>
+  <text x="480" y="76" text-anchor="middle" font-size="34" font-weight="700" fill="#3a5f80">编译时 (开发机)</text>
+
+  <g filter="url(#sh)">
+  <rect x="108" y="132" width="744" height="136" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.2"/>
+  <text x="480" y="188" text-anchor="middle" font-size="32" font-weight="700" fill="#3a5f80">C 源码 → Clang/LLVM → BPF 字节码</text>
+  <text x="480" y="236" text-anchor="middle" font-size="26" fill="#8aa0b6">BPF_CORE_READ(task, real_parent, tgid)</text>
+  </g>
+
+  <line x1="480" y1="268" x2="480" y2="324" stroke="#4a8ec9" stroke-width="3" marker-end="url(#ab)"/>
+
+  <g filter="url(#sh)">
+  <rect x="108" y="344" width="744" height="136" rx="16" fill="#f4f7fa" stroke="#d8e3ec" stroke-width="2"/>
+  <text x="480" y="400" text-anchor="middle" font-size="32" font-weight="700" fill="#4a6d8c">BTF 重定位记录生成</text>
+  <text x="480" y="448" text-anchor="middle" font-size="26" fill="#7d99b3">不生成硬编码偏移量，生成字段名+类型ID重定位条目</text>
+  </g>
+
+  <line x1="480" y1="480" x2="480" y2="540" stroke="#4a8ec9" stroke-width="3" marker-end="url(#ab)"/>
+
+  <g filter="url(#sh)">
+  <rect x="108" y="560" width="744" height="136" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.2"/>
+  <text x="480" y="616" text-anchor="middle" font-size="32" font-weight="700" fill="#3a5f80">ELF .o 文件输出</text>
+  <text x="480" y="664" text-anchor="middle" font-size="26" fill="#8aa0b6">BPF 指令 + Map 定义 + BTF.ext 重定位段</text>
+  </g>
+
+  <!-- BTF bridge arrows -->
+  <line x1="880" y1="200" x2="1040" y2="200" stroke="#5a9e6f" stroke-width="5" marker-end="url(#ag)"/>
+  <line x1="880" y1="412" x2="1040" y2="412" stroke="#5a9e6f" stroke-width="5" marker-end="url(#ag)"/>
+  <line x1="880" y1="628" x2="1040" y2="628" stroke="#5a9e6f" stroke-width="5" marker-end="url(#ag)"/>
+
+  <text x="960" y="164" text-anchor="middle" font-size="28" font-weight="700" fill="#5a9e6f">BTF</text>
+  <text x="960" y="700" text-anchor="middle" font-size="28" font-weight="700" fill="#5a9e6f">BTF</text>
+
+  <rect x="900" y="516" width="120" height="60" rx="12" fill="#f0f7f2" stroke="#a8d4b6" stroke-width="2"/>
+  <text x="960" y="556" text-anchor="middle" font-size="26" fill="#5a9e6f">解耦</text>
+
+  <!-- RIGHT: LOAD TIME -->
+  <rect x="1040" y="24" width="800" height="860" rx="20" fill="#f8fafc" stroke="#d0dbe6" stroke-width="2"/>
+  <rect x="1040" y="24" width="800" height="80" rx="20" fill="#edf3f8"/>
+  <rect x="1040" y="64" width="800" height="40" fill="#edf3f8"/>
+  <text x="1440" y="76" text-anchor="middle" font-size="34" font-weight="700" fill="#3a5f80">加载时 (目标机, 内核 v5.15-6.x)</text>
+
+  <g filter="url(#sh)">
+  <rect x="1068" y="132" width="744" height="136" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.2"/>
+  <text x="1440" y="188" text-anchor="middle" font-size="32" font-weight="700" fill="#3a5f80">libbpf 加载 ELF .o</text>
+  <text x="1440" y="236" text-anchor="middle" font-size="26" fill="#8aa0b6">bpf_object__open() → bpf_object__load()</text>
+  </g>
+
+  <line x1="1440" y1="268" x2="1440" y2="324" stroke="#4a8ec9" stroke-width="3" marker-end="url(#ab)"/>
+
+  <g filter="url(#sh)">
+  <rect x="1068" y="344" width="744" height="136" rx="16" fill="#f4f7fa" stroke="#d8e3ec" stroke-width="2"/>
+  <text x="1440" y="400" text-anchor="middle" font-size="32" font-weight="700" fill="#4a6d8c">BTF 重定位解析</text>
+  <text x="1440" y="448" text-anchor="middle" font-size="26" fill="#7d99b3">读取 /sys/kernel/btf/vmlinux → 解析字段实际偏移量</text>
+  </g>
+
+  <line x1="1440" y1="480" x2="1440" y2="540" stroke="#4a8ec9" stroke-width="3" marker-end="url(#ab)"/>
+
+  <g filter="url(#sh)">
+  <rect x="1068" y="560" width="744" height="136" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.2"/>
+  <text x="1440" y="616" text-anchor="middle" font-size="32" font-weight="700" fill="#3a5f80">字节码重写 + JIT 编译</text>
+  <text x="1440" y="664" text-anchor="middle" font-size="26" fill="#8aa0b6">重定位 → 真实偏移量 → x86_64/ARM64 原生指令</text>
+  </g>
+
+  <text x="960" y="836" text-anchor="middle" font-size="28" fill="#7d99b3">关键: 旧方案需为每个内核版本编译 → CO-RE 一份字节码跨 5.15 ↔ 6.17 通用</text>
+
+  <g filter="url(#sh)">
+  <rect x="240" y="900" width="480" height="80" rx="16" fill="#f4f7fa" stroke="#d8e3ec" stroke-width="2"/>
+  <text x="480" y="950" text-anchor="middle" font-size="26" fill="#7d99b3">开发: 内核 6.17 · task_struct 偏移 A</text>
+  </g>
+  <text x="800" y="952" font-size="36" fill="#5a9e6f">→</text>
+  <g filter="url(#sh)">
+  <rect x="860" y="900" width="480" height="80" rx="16" fill="#f4f7fa" stroke="#d8e3ec" stroke-width="2"/>
+  <text x="1100" y="950" text-anchor="middle" font-size="26" fill="#7d99b3">部署: 内核 5.15 · task_struct 偏移 B</text>
+  </g>
+  <text x="1440" y="952" font-size="32" fill="#5a9e6f" font-weight="700">✓ 无需重编译</text>
+</svg>

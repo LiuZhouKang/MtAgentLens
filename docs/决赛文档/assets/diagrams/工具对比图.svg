@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 640" style="max-width:950px;font-family:'Microsoft YaHei','SimHei',Arial,sans-serif">
+  <rect width="950" height="640" fill="#fcfcfc"/>
+
+  <!-- title removed -->
+
+  <!-- ===== Row 1: 4 global metric sub-charts ===== -->
+  <!-- Row 1 Y-axis (x=70, y=75..255, 180px range) -->
+  <line x1="70" y1="75" x2="70" y2="255" stroke="#333" stroke-width="1.5"/>
+  <line x1="65" y1="255" x2="70" y2="255" stroke="#888" stroke-width="1"/>
+  <text x="55" y="259" text-anchor="end" font-size="9" fill="#888">0.00</text>
+  <line x1="65" y1="210" x2="70" y2="210" stroke="#888" stroke-width="1"/>
+  <text x="55" y="214" text-anchor="end" font-size="9" fill="#888">0.25</text>
+  <line x1="65" y1="165" x2="70" y2="165" stroke="#888" stroke-width="1"/>
+  <text x="55" y="169" text-anchor="end" font-size="9" fill="#888">0.50</text>
+  <line x1="65" y1="120" x2="70" y2="120" stroke="#888" stroke-width="1"/>
+  <text x="55" y="124" text-anchor="end" font-size="9" fill="#888">0.75</text>
+  <line x1="65" y1="75" x2="70" y2="75" stroke="#888" stroke-width="1"/>
+  <text x="55" y="79" text-anchor="end" font-size="9" fill="#888">1.00</text>
+
+  <!-- Row 1 headers -->
+  <text x="215" y="30" text-anchor="middle" font-size="12" font-weight="700" fill="#333">ITT-TPR</text>
+  <text x="385" y="30" text-anchor="middle" font-size="12" font-weight="700" fill="#333">FPR</text>
+  <text x="555" y="30" text-anchor="middle" font-size="12" font-weight="700" fill="#333">F1</text>
+  <text x="725" y="30" text-anchor="middle" font-size="12" font-weight="700" fill="#333">MCC</text>
+
+  <!-- ITT-TPR: center=215, w=26 gap=4, left edges 157,187,217,247 -->
+  <rect x="157" y="94" width="26" height="161" fill="#00629B" rx="2"/>
+  <text x="170" y="86" text-anchor="middle" font-size="8" fill="#333">0.896</text>
+  <rect x="187" y="191" width="26" height="64" fill="#C8501E" rx="2"/>
+  <text x="200" y="183" text-anchor="middle" font-size="8" fill="#333">0.358</text>
+  <rect x="217" y="131" width="26" height="124" fill="#646464" rx="2"/>
+  <text x="230" y="123" text-anchor="middle" font-size="8" fill="#333">0.687</text>
+  <rect x="247" y="228" width="26" height="27" fill="#A0A0A0" rx="2"/>
+  <text x="260" y="220" text-anchor="middle" font-size="8" fill="#333">0.149</text>
+
+  <!-- FPR: center=385, left edges 327,357,387,417 -->
+  <rect x="327" y="255" width="26" height="0" fill="#00629B" rx="2"/>
+  <text x="340" y="247" text-anchor="middle" font-size="8" fill="#333">0.000</text>
+  <rect x="357" y="198" width="26" height="57" fill="#C8501E" rx="2"/>
+  <text x="370" y="190" text-anchor="middle" font-size="8" fill="#333">0.316</text>
+  <rect x="387" y="113" width="26" height="142" fill="#646464" rx="2"/>
+  <text x="400" y="105" text-anchor="middle" font-size="8" fill="#333">0.789</text>
+  <rect x="417" y="236" width="26" height="19" fill="#A0A0A0" rx="2"/>
+  <text x="430" y="228" text-anchor="middle" font-size="8" fill="#333">0.105</text>
+
+  <!-- F1: center=555, left edges 497,527,557,587 -->
+  <rect x="497" y="85" width="26" height="170" fill="#00629B" rx="2"/>
+  <text x="510" y="77" text-anchor="middle" font-size="8" fill="#333">0.945</text>
+  <rect x="527" y="166" width="26" height="89" fill="#C8501E" rx="2"/>
+  <text x="540" y="158" text-anchor="middle" font-size="8" fill="#333">0.495</text>
+  <rect x="557" y="126" width="26" height="129" fill="#646464" rx="2"/>
+  <text x="570" y="118" text-anchor="middle" font-size="8" fill="#333">0.719</text>
+  <rect x="587" y="209" width="26" height="46" fill="#A0A0A0" rx="2"/>
+  <text x="600" y="201" text-anchor="middle" font-size="8" fill="#333">0.253</text>
+
+  <!-- MCC: center=725, left edges 667,697,727,757 -->
+  <rect x="667" y="109" width="26" height="146" fill="#00629B" rx="2"/>
+  <text x="680" y="101" text-anchor="middle" font-size="8" fill="#333">0.809</text>
+  <rect x="697" y="245" width="26" height="10" fill="#C8501E" rx="2"/>
+  <text x="710" y="237" text-anchor="middle" font-size="8" fill="#333">0.053</text>
+  <rect x="727" y="255" width="26" height="20" fill="#c46262" rx="2"/>
+  <text x="740" y="283" text-anchor="middle" font-size="8" fill="#c46262">−0.110</text>
+  <rect x="757" y="255" width="26" height="23" fill="#c46262" rx="2"/>
+  <text x="770" y="286" text-anchor="middle" font-size="8" fill="#c46262">−0.128</text>
+
+  <!-- ===== Section title ===== -->
+  <text x="475" y="305" text-anchor="middle" font-size="14" font-weight="700" fill="#333">按攻击类型 TPR 分解</text>
+
+  <!-- ===== Row 2: 3 attack-type breakdown sub-charts ===== -->
+  <!-- Row 2 Y-axis (x=70, y=345..525, 180px range — same height as Row 1) -->
+  <line x1="70" y1="345" x2="70" y2="525" stroke="#333" stroke-width="1.5"/>
+  <line x1="65" y1="525" x2="70" y2="525" stroke="#888" stroke-width="1"/>
+  <text x="55" y="529" text-anchor="end" font-size="9" fill="#888">0.00</text>
+  <line x1="65" y1="480" x2="70" y2="480" stroke="#888" stroke-width="1"/>
+  <text x="55" y="484" text-anchor="end" font-size="9" fill="#888">0.25</text>
+  <line x1="65" y1="435" x2="70" y2="435" stroke="#888" stroke-width="1"/>
+  <text x="55" y="439" text-anchor="end" font-size="9" fill="#888">0.50</text>
+  <line x1="65" y1="390" x2="70" y2="390" stroke="#888" stroke-width="1"/>
+  <text x="55" y="394" text-anchor="end" font-size="9" fill="#888">0.75</text>
+  <line x1="65" y1="345" x2="70" y2="345" stroke="#888" stroke-width="1"/>
+  <text x="55" y="349" text-anchor="end" font-size="9" fill="#888">1.00</text>
+
+  <!-- Row 2 type labels -->
+  <text x="215" y="335" text-anchor="middle" font-size="11" fill="#333">Type A 直接注入 (n=10)</text>
+  <text x="475" y="335" text-anchor="middle" font-size="11" fill="#333">Type B 间接注入 (n=34)</text>
+  <text x="735" y="335" text-anchor="middle" font-size="11" fill="#333">Type C 多Agent协同 (n=23)</text>
+
+  <!-- Type A: center=215, w=32 gap=5, left edges 143,180,217,254 -->
+  <rect x="143" y="363" width="32" height="162" fill="#00629B" rx="2"/>
+  <text x="159" y="356" text-anchor="middle" font-size="8" fill="#333">0.900</text>
+  <rect x="180" y="363" width="32" height="162" fill="#C8501E" rx="2"/>
+  <text x="196" y="356" text-anchor="middle" font-size="8" fill="#333">0.900</text>
+  <rect x="217" y="435" width="32" height="90" fill="#646464" rx="2"/>
+  <text x="233" y="428" text-anchor="middle" font-size="8" fill="#333">0.500</text>
+  <rect x="254" y="525" width="32" height="0" fill="#A0A0A0" rx="2"/>
+  <line x1="143" y1="525" x2="286" y2="525" stroke="#888" stroke-width="1"/>
+
+  <!-- Type B: center=475, left edges 403,440,477,514 -->
+  <rect x="403" y="377" width="32" height="148" fill="#00629B" rx="2"/>
+  <text x="419" y="370" text-anchor="middle" font-size="8" fill="#333">0.824</text>
+  <rect x="440" y="461" width="32" height="64" fill="#C8501E" rx="2"/>
+  <text x="456" y="454" text-anchor="middle" font-size="8" fill="#333">0.353</text>
+  <rect x="477" y="371" width="32" height="154" fill="#646464" rx="2"/>
+  <text x="493" y="364" text-anchor="middle" font-size="8" fill="#333">0.853</text>
+  <rect x="514" y="483" width="32" height="42" fill="#A0A0A0" rx="2"/>
+  <text x="530" y="476" text-anchor="middle" font-size="8" fill="#333">0.235</text>
+  <line x1="403" y1="525" x2="546" y2="525" stroke="#888" stroke-width="1"/>
+
+  <!-- Type C: center=735, left edges 663,700,737,774 -->
+  <rect x="663" y="345" width="32" height="180" fill="#00629B" rx="2"/>
+  <text x="679" y="338" text-anchor="middle" font-size="8" fill="#333">1.000</text>
+  <rect x="700" y="502" width="32" height="23" fill="#C8501E" rx="2"/>
+  <text x="716" y="495" text-anchor="middle" font-size="8" fill="#333">0.130</text>
+  <rect x="737" y="431" width="32" height="94" fill="#646464" rx="2"/>
+  <text x="753" y="424" text-anchor="middle" font-size="8" fill="#333">0.522</text>
+  <rect x="774" y="509" width="32" height="16" fill="#A0A0A0" rx="2"/>
+  <text x="790" y="502" text-anchor="middle" font-size="8" fill="#333">0.087</text>
+  <line x1="663" y1="525" x2="806" y2="525" stroke="#888" stroke-width="1"/>
+
+  <!-- ===== Legend: bottom center, horizontal ===== -->
+  <rect x="220" y="558" width="14" height="14" fill="#00629B" rx="2"/>
+  <text x="240" y="570" font-size="11" fill="#333">MtAgentLens</text>
+  <rect x="360" y="558" width="14" height="14" fill="#C8501E" rx="2"/>
+  <text x="380" y="570" font-size="11" fill="#333">Agent Sentinel</text>
+  <rect x="510" y="558" width="14" height="14" fill="#646464" rx="2"/>
+  <text x="530" y="570" font-size="11" fill="#333">LLM Guard</text>
+  <rect x="640" y="558" width="14" height="14" fill="#A0A0A0" rx="2"/>
+  <text x="660" y="570" font-size="11" fill="#333">Meta Prompt Guard</text>
+
+  <!-- ===== Footer ===== -->
+  <text x="475" y="605" text-anchor="middle" font-size="11" fill="#C8501E" font-weight="bold">核心发现: Type C 多Agent场景中, prompt级工具原理上失效 (无恶意文本), MtAgentLens 是唯一有效检测方案 (TPR=1.000)</text>
+  <text x="475" y="625" text-anchor="middle" font-size="10" fill="#888">McNemar 配对检验 (Yates 校正): MtAgentLens vs 所有基线 p &lt; 0.001 (b=34,48,50; 所有 c=0)</text>
+</svg>

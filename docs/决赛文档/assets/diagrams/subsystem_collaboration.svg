@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1120" style="max-width:1920px;font-family:'Microsoft YaHei','SimHei',Arial,sans-serif">
+  <defs>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4a8ec9"/></marker>
+    <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#c4792b"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5a9e6f"/></marker>
+    <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-opacity="0.06"/></filter>
+  </defs>
+  <rect width="1920" height="1120" fill="#fcfcfc"/>
+
+<!-- title removed -->
+
+  <!-- CENTER: ClassificationEngine -->
+  <g filter="url(#sh)">
+  <rect x="660" y="320" width="600" height="116" rx="20" fill="#fff" stroke="#4a8ec9" stroke-width="3.6"/>
+  <text x="960" y="376" text-anchor="middle" font-size="34" font-weight="700" fill="#3a5f80">ClassificationEngine</text>
+  <text x="960" y="420" text-anchor="middle" font-size="26" fill="#8aa0b6">三级管道 · 双路由仲裁</text>
+  </g>
+
+  <!-- TOP: GraphBuilder + ResponsibilityGraph -->
+  <g filter="url(#sh)">
+  <rect x="260" y="40" width="512" height="104" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.4"/>
+  <text x="516" y="88" text-anchor="middle" font-size="32" font-weight="700" fill="#3a5f80">GraphBuilder</text>
+  <text x="516" y="128" text-anchor="middle" font-size="26" fill="#8aa0b6">事件 → PBC 边 · 六索引结构</text>
+  </g>
+
+  <g filter="url(#sh)">
+  <rect x="1148" y="40" width="512" height="104" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.4"/>
+  <text x="1404" y="88" text-anchor="middle" font-size="32" font-weight="700" fill="#3a5f80">ResponsibilityGraph</text>
+  <text x="1404" y="128" text-anchor="middle" font-size="26" fill="#8aa0b6">节点/边 CRUD · FIFO 淘汰</text>
+  </g>
+
+  <line x1="772" y1="92" x2="1148" y2="92" stroke="#4a8ec9" stroke-width="3" marker-end="url(#ab)"/>
+  <line x1="960" y1="144" x2="960" y2="320" stroke="#4a8ec9" stroke-width="3" marker-end="url(#ab)"/>
+
+  <!-- LEFT: TaintTracker + EvidenceCorrelator -->
+  <g filter="url(#sh)">
+  <rect x="100" y="416" width="440" height="116" rx="16" fill="#f4f7fa" stroke="#c0d4e6" stroke-width="2.4"/>
+  <text x="320" y="468" text-anchor="middle" font-size="32" font-weight="700" fill="#3a5f80">TaintTracker</text>
+  <text x="320" y="512" text-anchor="middle" font-size="26" fill="#8aa0b6">三条件 · 最早污染者优先</text>
+  </g>
+
+  <g filter="url(#sh)">
+  <rect x="100" y="560" width="440" height="116" rx="16" fill="#f4f7fa" stroke="#c0d4e6" stroke-width="2.4"/>
+  <text x="320" y="612" text-anchor="middle" font-size="32" font-weight="700" fill="#3a5f80">EvidenceCorrelator</text>
+  <text x="320" y="656" text-anchor="middle" font-size="26" fill="#8aa0b6">L1-L5 五级逐级降级</text>
+  </g>
+
+  <line x1="540" y1="474" x2="660" y2="378" stroke="#999" stroke-width="2.4" fill="none" marker-end="url(#ab)"/>
+  <line x1="540" y1="618" x2="660" y2="398" stroke="#999" stroke-width="2.4" fill="none" marker-end="url(#ab)"/>
+
+  <!-- RIGHT: ProgressiveScorer + CrossCycleFusion -->
+  <g filter="url(#sh)">
+  <rect x="1340" y="484" width="500" height="128" rx="16" fill="#fefaf5" stroke="#e6cfa8" stroke-width="2.4"/>
+  <text x="1590" y="536" text-anchor="middle" font-size="32" font-weight="700" fill="#8b6914">ProgressiveScorer</text>
+  <text x="1590" y="584" text-anchor="middle" font-size="26" fill="#ad8f52">6维 EWMA/CUSUM · force_observer</text>
+  </g>
+
+  <g filter="url(#sh)">
+  <rect x="1340" y="644" width="500" height="128" rx="16" fill="#fefaf5" stroke="#e6cfa8" stroke-width="2.4"/>
+  <text x="1590" y="696" text-anchor="middle" font-size="32" font-weight="700" fill="#8b6914">CrossCycleFusion</text>
+  <text x="1590" y="744" text-anchor="middle" font-size="26" fill="#ad8f52">Noisy-OR · Platt · ECE 监控</text>
+  </g>
+
+  <path d="M1340 528 L1260 380" stroke="#c4792b" stroke-width="2.6" fill="none" marker-end="url(#ao)"/>
+  <text x="1280" y="456" font-size="26" fill="#ad8f52">force_observer</text>
+
+  <path d="M1340 708 L1260 408" stroke="#c4792b" stroke-width="2.6" fill="none" marker-end="url(#ao)"/>
+  <text x="1260" y="580" font-size="26" fill="#ad8f52">融合分</text>
+
+  <!-- BOTTOM: Output -->
+  <line x1="960" y1="436" x2="960" y2="580" stroke="#4a8ec9" stroke-width="3" marker-end="url(#ab)"/>
+
+  <g filter="url(#sh)">
+  <rect x="660" y="596" width="600" height="112" rx="16" fill="#fff" stroke="#5a9e6f" stroke-width="2.8"/>
+  <text x="960" y="648" text-anchor="middle" font-size="32" font-weight="700" fill="#3d704a">Claims → Alerts</text>
+  <text x="960" y="692" text-anchor="middle" font-size="26" fill="#6a9e7a">归因结论 · 分级告警 · SSE 推送</text>
+  </g>
+
+  <line x1="960" y1="708" x2="960" y2="780" stroke="#5a9e6f" stroke-width="3" marker-end="url(#ag)"/>
+
+  <g filter="url(#sh)">
+  <rect x="580" y="796" width="760" height="88" rx="44" fill="#f5faf7" stroke="#a8d4b6" stroke-width="2"/>
+  <text x="960" y="852" text-anchor="middle" font-size="32" font-weight="700" fill="#3d704a">3D 前端 · SQLite · JSONL · HTTP API</text>
+  </g>
+
+  <text x="1000" y="240" font-size="26" fill="#999">trigger() 每周期投喂评分</text>
+
+  <!-- Legend -->
+  <rect x="360" y="940" width="1200" height="60" rx="12" fill="#fafafa" stroke="#eee" stroke-width="1.6"/>
+  <rect x="400" y="956" width="32" height="32" rx="6" fill="#fff" stroke="#c0d4e6" stroke-width="2"/><text x="448" y="984" font-size="26" fill="#999">核心子系统</text>
+  <rect x="660" y="956" width="32" height="32" rx="6" fill="#fefaf5" stroke="#e6cfa8" stroke-width="2"/><text x="708" y="984" font-size="26" fill="#999">评分/融合增强</text>
+  <rect x="960" y="956" width="32" height="32" rx="6" fill="#f4f7fa" stroke="#c0d4e6" stroke-width="2"/><text x="1008" y="984" font-size="26" fill="#999">辅助子系统</text>
+  <rect x="1240" y="956" width="32" height="32" rx="6" fill="#f5faf7" stroke="#a8d4b6" stroke-width="2"/><text x="1288" y="984" font-size="26" fill="#999">输出</text>
+</svg>

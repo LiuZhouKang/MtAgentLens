@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1316" style="max-width:1920px;font-family:'Microsoft YaHei','SimHei',Arial,sans-serif">
+  <defs>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4a8ec9"/></marker>
+    <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#c4792b"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5a9e6f"/></marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#c46262"/></marker>
+    <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-opacity="0.06"/></filter>
+  </defs>
+  <rect width="1920" height="1316" fill="#fcfcfc"/>
+
+  <!-- title removed -->
+
+  <!-- ProgressiveScorer pill -->
+  <rect x="400" y="40" width="1120" height="60" rx="30" fill="#f0f4f8" stroke="#d0dbe6" stroke-width="1.6"/>
+  <text x="960" y="80" text-anchor="middle" font-size="26" fill="#5a88aa" font-weight="700">ProgressiveScorer: 每 Agent · 6维 EWMA/CUSUM 渐进跟踪 → force_observer</text>
+
+  <!-- L1 -> L2 -> L3 -->
+  <g filter="url(#sh)">
+  <rect x="128" y="136" width="512" height="136" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.4"/>
+  <text x="384" y="196" text-anchor="middle" font-size="34" font-weight="700" fill="#3a5f80">L1 规则引擎</text>
+  <text x="384" y="244" text-anchor="middle" font-size="26" fill="#8aa0b6">Rule Engine · YAML 规则集热加载</text>
+  </g>
+
+  <line x1="640" y1="204" x2="724" y2="204" stroke="#4a8ec9" stroke-width="3.6" marker-end="url(#ab)"/>
+
+  <g filter="url(#sh)">
+  <rect x="740" y="136" width="512" height="136" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.4"/>
+  <text x="996" y="196" text-anchor="middle" font-size="34" font-weight="700" fill="#3a5f80">L2 图模式匹配</text>
+  <text x="996" y="244" text-anchor="middle" font-size="26" fill="#8aa0b6">Graph Pattern Match · 子图同构</text>
+  </g>
+
+  <line x1="1252" y1="204" x2="1336" y2="204" stroke="#4a8ec9" stroke-width="3.6" marker-end="url(#ab)"/>
+
+  <g filter="url(#sh)">
+  <rect x="1352" y="136" width="480" height="136" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.4"/>
+  <text x="1592" y="196" text-anchor="middle" font-size="34" font-weight="700" fill="#3a5f80">L3 加权评分</text>
+  <text x="1592" y="244" text-anchor="middle" font-size="26" fill="#8aa0b6">Weighted Scoring · 多维融合</text>
+  </g>
+
+  <line x1="996" y1="272" x2="996" y2="344" stroke="#4a8ec9" stroke-width="3.6" marker-end="url(#ab)"/>
+
+  <!-- Scoring pipeline -->
+  <g filter="url(#sh)">
+  <rect x="120" y="364" width="592" height="128" rx="16" fill="#fefaf5" stroke="#e6cfa8" stroke-width="2.4"/>
+  <text x="416" y="416" text-anchor="middle" font-size="32" font-weight="700" fill="#8b6914">6-Dim Fusion</text>
+  <text x="416" y="464" text-anchor="middle" font-size="26" fill="#ad8f52">7子分数 → OWA(80%) + GeoMean(20%)</text>
+  </g>
+
+  <line x1="712" y1="428" x2="792" y2="428" stroke="#c4792b" stroke-width="3" marker-end="url(#ao)"/>
+
+  <g filter="url(#sh)">
+  <rect x="808" y="364" width="512" height="128" rx="16" fill="#fefaf5" stroke="#e6cfa8" stroke-width="2.4"/>
+  <text x="1064" y="416" text-anchor="middle" font-size="32" font-weight="700" fill="#8b6914">Platt 概率校准</text>
+  <text x="1064" y="464" text-anchor="middle" font-size="26" fill="#ad8f52">P = 1/(1+e^{-(7.0×S−3.0)})</text>
+  </g>
+
+  <line x1="1320" y1="428" x2="1400" y2="428" stroke="#c4792b" stroke-width="3" marker-end="url(#ao)"/>
+
+  <g filter="url(#sh)">
+  <rect x="1416" y="364" width="408" height="128" rx="16" fill="#fef6f6" stroke="#e6c0c0" stroke-width="2.4"/>
+  <text x="1620" y="416" text-anchor="middle" font-size="32" font-weight="700" fill="#8b3030">Evidence Gate</text>
+  <text x="1620" y="464" text-anchor="middle" font-size="26" fill="#b06060">PBC &lt; 10 且无 Unsafe → cap 0.10</text>
+  </g>
+
+  <line x1="996" y1="492" x2="996" y2="576" stroke="#4a8ec9" stroke-width="3.6" marker-end="url(#ab)"/>
+
+  <!-- S_cal pill -->
+  <rect x="760" y="592" width="472" height="72" rx="36" fill="#edf3f8" stroke="#b0c8dd" stroke-width="2"/>
+  <text x="996" y="638" text-anchor="middle" font-size="30" font-weight="700" fill="#4a6d8c">S_cal ∈ [0, 1]</text>
+
+  <!-- Three branches -->
+  <path d="M760 628 L448 628" stroke="#5a9e6f" stroke-width="3.2" fill="none" marker-end="url(#ag)"/>
+  <line x1="996" y1="664" x2="996" y2="732" stroke="#c4792b" stroke-width="3.2" marker-end="url(#ao)"/>
+  <path d="M1232 628 L1544 628" stroke="#c46262" stroke-width="3.2" fill="none" marker-end="url(#ar)"/>
+
+  <!-- Safe -->
+  <g filter="url(#sh)">
+  <rect x="184" y="588" width="356" height="108" rx="16" fill="#f5faf7" stroke="#a8d4b6" stroke-width="2.4"/>
+  <text x="362" y="640" text-anchor="middle" font-size="32" font-weight="700" fill="#3d704a">Safe</text>
+  <text x="362" y="684" text-anchor="middle" font-size="26" fill="#6a9e7a">S_cal &lt; 0.15</text>
+  </g>
+
+  <!-- Unsafe -->
+  <g filter="url(#sh)">
+  <rect x="1396" y="588" width="356" height="108" rx="16" fill="#fdf6f6" stroke="#e6b8b8" stroke-width="2.4"/>
+  <text x="1574" y="640" text-anchor="middle" font-size="32" font-weight="700" fill="#8b3030">Direct Unsafe</text>
+  <text x="1574" y="684" text-anchor="middle" font-size="26" fill="#b06060">S_cal &gt; 0.70</text>
+  </g>
+
+  <!-- Grey Zone -->
+  <g filter="url(#sh)">
+  <rect x="556" y="752" width="880" height="108" rx="16" fill="#fefaf5" stroke="#e6cfa8" stroke-width="2.4"/>
+  <text x="996" y="800" text-anchor="middle" font-size="32" font-weight="700" fill="#8b6914">Grey Zone: 0.15 ≤ S_cal ≤ 0.70</text>
+  <text x="996" y="844" text-anchor="middle" font-size="26" fill="#ad8f52">模糊区间 → 根据 force_observer 标志选择路由</text>
+  </g>
+
+  <!-- Branch from Grey Zone to Observer / Fail-closed (symmetric) -->
+  <path d="M996 860 L620 1000" stroke="#5a9e6f" stroke-width="2.8" fill="none" marker-end="url(#ag)"/>
+  <path d="M996 860 L1372 1000" stroke="#c46262" stroke-width="2.8" fill="none" marker-end="url(#ar)"/>
+
+  <text x="620" y="972" text-anchor="middle" font-size="28" fill="#5a9e6f" font-weight="700">force_observer = true</text>
+  <text x="1372" y="972" text-anchor="middle" font-size="28" fill="#c46262" font-weight="700">force_observer = false</text>
+
+  <!-- Observer -->
+  <g filter="url(#sh)">
+  <rect x="284" y="1000" width="672" height="132" rx="16" fill="#f5faf7" stroke="#a8d4b6" stroke-width="2.4"/>
+  <text x="620" y="1052" text-anchor="middle" font-size="30" font-weight="700" fill="#3d704a">Observer LLM 语义仲裁 (冷路径)</text>
+  <text x="620" y="1096" text-anchor="middle" font-size="26" fill="#6a9e7a">Unsafe → S×0.4 + conf×0.6, Safe → S×(1 − conf×0.7)</text>
+  </g>
+
+  <!-- Fail-closed -->
+  <g filter="url(#sh)">
+  <rect x="1036" y="1000" width="672" height="132" rx="16" fill="#fdf6f6" stroke="#e6b8b8" stroke-width="2.4"/>
+  <text x="1372" y="1052" text-anchor="middle" font-size="30" font-weight="700" fill="#8b3030">Phase 2 启发式回退 (批量路径)</text>
+  <text x="1372" y="1096" text-anchor="middle" font-size="26" fill="#b06060">fail-closed: Grey Zone → Unsafe / Warning</text>
+  </g>
+
+  <!-- Arrows to output (symmetric) -->
+  <path d="M620 1132 L620 1176 L996 1176" stroke="#999" stroke-width="2.2" fill="none"/>
+  <path d="M1372 1132 L1372 1176 L996 1176" stroke="#999" stroke-width="2.2" fill="none"/>
+  <line x1="996" y1="1176" x2="996" y2="1240" stroke="#4a8ec9" stroke-width="3.6" marker-end="url(#ab)"/>
+
+  <g filter="url(#sh)">
+  <rect x="640" y="1248" width="712" height="72" rx="36" fill="#edf3f8" stroke="#b0c8dd" stroke-width="2"/>
+  <text x="996" y="1294" text-anchor="middle" font-size="30" font-weight="700" fill="#3a5f80">ClassificationResult → Claims → Alerts</text>
+  </g>
+
+</svg>

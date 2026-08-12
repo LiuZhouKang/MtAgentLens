@@ -1,0 +1,509 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 1500 1465" style="max-width: 1500px;">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f2f6fb" />
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f7fbff" />
+    </linearGradient>
+    <filter id="softShadow" x="-12%" y="-12%" width="124%" height="124%">
+      <feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#1e3a5f" flood-opacity="0.10" />
+    </filter>
+    <marker id="arrBlue" markerWidth="10" markerHeight="10" refX="8.4" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#2563eb" />
+    </marker>
+    <marker id="arrGreen" markerWidth="10" markerHeight="10" refX="8.4" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#16a34a" />
+    </marker>
+    <marker id="arrRed" markerWidth="10" markerHeight="10" refX="8.4" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#dc2626" />
+    </marker>
+    <marker id="arrOrange" markerWidth="10" markerHeight="10" refX="8.4" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#f59e0b" />
+    </marker>
+    <marker id="arrGray" markerWidth="10" markerHeight="10" refX="8.4" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#64748b" />
+    </marker>
+    <marker id="arrTeal" markerWidth="10" markerHeight="10" refX="8.4" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#0d9488" />
+    </marker>
+    <marker id="arrPink" markerWidth="10" markerHeight="10" refX="8.4" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#db2777" />
+    </marker>
+    <marker id="arrIndigo" markerWidth="10" markerHeight="10" refX="8.4" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#4f46e5" />
+    </marker>
+    <marker id="arrCyan" markerWidth="10" markerHeight="10" refX="8.4" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#0891b2" />
+    </marker>
+    <marker id="arrLime" markerWidth="10" markerHeight="10" refX="8.4" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#65a30d" />
+    </marker>
+    <marker id="arrAmber" markerWidth="10" markerHeight="10" refX="8.4" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#d97706" />
+    </marker>
+    <style>
+      .bg{fill:url(#bgGrad)}
+      .panel{fill:#ffffff;stroke:#2f7dd3;stroke-width:1.5;rx:14;filter:url(#softShadow)}
+      .card{fill:url(#cardGrad);stroke:#9fc5ef;stroke-width:1.25;rx:10}
+      .card2{fill:#fbfdff;stroke:#b7cce5;stroke-width:1.15;rx:10}
+      .divider{stroke:#b7cce5;stroke-width:1.2}
+      .title{font-family:"Microsoft YaHei","SimHei",Arial,sans-serif;font-size:38px;font-weight:800;fill:#0b2a55;letter-spacing:.5px}
+      .sec{font-family:"Microsoft YaHei","SimHei",Arial,sans-serif;font-size:25px;font-weight:800;fill:#0b3a78}
+      .h{font-family:"Microsoft YaHei","SimHei",Arial,sans-serif;font-size:20px;font-weight:800;fill:#111827}
+      .t{font-family:"Microsoft YaHei","SimHei",Arial,sans-serif;font-size:19px;fill:#1f2937}
+      .s{font-family:"Microsoft YaHei","SimHei",Arial,sans-serif;font-size:18.5px;fill:#374151}
+      .xs{font-family:"Microsoft YaHei","SimHei",Arial,sans-serif;font-size:17.5px;fill:#4b5563}
+      .mono{font-family:"Microsoft YaHei","SimHei",Arial,sans-serif;font-size:18px;font-weight:700;fill:#172554}
+      .white{fill:#fff;font-family:"Microsoft YaHei","SimHei",Arial,sans-serif;font-size:20px;font-weight:800}
+      .num{fill:#145aaa}
+      .blue{stroke:#2563eb;fill:#eff6ff}
+      .green{stroke:#16a34a;fill:#f0fdf4}
+      .purple{stroke:#7c3aed;fill:#f5f3ff}
+      .orange{stroke:#d97706;fill:#fffbeb}
+      .red{stroke:#dc2626;fill:#fef2f2}
+      .gray{stroke:#64748b;fill:#f8fafc}
+      .lineB{stroke:#2563eb;stroke-width:2.6;fill:none;marker-end:url(#arrBlue)}
+      .lineG{stroke:#16a34a;stroke-width:2.6;fill:none;marker-end:url(#arrGreen)}
+      .lineR{stroke:#dc2626;stroke-width:2.2;fill:none;marker-end:url(#arrRed);stroke-dasharray:6 5}
+      .lineO{stroke:#f59e0b;stroke-width:2.2;fill:none;marker-end:url(#arrOrange)}
+      .lineP{stroke:#7c3aed;stroke-width:2.2;fill:none;marker-end:url(#arrBlue);stroke-dasharray:3 5}
+      .lineGray{stroke:#64748b;stroke-width:2.1;fill:none;marker-end:url(#arrGray);stroke-dasharray:8 5}
+      .lineTeal{stroke:#0d9488;stroke-width:2.4;fill:none;marker-end:url(#arrTeal);stroke-dasharray:6 3}
+      .linePink{stroke:#db2777;stroke-width:2.2;fill:none;marker-end:url(#arrPink);stroke-dasharray:2 4}
+      .lineIndigo{stroke:#4f46e5;stroke-width:2.4;fill:none;marker-end:url(#arrIndigo);stroke-dasharray:10 4}
+      .lineCyan{stroke:#0891b2;stroke-width:2.2;fill:none;marker-end:url(#arrCyan);stroke-dasharray:5 3 2 3}
+      .lineLime{stroke:#65a30d;stroke-width:2.4;fill:none;marker-end:url(#arrLime);stroke-dasharray:1 5}
+      .lineAmber{stroke:#d97706;stroke-width:2.3;fill:none;marker-end:url(#arrAmber);stroke-dasharray:12 4 2 4}
+      .thin{stroke:#b7cce5;stroke-width:1.1;fill:none}
+    </style>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1500" height="1465" />
+  
+<!-- title + subtitle removed -->
+  
+  <rect class="panel" x="24" y="20" width="1452" height="510" />
+  
+  <g transform="translate(44,40)">
+    <circle cx="20" cy="20" r="19" fill="#145aaa" />
+    <text class="white" x="20" y="26" text-anchor="middle" style="font-size:16.0px">1</text>
+    <text class="sec" x="55" y="27">主存储（核心数据）</text>
+    <rect class="card" x="0" y="64" width="250" height="150" />
+    
+    <g transform="translate(22,94)" stroke="#1976d2" stroke-width="4" fill="none">
+      <ellipse cx="36" cy="15" rx="23" ry="10" />
+      <path d="M13 15v46c0 6 46 6 46 0V15" />
+      <path d="M13 38c0 6 46 6 46 0" />
+      <path d="M13 61c0 6 46 6 46 0" />
+    </g>
+    <text class="h" x="105" y="112" style="font-size:16.0px">nodes</text>
+    <text class="mono" x="105" y="138" style="font-size:14.0px">HashMap&lt;NodeId,</text>
+    <text class="mono" x="105" y="158" style="font-size:14.0px">ResponsibilityNode&gt;</text>
+    <text class="s" x="105" y="194" style="font-size:14.5px">存储所有责任节点</text>
+    <rect class="card" x="0" y="230" width="250" height="150" />
+    
+    <g transform="translate(28,272)" stroke="#1976d2" stroke-width="2.5" fill="none">
+      <circle cx="16" cy="16" r="5" />
+      <circle cx="48" cy="8" r="5" />
+      <circle cx="54" cy="44" r="5" />
+      <circle cx="6" cy="48" r="5" />
+      <path d="M21 14 L43 9 M20 21 L49 39 M12 23 L8 42 M14 45 L49 43" />
+    </g>
+    <text class="h" x="105" y="278" style="font-size:16.0px">edges</text>
+    <text class="mono" x="105" y="304" style="font-size:14.0px">HashMap&lt;EdgeId,</text>
+    <text class="mono" x="105" y="324" style="font-size:14.0px">ResponsibilityEdge&gt;</text>
+    <text class="s" x="105" y="360" style="font-size:14.5px">存储所有责任边</text>
+  </g>
+  <line class="divider" x1="328" y1="116" x2="328" y2="590" />
+  
+  <g transform="translate(360,40)">
+    <circle cx="20" cy="20" r="19" fill="#145aaa" />
+    <text class="white" x="20" y="26" text-anchor="middle" style="font-size:16.0px">2</text>
+    <text class="sec" x="55" y="27">六大索引（加速查询与遍历）</text>
+    
+    <g transform="translate(0,64)">
+      <rect class="card" x="0" y="0" width="252" height="112" />
+      <rect x="12" y="12" width="24" height="24" rx="5" fill="#145aaa" />
+      <text class="white" x="24" y="30" text-anchor="middle" style="font-size:13.0px">1</text>
+      
+      <circle cx="58" cy="32" r="18" fill="#e0f2fe" stroke="#0284c7" stroke-width="2" />
+      <circle cx="58" cy="27" r="6" fill="#0284c7" />
+      <path d="M46 43c4-10 20-10 24 0" fill="#0284c7" />
+      <text class="h" x="88" y="28" style="font-size:16.0px">agent_nodes</text>
+      <text class="mono" x="88" y="50" style="font-size:14.0px">AgentId → Vec&lt;NodeId&gt;</text>
+      <text class="s" x="88" y="78" style="font-size:14.5px">给定 Agent 查询关联节点</text>
+      <text class="xs" x="88" y="96" style="font-size:13.5px">由 add_node 插入时更新</text>
+      <rect class="card" x="268" y="0" width="252" height="112" />
+      <rect x="280" y="12" width="24" height="24" rx="5" fill="#145aaa" />
+      <text class="white" x="292" y="30" text-anchor="middle" style="font-size:13.0px">2</text>
+      
+      <circle cx="325" cy="32" r="18" fill="#e0f2fe" stroke="#0284c7" stroke-width="2" />
+      <path d="M318 34l-2 2a7 7 0 0 0 10 10l4-4a7 7 0 0 0-3-12" stroke="#0284c7" stroke-width="3" fill="none" />
+      <path d="M332 30l2-2a7 7 0 0 0-10-10l-4 4a7 7 0 0 0 3 12" stroke="#0284c7" stroke-width="3" fill="none" />
+      <text class="h" x="355" y="28" style="font-size:16.0px">agent_edges</text>
+      <text class="mono" x="355" y="50" style="font-size:14.0px">AgentId → Vec&lt;EdgeId&gt;</text>
+      <text class="s" x="355" y="78" style="font-size:14.5px">由边两端 Agent 更新</text>
+      <text class="xs" x="355" y="96" style="font-size:13.5px">source=target 时避免重复</text>
+      <rect class="card" x="0" y="128" width="252" height="112" />
+      <rect x="12" y="140" width="24" height="24" rx="5" fill="#145aaa" />
+      <text class="white" x="24" y="158" text-anchor="middle" style="font-size:13.0px">3</text>
+      
+      <circle cx="58" cy="160" r="18" fill="#dbeafe" stroke="#2563eb" stroke-width="2" />
+      <path d="M48 160h20M61 152l8 8-8 8" stroke="#2563eb" stroke-width="4" fill="none" stroke-linecap="round" />
+      <text class="h" x="88" y="156" style="font-size:16.0px">outgoing_edges</text>
+      <text class="mono" x="88" y="178" style="font-size:14.0px">NodeId → Vec&lt;EdgeId&gt;</text>
+      <text class="s" x="88" y="206" style="font-size:14.5px">给定源节点查询出边</text>
+      <text class="xs" x="88" y="224" style="font-size:13.5px">用于 bfs_from 正向遍历</text>
+      <rect class="card" x="268" y="128" width="252" height="112" />
+      <rect x="280" y="140" width="24" height="24" rx="5" fill="#145aaa" />
+      <text class="white" x="292" y="158" text-anchor="middle" style="font-size:13.0px">4</text>
+      <circle cx="325" cy="160" r="18" fill="#dbeafe" stroke="#2563eb" stroke-width="2" />
+      <path d="M335 160h-20M322 152l-8 8 8 8" stroke="#2563eb" stroke-width="4" fill="none" stroke-linecap="round" />
+      <text class="h" x="355" y="156" style="font-size:16.0px">incoming_edges</text>
+      <text class="mono" x="355" y="178" style="font-size:14.0px">NodeId → Vec&lt;EdgeId&gt;</text>
+      <text class="s" x="355" y="206" style="font-size:14.5px">给定目标节点查询入边</text>
+      <text class="xs" x="355" y="224" style="font-size:13.5px">用于 walk_backward 追溯</text>
+      <rect class="card" x="0" y="256" width="252" height="112" />
+      <rect x="12" y="268" width="24" height="24" rx="5" fill="#145aaa" />
+      <text class="white" x="24" y="286" text-anchor="middle" style="font-size:13.0px">5</text>
+      
+      <circle cx="58" cy="288" r="18" fill="#f0fdf4" stroke="#16a34a" stroke-width="2" />
+      <path d="M48 281l12-6 13 13-12 12-13-13z" fill="none" stroke="#16a34a" stroke-width="3" />
+      <circle cx="57" cy="283" r="2" fill="#16a34a" />
+      <text class="h" x="88" y="284" style="font-size:16.0px">nodes_by_type</text>
+      <text class="mono" x="88" y="306" style="font-size:14.0px">NodeType → Vec&lt;NodeId&gt;</text>
+      <text class="s" x="88" y="334" style="font-size:14.5px">按节点类型分类查询</text>
+      <rect class="card" x="268" y="256" width="252" height="112" />
+      <rect x="280" y="268" width="24" height="24" rx="5" fill="#145aaa" />
+      <text class="white" x="292" y="286" text-anchor="middle" style="font-size:13.0px">6</text>
+      
+      <circle cx="325" cy="288" r="18" fill="#f0fdf4" stroke="#16a34a" stroke-width="2" />
+      <path d="M325 275l13 13-13 13-13-13z" fill="#16a34a" />
+      <text class="h" x="355" y="284" style="font-size:16.0px">edges_by_type</text>
+      <text class="mono" x="355" y="306" style="font-size:14.0px">EdgeType → Vec&lt;EdgeId&gt;</text>
+      <text class="s" x="355" y="334" style="font-size:14.5px">按边类型分类查询</text>
+    </g>
+  </g>
+  <line class="divider" x1="912" y1="116" x2="912" y2="590" />
+  
+  <g transform="translate(940,40)">
+    <circle cx="20" cy="20" r="19" fill="#145aaa" />
+    <text class="white" x="20" y="26" text-anchor="middle" style="font-size:16.0px">3</text>
+    <text class="sec" x="55" y="27">FIFO 淘汰机制（容量控制）</text>
+    <rect class="card" x="0" y="64" width="470" height="118" />
+    
+    <g transform="translate(36,82)" fill="#1976d2">
+      <rect x="0" y="0" width="38" height="8" rx="3" />
+      <rect x="0" y="18" width="38" height="8" rx="3" />
+      <rect x="0" y="36" width="38" height="8" rx="3" />
+      <circle cx="-9" cy="4" r="4" />
+      <circle cx="-9" cy="22" r="4" />
+      <circle cx="-9" cy="40" r="4" />
+    </g>
+    <text class="h" x="105" y="96" style="font-size:16.0px">node_order（Vec&lt;NodeId&gt;）</text>
+    <text class="s" x="105" y="120" style="font-size:14.5px">节点插入顺序队列（FIFO）</text>
+    <g transform="translate(102,143)">
+      <rect class="gray" x="0" y="0" width="64" height="32" rx="5" />
+      <rect class="gray" x="66" y="0" width="64" height="32" rx="5" />
+      <rect class="gray" x="132" y="0" width="64" height="32" rx="5" />
+      <rect class="gray" x="198" y="0" width="64" height="32" rx="5" />
+      <text class="t" x="32" y="21" text-anchor="middle" style="font-size:15.0px">n₁</text>
+      <text class="t" x="98" y="21" text-anchor="middle" style="font-size:15.0px">n₂</text>
+      <text class="t" x="164" y="21" text-anchor="middle" style="font-size:15.0px">…</text>
+      <text class="t" x="230" y="21" text-anchor="middle" style="font-size:15.0px">nₖ</text>
+      <text class="xs" x="0" y="51" style="font-size:13.5px">头部（最早）</text>
+      <text class="xs" x="205" y="51" style="font-size:13.5px">尾部（最新）</text>
+    </g>
+    <rect class="card" x="0" y="202" width="470" height="118" />
+    
+    <circle cx="55" cy="247" r="22" fill="#e0f2fe" stroke="#0284c7" stroke-width="2" />
+    <path d="M43 253c8-10 18-10 26 0M47 242c5 5 12 5 17 0" stroke="#0284c7" stroke-width="3" fill="none" />
+    <text class="h" x="105" y="236" style="font-size:16.0px">edge_order（Vec&lt;EdgeId&gt;）</text>
+    <text class="s" x="105" y="260" style="font-size:14.5px">边插入顺序队列（FIFO）</text>
+    <g transform="translate(102,281)">
+      <rect class="gray" x="0" y="0" width="64" height="32" rx="5" />
+      <rect class="gray" x="66" y="0" width="64" height="32" rx="5" />
+      <rect class="gray" x="132" y="0" width="64" height="32" rx="5" />
+      <rect class="gray" x="198" y="0" width="64" height="32" rx="5" />
+      <text class="t" x="32" y="21" text-anchor="middle" style="font-size:15.0px">e₁</text>
+      <text class="t" x="98" y="21" text-anchor="middle" style="font-size:15.0px">e₂</text>
+      <text class="t" x="164" y="21" text-anchor="middle" style="font-size:15.0px">…</text>
+      <text class="t" x="230" y="21" text-anchor="middle" style="font-size:15.0px">eₘ</text>
+      <text class="xs" x="0" y="51" style="font-size:13.5px">头部（最早）</text>
+      <text class="xs" x="205" y="51" style="font-size:13.5px">尾部（最新）</text>
+    </g>
+    <rect class="card2" x="0" y="340" width="470" height="130" />
+    <text class="t" x="22" y="368" style="font-size:15.0px">• add_node：追加到 node_order，随后调用 <tspan class="mono" fill="#dc2626" style="font-size:14.0px">enforce_node_limit</tspan></text>
+    <text class="t" x="22" y="396" style="font-size:15.0px">• add_edge：追加到 edge_order，随后调用 <tspan class="mono" fill="#dc2626" style="font-size:14.0px">enforce_edge_limit</tspan></text>
+    <text class="t" x="22" y="424" style="font-size:15.0px">• 超过 hard_max_nodes / hard_max_edges 时，</text>
+    <text class="t" x="34" y="448" style="font-size:15.0px">从队列头部逐个移除；remove_node 同步清理索引与关联边</text>
+  </g>
+  
+  <rect class="panel" x="24" y="620" width="1452" height="445" />
+  <line class="divider" x1="770" y1="636" x2="770" y2="1010" />
+
+  <g transform="translate(58,561)">
+    <circle cx="20" cy="20" r="19" fill="#145aaa" />
+    <text class="white" x="20" y="26" text-anchor="middle">4</text>
+    <text class="sec" x="52" y="27">七种节点类型与结构（ResponsibilityNode）</text>
+    <g transform="translate(0,58)">
+      <rect class="card green" x="0" y="0" width="162" height="168" />
+      <circle cx="81" cy="30" r="14" fill="#ecfdf5" stroke="#16a34a" stroke-width="2" />
+      <circle cx="81" cy="24" r="5" fill="#16a34a" />
+      <path d="M68 42c5-12 21-12 26 0" fill="#16a34a" />
+      <text class="h" x="81" y="72" text-anchor="middle" fill="#16a34a">Agent</text>
+      <text class="xs" x="14" y="96">node_id</text>
+      <text class="xs" x="14" y="116">agent_id</text>
+      <text class="xs" x="14" y="136">evidence_refs</text>
+      <text class="xs" x="14" y="156">timestamp_ns</text>
+      <rect class="card purple" x="174" y="0" width="162" height="168" />
+      <g transform="translate(0,-4)">
+        <ellipse cx="255" cy="30" rx="13" ry="7" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2" />
+        <path d="M242 30v28c0 5 26 5 26 0V30" fill="none" stroke="#7c3aed" stroke-width="2" />
+        <path d="M242 44c0 5 26 5 26 0" fill="none" stroke="#7c3aed" stroke-width="2" />
+      </g>
+      <text class="h" x="255" y="72" text-anchor="middle" fill="#7c3aed">Resource</text>
+      <text class="xs" x="188" y="96">resource:</text>
+      <text class="xs" x="188" y="114">NormalizedRes.</text>
+      <text class="xs" x="188" y="132">资源规范化描述</text>
+      <text class="xs" x="188" y="150">其余字段同结构体</text>
+      <rect class="card orange" x="348" y="0" width="162" height="168" />
+      <g transform="translate(429,40) scale(0.625) translate(-429,-44)">
+        <path d="M429 22l16 7v15c0 12-12 19-16 22-4-3-16-10-16-22V29z" fill="#fffbeb" stroke="#d97706" stroke-width="2.9"/>
+      </g>
+      <text class="h" x="429" y="72" text-anchor="middle" fill="#b45309">PolicyBoundary</text>
+      <text class="xs" x="362" y="96">策略边界/约束域</text>
+      <text class="xs" x="362" y="116">边界跨越责任分析</text>
+      <text class="xs" x="362" y="136">其余字段同结构体</text>
+      <rect class="card blue" x="522" y="0" width="162" height="168" />
+      <rect x="587" y="20" width="28" height="28" rx="4" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5" />
+      <path d="M595 30h12M595 36h12" stroke="#2563eb" stroke-width="2" fill="none" />
+      <text class="h" x="603" y="72" text-anchor="middle" fill="#2563eb">Process</text>
+      <text class="xs" x="536" y="96">进程/执行上下文</text>
+      <text class="xs" x="536" y="116">追踪进程生命周期</text>
+      <text class="xs" x="536" y="136">其余字段同结构体</text>
+      <rect x="0" y="184" width="222" height="130" style="fill:#fef3c7;stroke:#b45309;stroke-width:1.5" rx="10" />
+      <circle cx="30" cy="215" r="14" fill="#fef3c7" stroke="#b45309" stroke-width="2.2" />
+      <path d="M20 211h20M22 219h16" stroke="#b45309" stroke-width="2.5" fill="none" stroke-linecap="round" />
+      <text class="h" x="70" y="223" fill="#b45309">ToolCall</text>
+      <text class="xs" x="18" y="255">工具调用节点</text>
+      <text class="xs" x="18" y="277">记录 Agent 的工具调用</text>
+      <text class="xs" x="18" y="299">其余字段同结构体</text>
+      <rect x="234" y="184" width="222" height="130" style="fill:#fce7f3;stroke:#ec4899;stroke-width:1.5" rx="10" />
+      <circle cx="264" cy="215" r="14" fill="#fce7f3" stroke="#ec4899" stroke-width="2.2" />
+      <circle cx="264" cy="209" r="4" fill="#ec4899" />
+      <rect x="254" y="225" width="20" height="8" rx="2" fill="none" stroke="#ec4899" stroke-width="1.8" />
+      <text class="h" x="300" y="223" fill="#db2777">Credential</text>
+      <text class="xs" x="252" y="255">凭证/身份节点</text>
+      <text class="xs" x="252" y="277">身份凭证/认证信息</text>
+      <text class="xs" x="252" y="299">其余字段同结构体</text>
+      <rect x="468" y="184" width="222" height="130" style="fill:#ffe4e6;stroke:#e11d48;stroke-width:1.5" rx="10" />
+      <circle cx="498" cy="215" r="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2.2" />
+      <path d="M488 211c5-5 12-3 14 2s-3 12-8 10" stroke="#e11d48" stroke-width="2" fill="none" />
+      <circle cx="498" cy="215" r="4" fill="#e11d48" />
+      <text class="h" x="535" y="223" fill="#e11d48">Context</text>
+      <text class="xs" x="486" y="255">上下文/环境节点</text>
+      <text class="xs" x="486" y="277">环境信息/会话上下文</text>
+      <text class="xs" x="486" y="299">其余字段同结构体</text>
+    </g>
+  </g>
+
+  <g transform="translate(740,561)">
+    <circle cx="90" cy="20" r="19" fill="#145aaa" />
+    <text class="white" x="90" y="26" text-anchor="middle">5</text>
+    <text class="sec" x="122" y="27">十二种边类型与结构（ResponsibilityEdge）</text>
+    <g transform="translate(70,58)">
+	      <line x1="0" y1="35" x2="640" y2="35" class="thin" stroke="#d1d5db" stroke-dasharray="6 6" stroke-width="0.7"/>
+	      <line x1="0" y1="71" x2="640" y2="71" class="thin" stroke="#d1d5db" stroke-dasharray="6 6" stroke-width="0.7"/>
+	      <line x1="0" y1="107" x2="640" y2="107" class="thin" stroke="#d1d5db" stroke-dasharray="6 6" stroke-width="0.7"/>
+	      <line x1="0" y1="143" x2="640" y2="143" class="thin" stroke="#d1d5db" stroke-dasharray="6 6" stroke-width="0.7"/>
+	      <line x1="0" y1="179" x2="640" y2="179" class="thin" stroke="#d1d5db" stroke-dasharray="6 6" stroke-width="0.7"/>
+      <line class="lineG" x1="0" y1="14" x2="64" y2="14" />
+      <text class="h" x="78" y="13">IntentCausesAction</text>
+      <text class="xs" x="78" y="29">意图→行动（因果/触发）</text>
+      <line class="lineB" x1="0" y1="50" x2="64" y2="50" />
+      <text class="h" x="78" y="49">AgentDelegatesTo</text>
+      <text class="xs" x="78" y="65">父→子Agent（委托关系）</text>
+      <line class="lineIndigo" x1="0" y1="86" x2="64" y2="86" />
+      <text class="h" x="78" y="85">ContextFlowsFrom</text>
+      <text class="xs" x="78" y="101">源→目标节点（上下文流动）</text>
+      <line class="lineR" x1="0" y1="122" x2="64" y2="122" />
+      <text class="h" x="78" y="121">TaintPropagatesTo</text>
+      <text class="xs" x="78" y="137">资源→Agent（污点传播）</text>
+      <line class="lineO" x1="0" y1="158" x2="64" y2="158" />
+      <text class="h" x="78" y="157">PolicyBoundaryCrossing</text>
+      <text class="xs" x="78" y="173">跨策略边界</text>
+      <line class="lineGray" x1="0" y1="194" x2="64" y2="194" />
+      <text class="h" x="78" y="193">CompetingExplanation</text>
+      <text class="xs" x="78" y="209">竞争性解释</text>
+      <line class="lineTeal" x1="350" y1="14" x2="414" y2="14" />
+      <text class="h" x="428" y="13">Delegation</text>
+      <text class="xs" x="428" y="29">委托关系</text>
+      <line class="lineCyan" x1="350" y1="50" x2="414" y2="50" />
+      <text class="h" x="428" y="49">AuthorityTransfer</text>
+      <text class="xs" x="428" y="65">权限转移</text>
+      <line class="linePink" x1="350" y1="86" x2="414" y2="86" />
+      <text class="h" x="428" y="85">CapabilityUse</text>
+      <text class="xs" x="428" y="101">能力使用</text>
+      <line class="lineLime" x1="350" y1="122" x2="414" y2="122" />
+      <text class="h" x="428" y="121">ContextInheritance</text>
+      <text class="xs" x="428" y="137">上下文继承</text>
+      <line class="lineAmber" x1="350" y1="158" x2="414" y2="158" />
+      <text class="h" x="428" y="157">TaintPropagation</text>
+      <text class="xs" x="428" y="173">污点传播</text>
+      <line class="lineP" x1="350" y1="194" x2="414" y2="194" />
+      <text class="h" x="428" y="193">ViolationProvenance</text>
+      <text class="xs" x="428" y="209">违规溯源</text>
+      <rect class="card" x="0" y="230" width="640" height="114" />
+      <text class="s" x="22" y="258">edge_id: EdgeId</text>
+      <text class="s" x="210" y="258">edge_type: RespEdge</text>
+      <text class="s" x="440" y="258">confidence: f32</text>
+      <text class="s" x="22" y="290">source: NodeId</text>
+      <text class="s" x="210" y="290">target: NodeId</text>
+      <text class="s" x="440" y="290">phase: PhaseIndicator</text>
+      <text class="s" x="22" y="322">evidence_refs: Vec&lt;EvidenceId&gt;</text>
+      <text class="s" x="310" y="322">signal: Option&lt;DetectedSignal&gt;</text>
+    </g>
+  </g>
+
+  <rect class="panel" x="24" y="1075" width="1452" height="400" />
+
+  <g transform="translate(58,982)">
+    <g transform="translate(0,30)">
+      <circle cx="18" cy="18" r="18" fill="#1976d2" />
+      <circle cx="18" cy="18" r="4" fill="#fff" />
+      <circle cx="7" cy="30" r="4" fill="#fff" />
+      <circle cx="31" cy="30" r="4" fill="#fff" />
+      <path d="M18 18L7 30M18 18L31 30M7 30H31" stroke="#fff" stroke-width="2" />
+    </g>
+    <text class="sec" x="52" y="55">图结构示例</text>
+
+    <g transform="translate(20,85)">
+      <!-- ===== NODES (8 types, 2 rows) ===== -->
+
+      <!-- Row 1 -->
+
+      <!-- Context (rose) -->
+      <g transform="translate(-378,-185)">
+        <circle cx="498" cy="215" r="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2.2"/>
+        <path d="M488 211c5-5 12-3 14 2s-3 12-8 10" stroke="#e11d48" stroke-width="2" fill="none"/>
+        <circle cx="498" cy="215" r="4" fill="#e11d48"/>
+      </g>
+      <text x="120" y="60" text-anchor="middle" fill="#111827" font-weight="700" style="font-size:21.0">Context</text>
+
+      <!-- Agent A (green) -->
+      <g transform="translate(349,0)">
+        <circle cx="81" cy="30" r="14" fill="#ecfdf5" stroke="#16a34a" stroke-width="2"/>
+        <circle cx="81" cy="24" r="5" fill="#16a34a"/>
+        <path d="M68 42c5-12 21-12 26 0" fill="#16a34a"/>
+      </g>
+      <text x="430" y="60" text-anchor="middle" fill="#111827" font-weight="700" style="font-size:21.0">Agent A</text>
+
+      <!-- Agent B (green) -->
+      <g transform="translate(669,0)">
+        <circle cx="81" cy="30" r="14" fill="#ecfdf5" stroke="#16a34a" stroke-width="2"/>
+        <circle cx="81" cy="24" r="5" fill="#16a34a"/>
+        <path d="M68 42c5-12 21-12 26 0" fill="#16a34a"/>
+      </g>
+      <text x="750" y="60" text-anchor="middle" fill="#111827" font-weight="700" style="font-size:21.0">Agent B</text>
+
+      <!-- Credential (pink) -->
+      <g transform="translate(796,-191)">
+        <circle cx="264" cy="215" r="14" fill="#fce7f3" stroke="#ec4899" stroke-width="2.2"/>
+        <circle cx="264" cy="209" r="4" fill="#ec4899"/>
+        <rect x="254" y="225" width="20" height="8" rx="2" fill="none" stroke="#ec4899" stroke-width="1.8"/>
+      </g>
+      <text x="1060" y="60" text-anchor="middle" fill="#111827" font-weight="700" style="font-size:21.0">Credential</text>
+
+      <!-- Row 2 -->
+
+      <!-- Resource (purple) -->
+      <g transform="translate(-105,149)">
+        <ellipse cx="255" cy="30" rx="13" ry="7" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+        <path d="M242 30v28c0 5 26 5 26 0V30" fill="none" stroke="#7c3aed" stroke-width="2"/>
+        <path d="M242 44c0 5 26 5 26 0" fill="none" stroke="#7c3aed" stroke-width="2"/>
+      </g>
+      <text x="150" y="225" text-anchor="middle" fill="#111827" font-weight="700" style="font-size:21.0">Resource</text>
+
+      <!-- ToolCall (amber) -->
+      <g transform="translate(450,-15)">
+        <circle cx="30" cy="215" r="14" fill="#fef3c7" stroke="#b45309" stroke-width="2.2"/>
+        <path d="M20 211h20M22 219h16" stroke="#b45309" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      </g>
+      <text x="480" y="230" text-anchor="middle" fill="#111827" font-weight="700" style="font-size:21.0">ToolCall</text>
+
+      <!-- Process (blue) -->
+      <g transform="translate(209,154)">
+        <rect x="587" y="20" width="28" height="28" rx="4" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+        <path d="M595 30h12M595 36h12" stroke="#2563eb" stroke-width="2" fill="none"/>
+      </g>
+      <text x="810" y="220" text-anchor="middle" fill="#111827" font-weight="700" style="font-size:21.0">Process</text>
+
+      <!-- PolicyBoundary (orange): scaled original shield -->
+      <g transform="translate(651,158)">
+        <g transform="translate(429,40) scale(0.625) translate(-429,-44)">
+          <path d="M429 22l16 7v15c0 12-12 19-16 22-4-3-16-10-16-22V29z" fill="#fffbeb" stroke="#d97706" stroke-width="2.9"/>
+        </g>
+      </g>
+      <text x="1080" y="230" text-anchor="middle" fill="#111827" font-weight="700" style="font-size:21.0">PolicyBoundary</text>
+
+      <!-- ===== EDGES (12 types, endpoints at icon boundaries + 2px gap) ===== -->
+      <!-- Centers/half-sizes:
+           Context(120,30,r16) AgentA(430,30,r14) AgentB(750,30,r14) Cred(1060,24,r18)
+           Resource(150,190,w14,h28) ToolCall(480,200,r14) Process(810,188,r14) PolicyB(1080,201,w8,h11) -->
+
+      <!-- 1. IntentCausesAction: Agent A ↓ → ToolCall ↑ -->
+      <path class="lineG" d="M430 47 C430 100 480 140 480 181"/>
+
+      <!-- 2. AgentDelegatesTo: Agent A → → Agent B ← -->
+      <path class="lineB" d="M447 30 H733"/>
+
+      <!-- 3. ContextFlowsFrom: Context → → Agent A ← -->
+      <path class="lineIndigo" d="M139 30 C230 24 320 26 413 28"/>
+
+      <!-- 4. TaintPropagatesTo: Resource → → Process ← -->
+      <path class="lineR" d="M167 190 C380 170 620 170 793 183"/>
+
+      <!-- 5. PolicyBoundaryCrossing: Process → → PolicyB ← -->
+      <path class="lineO" d="M827 188 C920 190 1000 198 1068 198"/>
+
+      <!-- 6. CompetingExplanation: ToolCall → → Process ← -->
+      <path class="lineGray" d="M497 200 C600 195 700 192 793 188"/>
+
+      <!-- 7. Delegation: Agent B ↓ → Process ↑ -->
+      <path class="lineTeal" d="M750 47 C770 100 800 140 810 171"/>
+
+      <!-- 8. AuthorityTransfer: Agent B → → Credential ← -->
+      <path class="lineCyan" d="M767 30 H1039"/>
+
+      <!-- 9. CapabilityUse: ToolCall ← → Resource → -->
+      <path class="linePink" d="M463 200 C340 208 250 200 167 190"/>
+
+      <!-- 10. ContextInheritance: Context ↑ arc → Agent B ↑ -->
+      <path class="lineLime" d="M136 11 C320 -5 580 -2 733 11"/>
+
+      <!-- 11. TaintPropagation: Credential ↓ → Process ↑ -->
+      <path class="lineAmber" d="M1060 45 C1060 100 1000 150 810 171"/>
+
+      <!-- 12. ViolationProvenance: Process ↖ → Agent A ↓ -->
+      <path class="lineP" d="M793 171 C620 130 510 90 430 47"/>
+
+      <!-- ===== EDGE LABELS ===== -->
+      <text x="465" y="140" fill="#16a34a" style="font-size:17.0" opacity="0.92">IntentCausesAction</text>
+      <text x="580" y="23" fill="#2563eb" style="font-size:17.0" opacity="0.92">AgentDelegatesTo</text>
+      <text x="260" y="22" fill="#4f46e5" style="font-size:17.0" opacity="0.92">ContextFlowsFrom</text>
+      <text x="470" y="168" fill="#dc2626" style="font-size:17.0" opacity="0.92">TaintPropagatesTo</text>
+      <text x="950" y="190" fill="#f59e0b" style="font-size:17.0" opacity="0.92">PolicyBoundaryCrossing</text>
+      <text x="640" y="210" fill="#64748b" style="font-size:17.0" opacity="0.92">CompetingExplanation</text>
+      <text x="790" y="120" fill="#0d9488" style="font-size:17.0" opacity="0.92">Delegation</text>
+      <text x="895" y="22" fill="#0891b2" style="font-size:17.0" opacity="0.92">AuthorityTransfer</text>
+      <text x="300" y="218" fill="#db2777" style="font-size:17.0" opacity="0.92">CapabilityUse</text>
+      <text x="420" y="2" fill="#65a30d" style="font-size:17.0" opacity="0.92">ContextInheritance</text>
+      <text x="1030" y="115" fill="#d97706" style="font-size:17.0" opacity="0.92">TaintPropagation</text>
+      <text x="620" y="110" fill="#7c3aed" style="font-size:17.0" opacity="0.92">ViolationProvenance</text>
+    </g>
+  </g>
+
+</svg>

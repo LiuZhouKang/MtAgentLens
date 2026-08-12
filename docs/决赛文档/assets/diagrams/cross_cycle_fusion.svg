@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1280" style="max-width:1920px;font-family:'Microsoft YaHei','SimHei',Arial,sans-serif">
+  <defs>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4a8ec9" /></marker>
+    <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#c4792b" /></marker>
+    <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-opacity="0.06" /></filter>
+  </defs>
+  <rect width="1920" height="1280" fill="#fcfcfc" />
+
+  <!-- title removed -->
+
+  
+  <text x="208" y="56" font-size="30" font-weight="700" fill="#7d99b3">多周期事件输入</text>
+
+  <g filter="url(#sh)">
+  <rect x="208" y="80" width="256" height="88" rx="12" fill="#fff" stroke="#c0d4e6" stroke-width="2.4" />
+  <text x="336" y="134" text-anchor="middle" font-size="30" fill="#5a7d9a">Cycle T₁</text>
+  </g>
+  <g filter="url(#sh)">
+  <rect x="504" y="80" width="256" height="88" rx="12" fill="#fff" stroke="#c0d4e6" stroke-width="2.4" />
+  <text x="632" y="134" text-anchor="middle" font-size="30" fill="#5a7d9a">Cycle T₂</text>
+  </g>
+  <g filter="url(#sh)">
+  <rect x="800" y="80" width="256" height="88" rx="12" fill="#fff" stroke="#c0d4e6" stroke-width="2.4" />
+  <text x="928" y="134" text-anchor="middle" font-size="30" fill="#5a7d9a">Cycle T₃</text>
+  </g>
+  <text x="1120" y="136" font-size="30" fill="#aaa">···</text>
+  <g filter="url(#sh)">
+  <rect x="1208" y="80" width="256" height="88" rx="12" fill="#fff" stroke="#c0d4e6" stroke-width="2.4" />
+  <text x="1336" y="134" text-anchor="middle" font-size="30" fill="#5a7d9a">Cycle Tₙ</text>
+  </g>
+
+  
+  <line x1="336" y1="168" x2="336" y2="264" stroke="#4a8ec9" stroke-width="2.8" marker-end="url(#ab)" />
+  <line x1="632" y1="168" x2="632" y2="264" stroke="#4a8ec9" stroke-width="2.8" marker-end="url(#ab)" />
+  <line x1="928" y1="168" x2="928" y2="264" stroke="#4a8ec9" stroke-width="2.8" marker-end="url(#ab)" />
+  <line x1="1336" y1="168" x2="1336" y2="264" stroke="#4a8ec9" stroke-width="2.8" marker-end="url(#ab)" />
+
+  
+  <g filter="url(#sh)">
+  <rect x="120" y="264" width="1680" height="136" rx="16" fill="#fff" stroke="#c0d4e6" stroke-width="2.4" />
+  <text x="960" y="320" text-anchor="middle" font-size="34" font-weight="700" fill="#3a5f80">① 跨周期信号累积 (SignalAccumulator)</text>
+  <text x="960" y="372" text-anchor="middle" font-size="26" fill="#8aa0b6">按 (Agent, SignalType, Policy, Boundary, ResourceDigest) 五元组分桶 · 同行为路径信号合并累积</text>
+  </g>
+
+  <line x1="960" y1="400" x2="960" y2="492" stroke="#4a8ec9" stroke-width="3.6" marker-end="url(#ab)" />
+
+  
+  <g filter="url(#sh)">
+  <rect x="440" y="492" width="1040" height="104" rx="16" fill="#f4f7fa" stroke="#d8e3ec" stroke-width="2" />
+  <text x="960" y="540" text-anchor="middle" font-size="30" font-weight="700" fill="#4a6d8c">AccumBucket</text>
+  <text x="960" y="580" text-anchor="middle" font-size="26" fill="#7d99b3">entries: [ (edge_id, causal_weight, detection_confidence, timestamp_ns) ... ]</text>
+  </g>
+
+  <line x1="960" y1="596" x2="960" y2="692" stroke="#4a8ec9" stroke-width="3.6" marker-end="url(#ab)" />
+
+  
+  <g filter="url(#sh)">
+  <rect x="120" y="692" width="940" height="136" rx="16" fill="#fefaf5" stroke="#e6cfa8" stroke-width="2.4" />
+  <text x="590" y="744" text-anchor="middle" font-size="34" font-weight="700" fill="#8b6914">② Noisy-OR 多源证据融合</text>
+  <text x="590" y="796" text-anchor="middle" font-size="26" fill="#ad8f52">S(t) = 1 − ∏ (1 − wᵢ × sᵢ × e^{-λ(t−tᵢ)})</text>
+  </g>
+
+  <g filter="url(#sh)">
+  <rect x="1104" y="692" width="696" height="136" rx="16" fill="#fefaf5" stroke="#e6cfa8" stroke-width="2.4" />
+  <text x="1452" y="744" text-anchor="middle" font-size="34" font-weight="700" fill="#8b6914">③ 指数时间衰减</text>
+  <text x="1452" y="796" text-anchor="middle" font-size="26" fill="#ad8f52">λ = ln2 / 300s (5min 半衰期)</text>
+  </g>
+
+  <line x1="1060" y1="760" x2="1104" y2="760" stroke="#c4792b" stroke-width="3" marker-end="url(#ao)" />
+
+  <line x1="960" y1="828" x2="960" y2="924" stroke="#4a8ec9" stroke-width="3.6" marker-end="url(#ab)" />
+
+  
+  <g filter="url(#sh)">
+  <rect x="400" y="924" width="1120" height="120" rx="16" fill="#fefaf5" stroke="#e6cfa8" stroke-width="2.4" />
+  <text x="960" y="976" text-anchor="middle" font-size="34" font-weight="700" fill="#8b6914">④ Platt Scaling 概率校准 + ECE 监控</text>
+  <text x="960" y="1024" text-anchor="middle" font-size="26" fill="#ad8f52">P(attack) = 1/(1+e^{-(7.0×S−3.0)}) · ECE &gt; 0.05 触发在线 SGD 重校准</text>
+  </g>
+
+  <line x1="960" y1="1044" x2="960" y2="1136" stroke="#4a8ec9" stroke-width="3.6" marker-end="url(#ab)" />
+
+  
+  <g filter="url(#sh)">
+  <rect x="560" y="1136" width="800" height="76" rx="38" fill="#edf3f8" stroke="#b0c8dd" stroke-width="2" />
+  <text x="960" y="1184" text-anchor="middle" font-size="30" font-weight="700" fill="#3a5f80">校准概率 → ClassificationResult.progressive_fused</text>
+  </g>
+
+  
+  <text x="240" y="1064" font-size="26" fill="#999">单周期弱信号不再被丢弃</text>
+  <path d="M280 1064 L320 980" stroke="#ccc" stroke-width="2" stroke-dasharray="3 3" fill="none" />
+
+</svg>

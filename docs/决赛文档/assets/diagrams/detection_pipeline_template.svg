@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1480" style="max-width:1920px;font-family:'Microsoft YaHei','SimHei',Arial,sans-serif">
+  <defs>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4a8ec9"/></marker>
+    <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#c4792b"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5a9e6f"/></marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" orient="auto"><path d="M0 0L10 5L0 10z" fill="#c46262"/></marker>
+    <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-opacity="0.06"/></filter>
+  </defs>
+  <rect width="1920" height="1480" fill="#fcfcfc"/>
+
+  <!-- Title -->
+  <rect x="440" y="24" width="1040" height="52" rx="26" fill="#f0f4f8" stroke="#d0dbe6" stroke-width="1.6"/>
+  <text x="960" y="58" text-anchor="middle" font-size="24" fill="#5a88aa" font-weight="700">检测流水线：从系统调用到最终判定的完整数据流（4层透视图）</text>
+
+  <!-- ===== Layer 0: eBPF Events ===== -->
+  <g filter="url(#sh)">
+    <rect x="80" y="104" width="1760" height="140" rx="16" fill="#edf3f8" stroke="#b0c8dd" stroke-width="2.4"/>
+    <rect x="80" y="104" width="1760" height="36" rx="16" fill="#4a8ec9"/>
+    <rect x="80" y="124" width="1760" height="16" fill="#4a8ec9"/>
+    <text x="960" y="128" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">第 0 层 — 原始 eBPF 事件（内核层）</text>
+    <!-- process_events -->
+    <text x="220" y="182" text-anchor="middle" font-size="18" fill="#3a5f80" font-family="'DejaVu Sans Mono','Courier New',monospace">process_events</text>
+    <text x="220" y="208" text-anchor="middle" font-size="16" fill="#6a8ba8">进程派生/退出事件</text>
+    <!-- file_events -->
+    <text x="580" y="182" text-anchor="middle" font-size="18" fill="#3a5f80" font-family="'DejaVu Sans Mono','Courier New',monospace">file_events</text>
+    <text x="580" y="208" text-anchor="middle" font-size="16" fill="#6a8ba8">敏感文件 OPEN 操作</text>
+    <!-- ssl_events -->
+    <text x="940" y="182" text-anchor="middle" font-size="18" fill="#3a5f80" font-family="'DejaVu Sans Mono','Courier New',monospace">ssl_events</text>
+    <text x="940" y="208" text-anchor="middle" font-size="16" fill="#6a8ba8">TLS 加密通信明文截获</text>
+    <!-- 总事件数 -->
+    <text x="1400" y="182" text-anchor="middle" font-size="18" fill="#3a5f80" font-family="'DejaVu Sans Mono','Courier New',monospace">总事件数</text>
+    <text x="1400" y="208" text-anchor="middle" font-size="16" fill="#6a8ba8">evidence → edges → nodes</text>
+    <!-- 5 eBPF probes -->
+    <text x="1720" y="195" text-anchor="middle" font-size="15" fill="#8aa0b6">5 探针矩阵</text>
+    <text x="1720" y="215" text-anchor="middle" font-size="13" fill="#a0b8cc" font-family="'DejaVu Sans Mono','Courier New',monospace">sslsniff · process_new · fileaccess</text>
+    <text x="1720" y="233" text-anchor="middle" font-size="13" fill="#a0b8cc" font-family="'DejaVu Sans Mono','Courier New',monospace">browsertrace · stdiocap</text>
+  </g>
+
+  <!-- L0 → L1 arrow -->
+  <line x1="960" y1="244" x2="960" y2="280" stroke="#4a8ec9" stroke-width="3.6" marker-end="url(#ab)"/>
+  <text x="996" y="268" font-size="16" fill="#4a8ec9">事件流推送至 Rust collector → ResponsibilityRuntime</text>
+
+  <!-- ===== Layer 1: PBC Gating + 6-Dim ===== -->
+  <g filter="url(#sh)">
+    <rect x="80" y="296" width="1760" height="320" rx="16" fill="#fefaf5" stroke="#e6cfa8" stroke-width="2.4"/>
+    <rect x="80" y="296" width="1760" height="36" rx="16" fill="#c4792b"/>
+    <rect x="80" y="316" width="1760" height="16" fill="#c4792b"/>
+    <text x="960" y="320" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">第 1 层 — PBC 边界穿越门控（规则引擎）+ 6 维渐进评分</text>
+
+    <!-- PBC section -->
+    <rect x="120" y="348" width="640" height="100" rx="10" fill="#fff" stroke="#e6cfa8" stroke-width="1.6"/>
+    <text x="440" y="376" text-anchor="middle" font-size="18" font-weight="700" fill="#8b6914">PBC (Process Boundary Crossing) 门控</text>
+    <text x="440" y="404" text-anchor="middle" font-size="16" fill="#ad8f52" font-family="'DejaVu Sans Mono','Courier New',monospace">N× ProcessBoundaryCrossing · FileBoundaryCrossing</text>
+    <text x="440" y="428" text-anchor="middle" font-size="16" fill="#ad8f52" font-family="'DejaVu Sans Mono','Courier New',monospace">NetworkBoundaryCrossing · AgentDelegatesTo</text>
+    <text x="440" y="444" text-anchor="middle" font-size="15" fill="#8b6914">PBC total = 累计边界穿越加权值</text>
+
+    <!-- 6-Dim bar chart area -->
+    <rect x="800" y="348" width="1000" height="256" rx="10" fill="#fff" stroke="#e6cfa8" stroke-width="1.6"/>
+    <text x="1300" y="376" text-anchor="middle" font-size="18" font-weight="700" fill="#8b6914">6 维渐进评分（每 Agent · 每维度 EWMA/CUSUM 独立跟踪）</text>
+
+    <!-- D1 -->
+    <text x="860" y="408" font-size="16" font-weight="700" fill="#4a5568" font-family="'DejaVu Sans Mono','Courier New',monospace">D1 边界规则</text>
+    <rect x="960" y="396" width="380" height="16" rx="8" fill="#4a8ec9"/>
+    <text x="1352" y="410" font-size="15" fill="#4a5568" font-family="'DejaVu Sans Mono','Courier New',monospace">进程/文件/网络边界穿越</text>
+
+    <!-- D2 -->
+    <text x="860" y="436" font-size="16" font-weight="700" fill="#4a5568" font-family="'DejaVu Sans Mono','Courier New',monospace">D2 模式匹配</text>
+    <rect x="960" y="424" width="120" height="16" rx="8" fill="#c0d4e6"/>
+    <text x="1352" y="438" font-size="15" fill="#4a5568" font-family="'DejaVu Sans Mono','Courier New',monospace">子图同构 · 已知攻击模式匹配</text>
+
+    <!-- D3 -->
+    <text x="860" y="464" font-size="16" font-weight="700" fill="#4a5568" font-family="'DejaVu Sans Mono','Courier New',monospace">D3 角色放大</text>
+    <rect x="960" y="452" width="450" height="16" rx="8" fill="#4a8ec9"/>
+    <text x="1352" y="466" font-size="15" fill="#4a5568" font-family="'DejaVu Sans Mono','Courier New',monospace">父→多子 · 角色链深度 · 共谋环</text>
+
+    <!-- D4 -->
+    <text x="860" y="492" font-size="16" font-weight="700" fill="#4a5568" font-family="'DejaVu Sans Mono','Courier New',monospace">D4 时间异常</text>
+    <rect x="960" y="480" width="200" height="16" rx="8" fill="#c0d4e6"/>
+    <text x="1352" y="494" font-size="15" fill="#4a5568" font-family="'DejaVu Sans Mono','Courier New',monospace">CUSUM 漂移 · 事件密度</text>
+
+    <!-- D5 -->
+    <text x="860" y="520" font-size="16" font-weight="700" fill="#4a5568" font-family="'DejaVu Sans Mono','Courier New',monospace">D5 证据质量</text>
+    <rect x="960" y="508" width="330" height="16" rx="8" fill="#5a9e6f"/>
+    <text x="1352" y="522" font-size="15" fill="#4a5568" font-family="'DejaVu Sans Mono','Courier New',monospace">直接证据 vs 推断 · 证据链完整性</text>
+
+    <!-- D6 -->
+    <text x="860" y="548" font-size="16" font-weight="700" fill="#4a5568" font-family="'DejaVu Sans Mono','Courier New',monospace">D6 行为密度</text>
+    <rect x="960" y="536" width="400" height="16" rx="8" fill="#5a9e6f"/>
+    <text x="1352" y="550" font-size="15" fill="#4a5568" font-family="'DejaVu Sans Mono','Courier New',monospace">多进程并发敏感操作密度</text>
+
+    <!-- EWMA/CUSUM note -->
+    <text x="1300" y="586" text-anchor="middle" font-size="15" fill="#ad8f52">EWMA α=0.10 慢速跟踪 · CUSUM h=2.5 K=3 漂移检测 · 时间衰减 300s 半衰期</text>
+  </g>
+
+  <!-- L1 → L2 arrow -->
+  <line x1="960" y1="616" x2="960" y2="648" stroke="#4a8ec9" stroke-width="3.6" marker-end="url(#ab)"/>
+  <text x="996" y="638" font-size="16" fill="#4a8ec9">6 维信号 → OWA(80%) + GeoMean(20%) → Platt 校准 → 路由决策</text>
+
+  <!-- ===== Layer 2: Responsibility Graph + Identity + Taint ===== -->
+  <g filter="url(#sh)">
+    <rect x="80" y="664" width="1760" height="320" rx="16" fill="#f5faf7" stroke="#a8d4b6" stroke-width="2.4"/>
+    <rect x="80" y="664" width="1760" height="36" rx="16" fill="#5a9e6f"/>
+    <rect x="80" y="684" width="1760" height="16" fill="#5a9e6f"/>
+    <text x="960" y="688" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">第 2 层 — 责任图 + 身份解析 + 污点追踪 + 传递闭包</text>
+
+    <!-- Identity Resolver -->
+    <rect x="120" y="716" width="500" height="130" rx="10" fill="#fff" stroke="#a8d4b6" stroke-width="1.6"/>
+    <text x="370" y="744" text-anchor="middle" font-size="18" font-weight="700" fill="#3d704a">IdentityResolver（三信号并查集）</text>
+    <text x="370" y="774" text-anchor="middle" font-size="15" fill="#6a9e7a" font-family="'DejaVu Sans Mono','Courier New',monospace">signal_root_pid     → 同 PID 树合并</text>
+    <text x="370" y="798" text-anchor="middle" font-size="15" fill="#6a9e7a" font-family="'DejaVu Sans Mono','Courier New',monospace">signal_tls_session  → 同 TLS 会话确认同源</text>
+    <text x="370" y="822" text-anchor="middle" font-size="15" fill="#6a9e7a" font-family="'DejaVu Sans Mono','Courier New',monospace">signal_conversation_id → 同任务上下文确认</text>
+    <text x="370" y="842" text-anchor="middle" font-size="14" fill="#3d704a">→ 结论: M 个 PID 属于同一 Agent 上下文</text>
+
+    <!-- Causal Chain Tracer -->
+    <rect x="660" y="716" width="540" height="130" rx="10" fill="#fff" stroke="#a8d4b6" stroke-width="1.6"/>
+    <text x="930" y="744" text-anchor="middle" font-size="18" font-weight="700" fill="#3d704a">CausalChainTracer（因果链追溯）</text>
+    <text x="930" y="774" text-anchor="middle" font-size="15" fill="#6a9e7a" font-family="'DejaVu Sans Mono','Courier New',monospace">目标事件 → 上游操作 → 进程派生 → 原始 LLM 响应</text>
+    <text x="930" y="798" text-anchor="middle" font-size="15" fill="#6a9e7a">深度优先逆向遍历 ResponsibilityGraph 六索引结构</text>
+    <text x="930" y="822" text-anchor="middle" font-size="15" fill="#6a9e7a">定位攻击根因（父 Agent 的原始 LLM 指令）</text>
+    <text x="930" y="842" text-anchor="middle" font-size="14" fill="#3d704a">→ 因果链深度: d，根因: 父 Agent 的原始 LLM 响应</text>
+
+    <!-- Taint Tracker -->
+    <rect x="1240" y="716" width="560" height="130" rx="10" fill="#fff" stroke="#a8d4b6" stroke-width="1.6"/>
+    <text x="1520" y="744" text-anchor="middle" font-size="18" font-weight="700" fill="#3d704a">TaintTracker（三条件污点检测）</text>
+    <text x="1520" y="774" text-anchor="middle" font-size="15" fill="#6a9e7a" font-family="'DejaVu Sans Mono','Courier New',monospace">① Agent 写入共享文件 → mark_contaminated</text>
+    <text x="1520" y="798" text-anchor="middle" font-size="15" fill="#6a9e7a" font-family="'DejaVu Sans Mono','Courier New',monospace">② 另一 Agent 读取该文件 → check_access → TAINTED</text>
+    <text x="1520" y="822" text-anchor="middle" font-size="15" fill="#6a9e7a" font-family="'DejaVu Sans Mono','Courier New',monospace">③ 下游决策受污染影响 → propagate → pollution</text>
+    <text x="1520" y="842" text-anchor="middle" font-size="14" fill="#3d704a">→ 结论: C 个 contaminated artifacts · P 条污染边</text>
+
+    <!-- Transitive Closure -->
+    <rect x="120" y="866" width="1680" height="100" rx="10" fill="#fff" stroke="#a8d4b6" stroke-width="1.6"/>
+    <text x="960" y="894" text-anchor="middle" font-size="18" font-weight="700" fill="#3d704a">传递闭包扫描 (Transitive Boundary Closure) + 祖先链构建 (build_ancestor_map)</text>
+    <text x="960" y="922" text-anchor="middle" font-size="15" fill="#6a9e7a">沿进程祖先链逐级扫描每一跳的边界穿越行为，识别深度 d 处从合法行为到攻击行为的突变点</text>
+    <text x="960" y="946" text-anchor="middle" font-size="15" fill="#6a9e7a" font-family="'DejaVu Sans Mono','Courier New',monospace">Root(PID₀) → W₁(PID₁) → W₂(PID₂) → ... → Wₙ(PIDₙ)  ← 完整 N 级进程祖先链</text>
+  </g>
+
+  <!-- L2 → L3 arrow -->
+  <line x1="960" y1="984" x2="960" y2="1016" stroke="#4a8ec9" stroke-width="3.6" marker-end="url(#ab)"/>
+  <text x="996" y="1006" font-size="16" fill="#4a8ec9">图结构 + 身份/污点/闭包 → 融合分数</text>
+
+  <!-- ===== Layer 3: Fusion + Decision ===== -->
+  <g filter="url(#sh)">
+    <rect x="80" y="1032" width="1760" height="260" rx="16" fill="#fdf6f6" stroke="#e6b8b8" stroke-width="2.4"/>
+    <rect x="80" y="1032" width="1760" height="36" rx="16" fill="#c46262"/>
+    <rect x="80" y="1052" width="1760" height="16" fill="#c46262"/>
+    <text x="960" y="1056" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">第 3 层 — 信号融合与判定（含 Observer LLM 按需仲裁）</text>
+
+    <!-- Score Fusion -->
+    <rect x="120" y="1084" width="520" height="90" rx="10" fill="#fff" stroke="#e6b8b8" stroke-width="1.6"/>
+    <text x="380" y="1112" text-anchor="middle" font-size="17" font-weight="700" fill="#8b3030">加权融合 (OWA + GeoMean)</text>
+    <text x="380" y="1140" text-anchor="middle" font-size="15" fill="#b06060" font-family="'DejaVu Sans Mono','Courier New',monospace">raw_fused = D1·0.25 + D3·0.20 + D4·0.15</text>
+    <text x="380" y="1162" text-anchor="middle" font-size="15" fill="#b06060" font-family="'DejaVu Sans Mono','Courier New',monospace">           + D5·0.20 + D6·0.20</text>
+
+    <!-- Calibration -->
+    <rect x="680" y="1084" width="400" height="90" rx="10" fill="#fff" stroke="#e6b8b8" stroke-width="1.6"/>
+    <text x="880" y="1112" text-anchor="middle" font-size="17" font-weight="700" fill="#8b3030">Platt 概率校准</text>
+    <text x="880" y="1140" text-anchor="middle" font-size="15" fill="#b06060" font-family="'DejaVu Sans Mono','Courier New',monospace">calibrated = 1/(1+e^{-(7.0×S−3.0)})</text>
+    <text x="880" y="1162" text-anchor="middle" font-size="15" fill="#b06060">融合 L2 证据相关性 → 校准后概率</text>
+
+    <!-- Boost -->
+    <rect x="1120" y="1084" width="340" height="90" rx="10" fill="#fff" stroke="#e6b8b8" stroke-width="1.6"/>
+    <text x="1290" y="1112" text-anchor="middle" font-size="17" font-weight="700" fill="#8b3030">信号增强</text>
+    <text x="1290" y="1140" text-anchor="middle" font-size="15" fill="#b06060" font-family="'DejaVu Sans Mono','Courier New',monospace">taint_boost: 污点传播增益</text>
+    <text x="1290" y="1162" text-anchor="middle" font-size="15" fill="#b06060" font-family="'DejaVu Sans Mono','Courier New',monospace">pollution_boost: 污染边放大</text>
+
+    <!-- Observer -->
+    <rect x="1500" y="1084" width="300" height="90" rx="10" fill="#fefaf5" stroke="#e6cfa8" stroke-width="1.6"/>
+    <text x="1650" y="1112" text-anchor="middle" font-size="17" font-weight="700" fill="#8b6914">Observer 仲裁</text>
+    <text x="1650" y="1140" text-anchor="middle" font-size="15" fill="#ad8f52">按需激活</text>
+    <text x="1650" y="1162" text-anchor="middle" font-size="15" fill="#ad8f52">CachePrior + LLM 语义判定</text>
+
+    <!-- Decision -->
+    <rect x="340" y="1200" width="1240" height="70" rx="35" fill="#edf3f8" stroke="#b0c8dd" stroke-width="2"/>
+    <text x="960" y="1228" text-anchor="middle" font-size="20" font-weight="700" fill="#3a5f80" font-family="'DejaVu Sans Mono','Courier New',monospace">最终分数 s = raw_fused + calibrated + boosts → 判定: ATTACK / BENIGN</text>
+    <text x="960" y="1254" text-anchor="middle" font-size="16" fill="#6a8ba8" font-family="'DejaVu Sans Mono','Courier New',monospace">route: unsafe_by_engine / safe_by_engine / observer_safe / observer_unsafe</text>
+  </g>
+
+  <!-- Bottom note -->
+  <rect x="340" y="1340" width="1240" height="56" rx="28" fill="#f0f4f8" stroke="#d0dbe6" stroke-width="1.6"/>
+  <text x="960" y="1360" text-anchor="middle" font-size="15" fill="#5a88aa">注：各案例的差异在于（1）第1层6维的具体分数和激活维度；（2）第2层的侧重点（身份解析/污点追踪/传递闭包）</text>
+  <text x="960" y="1380" text-anchor="middle" font-size="15" fill="#5a88aa">（3）第3层 taint_boost / pollution_boost 的具体值；（4）Observer 是否被触发（仅在 grey_zone 或 evidence_conflict 时）</text>
+
+  <!-- Routing annotation (right side) -->
+  <rect x="1640" y="1196" width="240" height="78" rx="10" fill="#fefaf5" stroke="#e6cfa8" stroke-width="1.4"/>
+  <text x="1760" y="1220" text-anchor="middle" font-size="14" font-weight="700" fill="#8b6914">S_cal ∈ [0, 1]</text>
+  <text x="1760" y="1242" text-anchor="middle" font-size="13" fill="#ad8f52">&lt;0.15 → Safe (不触发)</text>
+  <text x="1760" y="1260" text-anchor="middle" font-size="13" fill="#ad8f52">0.15~0.70 → Grey → Observer</text>
+</svg>

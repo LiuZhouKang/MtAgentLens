@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 1240 1240" style="max-width: 1240px;">
+  <defs>
+    <style>
+      .bg{fill:#fff}
+      .title{font-family:Arial,"Microsoft YaHei",sans-serif;font-weight:800;fill:#fff}
+      .h1{font-size:38px}
+      .h2{font-size:26px;stroke:#fff;stroke-width:0.8;paint-order:stroke fill}
+      .body{font-size:20px;stroke:#fff;stroke-width:0.7;paint-order:stroke fill}
+      .small{font-size:17.5px;stroke:#fff;stroke-width:0.6;paint-order:stroke fill}
+      .black{fill:#050505}
+      .blue{fill:#1356b3}.orange{fill:#f26a00}.green{fill:#168331}
+      .blueS{stroke:#1356b3}.orangeS{stroke:#f26a00}.greenS{stroke:#168331}
+      .box{fill:#fffdf8;stroke-width:2}
+      .dash{fill:none;stroke-width:2;stroke-dasharray:7 5}
+      .thick{fill:none;stroke-width:8;stroke-linecap:round;stroke-linejoin:round}
+      .thin{fill:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
+      text{font-family:Arial,"Microsoft YaHei",sans-serif}
+    </style>
+    <linearGradient id="blueHead" x1="0" x2="1">
+      <stop offset="0" stop-color="#0755b7"/><stop offset="1" stop-color="#0b62cf"/>
+    </linearGradient>
+    <linearGradient id="orangeHead" x1="0" x2="1">
+      <stop offset="0" stop-color="#ff6b00"/><stop offset="1" stop-color="#f36a00"/>
+    </linearGradient>
+    <linearGradient id="greenHead" x1="0" x2="1">
+      <stop offset="0" stop-color="#188334"/><stop offset="1" stop-color="#1b9738"/>
+    </linearGradient>
+    <marker id="arrowBlue" markerWidth="14" markerHeight="14" refX="7" refY="7" orient="auto">
+      <path d="M0,0 L14,7 L0,14 Z" fill="#1356b3"/>
+    </marker>
+    <marker id="arrowOrange" markerWidth="14" markerHeight="14" refX="7" refY="7" orient="auto">
+      <path d="M0,0 L14,7 L0,14 Z" fill="#f26a00"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="1240" height="1240"/>
+  
+  <rect x="26" y="22" width="1188" height="374" rx="14" fill="#f8fbff" stroke="#1356b3" stroke-width="3"/>
+  <rect x="26" y="22" width="1188" height="70" rx="14" fill="url(#blueHead)"/>
+  <rect x="26" y="72" width="1188" height="20" fill="url(#blueHead)"/>
+  <text x="620" y="68" text-anchor="middle" class="title h1">第一层： eBPF 内核探针层 (C)</text>
+  <g class="blueS">
+    <rect class="box blueS" x="52" y="116" width="220" height="184" rx="10"/>
+    <path class="thick" d="M132 166 v-20 a25 25 0 0 1 50 0 v20"/>
+    <rect x="132" y="158" width="50" height="44" rx="4" fill="#1356b3"/>
+    <circle cx="157" cy="178" r="5" fill="#fff"/>
+    <text x="162" y="238" text-anchor="middle" class="h2 blue">sslsniff</text>
+    <text x="162" y="278" text-anchor="middle" class="body blue">SSL/TLS 明文截获</text>
+    <rect class="box blueS" x="286" y="116" width="220" height="184" rx="10"/>
+    <circle cx="396" cy="166" r="20" fill="none" stroke="#1356b3" stroke-width="9"/>
+    <path class="thick" d="M396 141v-15M396 191v15M372 166h-15M420 166h15M378 149l-10-10M414 183l10 10M414 149l10-10M378 183l-10 10"/>
+    <circle cx="396" cy="166" r="7" fill="#1356b3"/>
+    <text x="396" y="238" text-anchor="middle" class="h2 blue">process</text>
+    <text x="396" y="278" text-anchor="middle" class="body blue">进程/文件/信号监控</text>
+    <rect class="box blueS" x="520" y="116" width="220" height="184" rx="10"/>
+    <rect x="596" y="140" width="66" height="52" rx="3" fill="none" stroke="#1356b3" stroke-width="6"/>
+    <path d="M612 158l15 11-15 11M636 180h18" fill="none" stroke="#1356b3" stroke-width="6" stroke-linecap="round"/>
+    <text x="630" y="238" text-anchor="middle" class="h2 blue">stdiocap</text>
+    <text x="630" y="278" text-anchor="middle" class="body blue">stdio I/O 捕获</text>
+    <rect class="box blueS" x="754" y="116" width="220" height="184" rx="10"/>
+    <circle cx="864" cy="166" r="32" fill="none" stroke="#1356b3" stroke-width="4"/>
+    <path d="M832 166h64M864 134v64M842 144c18 10 42 10 62 0M842 188c18-10 42-10 62 0M854 136c-12 22-12 42 0 62M874 136c12 22 12 42 0 62" fill="none" stroke="#1356b3" stroke-width="3"/>
+    <text x="864" y="238" text-anchor="middle" class="h2 blue">browsertrace</text>
+    <text x="864" y="278" text-anchor="middle" class="body blue">浏览器 SSL 明文追踪</text>
+    <rect class="box blueS" x="986" y="116" width="220" height="184" rx="10"/>
+    <path d="M1069 149h34l20 20v41h-54z" fill="#1356b3"/>
+    <path d="M1103 149v20h20" fill="none" stroke="#fff" stroke-width="5"/>
+    <path d="M1082 168h25M1082 178h20M1082 188h15" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+    <text x="1096" y="238" text-anchor="middle" class="h2 blue">fileaccess</text>
+    <text x="1096" y="278" text-anchor="middle" class="body blue">文件访问审计</text>
+  </g>
+  <line x1="52" y1="326" x2="1206" y2="326" class="dash blueS"/>
+  <text x="620" y="370" text-anchor="middle" class="body blue" font-weight="700">
+    uprobe  ·  uretprobe  ·  kprobe  ·  tracepoint  ·  Ring Buffer  ·  BPF Maps  ·  libbpf
+  </text>
+  <path d="M608 408v52" class="thick blueS" marker-end="url(#arrowBlue)"/>
+  <text x="660" y="444" class="h2 blue" font-weight="800" stroke="none">JSON 事件流 (Ring Buffer)</text>
+  
+  <rect x="26" y="470" width="1188" height="348" rx="14" fill="#fffaf2" stroke="#f26a00" stroke-width="3"/>
+  <rect x="26" y="470" width="1188" height="66" rx="14" fill="url(#orangeHead)"/>
+  <rect x="26" y="516" width="1188" height="20" fill="url(#orangeHead)"/>
+  <text x="620" y="522" text-anchor="middle" class="title h1">第二层： Rust 流式处理框架 (collector)</text>
+  <g class="orangeS">
+    <rect class="box orangeS" x="52" y="560" width="548" height="164" rx="12"/>
+    <circle cx="116" cy="602" r="10" fill="#f26a00"/><circle cx="82" cy="642" r="10" fill="#f26a00"/>
+    <circle cx="154" cy="642" r="10" fill="#f26a00"/><circle cx="116" cy="678" r="10" fill="#f26a00"/>
+    <path d="M116 602L82 642L116 678L154 642Z M116 602L154 642" fill="none" stroke="#f26a00" stroke-width="3"/>
+    <text x="192" y="618" class="h2 orange">Framework (流式数据采集)</text>
+    <text x="194" y="660" class="body orange">AgentRunner  ·  管道-过滤器</text>
+    <text x="194" y="694" class="body orange">Analyzer链  ·  HTTP/SSE解析</text>
+    <rect class="box orangeS" x="644" y="560" width="558" height="164" rx="12"/>
+    <path d="M722 596c-20 0-35 15-35 35s15 35 35 35M724 596c20 0 35 15 35 35s-15 35-35 35M724 596v70M704 612c18 8 18 45 0 52M742 612c-18 8-18 45 0 52" fill="none" stroke="#f26a00" stroke-width="5" stroke-linecap="round"/>
+    <text x="790" y="618" class="h2 orange">Accountability (因果归因引擎)</text>
+    <text x="792" y="660" class="body orange">因果图  ·  污点追踪  ·  证据关联</text>
+    <text x="792" y="694" class="body orange">三级分类  ·  双写持久化</text>
+  </g>
+  <line x1="52" y1="750" x2="1206" y2="750" class="dash orangeS"/>
+  <text x="620" y="796" text-anchor="middle" class="body orange" font-weight="700">
+    tokio  ·  futures  ·  Hyper 1.0  ·  SQLite+JSONL  ·  HTTP API + SSE
+  </text>
+  <path d="M608 828v52" class="thick orangeS" marker-end="url(#arrowOrange)"/>
+  <text x="666" y="866" class="h2 orange" font-weight="800" stroke="none">REST + SSE + 静态文件</text>
+  
+  <rect x="26" y="890" width="1188" height="262" rx="14" fill="#f7fff7" stroke="#168331" stroke-width="3"/>
+  <rect x="26" y="890" width="1188" height="66" rx="14" fill="url(#greenHead)"/>
+  <rect x="26" y="936" width="1188" height="20" fill="url(#greenHead)"/>
+  <text x="620" y="932" text-anchor="middle" class="title h1">第三层： Next.js 3D 可视化前端 (TypeScript/React)</text>
+  <g class="greenS">
+    <rect class="box greenS" x="52" y="966" width="250" height="132" rx="10"/>
+    <circle cx="176" cy="1012" r="32" fill="none" stroke="#168331" stroke-width="4"/>
+    <path d="M144 1012h64M176 980v64M154 992c18 10 42 10 60 0M154 1030c18-10 42-10 60 0M166 982c-12 22-12 42 0 62M186 982c12 22 12 42 0 62" fill="none" stroke="#168331" stroke-width="3"/>
+    <text x="176" y="1080" text-anchor="middle" class="h2 green">3D Globe 渲染</text>
+    <text x="176" y="1118" text-anchor="middle" class="small green">Three.js · 粒子效果 · Bloom</text>
+    <rect class="box greenS" x="326" y="966" width="286" height="132" rx="10"/>
+    <circle cx="438" cy="1036" r="9" fill="#168331"/><circle cx="496" cy="1012" r="9" fill="#168331"/>
+    <circle cx="468" cy="990" r="9" fill="#168331"/><circle cx="520" cy="982" r="9" fill="#168331"/>
+    <path d="M438 1036L468 990L496 1012L520 982" fill="none" stroke="#168331" stroke-width="4"/>
+    <text x="469" y="1080" text-anchor="middle" class="h2 green">因果图可视化</text>
+    <text x="469" y="1118" text-anchor="middle" class="small green">节点/边 3D 映射 · Raycaster</text>
+    <rect class="box greenS" x="636" y="966" width="268" height="132" rx="10"/>
+    <path d="M770 986c-24 12-30 28-30 54h60c0-26-6-42-30-54z" fill="#168331"/>
+    <path d="M758 1040a12 12 0 0 0 24 0" fill="none" stroke="#168331" stroke-width="5"/>
+    <rect x="750" y="1038" width="40" height="7" rx="3" fill="#168331"/>
+    <text x="770" y="1080" text-anchor="middle" class="h2 green">实时告警面板</text>
+    <text x="770" y="1118" text-anchor="middle" class="small green">AlertCard · TracebackChain</text>
+    <rect class="box greenS" x="928" y="966" width="274" height="132" rx="10"/>
+    <circle cx="1064" cy="1018" r="10" fill="#168331"/>
+    <path d="M1048 1000a26 26 0 0 0 0 36M1080 1000a26 26 0 0 1 0 36M1034 986a46 46 0 0 0 0 64M1094 986a46 46 0 0 1 0 64" fill="none" stroke="#168331" stroke-width="6" stroke-linecap="round"/>
+    <text x="1065" y="1080" text-anchor="middle" class="h2 green">SSE 实时推送</text>
+    <text x="1065" y="1118" text-anchor="middle" class="small green">EventSource · 毫秒级更新</text>
+  </g>
+  
+  <rect x="26" y="1170" width="1188" height="66" rx="8" fill="#fff" stroke="#777" stroke-width="2"/>
+  <text x="620" y="1214" text-anchor="middle" class="h2 black" font-weight="800" stroke="none">
+    MtAgentLens — Kernel-Native AI Agent Traffic Mirroring &amp; Causal Attribution Engine
+  </text>
+</svg>

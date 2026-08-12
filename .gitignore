@@ -68,6 +68,23 @@ awesome-design-md/
 
 # 决赛演示视频（体积过大，仅网盘分发，不进入仓库）
 MtAgentLens决赛演示视频.mp4
+# 决赛 PPT 大文件版（154MB，仅本地使用，不入库）
+MtAgentLens决赛PPT.pptx
+
+# 决赛文档演示视频（仅本地，走网盘分发，不入库）
+docs/决赛文档/assets/video/
+
+# LaTeX build artifacts
+*.aux
+*.toc
+*.out
+*.lof
+*.lot
+*.bbl
+*.blg
+*.synctex.gz
+*.fls
+*.fdb_latexmk
 
 # Sensitive files
 .env

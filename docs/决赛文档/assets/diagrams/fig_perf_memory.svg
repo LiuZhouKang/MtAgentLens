@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="420" font-family="Inter,Noto Sans CJK SC,DejaVu Sans,sans-serif">
+<defs>
+<linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4338CA" stop-opacity="0.20"/><stop offset="100%" stop-color="#4338CA" stop-opacity="0.02"/></linearGradient>
+</defs>
+<rect width="700" height="420" fill="#FAFAFA" rx="12"/>
+<text x="350.0" y="406" text-anchor="middle" font-size="11" fill="#6B7280">时间（秒）</text>
+<text x="18" y="205.0" text-anchor="middle" font-size="12" font-weight="600" fill="#4B5563" transform="rotate(-90,18,205.0)">RSS（MB）</text>
+<line x1="70" y1="330.0" x2="670" y2="330.0" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="334.0" text-anchor="end" font-size="11" fill="#9CA3AF">34.9</text>
+<line x1="70" y1="267.5" x2="670" y2="267.5" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="271.5" text-anchor="end" font-size="11" fill="#9CA3AF">37.2</text>
+<line x1="70" y1="205.0" x2="670" y2="205.0" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="209.0" text-anchor="end" font-size="11" fill="#9CA3AF">39.4</text>
+<line x1="70" y1="142.5" x2="670" y2="142.5" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="146.5" text-anchor="end" font-size="11" fill="#9CA3AF">41.6</text>
+<line x1="70" y1="80.0" x2="670" y2="80.0" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="84.0" text-anchor="end" font-size="11" fill="#9CA3AF">43.8</text>
+<path d="M 70.0,289.0 L 80.2,289.0 L 90.3,287.6 L 100.5,287.6 L 110.7,287.6 L 120.8,287.6 L 131.0,287.6 L 141.2,286.7 L 151.4,285.2 L 161.5,285.1 L 171.7,285.1 L 181.9,284.9 L 192.0,284.7 L 202.2,284.7 L 212.4,284.7 L 222.5,284.7 L 232.7,284.7 L 242.9,284.5 L 253.1,284.2 L 263.2,284.2 L 273.4,284.0 L 283.6,283.9 L 293.7,282.1 L 303.9,282.1 L 314.1,282.1 L 324.2,282.1 L 334.4,282.0 L 344.6,282.0 L 354.7,278.0 L 364.9,278.0 L 375.1,277.8 L 385.3,277.4 L 395.4,277.3 L 405.6,277.3 L 415.8,277.3 L 425.9,277.2 L 436.1,277.2 L 446.3,277.2 L 456.4,270.8 L 466.6,269.2 L 476.8,269.2 L 486.9,269.2 L 497.1,268.9 L 507.3,268.9 L 517.5,268.9 L 527.6,268.9 L 537.8,268.9 L 548.0,268.8 L 558.1,268.8 L 568.3,268.8 L 578.5,268.8 L 588.6,268.6 L 598.8,268.5 L 609.0,268.5 L 619.2,268.5 L 629.3,268.5 L 639.5,268.4 L 649.7,268.3 L 659.8,268.1 L 670.0,268.1 L 670.0,330.0 L 70.0,330.0 Z" fill="url(#area)"/>
+<path d="M 70.0,289.0 L 80.2,289.0 L 90.3,287.6 L 100.5,287.6 L 110.7,287.6 L 120.8,287.6 L 131.0,287.6 L 141.2,286.7 L 151.4,285.2 L 161.5,285.1 L 171.7,285.1 L 181.9,284.9 L 192.0,284.7 L 202.2,284.7 L 212.4,284.7 L 222.5,284.7 L 232.7,284.7 L 242.9,284.5 L 253.1,284.2 L 263.2,284.2 L 273.4,284.0 L 283.6,283.9 L 293.7,282.1 L 303.9,282.1 L 314.1,282.1 L 324.2,282.1 L 334.4,282.0 L 344.6,282.0 L 354.7,278.0 L 364.9,278.0 L 375.1,277.8 L 385.3,277.4 L 395.4,277.3 L 405.6,277.3 L 415.8,277.3 L 425.9,277.2 L 436.1,277.2 L 446.3,277.2 L 456.4,270.8 L 466.6,269.2 L 476.8,269.2 L 486.9,269.2 L 497.1,268.9 L 507.3,268.9 L 517.5,268.9 L 527.6,268.9 L 537.8,268.9 L 548.0,268.8 L 558.1,268.8 L 568.3,268.8 L 578.5,268.8 L 588.6,268.6 L 598.8,268.5 L 609.0,268.5 L 619.2,268.5 L 629.3,268.5 L 639.5,268.4 L 649.7,268.3 L 659.8,268.1 L 670.0,268.1" fill="none" stroke="#4338CA" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="670.0" cy="268.1" r="5.5" fill="#4338CA" stroke="white" stroke-width="2.5"/>
+<rect x="642" y="228.06519083566945" width="56" height="24" rx="12" fill="#111827" opacity="0.90"/>
+<text x="670.0" y="244.06519083566945" text-anchor="middle" font-size="12" font-weight="700" fill="white">37.2 MB</text>
+<line x1="70" y1="274.9" x2="670" y2="274.9" stroke="#DB2777" stroke-width="1.8" stroke-dasharray="6,4" opacity="0.85"/>
+<rect x="78" y="250.9126599817791" width="120" height="22" rx="6" fill="#FDF2F8" stroke="#FBCFE8" stroke-width="1"/>
+<text x="138" y="265.9126599817791" text-anchor="middle" font-size="11" font-weight="600" fill="#BE185D">稳态: 36.9 MB</text>
+</svg>

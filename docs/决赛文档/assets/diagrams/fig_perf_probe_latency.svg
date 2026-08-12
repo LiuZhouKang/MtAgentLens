@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="420" font-family="Inter,Noto Sans CJK SC,DejaVu Sans,sans-serif">
+<defs>
+<linearGradient id="g0" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4338CA" stop-opacity="1"/><stop offset="100%" stop-color="#4338CA" stop-opacity="0.75"/></linearGradient>
+<linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7C3AED" stop-opacity="1"/><stop offset="100%" stop-color="#7C3AED" stop-opacity="0.75"/></linearGradient>
+<linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#DB2777" stop-opacity="1"/><stop offset="100%" stop-color="#DB2777" stop-opacity="0.75"/></linearGradient>
+<filter id="shadow"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.12"/></filter>
+</defs>
+<rect width="700" height="420" fill="#FAFAFA" rx="12"/>
+<text x="18" y="210.0" text-anchor="middle" font-size="12" font-weight="600" fill="#4B5563" transform="rotate(-90,18,210.0)">平均延迟（纳秒）</text>
+<line x1="70" y1="340.0" x2="670" y2="340.0" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="344.0" text-anchor="end" font-size="11" fill="#9CA3AF">0</text>
+<line x1="70" y1="275.0" x2="670" y2="275.0" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="279.0" text-anchor="end" font-size="11" fill="#9CA3AF">56</text>
+<line x1="70" y1="210.0" x2="670" y2="210.0" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="214.0" text-anchor="end" font-size="11" fill="#9CA3AF">111</text>
+<line x1="70" y1="145.0" x2="670" y2="145.0" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="149.0" text-anchor="end" font-size="11" fill="#9CA3AF">167</text>
+<line x1="70" y1="80.0" x2="670" y2="80.0" stroke="#E5E7EB" stroke-width="1"/>
+<text x="60" y="84.0" text-anchor="end" font-size="11" fill="#9CA3AF">223</text>
+<rect x="120.0" y="272.8" width="100.0" height="67.2" fill="url(#g0)" rx="6.0" filter="url(#shadow)"/>
+<rect x="132.5" y="240.8" width="75.0" height="26.0" rx="13" fill="#111827" opacity="0.92"/>
+<text x="170.0" y="257.8" text-anchor="middle" font-size="13" font-weight="700" fill="white">58 ns</text>
+<text x="170.0" y="362.0" text-anchor="middle" font-size="12" font-weight="600" fill="#374151">read_exit</text>
+<text x="170.0" y="382.0" text-anchor="middle" font-size="11" fill="#9CA3AF">26% of total</text>
+<rect x="320.0" y="221.8" width="100.0" height="118.2" fill="url(#g1)" rx="6.0" filter="url(#shadow)"/>
+<rect x="332.5" y="189.8" width="75.0" height="26.0" rx="13" fill="#111827" opacity="0.92"/>
+<text x="370.0" y="206.8" text-anchor="middle" font-size="13" font-weight="700" fill="white">101 ns</text>
+<text x="370.0" y="362.0" text-anchor="middle" font-size="12" font-weight="600" fill="#374151">rw_enter</text>
+<text x="370.0" y="382.0" text-anchor="middle" font-size="11" fill="#9CA3AF">46% of total</text>
+<rect x="520.0" y="270.7" width="100.0" height="69.3" fill="url(#g2)" rx="6.0" filter="url(#shadow)"/>
+<rect x="532.5" y="238.7" width="75.0" height="26.0" rx="13" fill="#111827" opacity="0.92"/>
+<text x="570.0" y="255.7" text-anchor="middle" font-size="13" font-weight="700" fill="white">59 ns</text>
+<text x="570.0" y="362.0" text-anchor="middle" font-size="12" font-weight="600" fill="#374151">write_exit</text>
+<text x="570.0" y="382.0" text-anchor="middle" font-size="11" fill="#9CA3AF">27% of total</text>
+<text x="350.0" y="406" text-anchor="middle" font-size="10" fill="#9CA3AF">Measured via kernel bpftool prog show — run_time_ns / run_cnt over 500K iterations</text>
+</svg>

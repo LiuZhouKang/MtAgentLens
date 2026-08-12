@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 1240 900" style="max-width: 1240px;">
+  <defs>
+    <style>
+      .bg{fill:#fff}
+      .h2{font-size:22px;font-weight:800;fill:#fff}
+      .h3{font-size:18px;font-weight:800}
+      .body{font-size:16px}
+      .small{font-size:14px}
+      .xs{font-size:12.5px}
+      .blue{fill:#1356b3}.orange{fill:#f26a00}.green{fill:#168331}.gray{fill:#555}
+      .blueS{stroke:#1356b3}.orangeS{stroke:#f26a00}.greenS{stroke:#168331}.grayS{stroke:#888}
+      .box{fill:#fffdf8;stroke-width:2}
+      .dash{fill:none;stroke-width:2;stroke-dasharray:7 5}
+      .arrow{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+      text{font-family:Arial,"Microsoft YaHei",sans-serif}
+    </style>
+    <linearGradient id="blueHead" x1="0" x2="1">
+      <stop offset="0" stop-color="#0755b7"/><stop offset="1" stop-color="#0b62cf"/>
+    </linearGradient>
+    <linearGradient id="orangeHead" x1="0" x2="1">
+      <stop offset="0" stop-color="#ff6b00"/><stop offset="1" stop-color="#f36a00"/>
+    </linearGradient>
+    <marker id="arrB" markerWidth="9" markerHeight="9" refX="4.5" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#1356b3"/>
+    </marker>
+    <marker id="arrO" markerWidth="9" markerHeight="9" refX="4.5" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#f26a00"/>
+    </marker>
+    <marker id="arrG" markerWidth="9" markerHeight="9" refX="4.5" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#168331"/>
+    </marker>
+    <marker id="arrGy" markerWidth="9" markerHeight="9" refX="4.5" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#888"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="1240" height="900"/>
+
+  <!-- ============ LEFT: Program Loading Flow ============ -->
+  <rect x="24" y="14" width="572" height="790" rx="10" fill="#f8fbff" stroke="#1356b3" stroke-width="2"/>
+  <rect x="24" y="14" width="572" height="44" rx="10" fill="url(#blueHead)"/>
+  <rect x="24" y="38" width="572" height="20" fill="url(#blueHead)"/>
+  <text x="310" y="44" text-anchor="middle" class="h2">程序编译与加载流程</text>
+
+  <text x="52" y="100" class="small" fill="#888" font-weight="700">▸ 用户空间</text>
+
+  <!-- Step 1 -->
+  <rect class="box blueS" x="48" y="118" width="524" height="74" rx="6"/>
+  <text x="310" y="148" text-anchor="middle" class="h3 blue">1. 编写 eBPF 程序</text>
+  <text x="310" y="174" text-anchor="middle" class="xs blue">C 源码 (.bpf.c) — 通过 SEC() 宏声明挂载点与程序类型</text>
+
+  <path d="M310 192v27" class="arrow blueS" marker-end="url(#arrB)"/>
+
+  <!-- Step 2 -->
+  <rect class="box orangeS" x="48" y="230" width="524" height="74" rx="6"/>
+  <text x="310" y="260" text-anchor="middle" class="h3 orange">2. Clang/LLVM 编译</text>
+  <text x="310" y="286" text-anchor="middle" class="xs orange">clang -O2 -target bpf -c program.bpf.c -o program.bpf.o</text>
+
+  <path d="M310 304v27" class="arrow orangeS" marker-end="url(#arrO)"/>
+
+  <!-- Step 3 -->
+  <rect class="box blueS" x="48" y="342" width="524" height="74" rx="6"/>
+  <text x="310" y="372" text-anchor="middle" class="h3 blue">3. BPF 字节码目标文件</text>
+  <text x="310" y="398" text-anchor="middle" class="xs blue">ELF .o 文件 — 含 BPF 指令、Map 定义、BTF 类型信息</text>
+
+  <path d="M310 416v27" class="arrow blueS" marker-end="url(#arrB)"/>
+
+  <!-- Step 4 -->
+  <rect class="box orangeS" x="48" y="454" width="524" height="74" rx="6"/>
+  <text x="310" y="484" text-anchor="middle" class="h3 orange">4. libbpf 加载与附着</text>
+  <text x="310" y="510" text-anchor="middle" class="xs orange">bpf_object__open() → bpf_object__load() → bpf_program__attach()</text>
+
+  <path d="M310 528v27" class="arrow orangeS" marker-end="url(#arrO)"/>
+
+  <!-- Step 5: boundary -->
+  <rect class="box grayS" x="48" y="566" width="524" height="56" rx="6"/>
+  <text x="310" y="590" text-anchor="middle" class="h3 gray">5. bpf(BPF_PROG_LOAD, ...) 系统调用</text>
+  <text x="310" y="612" text-anchor="middle" class="xs gray">—— 用户态 / 内核态 边界 ——</text>
+
+  <path d="M310 622v65" class="arrow grayS" marker-end="url(#arrGy)"/>
+
+  <!-- Kernel space -->
+  <text x="52" y="680" class="small" fill="#168331" font-weight="700">▸ 内核空间</text>
+
+  <rect class="box greenS" x="48" y="698" width="248" height="66" rx="6"/>
+  <text x="172" y="724" text-anchor="middle" class="h3 green">6. BPF 验证器</text>
+  <text x="172" y="748" text-anchor="middle" class="xs green">静态分析 · 安全检查</text>
+
+  <path d="M296 731h17" class="arrow greenS" marker-end="url(#arrG)"/>
+
+  <rect class="box greenS" x="324" y="698" width="248" height="66" rx="6"/>
+  <text x="448" y="724" text-anchor="middle" class="h3 green">7. JIT 编译</text>
+  <text x="448" y="748" text-anchor="middle" class="xs green">字节码 → 原生指令</text>
+
+  <!-- ============ RIGHT: Kernel Runtime Architecture ============ -->
+  <rect x="620" y="14" width="596" height="790" rx="10" fill="#fffaf2" stroke="#f26a00" stroke-width="2"/>
+  <rect x="620" y="14" width="596" height="44" rx="10" fill="url(#orangeHead)"/>
+  <rect x="620" y="38" width="596" height="20" fill="url(#orangeHead)"/>
+  <text x="918" y="44" text-anchor="middle" class="h2">内核运行时架构与数据通路</text>
+
+  <rect x="638" y="74" width="560" height="708" rx="8" fill="#f7fff7" stroke="#168331" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="918" y="100" text-anchor="middle" class="small green" font-weight="700">Linux 内核空间</text>
+
+  <!-- Hook types -->
+  <rect class="box greenS" x="654" y="118" width="174" height="100" rx="6"/>
+  <text x="741" y="146" text-anchor="middle" class="h3 green">kprobe / kretprobe</text>
+  <text x="741" y="172" text-anchor="middle" class="xs green">内核函数入口/返回</text>
+  <text x="741" y="196" text-anchor="middle" class="xs gray">例: do_sys_open</text>
+
+  <rect class="box greenS" x="844" y="118" width="174" height="100" rx="6"/>
+  <text x="931" y="146" text-anchor="middle" class="h3 green">uprobe / uretprobe</text>
+  <text x="931" y="172" text-anchor="middle" class="xs green">用户函数入口/返回</text>
+  <text x="931" y="196" text-anchor="middle" class="xs gray">例: SSL_read, SSL_write</text>
+
+  <rect class="box greenS" x="1034" y="118" width="150" height="100" rx="6"/>
+  <text x="1109" y="146" text-anchor="middle" class="h3 green">tracepoint</text>
+  <text x="1109" y="172" text-anchor="middle" class="xs green">内核静态追踪点</text>
+  <text x="1109" y="196" text-anchor="middle" class="xs gray">例: sys_enter_execve</text>
+
+  <!-- eBPF execution engine — 3 boxes -->
+  <rect x="654" y="246" width="530" height="108" rx="6" fill="#f8fbff" stroke="#1356b3" stroke-width="1.5"/>
+  <text x="918" y="274" text-anchor="middle" class="h3 blue">eBPF 程序执行引擎</text>
+
+  <rect x="670" y="294" width="196" height="42" rx="4" fill="#e8f0fe" stroke="#1356b3" stroke-width="1"/>
+  <text x="768" y="320" text-anchor="middle" class="xs blue">BPF_PROG_TYPE_KPROBE</text>
+
+  <rect x="878" y="294" width="200" height="42" rx="4" fill="#e8f0fe" stroke="#1356b3" stroke-width="1"/>
+  <text x="978" y="320" text-anchor="middle" class="xs blue">BPF_PROG_TYPE_TRACEPOINT</text>
+
+  <rect x="1090" y="294" width="78" height="42" rx="4" fill="#fff" stroke="#1356b3" stroke-width="0.8" stroke-dasharray="3 2"/>
+  <text x="1129" y="320" text-anchor="middle" class="xs blue">... 30+</text>
+
+  <!-- Maps + Ring Buffer -->
+  <rect x="654" y="382" width="260" height="120" rx="6" fill="#fff" stroke="#168331" stroke-width="1.5"/>
+  <text x="784" y="410" text-anchor="middle" class="h3 green">BPF Maps（数据共享）</text>
+  <text x="784" y="440" text-anchor="middle" class="xs gray">HashMap · Array · RingBuf</text>
+  <text x="784" y="462" text-anchor="middle" class="xs gray">PerCPU · LRU Hash · Stack Trace</text>
+  <text x="784" y="484" text-anchor="middle" class="xs gray">Bloom Filter</text>
+
+  <rect x="930" y="382" width="254" height="120" rx="6" fill="#fff" stroke="#f26a00" stroke-width="1.5"/>
+  <text x="1057" y="410" text-anchor="middle" class="h3 orange">Ring Buffer（事件推送）</text>
+  <text x="1057" y="440" text-anchor="middle" class="xs gray">per-CPU 无锁环形缓冲区</text>
+  <text x="1057" y="462" text-anchor="middle" class="xs gray">低延迟 · 高吞吐</text>
+  <text x="1057" y="484" text-anchor="middle" class="xs gray">可变长度记录</text>
+
+  <!-- Arrows to user space consumers -->
+  <path d="M784 502v42" class="arrow blueS" marker-end="url(#arrB)" stroke-dasharray="7 5"/>
+  <rect x="654" y="553" width="254" height="50" rx="6" fill="#fff" stroke="#1356b3" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <text x="781" y="585" text-anchor="middle" class="small blue">用户态读取 — bpf_map_lookup_elem()</text>
+
+  <path d="M1057 502v42" class="arrow orangeS" marker-end="url(#arrO)"/>
+  <rect x="930" y="553" width="254" height="50" rx="6" fill="#fff" stroke="#1356b3" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <text x="1057" y="585" text-anchor="middle" class="small blue">用户态轮询 — ring_buffer__consume()</text>
+
+  <!-- Helper functions — 2 lines -->
+  <rect x="654" y="648" width="530" height="92" rx="6" fill="#fafafa" stroke="#888" stroke-width="1.2"/>
+  <text x="918" y="674" text-anchor="middle" class="h3 gray">eBPF Helper 函数（受控内核 API）</text>
+  <text x="918" y="702" text-anchor="middle" class="xs gray">bpf_map_lookup_elem()  ·  bpf_ringbuf_reserve()  ·  bpf_get_current_pid_tgid()</text>
+  <text x="918" y="724" text-anchor="middle" class="xs gray">bpf_probe_read_user()  ·  bpf_ktime_get_ns()</text>
+
+  <!-- Bottom line -->
+  <line x1="24" y1="830" x2="1216" y2="830" class="dash grayS"/>
+  <text x="620" y="868" text-anchor="middle" class="xs gray">
+    libbpf · BPF CO-RE (BTF 类型自省) · kprobe / uprobe / tracepoint · Ring Buffer · BPF Maps · JIT 编译
+  </text>
+</svg>

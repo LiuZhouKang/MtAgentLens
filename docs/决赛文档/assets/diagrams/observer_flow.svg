@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 935" style="max-width:1200px;font-family:'Microsoft YaHei','SimHei',Arial,sans-serif">
+  <defs>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1L9 5L0 9z" fill="#4a8ec9"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1L9 5L0 9z" fill="#4a9e5c"/></marker>
+    <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1L9 5L0 9z" fill="#c4792b"/></marker>
+    <marker id="af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0 2L9 5L0 8z" fill="#888"/></marker>
+    <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-opacity="0.06"/></filter>
+  </defs>
+  <rect width="1200" height="935" fill="#fcfcfc"/>
+
+  <!-- ===== Entry: 新证据包到达 ===== -->
+  <g filter="url(#sh)">
+    <rect x="400" y="35" width="400" height="50" rx="25" fill="#edf3f8" stroke="#b0c8dd" stroke-width="2"/>
+    <text x="600" y="67" text-anchor="middle" font-size="22" font-weight="700" fill="#3a5f80">新证据包到达</text>
+  </g>
+
+  <!-- ===== L1 签名哈希 ===== -->
+  <g filter="url(#sh)">
+    <rect x="220" y="145" width="760" height="110" rx="14" fill="#edf3f8" stroke="#b0c8dd" stroke-width="2"/>
+    <text x="600" y="183" text-anchor="middle" font-size="28" font-weight="700" fill="#3a5f80">L1 签名哈希 · 精确去重</text>
+    <text x="600" y="215" text-anchor="middle" font-size="18" fill="#6a8ba8" font-family="'DejaVu Sans Mono','Courier New',monospace">SHA-256(edge_types_hash,</text>
+    <text x="600" y="239" text-anchor="middle" font-size="18" fill="#6a8ba8" font-family="'DejaVu Sans Mono','Courier New',monospace">        node_types_hash, resource_path_hash)</text>
+  </g>
+
+  <!-- L1 → Hit branch -->
+  <g filter="url(#sh)">
+    <rect x="1016" y="173" width="118" height="54" rx="27" fill="#f0f7f2" stroke="#a8d4b6" stroke-width="2"/>
+    <text x="1075" y="206" text-anchor="middle" font-size="22" font-weight="700" fill="#3d704a">命中</text>
+  </g>
+  <text x="1075" y="251" text-anchor="middle" font-size="16" fill="#6a9e7a">直接返回缓存</text>
+  <text x="1075" y="273" text-anchor="middle" font-size="14" fill="#9bb8a8">零 LLM 成本</text>
+
+  <!-- L1 → L2 (miss) -->
+  <text x="628" y="269" font-size="18" fill="#c4792b" font-weight="700">未命中</text>
+
+  <!-- ===== L2 模式缓存 ===== -->
+  <g filter="url(#sh)">
+    <rect x="220" y="310" width="760" height="110" rx="14" fill="#f5f5f5" stroke="#c0c0c0" stroke-width="2"/>
+    <text x="600" y="348" text-anchor="middle" font-size="28" font-weight="700" fill="#4a5568">L2 模式缓存 · CachePrior</text>
+    <text x="600" y="380" text-anchor="middle" font-size="18" fill="#7a8a9a">查询各资源模式 (resource_path, tool_name)</text>
+    <text x="600" y="404" text-anchor="middle" font-size="18" fill="#7a8a9a">的 fleet 级异常率</text>
+  </g>
+
+  <!-- ===== LLM 调用 ===== -->
+  <g filter="url(#sh)">
+    <rect x="220" y="475" width="760" height="110" rx="14" fill="#fefaf5" stroke="#e6cfa8" stroke-width="2"/>
+    <text x="600" y="513" text-anchor="middle" font-size="28" font-weight="700" fill="#8b6914">LLM 调用 · 语义判定</text>
+    <text x="600" y="545" text-anchor="middle" font-size="18" fill="#ad8f52">注入 CachePrior 历史先验</text>
+    <text x="600" y="569" text-anchor="middle" font-size="18" fill="#ad8f52">LLM 给出 Safe / Unsafe / Uncertain</text>
+  </g>
+
+  <!-- ===== 结果写回 ===== -->
+  <g filter="url(#sh)">
+    <rect x="170" y="640" width="860" height="136" rx="14" fill="#fef6f6" stroke="#e6c0c0" stroke-width="2"/>
+    <text x="600" y="678" text-anchor="middle" font-size="28" font-weight="700" fill="#8b3030">结果写回 · cache_ttl 自主控制</text>
+    <text x="600" y="710" text-anchor="middle" font-size="18" fill="#b06060" font-family="'DejaVu Sans Mono','Courier New',monospace">once: 不写L1 · 仅本次有效</text>
+    <text x="600" y="736" text-anchor="middle" font-size="18" fill="#b06060" font-family="'DejaVu Sans Mono','Courier New',monospace">task: 写L1(TTL=任务结束) · 同一任务内去重</text>
+    <text x="600" y="762" text-anchor="middle" font-size="18" fill="#b06060" font-family="'DejaVu Sans Mono','Courier New',monospace">all:  写L1(永久) + 更新L2统计 · 跨任务持久化</text>
+  </g>
+
+  <!-- ===== Colored main flow arrows (after all blocks for z-order) ===== -->
+  <!-- Entry → L1 -->
+  <line x1="600" y1="85" x2="600" y2="147" stroke="#4a8ec9" stroke-width="4" marker-end="url(#ab)"/>
+
+  <!-- L1 → Hit -->
+  <line x1="980" y1="200" x2="1018" y2="200" stroke="#4a9e5c" stroke-width="4" marker-end="url(#ag)"/>
+
+  <!-- L1 → L2 (miss) -->
+  <line x1="600" y1="255" x2="600" y2="312" stroke="#c4792b" stroke-width="4" marker-end="url(#ao)"/>
+
+  <!-- L2 → LLM -->
+  <line x1="600" y1="420" x2="600" y2="477" stroke="#4a8ec9" stroke-width="4" marker-end="url(#ab)"/>
+
+  <!-- LLM → 结果写回 -->
+  <line x1="600" y1="585" x2="600" y2="642" stroke="#4a8ec9" stroke-width="4" marker-end="url(#ab)"/>
+
+  <!-- ===== Feedback dashed arrows (on top of main flow) ===== -->
+  <!-- Left: 结果写回 → L1 更新 -->
+  <path d="M170 708 L90 460 L220 200" stroke="#999" stroke-width="2.5" fill="none" stroke-dasharray="10,6" marker-end="url(#af)"/>
+  <text x="80" y="465" font-size="14" fill="#888">更新 L1 哈希缓存</text>
+
+  <!-- Right: 结果写回 → L2 更新 -->
+  <path d="M1030 708 L1110 460 L980 365" stroke="#999" stroke-width="2.5" fill="none" stroke-dasharray="10,6" marker-end="url(#af)"/>
+  <text x="1095" y="465" font-size="14" fill="#888">更新 L2 模式缓存</text>
+
+  <!-- ===== 自学习效应 ===== -->
+  <rect x="240" y="829" width="720" height="48" rx="24" fill="#f0f4f8" stroke="#d0dbe6" stroke-width="1.6"/>
+  <text x="600" y="847" text-anchor="middle" font-size="16" fill="#5a88aa" font-weight="700">自学习效应：运行越久 → L1/L2 缓存越丰富 → 命中率↑</text>
+  <text x="600" y="867" text-anchor="middle" font-size="15" fill="#7a9db8">LLM 调用↓ → 成本↓ 、 延迟↓</text>
+
+</svg>

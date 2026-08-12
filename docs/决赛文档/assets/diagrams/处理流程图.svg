@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 1600 950" style="max-width: 1600px;">
+  <defs>
+    <style>
+      text{font-family:"Microsoft YaHei","SimHei",Arial,sans-serif;fill:#17345f;letter-spacing:0}
+      .title{font-size:34px;font-weight:700}
+      .phase{font-size:24px;font-weight:700;fill:#fff}
+      .phase2{font-size:18px;font-weight:700;fill:#fff}
+      .h{font-size:20px;font-weight:700}
+      .sh{font-size:15px;font-weight:700}
+      .b{font-size:13.5px}
+      .s{font-size:12.5px;fill:#3d5370}
+      .box{fill:#fff;stroke:#2f6fb3;stroke-width:1.6;rx:8}
+      .soft{fill:#f8fbff;stroke:#7aa5d8;stroke-width:1.25;rx:8}
+      .orange{fill:#fffaf2;stroke:#d98b1f;stroke-width:1.35;rx:8}
+      .gray{fill:#f7f8fa;stroke:#9aa9bb;stroke-width:1.2;rx:8}
+      .dash{fill:none;stroke:#8aa2bc;stroke-width:1.2;stroke-dasharray:6 5;rx:8}
+      .arr{stroke:#11599c;stroke-width:2.3;fill:none;marker-end:url(#arr)}
+      .arrO{stroke:#bd6b00;stroke-width:2.2;fill:none;marker-end:url(#arrO)}
+      .arrG{stroke:#7c8fa8;stroke-width:1.4;fill:none;marker-end:url(#arrG)}
+      .ico{fill:none;stroke:#11599c;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round;opacity:.86}
+      .icoO{fill:none;stroke:#bd6b00;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round;opacity:.88}
+    </style>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#11599c"/></marker>
+    <marker id="arrO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#bd6b00"/></marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#7c8fa8"/></marker>
+  </defs>
+  <rect width="1600" height="950" fill="#fff"/>
+  <text x="800" y="54" text-anchor="middle" class="title">系统数据处理与因果归责完整流水线</text>
+  
+  <g>
+    <path d="M18 78H145L178 164L145 250H18Q8 250 8 240V88Q8 78 18 78Z" fill="#0d4f8f"/>
+    <text x="76" y="119" text-anchor="middle" class="phase">Phase 0</text>
+    <path fill="#ffffff" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" d="M58 150h48v42H58z"/>
+    <path fill="none" stroke="#0d4f8f" stroke-width="2.3" stroke-linecap="round" d="M66 162h32M66 178h32"/>
+    <text x="76" y="222" text-anchor="middle" class="phase2">数据采集</text>
+    <path d="M18 262H145L178 338L145 414H18Q8 414 8 404V272Q8 262 18 262Z" fill="#1265a8"/>
+    <text x="76" y="303" text-anchor="middle" class="phase">Phase 1</text>
+    <path fill="#ffffff" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" d="M58 311h50L88 330v23l-12 7v-30z"/>
+    <text x="76" y="392" text-anchor="middle" class="phase2">流式预处理</text>
+    <path d="M18 426H145L178 562L145 698H18Q8 698 8 688V436Q8 426 18 426Z" fill="#0d4f8f"/>
+    <text x="76" y="468" text-anchor="middle" class="phase">Phase 2</text>
+    <path fill="#0d4f8f" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" d="M54 585l31-48 36 34z"/>
+    <path fill="none" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" d="M55 585l66-14M85 537l36-29M85 537l-8-37"/>
+    <circle cx="55" cy="585" r="6" fill="#fff"/><circle cx="85" cy="537" r="6" fill="#fff"/><circle cx="121" cy="508" r="6" fill="#fff"/><circle cx="121" cy="571" r="6" fill="#fff"/>
+    <text x="76" y="622" text-anchor="middle" class="phase2">归责引擎</text>
+    <path d="M18 710H145L178 796L145 882H18Q8 882 8 872V720Q8 710 18 710Z" fill="#1265a8"/>
+    <text x="76" y="751" text-anchor="middle" class="phase">Phase 3</text>
+    <path fill="#ffffff" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" d="M58 778h48v44H58z"/>
+    <path fill="none" stroke="#1265a8" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" d="M66 790h32M74 802l8 8 16-20"/>
+    <text x="76" y="856" text-anchor="middle" class="phase2">输出与持久化</text>
+  </g>
+  
+  <rect x="185" y="78" width="1385" height="172" class="box"/>
+  <rect x="205" y="104" width="715" height="124" class="dash"/>
+  <text x="550" y="100" text-anchor="middle" class="h">数据源：多 Runner 采集</text>
+  <g>
+    <rect x="220" y="125" width="163" height="95" class="soft"/>
+    <path class="ico" d="M246 151h28v28h-28zM240 185h40M246 157l28 22M274 157l-28 22"/>
+    <text x="304" y="153" class="sh">sslsniff</text><text x="304" y="178" class="s">SSL/TLS 明文</text><text x="304" y="198" class="s">ssl_read/write</text>
+    <rect x="394" y="125" width="163" height="95" class="soft"/>
+    <path class="ico" d="M420 151h28v28h-28M434 143v12M434 179v12M414 165h-12M448 165h12"/>
+    <text x="476" y="153" class="sh">process</text><text x="476" y="178" class="s">exec/exit 事件</text><text x="476" y="198" class="s">文件/信号/资源</text>
+    <rect x="568" y="125" width="163" height="95" class="soft"/>
+    <path class="ico" d="M594 151h32v28h-32zM602 160l9 5-9 5M594 187h32"/>
+    <text x="650" y="153" class="sh">stdiocap</text><text x="650" y="178" class="s">stdin/stdout</text><text x="650" y="198" class="s">原始数据</text>
+    <rect x="742" y="125" width="163" height="95" class="soft"/>
+    <path class="ico" d="M768 176h6l6-22 9 34 7-16h10M768 151h38v38h-38z"/>
+    <text x="824" y="153" class="sh">system</text><text x="824" y="178" class="s">CPU/内存/网络</text><text x="824" y="198" class="s">资源指标</text>
+  </g>
+  <path class="arr" d="M925 164H985"/>
+  <rect x="997" y="98" width="270" height="136" class="soft"/>
+  <path class="ico" d="M1032 139h46v46h-46zM1042 154h26M1042 170h26M1055 127v12M1055 185v12"/>
+  <text x="1102" y="131" class="h">AgentRunner</text>
+  <text x="1102" y="160" class="b">顺序 await 各 Runner.run()</text>
+  <text x="1102" y="184" class="b">收集所有 EventStream</text>
+  <text x="1102" y="208" class="b">select_all 合并轮询</text>
+  <path class="arr" d="M1275 164H1325"/>
+  <rect x="1337" y="98" width="225" height="136" class="orange"/>
+  <path class="icoO" d="M1365 154c16-14 30 14 46 0M1365 170c16-14 30 14 46 0M1365 186c16-14 30 14 46 0"/>
+  <text x="1412" y="132" class="h" fill="#9b5700">merged_stream</text>
+  <text x="1417" y="161" class="b">单一事件流</text>
+  <text x="1417" y="185" class="b">Round-Robin 轮询</text>
+  <text x="1417" y="209" class="b">新事件即时 yield</text>
+  
+  <rect x="185" y="262" width="1385" height="152" class="box"/>
+  <text x="205" y="294" class="h">流式 Analyzer 管道：链式处理，前一 Analyzer 完成后进入下一阶段</text>
+  <g>
+    <rect x="205" y="308" width="194" height="90" class="soft"/>
+    <path class="ico" d="M228 337h34v28h-34zM234 347h22M234 357h22"/>
+    <text x="272" y="335" class="sh">ConnectionBuffer</text><text x="272" y="360" class="s">pid:tid / connection_id</text><text x="272" y="379" class="s">512KB 上限，60s TTL</text>
+    <path class="arr" d="M404 353H430"/>
+    <rect x="434" y="308" width="190" height="90" class="soft"/>
+    <path class="ico" d="M457 338c14-10 28 10 42 0M457 353c14-10 28 10 42 0M457 368c14-10 28 10 42 0"/>
+    <text x="514" y="335" class="sh">SSEProcessor</text><text x="514" y="360" class="s">检测 data: 前缀</text><text x="514" y="379" class="s">event-id 重组消息</text>
+    <path class="arr" d="M628 353H654"/>
+    <rect x="658" y="308" width="190" height="90" class="soft"/>
+    <path class="ico" d="M682 332h32v40h-32zM688 344h20M688 356h20"/>
+    <text x="737" y="335" class="sh">HTTPParser</text><text x="737" y="360" class="s">请求/响应/头/体</text><text x="737" y="379" class="s">解析 SSL 载荷</text>
+    <path class="arr" d="M852 353H878"/>
+    <rect x="882" y="308" width="212" height="90" class="soft"/>
+    <path class="ico" d="M905 333a19 19 0 1 0 0.1 0M905 346v13l11 7"/>
+    <text x="938" y="335" class="sh">TimestampNormalizer</text><text x="938" y="360" class="s">读取 /proc/stat btime</text><text x="938" y="379" class="s">eBPF ns → epoch ms</text>
+    <path class="arr" d="M1098 353H1124"/>
+    <rect x="1128" y="308" width="198" height="90" class="soft"/>
+    <path class="ico" d="M1150 333h42l-16 20v26l-10 6v-32z"/>
+    <text x="1210" y="335" class="sh">过滤与脱敏</text><text x="1210" y="360" class="s">HTTP/SSL Filter</text><text x="1210" y="379" class="s">AuthHeaderRemover</text>
+    <path class="arr" d="M1330 353H1358"/>
+    <rect x="1362" y="308" width="188" height="90" class="soft"/>
+    <path class="ico" d="M1386 338h34M1386 353h34M1386 368h34M1428 338l10 10-10 10"/>
+    <text x="1446" y="338" class="sh">规范化事件流</text><text x="1446" y="363" class="s">标准化、过滤后</text><text x="1446" y="382" class="s">进入归责引擎</text>
+  </g>
+  
+  <rect x="185" y="426" width="1385" height="272" class="box"/>
+  <text x="800" y="462" text-anchor="middle" class="h">ResponsibilityRuntime：route_event 分派至信号图、身份解析与证据关联子系统</text>
+  <rect x="205" y="478" width="735" height="146" class="soft"/>
+  <text x="230" y="505" class="h">流式触发路径 trigger()</text>
+  <text x="700" y="505" class="s">默认 2s debounce 或每 50 事件</text>
+  <g>
+    <rect x="222" y="522" width="120" height="76" class="soft"/>
+    <text x="282" y="548" text-anchor="middle" class="sh">缓冲冲刷</text><text x="282" y="572" text-anchor="middle" class="s">意图提取</text>
+    <path class="arrG" d="M345 560H365"/>
+    <rect x="368" y="522" width="120" height="76" class="soft"/>
+    <text x="428" y="548" text-anchor="middle" class="sh">信号图快照</text><text x="428" y="572" text-anchor="middle" class="s">增量节点边</text>
+    <path class="arrG" d="M491 560H511"/>
+    <rect x="514" y="522" width="120" height="76" class="soft"/>
+    <text x="574" y="548" text-anchor="middle" class="sh">证据关联</text><text x="574" y="572" text-anchor="middle" class="s">L1-L5 匹配</text>
+    <path class="arrG" d="M637 560H657"/>
+    <rect x="660" y="522" width="130" height="76" class="soft"/>
+    <text x="725" y="548" text-anchor="middle" class="sh">图构建简化</text><text x="725" y="572" text-anchor="middle" class="s">FIFO 淘汰</text>
+    <path class="arrG" d="M793 560H813"/>
+    <rect x="816" y="522" width="108" height="76" class="soft"/>
+    <text x="870" y="548" text-anchor="middle" class="sh">流式分类</text><text x="870" y="572" text-anchor="middle" class="s">规则+评分</text>
+  </g>
+  <rect x="960" y="478" width="580" height="146" class="orange"/>
+  <text x="985" y="505" class="h" fill="#9b5700">终局权威路径 finalize()</text>
+  <text x="1315" y="505" class="s">SIGINT / SIGCHLD / API / 超时触发</text>
+  <g>
+    <rect x="978" y="522" width="112" height="76" class="orange"/>
+    <text x="1034" y="548" text-anchor="middle" class="sh">冻结快照</text><text x="1034" y="572" text-anchor="middle" class="s">SignalSnapshot</text>
+    <path class="arrO" d="M1093 560H1111"/>
+    <rect x="1114" y="522" width="142" height="76" class="orange"/>
+    <text x="1185" y="548" text-anchor="middle" class="sh">权威身份解析</text><text x="1185" y="572" text-anchor="middle" class="s">S2/S1 并查集</text>
+    <path class="arrO" d="M1259 560H1277"/>
+    <rect x="1280" y="522" width="118" height="76" class="orange"/>
+    <text x="1339" y="548" text-anchor="middle" class="sh">批量关联</text><text x="1339" y="572" text-anchor="middle" class="s">全量笛卡尔积</text>
+    <path class="arrO" d="M1401 560H1419"/>
+    <rect x="1422" y="522" width="108" height="76" class="orange"/>
+    <text x="1476" y="548" text-anchor="middle" class="sh">权威分类</text><text x="1476" y="572" text-anchor="middle" class="s">fail-closed</text>
+  </g>
+  <path class="arrG" d="M870 598V644"/>
+  <path class="arrO" d="M1250 598V644"/>
+  <rect x="450" y="648" width="720" height="42" class="gray"/>
+  <text x="545" y="675" class="sh">告警 Alerts</text>
+  <text x="745" y="675" class="sh">归责结论 Claims</text>
+  <text x="985" y="675" class="sh">因果回溯 Tracebacks</text>
+  
+  <rect x="185" y="710" width="1385" height="172" class="box"/>
+  <g>
+    <rect x="215" y="732" width="385" height="126" class="soft"/>
+    <path class="ico" d="M238 772c0-8 36-8 36 0v48c0 8-36 8-36 0zM238 772c0 8 36 8 36 0M238 796c0 8 36 8 36 0"/>
+    <text x="305" y="768" class="h">持久化存储</text>
+    <text x="305" y="798" class="sh">SQLite</text><text x="305" y="822" class="s">causal_schema + </text>
+    <text x="305" y="798" class="sh">SQLite</text><text x="305" y="842" class="s">responsibility_schema</text>
+    <text x="455" y="798" class="sh">JSONL</text><text x="455" y="822" class="s">逐行追加，流式推送</text>
+    <rect x="640" y="732" width="375" height="126" class="soft"/>
+    <path class="ico" d="M665 780a22 22 0 1 0 0.1 0M643 780h44M665 758c11 14 11 30 0 44"/>
+    <text x="715" y="768" class="h">服务与接口</text>
+    <text x="715" y="798" class="sh">HTTP API</text><text x="715" y="822" class="s">/api/graph / alerts </text>
+    <text x="715" y="798" class="sh">HTTP API</text><text x="715" y="842" class="s">/ events / evidence</text>
+    <text x="875" y="798" class="sh">SSE</text><text x="875" y="822" class="s">broadcast 实时推送告警</text>
+    <rect x="1055" y="732" width="305" height="126" class="soft"/>
+    <path class="ico" d="M1080 766h52v38h-52zM1106 804v18M1094 822h24M1106 776l15 8-15 8-15-8z"/>
+    <text x="1150" y="768" class="h">可视化前端</text>
+    <text x="1150" y="798" class="sh">Three.js 3D 因果分析</text>
+    <text x="1150" y="822" class="s">Globe / AlertCard / TracebackChain</text>
+    <path class="arr" d="M1370 795H1418"/>
+    <circle cx="1450" cy="782" r="9" fill="#17345f"/><circle cx="1482" cy="782" r="9" fill="#17345f"/><circle cx="1514" cy="782" r="9" fill="#17345f"/>
+    <path d="M1438 826c8-24 40-24 48 0M1470 826c8-24 40-24 48 0" fill="none" stroke="#17345f" stroke-width="4" stroke-linecap="round"/>
+    <text x="1482" y="848" text-anchor="middle" class="sh">分析 / 运维 / 决策</text>
+  </g>
+  
+  <rect x="190" y="900" width="1220" height="34" class="dash"/>
+  <path class="arr" d="M240 917H282"/><text x="300" y="923" class="b">数据流向</text>
+  <path class="arrG" d="M440 917H482"/><text x="500" y="923" class="b">控制流程</text>
+  <rect x="670" y="905" width="24" height="24" class="soft"/><text x="715" y="923" class="b">处理组件</text>
+  <rect x="870" y="905" width="24" height="24" class="orange"/><text x="915" y="923" class="b">归责组件 / 权威路径</text>
+  <path class="arrO" d="M1120 917H1160"/><text x="1180" y="923" class="b">Finalize 权威流程</text>
+</svg>

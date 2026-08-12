@@ -6,6 +6,10 @@ agentsight
 # GitHub Actions（本平台为 GitLab，不使用 GitHub CI）
 .github/
 
+# 演示视频（体积大，仅本地保留，不入库；成品放 决赛文档/assets/video/）
+demo.webm
+docs/demo-full.mp4
+
 # Dependencies
 node_modules/
 .venv/

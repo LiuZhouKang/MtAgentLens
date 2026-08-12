@@ -76,6 +76,15 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
 
 与依赖 prompt 分类或应用日志的方案相比，MtAgentLens 的差异在于将观测位置置于 Agent 之下、将归因对象置于任务链与责任链之上。其产出不是“这段文本可疑”，而是“该行为由谁触发、经历了何种路径、证据留存何处、应归责于谁”。
 
+## 功能演示
+
+<p align="center">
+  <video src="docs/demo.mp4" poster="docs/demo-poster.jpg" autoplay muted loop controls playsinline width="720">
+    您的浏览器不支持内嵌视频播放，请下载 <a href="docs/demo.mp4">docs/demo.mp4</a> 或查看完整演示。
+  </video>
+</p>
+<p align="center"><em><small>完整功能演示（65 秒）：eBPF 内核级零插桩采集 → 跨进程责任图构建 → 结构化告警与证据回溯的端到端流程</small></em></p>
+
 ---
 
 ## 架构

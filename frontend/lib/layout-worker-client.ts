@@ -14,6 +14,8 @@ export interface LayoutNodeInput {
   id: string;
   x: number;
   y: number;
+  /** 节点视觉尺寸 —— ForceAtlas2 adjustSizes 用它避免节点重叠。 */
+  size?: number;
 }
 
 export interface LayoutEdgeInput {

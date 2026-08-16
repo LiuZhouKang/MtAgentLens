@@ -2,7 +2,7 @@ import type { ResponsibilityAlert } from './types';
 
 export type InvestigationMode = 'live' | 'replay' | 'presentation';
 export type GraphFocusReason =
-  'overview' | 'incident' | 'agent' | 'cluster' | 'edge' | 'resource' | 'evidence' | 'handoff';
+   'overview' | 'incident' | 'agent' | 'unit' | 'edge' | 'resource' | 'evidence' | 'handoff';
 
 export type InvestigationGraphFocus = {
   reason: GraphFocusReason;
@@ -16,7 +16,7 @@ export type InvestigationContext = {
   mode: InvestigationMode;
   activeIncidentId: string | null;
   activeAgentId: string | null;
-  activeClusterId: string | null;
+  activeUnitId: string | null;
   activeNodeId: string | null;
   activeEdgeId: string | null;
   activeResourceId: string | null;
@@ -31,7 +31,7 @@ export const DEFAULT_INVESTIGATION_CONTEXT: InvestigationContext = {
   mode: 'live',
   activeIncidentId: null,
   activeAgentId: null,
-  activeClusterId: null,
+  activeUnitId: null,
   activeNodeId: null,
   activeEdgeId: null,
   activeResourceId: null,

@@ -16,12 +16,12 @@ import gsap from 'gsap';
 import IncidentRail from '@/components/command-center/incident-rail';
 import { CommandPalette } from '@/components/system/command-palette';
 import RunSelector from '@/components/system/run-selector';
-import LoadingIndicator from '@/components/ui/loading-indicator';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { LiveSessionMount } from '@/components/live/live-session-mount';
 import { LiveStatusBar } from '@/components/live/live-status-bar';
 import { MtlLogo } from '@/components/ui/mtl-logo';
 import { useAlertModels } from '@/lib/use-alert-models';
+import { buildAnalysisSummary, buildAnalysisTitle } from '@/lib/investigation';
 import { useAppStore } from '@/lib/store';
 import type { ResponsibilityAlert } from '@/lib/types';
 
@@ -95,15 +95,17 @@ function MainShell({ children }: { children: React.ReactNode }) {
   const isHome = pathname === '/console';
   const [paletteOpen, setPaletteOpen] = useState(false);
 
-  // ── Route-transition loading overlay ──
-  // On every route change we show the full loading animation and hide it the
-  // moment the next page has committed (useTransition isPending) plus a short
-  // grace so it plays a beat — never a fixed multi-second wait. The new content
-  // cross-fades in as the loader fades out.
-  const [showLoader, setShowLoader] = useState(false);
+  // ── Route-transition + data-coordination loading overlay ──
+  // 全站唯一加载态（全屏 Observation Orbit，Image 8）：路由切换中 / 数据加载导入中 /
+  // 页面内容未渲染 / 侧边栏模型未就绪 → 覆盖。全部就绪后由 LoadingScreen 的 CSS
+  // opacity 平滑淡出，一次揭示完整页面（侧边栏 + 内容 + 图）—— 消除「加载器先淡出、
+  // 侧边栏/内容随后冒出来」的跳变。showLoader 为推导值（见组件尾部 sidebarReady 处）。
+  const [routeBusy, setRouteBusy] = useState(false);
   const [isPending, startTransition] = useTransition();
   const prevPathRef = useRef(pathname);
-  const loaderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dataLoading = useAppStore((s) => s.dataLoading);
+  const pageReady = useAppStore((s) => s.pageReady);
+  const setPageReady = useAppStore((s) => s.setPageReady);
 
   // ── Global navigation interception ──
   // Show the loader BEFORE navigation renders, so it always appears and
@@ -125,8 +127,8 @@ function MainShell({ children }: { children: React.ReactNode }) {
 
       e.preventDefault();
 
-      // 1. Show loader synchronously (urgent update → paints immediately)
-      setShowLoader(true);
+      // 1. Mark route busy synchronously (urgent update → loader paints immediately)
+      setRouteBusy(true);
       // 2. Let the browser draw at least one animation frame
       requestAnimationFrame(() => {
         // 3. Navigate as an interruptible transition — heavy page mounts
@@ -143,62 +145,24 @@ function MainShell({ children }: { children: React.ReactNode }) {
 
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Hide the loader and cross-fade the new content in (GPU-composited opacity
-  // + y transform only). Called the moment a navigation commits.
-  const hideLoader = useCallback(() => {
-    if (loaderTimerRef.current) clearTimeout(loaderTimerRef.current);
-    loaderTimerRef.current = null;
-    setShowLoader(false);
-    if (contentRef.current) {
-      gsap.fromTo(
-        contentRef.current,
-        { opacity: 0, y: 10 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.45,
-          ease: 'power2.out',
-          clearProps: 'transform,opacity',
-        },
-      );
-    }
-  }, []);
-
-  // ── Route change: show the loader on ANY navigation, incl. browser
-  // back/forward (popstate). The isPending effect below hides it as soon as
-  // the client transition commits; this timer is only a safety max. ──
+  // ── Route change: reset the new page's readiness and keep the loader up until
+  // the new page reports its content rendered (pageReady). Covers browser
+  // back/forward too. The loader hides only when pageReady + sidebarReady land. ──
   useEffect(() => {
     const prev = prevPathRef.current;
     prevPathRef.current = pathname;
     if (prev === pathname) return;
 
-    setShowLoader(true);
+    // 新页面内容未就绪 → 保持 loader，等页面自身 setPageReady(true)
+    setPageReady(false);
+    setRouteBusy(true);
+  }, [pathname, setPageReady]);
 
-    if (loaderTimerRef.current) clearTimeout(loaderTimerRef.current);
-    loaderTimerRef.current = setTimeout(hideLoader, 3000);
-
-    return () => {
-      if (loaderTimerRef.current) clearTimeout(loaderTimerRef.current);
-    };
-  }, [pathname, hideLoader]);
-
-  // ── Hide the loader the moment the navigation commits ──
-  // isPending goes true when startTransition(push) starts and false when the
-  // next route has committed. A short grace keeps the animation from flashing
-  // for a single frame, then content cross-fades in as the loader fades out.
+  // ── Navigation commit: the client transition is done; the loader stays up
+  // until the page content + sidebar model are ready (derived showLoader below). ──
   useEffect(() => {
-    if (isPending) {
-      // New transition in flight — cancel any pending hide and set a safety max
-      // so a hung navigation can never strand the loader on screen.
-      if (loaderTimerRef.current) clearTimeout(loaderTimerRef.current);
-      loaderTimerRef.current = setTimeout(hideLoader, 3000);
-      setShowLoader(true);
-      return;
-    }
-    if (!showLoader) return; // no loader showing (first mount / nothing to hide)
-    if (loaderTimerRef.current) clearTimeout(loaderTimerRef.current);
-    loaderTimerRef.current = setTimeout(hideLoader, 400);
-  }, [isPending, showLoader, hideLoader]);
+    if (!isPending) setRouteBusy(false);
+  }, [isPending]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -215,12 +179,14 @@ function MainShell({ children }: { children: React.ReactNode }) {
 
   const alerts = useAppStore((s) => s.alerts);
   const graph = useAppStore((s) => s.graph);
+  // db 导入时填充 correlation_evidence → 证据工作台展示真实证据置信度
+  const evidence = useAppStore((s) => s.evidence);
 
   // Deferred model computation — the rail never blocks first paint on a large
   // alert set; models fill in progressively via idle-time chunks.
   const deferredAlerts = useDeferredValue(alerts);
   const deferredGraph = useDeferredValue(graph);
-  const alertModels = useAlertModels(deferredAlerts, deferredGraph);
+  const alertModels = useAlertModels(deferredAlerts, deferredGraph, evidence);
 
   const selectedItem = useMemo(() => {
     if (!alertModels.length) return null;
@@ -234,12 +200,56 @@ function MainShell({ children }: { children: React.ReactNode }) {
   // the main thread with a synchronous build — large graphs stay fluid.
   const selectedModel = sel?.model ?? null;
 
+  // 侧边栏模型与当前告警数据同步：数据切换（如导入真实 db）后，useAlertModels 经
+  // useDeferredValue 延迟重算——期间模型仍指向旧（样例）数据。据此保持全屏 Orbit 覆盖，
+  // 直到模型与新数据一致，杜绝「loader 先淡出、旧数据随后被新数据替换」的跳变。
+  const currentAlertIds = new Set(alerts.map((a) => a.alert_id));
+  const modelsSynced =
+    alertModels.length === alerts.length &&
+    alertModels.every((m) => currentAlertIds.has(m.alert.alert_id));
+  // 侧边栏就绪：无告警（空态）或 选中模型已计算且与当前数据同步 ——
+  // 侧边栏绝不展示「构建中」迷你 Orbit，避免第二加载动画。
+  const sidebarReady = alerts.length === 0 || (selectedModel != null && modelsSynced);
+  // 全站唯一加载态（推导）：任一条件未就绪 → 全屏 Observation Orbit 覆盖；
+  // 全部就绪 → LoadingScreen CSS opacity 平滑淡出，一次揭示完整页面。
+  const showLoader = routeBusy || isPending || dataLoading || !pageReady || !sidebarReady;
+  const prevLoaderRef = useRef(showLoader);
+  // loader 收敛时内容交叉淡入（GPU-composited opacity + y）
+  useEffect(() => {
+    if (prevLoaderRef.current && !showLoader && contentRef.current) {
+      gsap.fromTo(
+        contentRef.current,
+        { opacity: 0, y: 10 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.45,
+          ease: 'power2.out',
+          clearProps: 'transform,opacity',
+        },
+      );
+    }
+    prevLoaderRef.current = showLoader;
+  }, [showLoader]);
+
+  // 安全网：数据已就绪（非 dataLoading）但页面/侧边栏长时间未置就绪（页面遗漏）时，
+  // 10s 后强制释放 pageReady 门 —— dataLoading/sidebarReady 仍会正确拦住真实加载场景，
+  // 避免某页漏设 pageReady 导致 loader 永久滞留。
+  useEffect(() => {
+    if (!showLoader || dataLoading) return;
+    const t = setTimeout(() => setPageReady(true), 10_000);
+    return () => clearTimeout(t);
+  }, [showLoader, dataLoading, setPageReady]);
+
   const anchorNs = useMemo(
     () => Math.max(...alerts.map((a) => a.timestamp_ns), Date.now() * 1_000_000),
     [alerts],
   );
 
-  const hasData = selectedAlert != null;
+  // 有告警或有图即视为「有数据」：0 告警的 db（有图无告警）侧边栏也应显示
+  // 空态而非整个消失（此前 hasData 只依赖 selectedAlert → 0 告警时侧边栏不渲染，
+  // 用户误以为「加载不出来」）。
+  const hasData = selectedAlert != null || graph.nodes.length > 0;
 
   // persisted sidebar width
   const [customRailWidth, setCustomRailWidth] = useState<number | undefined>(() => {
@@ -347,8 +357,11 @@ function MainShell({ children }: { children: React.ReactNode }) {
                 selectedModel={selectedModel}
                 selectionSummary={{
                   eyebrow: '当前事件',
-                  title: selectedAlert!.title,
-                  description: selectedAlert!.summary,
+                  // 英文标题 → 中文（上下文污染使用 · 推断（主体 …））
+                  title: buildAnalysisTitle(selectedAlert!),
+                  // 原始英文分析摘要（Rust 后端）不可直读 —— 解析为结构化中文：
+                  // 检测结论 / 图规模 / 真实置信度 / 判定，用户一眼看懂。
+                  description: buildAnalysisSummary(selectedAlert!),
                 }}
                 alertModels={alertModels}
                 selectedAlertId={selectedAlert!.alert_id}
@@ -389,7 +402,33 @@ function MainShell({ children }: { children: React.ReactNode }) {
                     height: '100%',
                   }}
                 >
-                  <LoadingIndicator size={32} label="构建中" />
+                  {selectedAlert ? (
+                    // 模型计算期由布局层全屏 Orbit 覆盖（sidebarReady 门保持到模型就绪），
+                    // 此处渲染静态文本占位而非迷你 Orbit —— 杜绝第二加载动画残留（此前「构建中」
+                    // 迷你 Orbit 在加载器淡出后短暂冒出来造成跳变）。
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: 'rgba(255,255,255,0.3)',
+                        writingMode: 'vertical-rl',
+                        letterSpacing: '0.12em',
+                      }}
+                    >
+                      事件模型计算中…
+                    </span>
+                  ) : (
+                    // 有图无告警：显示空态（态势图正常渲染），而非永远转加载
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: 'rgba(255,255,255,0.45)',
+                        writingMode: 'vertical-rl',
+                        letterSpacing: '0.12em',
+                      }}
+                    >
+                      暂无告警
+                    </span>
+                  )}
                 </div>
               </aside>
             )}
@@ -417,8 +456,8 @@ function MainShell({ children }: { children: React.ReactNode }) {
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      {/* Preload the loading animation so it starts instantly on first nav */}
-      <link rel="preload" as="image" href="/brand/mtl-logo.svg" fetchPriority="high" />
+      {/* 品牌动画为内联 SVG（MtlLogo 用 useGSAP 驱动），无需 preload 外部资源；
+         此前 preload /brand/mtl-logo.svg 从未被使用 → 浏览器 preload 警告。 */}
       <Suspense fallback={<div className="linear-root ln-page" style={{ height: '100%' }} />}>
         <MainShell>{children}</MainShell>
       </Suspense>

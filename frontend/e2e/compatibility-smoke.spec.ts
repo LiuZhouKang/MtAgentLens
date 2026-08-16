@@ -29,7 +29,7 @@ const routes = [
     path: '/traces',
     assert: async (page: import('@playwright/test').Page) => {
       await expect(page.getByRole('link', { name: '追踪', exact: true })).toBeVisible();
-      await expect(page.getByText('责任链路')).toBeVisible();
+      await expect(page.getByText('责任链路', { exact: true })).toBeVisible();
       // agent monogram avatars are part of the responsibility chain —
       // ids are "agent-*" in demo fixtures and UUIDs in real/sample data
       await expect(page.getByRole('img', { name: /agent-|^[0-9a-f]{8}-/ }).first()).toBeVisible();

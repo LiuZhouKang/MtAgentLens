@@ -63,21 +63,59 @@ export function deriveSeverityBreakdown(alerts: ResponsibilityAlert[]): {
   return out;
 }
 
-/** 真实证据统计：总证据数 + 按集群分布（top 8）。 */
-export function deriveEvidenceStats(
-  clusterModels: Array<{ clusterId: string; linkedEvidence: unknown[] }>,
-): { total: number; byCluster: Array<{ name: string; value: number }> } {
-  const total = clusterModels.reduce((s, m) => s + m.linkedEvidence.length, 0);
-  const byCluster = clusterModels.slice(0, 8).map((m) => ({
-    name: m.clusterId.length > 12 ? `${m.clusterId.slice(0, 12)}…` : m.clusterId,
-    value: m.linkedEvidence.length,
+/** 证据匹配精确度等级（官方后端枚举，L1 最精确 → L5 最宽松）。 */
+export const EVIDENCE_MATCH_ORDER = ['L1Exact', 'L2Normalized', 'L3Containment', 'L4Basename', 'L5Substring'];
+/** 官方枚举 → 完整中文语义（对齐 argument_matcher.rs 后端定义，完整显示不缩写）。 */
+export const EVIDENCE_MATCH_MEANING: Record<string, string> = {
+  L1Exact: '路径 / URL / 命令完全相等',
+  L2Normalized: '归一化后相等（~ 展开、./ 与 .. 解析、命令大小写、同主机异端口）',
+  L3Containment: 'URL 主机匹配 / 路径前缀或后缀包含',
+  L4Basename: '文件名 / 命令名 basename 一致',
+  L5Substring: '子串匹配（命令 ≥3 字符、路径 ≥8 字符）',
+};
+/** 官方枚举 → 图表横轴短标签（L1…L5，避免长枚举名拥挤）。 */
+export const EVIDENCE_MATCH_SHORT: Record<string, string> = {
+  L1Exact: 'L1',
+  L2Normalized: 'L2',
+  L3Containment: 'L3',
+  L4Basename: 'L4',
+  L5Substring: 'L5',
+};
+/** 可靠性语义配色：L1 精确（可靠，绿）→ L5 子串（宽松，红），一眼传达证据质量梯度。 */
+export const EVIDENCE_MATCH_COLORS: Record<string, string> = {
+  L1Exact: '#34d399',
+  L2Normalized: '#2dd4bf',
+  L3Containment: '#fbbf24',
+  L4Basename: '#fb923c',
+  L5Substring: '#f87171',
+};
+
+/** 真实证据精确度分布：按全量关联证据的 match_level（官方枚举）分桶。
+ *  始终返回完整 L1→L5 全谱（缺失等级如实计 0，视觉完整、绝不臆造计数）。 */
+export function deriveEvidenceMatchDistribution(
+  evidenceItems: Array<{ match_level?: string }>,
+): {
+  total: number;
+  byLevel: Array<{ name: string; short: string; value: number; percent: number }>;
+} {
+  const counts = new Map<string, number>();
+  for (const item of evidenceItems) {
+    const level = item.match_level ?? 'Unknown';
+    counts.set(level, (counts.get(level) ?? 0) + 1);
+  }
+  const total = evidenceItems.length;
+  const byLevel = EVIDENCE_MATCH_ORDER.map((l) => ({
+    name: l,
+    short: EVIDENCE_MATCH_SHORT[l],
+    value: counts.get(l) ?? 0,
+    percent: total > 0 ? ((counts.get(l) ?? 0) / total) * 100 : 0,
   }));
-  return { total, byCluster };
+  return { total, byLevel };
 }
 
-/** 真实集群压力：每集群边界穿越数（top 6），用于集群压力条。 */
-export function deriveClusterPressure(
-  clusterModels: Array<{ clusterId: string; boundaryCrossingCount: number }>,
+/** 真实责任单元压力：每单元边界穿越数（top 6），用于责任单元压力条。 */
+export function deriveResponsibilityUnitPressure(
+  responsibilityUnits: Array<{ unitId: string; boundaryCrossingCount: number }>,
 ): Array<{ name: string; value: number }> {
-  return clusterModels.slice(0, 6).map((m) => ({ name: m.clusterId, value: m.boundaryCrossingCount }));
+  return responsibilityUnits.slice(0, 6).map((m) => ({ name: m.unitId, value: m.boundaryCrossingCount }));
 }

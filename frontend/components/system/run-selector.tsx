@@ -198,6 +198,9 @@ export default function RunSelector() {
       setImportError(null);
       setLoadError(null);
       setImporting(true);
+      // 数据导入/解析期间全屏 Orbit 保持覆盖——解析可能耗时数秒，结束后数据才整体切换，
+      // 避免「加载器已淡出、导入数据随后冒出来」的跳变。
+      useAppStore.getState().setDataLoading(true);
       try {
         if (/\.(db|sqlite|sqlite3)$/i.test(file.name)) {
           const bytes = new Uint8Array(await file.arrayBuffer());
@@ -208,6 +211,7 @@ export default function RunSelector() {
             const msg = '该数据库不含责任数据（无图 / 告警 / 动作），可能不是 responsibility.db';
             setImportError(msg);
             useAppStore.getState().setError(msg);
+            useAppStore.getState().setDataLoading(false);
             return;
           }
           applyImport(local);
@@ -221,6 +225,7 @@ export default function RunSelector() {
         setImportError(msg);
         // 解析失败同样写入 store：错误横幅跨页可读，页面不再「无反馈」
         useAppStore.getState().setError(msg);
+        useAppStore.getState().setDataLoading(false);
       } finally {
         setImporting(false);
       }

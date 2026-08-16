@@ -7,6 +7,26 @@ async function openRail(page: Page) {
   await page.goto('/console', { waitUntil: 'domcontentloaded' });
   // 数据经 loader 兜底加载，重型首页在并行负载下可能需要更久
   await expect(page.locator('.incident-rail')).toBeVisible({ timeout: 20000 });
+  // 态势页全屏 Observation Orbit 覆盖（command-center 数据 loader）淡出后 dock 才可交互。
+  // layout 的路由 loader 常驻 DOM（showLoader=false 时 opacity 0）—— 等所有 LoadingScreen
+  // 容器透明度归 0（全部不可见），dock 即可交互。
+  await page.waitForFunction(
+    () => {
+      for (const w of document.querySelectorAll('.mtl-load-word')) {
+        let cur = w as HTMLElement | null;
+        while (cur && cur !== document.body) {
+          if (cur.getAttribute?.('aria-hidden') !== null) {
+            if (getComputedStyle(cur).opacity !== '0') return false;
+            break;
+          }
+          cur = cur.parentElement;
+        }
+      }
+      return true;
+    },
+    undefined,
+    { timeout: 15000 },
+  );
 }
 
 test.describe('侧边栏统一 · 4 页面结构 + 3 工作台', () => {
@@ -34,7 +54,7 @@ test.describe('侧边栏统一 · 4 页面结构 + 3 工作台', () => {
     await openRail(page);
 
     // 事件工作台
-    await page.getByRole('button', { name: '打开事件工作台' }).click({ force: true });
+    await page.getByRole('button', { name: '打开事件工作台' }).click();
     const subtitle = page.locator('.incident-rail__panel-heading small');
     await expect(subtitle).toContainText('事件研判 /');
     const subtitleText = (await subtitle.textContent()) ?? '';
@@ -52,16 +72,16 @@ test.describe('侧边栏统一 · 4 页面结构 + 3 工作台', () => {
     expect(subjectValue?.trim()).toBe(agentFromSubtitle);
 
     // 证据工作台
-    await page.getByRole('button', { name: '打开证据工作台' }).click({ force: true });
+    await page.getByRole('button', { name: '打开证据工作台' }).click();
     await expect(subtitle).toContainText('证据核验 /');
     // 链路工作台
-    await page.getByRole('button', { name: '打开链路工作台' }).click({ force: true });
+    await page.getByRole('button', { name: '打开链路工作台' }).click();
     await expect(subtitle).toContainText('责任溯源 /');
   });
 
   test('实时更新：store 推送到修改 → 事件工作台响应式刷新', async ({ page }) => {
     await openRail(page);
-    await page.getByRole('button', { name: '打开事件工作台' }).click({ force: true });
+    await page.getByRole('button', { name: '打开事件工作台' }).click();
     const subtitle = page.locator('.incident-rail__panel-heading small');
     await expect(subtitle).toContainText('事件研判 /');
 

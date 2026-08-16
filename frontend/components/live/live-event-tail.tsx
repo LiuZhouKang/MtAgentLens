@@ -157,6 +157,7 @@ export function LiveEventTail() {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
+        maxHeight: '100%',
         minHeight: 0,
         borderRadius: 12,
         border: '1px solid rgba(255,255,255,0.08)',
@@ -209,7 +210,10 @@ export function LiveEventTail() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             style={{
-              background: 'rgba(255,255,255,0.06)',
+              // 原生 <select> 用实色深底而非近透明背景 —— 浅色系统/忽略 color-scheme 的
+              // 浏览器会渲染白底，白底+白字=全白。实色底 + colorScheme:dark 双保险。
+              background: '#0d1117',
+              colorScheme: 'dark',
               border: '1px solid rgba(255,255,255,0.12)',
               borderRadius: 6,
               color: 'rgba(255,255,255,0.8)',

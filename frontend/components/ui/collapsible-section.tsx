@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 /**
@@ -8,6 +10,9 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
  *
  * 头部（eyebrow + title + meta + chevron）点击展开/收起内容；`aria-expanded`
  * 表达状态，Enter/Space 均可激活（WAI-ARIA 按钮约定）。默认收起，首屏保持干净。
+ *
+ * 展开/收起用 GSAP 高度过渡（顶级流畅，无跳动）；reduced-motion 直接切换。
+ * 默认收起时不渲染内容（首屏干净 + 无文本匹配），首次展开后常驻 DOM（可再次收起）。
  */
 export function CollapsibleSection({
   eyebrow,
@@ -23,8 +28,41 @@ export function CollapsibleSection({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  // 首次展开后常驻 DOM（收起仅隐藏，保留测量高度供二次展开动画）
+  const [wasOpened, setWasOpened] = useState(defaultOpen);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
-  const toggle = () => setOpen((v) => !v);
+  // 展开/收起高度过渡 —— 只动 height + opacity（内容在 DOM，过渡 280ms）
+  useGSAP(
+    () => {
+      const body = bodyRef.current;
+      if (!body) return;
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) {
+        gsap.set(body, { height: open ? 'auto' : 0, visibility: open ? 'visible' : 'hidden' });
+        return;
+      }
+      gsap.to(body, {
+        height: open ? 'auto' : 0,
+        opacity: open ? 1 : 0,
+        duration: 0.28,
+        ease: 'power2.inOut',
+        overwrite: 'auto',
+        onStart: () => {
+          if (open) gsap.set(body, { visibility: 'visible' });
+        },
+        onComplete: () => {
+          if (!open) gsap.set(body, { visibility: 'hidden' });
+        },
+      });
+    },
+    { scope: bodyRef, dependencies: [open] },
+  );
+
+  const toggle = () => {
+    setOpen((v) => !v);
+    setWasOpened(true);
+  };
 
   return (
     <section
@@ -80,7 +118,15 @@ export function CollapsibleSection({
           </span>
         )}
       </button>
-      {open && <div className="ln-panel-body">{children}</div>}
+      {wasOpened && (
+        <div
+          ref={bodyRef}
+          aria-hidden={!open}
+          style={{ height: open ? 'auto' : 0, overflow: 'hidden' }}
+        >
+          <div className="ln-panel-body">{children}</div>
+        </div>
+      )}
     </section>
   );
 }

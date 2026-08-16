@@ -1,38 +1,45 @@
 import { describe, expect, it } from 'vitest';
-import { buildClusterHref, parseClusterId } from '@/lib/cluster-route';
+import { buildResponsibilityUnitHref, parseUnitId } from '@/lib/responsibility-unit-route';
 import { buildAgentHref, parseAgentId } from '@/lib/agent-route';
 
 describe('stellar route helpers', () => {
-  it('builds cluster hrefs with hash-based deep links', () => {
-    expect(buildClusterHref('cluster-alpha')).toBe('/overview#clusterId=cluster-alpha');
-    expect(buildClusterHref('cluster id/with spaces')).toBe(
-      '/overview#clusterId=cluster%20id%2Fwith%20spaces',
+  it('builds responsibility-unit hrefs with hash-based deep links', () => {
+    expect(buildResponsibilityUnitHref('unit-alpha')).toBe('/overview#unitId=unit-alpha');
+    expect(buildResponsibilityUnitHref('unit id/with spaces')).toBe(
+      '/overview#unitId=unit%20id%2Fwith%20spaces',
     );
   });
 
-  it('falls back to the overview root when no cluster id is provided', () => {
-    expect(buildClusterHref()).toBe('/overview');
-    expect(buildClusterHref(null)).toBe('/overview');
+  it('falls back to the overview root when no unit id is provided', () => {
+    expect(buildResponsibilityUnitHref()).toBe('/overview');
+    expect(buildResponsibilityUnitHref(null)).toBe('/overview');
   });
 
-  it('parses cluster id from query params before hash params', () => {
+  it('parses unit id from query params before hash params', () => {
     expect(
-      parseClusterId(new URLSearchParams('clusterId=query-cluster'), '#clusterId=hash-cluster'),
-    ).toBe('query-cluster');
+      parseUnitId(new URLSearchParams('unitId=query-unit'), '#unitId=hash-unit'),
+    ).toBe('query-unit');
   });
 
-  it('parses cluster id from hash params when query params are missing', () => {
-    expect(parseClusterId(new URLSearchParams(), '#clusterId=cluster-security')).toBe(
-      'cluster-security',
+  it('parses unit id from hash params when query params are missing', () => {
+    expect(parseUnitId(new URLSearchParams(), '#unitId=unit-security')).toBe(
+      'unit-security',
     );
-    expect(parseClusterId(new URLSearchParams(), 'clusterId=cluster-runtime')).toBe(
-      'cluster-runtime',
+    expect(parseUnitId(new URLSearchParams(), 'unitId=unit-runtime')).toBe(
+      'unit-runtime',
     );
   });
 
-  it('returns null when cluster id is missing from both query and hash', () => {
-    expect(parseClusterId(new URLSearchParams(), '')).toBeNull();
-    expect(parseClusterId(new URLSearchParams(), '#view=hero')).toBeNull();
+  it('returns null when unit id is missing from both query and hash', () => {
+    expect(parseUnitId(new URLSearchParams(), '')).toBeNull();
+    expect(parseUnitId(new URLSearchParams(), '#view=hero')).toBeNull();
+  });
+
+  it('backward-compat: 仍解析重构前的旧 clusterId 深链', () => {
+    expect(parseUnitId(new URLSearchParams('clusterId=legacy'), '')).toBe('legacy');
+    expect(parseUnitId(new URLSearchParams(), '#clusterId=legacy-hash')).toBe('legacy-hash');
+    // 新 unitId 优先于旧 clusterId
+    expect(parseUnitId(new URLSearchParams('unitId=new'), '#clusterId=old')).toBe('new');
   });
 
   it('builds agent hrefs with hash-based deep links', () => {

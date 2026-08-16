@@ -1,5 +1,7 @@
 'use client';
 
+import { useId } from 'react';
+import { useReducedMotion } from 'motion/react';
 import {
   Area,
   AreaChart,
@@ -23,6 +25,8 @@ type TrendChartProps = {
   xKey?: string;
   seriesKey?: string;
   colors?: string[];
+  /** 面积图强调色（默认全站 accent #5e6ad2）；渐变 id 按实例唯一，避免多图串色 */
+  accent?: string;
   height?: number;
 };
 
@@ -53,9 +57,16 @@ export function TrendChart({
   xKey = 'name',
   seriesKey = 'value',
   colors = ['#5e6ad2'],
+  accent = '#5e6ad2',
   height = 180,
 }: TrendChartProps) {
   const tooltip = ChartTooltip();
+  // 每实例唯一渐变 id —— 多面积图同屏时 id 冲突会串色/不渲染
+  const areaGradientId = `ln-area-fill-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  // 图表入场动画：recharts 内部用 CSS 驱动（area 绘制 / bar 生长 / donut 展开）。
+  // 尊重 prefers-reduced-motion —— 用户偏好减弱动效时静止渲染。
+  const reducedMotion = useReducedMotion();
+  const animate = !reducedMotion;
 
   if (type === 'donut') {
     const total = data.reduce((sum, row) => sum + Number(row[seriesKey] ?? 0), 0);
@@ -72,7 +83,7 @@ export function TrendChart({
               outerRadius="88%"
               paddingAngle={2}
               stroke="none"
-              isAnimationActive={false}
+              isAnimationActive={animate}
             >
               {data.map((_, i) => (
                 <Cell key={i} fill={colors[i % colors.length]} />
@@ -113,7 +124,7 @@ export function TrendChart({
           <XAxis dataKey={xKey} tick={AXIS_TICK} axisLine={false} tickLine={false} />
           <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={34} />
           <Tooltip content={tooltip} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-          <Bar dataKey={seriesKey} radius={[3, 3, 0, 0]} isAnimationActive={false}>
+          <Bar dataKey={seriesKey} radius={[3, 3, 0, 0]} isAnimationActive={animate}>
             {data.map((_, i) => (
               <Cell key={i} fill={colors[i % colors.length]} />
             ))}
@@ -127,9 +138,9 @@ export function TrendChart({
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart {...common}>
         <defs>
-          <linearGradient id="ln-area-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#5e6ad2" stopOpacity={0.28} />
-            <stop offset="100%" stopColor="#5e6ad2" stopOpacity={0} />
+          <linearGradient id={areaGradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={accent} stopOpacity={0.28} />
+            <stop offset="100%" stopColor={accent} stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid stroke={GRID} vertical={false} />
@@ -139,10 +150,10 @@ export function TrendChart({
         <Area
           type="monotone"
           dataKey={seriesKey}
-          stroke="#5e6ad2"
+          stroke={accent}
           strokeWidth={1.8}
-          fill="url(#ln-area-fill)"
-          isAnimationActive={false}
+          fill={`url(#${areaGradientId})`}
+          isAnimationActive={animate}
         />
       </AreaChart>
     </ResponsiveContainer>

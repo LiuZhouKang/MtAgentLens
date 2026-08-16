@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactForceGraph3D from 'react-force-graph-3d';
-import LoadingIndicator from '@/components/ui/loading-indicator';
 import { useAppStore } from '@/lib/store';
 import type { GraphData } from '@/lib/types';
 import { adaptGraphToLargeGraph } from '@/lib/large-graph-adapter';
@@ -21,6 +20,8 @@ type Props = {
   onBackgroundClick?: () => void;
   /** 时间演化当前帧覆盖：传入时优先于 store.graph（不改全局态，scrubber 只读帧）。 */
   graphOverride?: GraphData;
+  /** 图渲染就绪回调：外层据此淡出统一加载覆盖层（消除两阶段加载跳变）。 */
+  onReady?: () => void;
 };
 
 // ── Alert highlight colors ──
@@ -33,12 +34,17 @@ export default function MtAgentLensGraphStage({
   onNodeClick,
   onBackgroundClick,
   graphOverride,
+  onReady,
 }: Props) {
   // Stable selectors — only re-render when data identity changes
   const storeGraph = useAppStore((s) => s.graph);
   const graph = graphOverride ?? storeGraph;
   const highlightedEdgeIds = useAppStore((s) => s.investigationContext.highlightedPathEdgeIds);
   const fgRef = useRef<any>(undefined);
+  const onReadyRef = useRef(onReady);
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  }, [onReady]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const [size, setSize] = useState({ w: 1, h: 1 });
@@ -198,32 +204,26 @@ export default function MtAgentLensGraphStage({
     };
   }, [active]);
 
+  // 图渲染就绪后通知外层（command-center）：态势页唯一的全屏 Observation Orbit
+  // 覆盖层据此平滑淡出。图内不再渲染自己的迷你 Orbit —— 态势页加载统一为一个
+  // 全屏品牌动画（Image 8），消除「全屏 Orbit → 图内迷你 Orbit（Image 9）」两段
+  // 加载动画的跳变。
+  useEffect(() => {
+    if (ready) onReadyRef.current?.();
+  }, [ready]);
+
   if (!active) return null;
 
   return (
     <div ref={containerRef} style={{ position: 'absolute', inset: 0 }}>
-      {/* Loading indicator while graph initializes */}
-      {!ready && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: '#010101',
-            zIndex: 1,
-          }}
-        >
-          <LoadingIndicator size={44} label="正在构建责任网络…" />
-        </div>
-      )}
       {size.w > 1 && size.h > 1 && (
         <ReactForceGraph3D
           ref={fgRef}
           graphData={graphData}
           width={size.w}
           height={size.h}
+          // 纯黑背景：覆盖 ReactForceGraph3D 默认 #000011 深蓝黑，与态势页原生纯黑统一
+          backgroundColor="#000000"
           nodeAutoColorBy="agent_id"
           nodeLabel={(n: any) => `${n.agent_id !== 'unassigned' ? n.agent_id : n.id}: ${n.desc}`}
           nodeResolution={isLarge ? 16 : 32}
@@ -232,6 +232,16 @@ export default function MtAgentLensGraphStage({
           enableNavigationControls={true}
           cooldownTime={isLarge ? 600 : 3000}
           d3VelocityDecay={0.6}
+          // 布局质量优先：使用默认 alphaDecay 让力导充分展开（节点分散到最优
+          // 位置，避免加速衰减导致布局未展开、节点挤在一起 —— 顶级布局美学）。
+          // engine 停止（力导收敛完成）时 stopSimulation 固定布局防抖，
+          // 粒子动画属渲染层、不受影响 —— 布局充分展开 + 节点静止兼得。
+          onEngineStop={() => {
+            // 力导收敛后固定布局防抖（粒子动画属渲染层、不受影响）。
+            // 不使用 zoomToFit：与备份的默认视角一致（密集责任图上 fit
+            // 全图会把节点缩成尘埃不可辨）。
+            (fgRef.current as any)?.stopSimulation?.();
+          }}
           onNodeClick={(n: any) =>
             onNodeClick?.({ id: n.id, node_type: n.node_type, agent_id: n.agent_id, desc: n.desc })
           }

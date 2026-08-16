@@ -1,23 +1,30 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import {
   ArrowRight,
-  Clock,
+  Bot,
+  ChevronDown,
   FileSearch,
-  GitBranch,
+  Gavel,
+  Globe,
   ShieldAlert,
-  TerminalSquare,
+  Sparkles,
+  Wrench,
 } from 'lucide-react';
+import { MetricCard } from '@/components/ui/linear/metric-card';
 import { SectionPanel } from '@/components/ui/linear/section-panel';
 import { StatusBadge, type StatusTone } from '@/components/ui/linear/status-badge';
-import LoadingIndicator from '@/components/ui/loading-indicator';
 import VirtualList from '@/components/ui/virtual-list';
+import AgentAvatar from '@/components/ui/agent-avatar';
 import ClaimList from '@/components/investigation/claim-list';
-import ForensicChain from '@/components/investigation/forensic-chain';
+import type { TraceEventKind } from '@/lib/trace-workbench';
+import { buildInvestigationTimeline } from '@/lib/investigation-timeline';
+import { authorityLabel, decisionLabel, severityLabel, TONE_COLOR } from '@/lib/investigation-labels';
+import { shortAgentId } from '@/lib/agent-identity';
 import type { ResponsibilityAlert } from '@/lib/types';
 import type { InvestigationModel } from '@/lib/investigation';
 import { collectAlertEvidenceRefs } from '@/lib/investigation';
@@ -30,44 +37,47 @@ const S = { xs: 2, sm: 4, md: 8, lg: 12, xl: 16 };
 function fmtMs(ms: number) {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
-function sevTone(s: string): StatusTone {
-  if (s === 'Critical') return 'danger';
-  if (s === 'Warning') return 'warning';
-  return 'info';
-}
-function decisionTone(d: string): StatusTone {
-  if (d === 'Unsafe') return 'danger';
-  if (d === 'Uncertain') return 'warning';
-  return 'success';
-}
-function statusLabel(d: string) {
-  if (d === 'Unsafe') return '需处置';
-  if (d === 'Uncertain') return '待复核';
-  return '已受控';
+
+/** epoch 纳秒 → HH:MM:SS（告警时间线时间戳为 epoch）。 */
+function fmtClock(ns: number): string {
+  return new Date(ns / 1_000_000).toISOString().slice(11, 19);
 }
 
-const sevColor: Record<string, string> = {
-  Critical: '#f87171',
-  Warning: '#fbbf24',
-  Info: '#60a5fa',
-};
-const evKindIcons: Record<string, typeof FileSearch> = {
-  role: ShieldAlert,
-  delegation: GitBranch,
-  boundary: ShieldAlert,
+// 事件 kind → 图标（与 traces 页 classifyEventKind 分类对齐，权威统一）
+const KIND_ICONS: Record<TraceEventKind, typeof FileSearch> = {
+  agent: Bot,
+  llm: Sparkles,
+  tool: Wrench,
   file: FileSearch,
-  exec: TerminalSquare,
-  default: Clock,
+  network: Globe,
+  boundary: ShieldAlert,
+  verdict: Gavel,
 };
+// kind → ln token 色（克制，无光晕）
+const KIND_COLOR: Record<TraceEventKind, string> = {
+  agent: 'var(--ln-info)',
+  llm: 'var(--ln-accent)',
+  tool: 'var(--ln-success)',
+  file: 'var(--ln-text-muted)',
+  network: 'var(--ln-info)',
+  boundary: 'var(--ln-danger)',
+  verdict: 'var(--ln-warning)',
+};
+
+/** 动作类型 → 行为徽章 tone（与进程谱系同语义）。 */
+function actionTone(actionType: string): string {
+  if (actionType === 'FileRead') return 'read';
+  if (actionType === 'FileWrite') return 'write';
+  if (actionType === 'FileOverwrite') return 'overwrite';
+  if (actionType === 'ProcessExec') return 'exec';
+  return 'other';
+}
 
 interface Props {
   alert: ResponsibilityAlert;
   model: InvestigationModel;
-  activeRunId: string | null;
   availableAlerts: ResponsibilityAlert[];
   onSelectAlert: (id: string) => void;
-  evidenceLoading: boolean;
-  evidenceError: string | null;
 }
 
 export default function InvestigationWorkbench({
@@ -75,38 +85,65 @@ export default function InvestigationWorkbench({
   model,
   availableAlerts,
   onSelectAlert,
-  evidenceLoading,
-  evidenceError,
 }: Props) {
   const claims = useAppStore((s) => s.claims);
   const tracebacks = useAppStore((s) => s.tracebacks);
   const graph = useAppStore((s) => s.graph);
   const dbAssets = useAppStore((s) => s.dbAssets);
-  const evidence = useAppStore((s) => s.evidence);
+  const storeActions = useAppStore((s) => s.actions);
   const tracebacksByClaimId = useMemo(() => buildTracebacksByClaimId(tracebacks), [tracebacks]);
   const alertEvidenceRefs = useMemo(() => collectAlertEvidenceRefs(alert, graph), [alert, graph]);
-
+  // 富化时间线：折叠 SSL 噪声 + 解析 pid + 关联真实数据（process_events/actions/evidence）
+  const timelineModel = useMemo(
+    () =>
+      buildInvestigationTimeline({
+        steps: model.timelineSteps,
+        evidence: model.linkedEvidence,
+        totalDurationMs: model.timelineDurationMs,
+        alertSeverity: alert.severity,
+        processEvents: dbAssets?.processEvents ?? [],
+        actions: storeActions,
+      }),
+    [
+      model.timelineSteps,
+      model.linkedEvidence,
+      model.timelineDurationMs,
+      alert.severity,
+      dbAssets?.processEvents,
+      storeActions,
+    ],
+  );
+  const [expandedTl, setExpandedTl] = useState<Set<string>>(new Set());
+  const toggleTl = (id: string) =>
+    setExpandedTl((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const rootRef = useRef<HTMLDivElement>(null);
+  const queueRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
-  const evidenceRef = useRef<HTMLDivElement>(null);
 
-  // GSAP entrance: timeline + evidence + verdict staggered
+  // GSAP entrance（与全站语言统一）：队列左滑 → 时间线左滑 → 判决错峰
   useGSAP(
     () => {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+      if (queueRef.current) {
+        tl.fromTo(
+          '.ln-alert-queue__btn',
+          { opacity: 0, x: -8 },
+          { opacity: 1, x: 0, duration: 0.35, stagger: 0.03, clearProps: 'transform' },
+          0.1,
+        );
+      }
       if (timelineRef.current) {
         tl.fromTo(
           '.tl-row',
           { opacity: 0, x: -10 },
           { opacity: 1, x: 0, duration: 0.4, stagger: 0.05, clearProps: 'transform' },
-          0.1,
-        );
-      }
-      if (evidenceRef.current) {
-        tl.fromTo(
-          '.ev-card',
-          { opacity: 0, y: 14 },
-          { opacity: 1, y: 0, duration: 0.4, stagger: 0.06, clearProps: 'transform' },
-          0.3,
+          0.15,
         );
       }
       tl.fromTo(
@@ -116,7 +153,7 @@ export default function InvestigationWorkbench({
         0.4,
       );
     },
-    { scope: timelineRef },
+    { scope: rootRef },
   );
 
   const kpi = [
@@ -124,42 +161,34 @@ export default function InvestigationWorkbench({
       label: '时间线事件',
       value: model.timelineSteps.length,
       delta: `${model.boundaryCrossingCount} 边界穿越`,
-      tone: 'info' as StatusTone,
+      deltaTone: 'info' as StatusTone,
     },
     {
       label: '证据链',
       value: model.evidenceRefs.length,
       delta: `${model.linkedEvidence.length} 关联`,
-      tone: 'success' as StatusTone,
+      deltaTone: 'success' as StatusTone,
     },
     {
       label: '置信度',
       value: `${(alert.confidence * 100).toFixed(0)}%`,
-      delta: alert.authority,
-      tone: sevTone(alert.severity),
+      delta: authorityLabel(alert.authority).label,
+      deltaTone: sevTone(alert.severity),
     },
     {
       label: '涉及主体',
       value: model.involvedAgentIds.length,
       delta: model.primaryAgentId ?? '—',
-      tone: 'info' as StatusTone,
+      deltaTone: 'info' as StatusTone,
     },
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: S.lg }}>
-      {/* KPI row */}
+    <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', gap: S.lg }}>
+      {/* KPI row —— 与 MetricCard 严格同构（DigitReel + label + delta） */}
       <div className="ln-kpi-strip">
-        {kpi.map((i) => (
-          <div key={i.label} className="ln-panel ln-metric">
-            <span className="ln-metric__label">{i.label}</span>
-            <strong className="ln-metric__value" style={{ fontSize: 20 }}>
-              {i.value}
-            </strong>
-            <span className="ln-metric__delta" data-tone={i.tone}>
-              {i.delta}
-            </span>
-          </div>
+        {kpi.map((k) => (
+          <MetricCard key={k.label} label={k.label} value={k.value} delta={k.delta} deltaTone={k.deltaTone} />
         ))}
       </div>
 
@@ -173,7 +202,7 @@ export default function InvestigationWorkbench({
           overflowX: 'auto',
         }}
       >
-        {/* ── LEFT: SentinelOne-style alert list ── */}
+        {/* ── LEFT: 告警队列（SentinelOne-style）── */}
         <div
           style={{
             display: 'flex',
@@ -184,86 +213,51 @@ export default function InvestigationWorkbench({
           }}
         >
           <span className="ln-eyebrow">告警队列</span>
-          {availableAlerts.map((a) => {
-            const active = a.alert_id === alert.alert_id;
-            const sc = sevColor[a.severity] ?? sevColor.Info;
-            return (
-              <button
-                key={a.alert_id}
-                className="alert-list-btn"
-                onClick={() => onSelectAlert(a.alert_id)}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 3,
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '10px 12px',
-                  borderRadius: 7,
-                  cursor: 'pointer',
-                  border: active ? `1px solid var(--ln-accent)` : `1px solid var(--ln-border)`,
-                  borderLeft: `3px solid ${active ? 'var(--ln-accent)' : sc}`,
-                  background: active ? 'var(--ln-accent-soft)' : 'transparent',
-                  transition: 'all 120ms ease',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span
-                    style={{
-                      fontSize: T.sm,
-                      fontWeight: 600,
-                      color: active ? 'var(--ln-text)' : 'var(--ln-text-secondary)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      flex: 1,
-                    }}
-                  >
-                    {a.title}
-                  </span>
-                  <StatusBadge tone={sevTone(a.severity)}>{a.severity}</StatusBadge>
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    fontSize: T.xs,
-                    color: 'var(--ln-text-muted)',
-                  }}
+          <div ref={queueRef} className="ln-alert-queue">
+            {availableAlerts.map((a) => {
+              const active = a.alert_id === alert.alert_id;
+              const sev = severityLabel(a.severity);
+              const dec = decisionLabel(a.decision);
+              return (
+                <button
+                  key={a.alert_id}
+                  type="button"
+                  className="ln-alert-queue__btn"
+                  data-active={active ? 'true' : 'false'}
+                  aria-pressed={active}
+                  onClick={() => onSelectAlert(a.alert_id)}
                 >
-                  <span style={{ fontFamily: 'var(--ln-mono)' }}>{a.primary_agent.agent_id}</span>
-                  <StatusBadge tone={decisionTone(a.decision)}>
-                    {statusLabel(a.decision)}
-                  </StatusBadge>
-                </div>
-              </button>
-            );
-          })}
+                  <span className="ln-alert-queue__head">
+                    <span className="ln-alert-queue__dot" style={{ background: TONE_COLOR[sev.tone ?? 'info'] }} />
+                    <span className="ln-alert-queue__title">{a.title}</span>
+                    <StatusBadge tone={sevTone(a.severity)}>{sev.label}</StatusBadge>
+                  </span>
+                  <span className="ln-alert-queue__meta">
+                    <AgentAvatar agentId={a.primary_agent.agent_id} size={14} />
+                    <span className="ln-alert-queue__agent">{a.primary_agent.agent_id}</span>
+                    <StatusBadge tone={sevTone(a.decision)}>{dec.label}</StatusBadge>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* ── CENTER: Datadog-style timeline + evidence ── */}
+        {/* ── CENTER: 时间线 + 证据链 + 责任声明 + 取证链 ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: S.lg }}>
-          {/* timeline — premium visual design */}
+          {/* 事件时间线 —— 富化责任瀑布：折叠 SSL 噪声 + pid/命令/证据 + 真实时间跨度 */}
           <SectionPanel
             eyebrow="事件时间线"
-            title={`${model.timelineSteps.length} 步`}
+            title={`${timelineModel.events.length} 步`}
             meta={
-              model.timelineSteps.length > 0
-                ? fmtMs(
-                    Math.max(
-                      0,
-                      (model.timelineSteps[model.timelineSteps.length - 1].timestamp_ns -
-                        model.timelineSteps[0].timestamp_ns) /
-                        1_000_000,
-                    ),
-                  )
-                : undefined
+              timelineModel.foldedSignals > 0
+                ? `折叠 ${timelineModel.foldedSignals} 条 SSL 信号 · ${fmtMs(timelineModel.totalMs)}`
+                : fmtMs(timelineModel.totalMs)
             }
             bodyClassName="ln-panel-body"
           >
             <div ref={timelineRef}>
-              {model.timelineSteps.length === 0 ? (
+              {timelineModel.events.length === 0 ? (
                 <div
                   style={{
                     textAlign: 'center',
@@ -275,534 +269,257 @@ export default function InvestigationWorkbench({
                   暂无时间线数据
                 </div>
               ) : (
-                <div style={{ height: 420, paddingRight: 4 }}>
-                  <VirtualList
-                    items={model.timelineSteps}
-                    estimateSize={72}
-                    dynamic
-                    renderRow={(step, i) => {
-                      const offset =
-                        i === 0
-                          ? 0
-                          : Math.max(
-                              0,
-                              Math.round(
-                                (step.timestamp_ns - model.timelineSteps[0].timestamp_ns) /
-                                  1_000_000,
-                              ),
-                            );
-                      const isLast = i === model.timelineSteps.length - 1;
-                      const evType = step.event_type?.toLowerCase() ?? '';
-                      const sc =
-                        sevColor[step.evidence_level === 'L1Exact' ? 'Critical' : 'Info'] ??
-                        '#60a5fa';
-                      const Icon =
-                        Object.entries(evKindIcons).find(([k]) => evType.includes(k))?.[1] ??
-                        evKindIcons.default;
-                      return (
-                        <div
-                          key={i}
-                          className="tl-row"
-                          style={{ display: 'flex', gap: 0, position: 'relative', minHeight: 56 }}
-                        >
-                          {/* timeline axis */}
+                <div>
+                  {/* 时间刻度尺：整条时间线 0 → 100% */}
+                  <div className="ln-inv-tl-scale">
+                    {[0, 0.25, 0.5, 0.75, 1].map((f) => (
+                      <span key={f} className="ln-inv-tl-scale__tick">
+                        {f === 0 ? 'T+0' : `T+${fmtMs(Math.round(timelineModel.totalMs * f))}`}
+                      </span>
+                    ))}
+                  </div>
+                  <div style={{ height: 420, paddingRight: 4 }}>
+                    <VirtualList
+                      items={timelineModel.events}
+                      estimateSize={88}
+                      dynamic
+                      renderRow={(ev, i) => {
+                        const isLast = i === timelineModel.events.length - 1;
+                        const color = KIND_COLOR[ev.kind] ?? 'var(--ln-text-muted)';
+                        const Icon = KIND_ICONS[ev.kind] ?? FileSearch;
+                        const expanded = expandedTl.has(ev.id);
+                        // 瀑布条：事件在整条时间线上的起止占比
+                        const barLeft = Math.min((ev.offsetMs / timelineModel.totalMs) * 100, 100);
+                        const barWidth = Math.max(
+                          (ev.durationMs / timelineModel.totalMs) * 100,
+                          0.4,
+                        );
+                        return (
                           <div
-                            style={{
-                              width: 64,
-                              minWidth: 64,
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              position: 'relative',
-                              paddingTop: 12,
-                            }}
+                            key={ev.id}
+                            className="tl-row"
+                            style={{ display: 'flex', gap: 0, position: 'relative' }}
                           >
-                            <span
-                              style={{
-                                fontSize: 10,
-                                fontFamily: 'var(--ln-mono)',
-                                color: 'var(--ln-text-muted)',
-                                lineHeight: 1,
-                                background: 'var(--ln-surface-0)',
-                                padding: '2px 6px',
-                                borderRadius: 4,
-                                border: '1px solid var(--ln-border)',
-                              }}
-                            >
-                              T+{fmtMs(offset)}
-                            </span>
-                            {/* glowing dot */}
-                            <div
-                              style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: 999,
-                                background: sc,
-                                boxShadow: `0 0 8px ${sc}60`,
-                                marginTop: 8,
-                                flexShrink: 0,
-                                transition: 'box-shadow 200ms ease',
-                              }}
-                            />
-                            {!isLast && (
-                              <div
-                                style={{
-                                  flex: 1,
-                                  width: 1.5,
-                                  minHeight: 16,
-                                  background: `linear-gradient(180deg, ${sc}40, var(--ln-border))`,
-                                }}
-                              />
-                            )}
-                          </div>
-                          {/* event card */}
-                          <div
-                            style={{
-                              flex: 1,
-                              padding: '10px 14px',
-                              marginBottom: S.xs,
-                              marginLeft: S.sm,
-                              borderRadius: 8,
-                              background: 'var(--ln-surface-0)',
-                              border: '1px solid var(--ln-border)',
-                              transition: 'border-color 150ms ease, box-shadow 150ms ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.borderColor = sc + '50';
-                              e.currentTarget.style.boxShadow = `0 2px 12px ${sc}14`;
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.borderColor = 'var(--ln-border)';
-                              e.currentTarget.style.boxShadow = 'none';
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                marginBottom: 4,
-                              }}
-                            >
-                              <Icon size={13} style={{ color: sc, flexShrink: 0 }} />
-                              <span
-                                style={{ fontSize: T.sm, fontWeight: 600, color: 'var(--ln-text)' }}
+                            {/* 时间轴：T+ 偏移 + kind 色点 + 连接线 */}
+                            <div className="ln-inv-tl-axis">
+                              <span className="ln-inv-tl-time">T+{fmtMs(ev.offsetMs)}</span>
+                              <span className="ln-inv-tl-dot" style={{ background: color }} />
+                              {!isLast && <span className="ln-inv-tl-line" />}
+                            </div>
+                            {/* 事件体：头部 + 标题 + 瀑布条 + 元信息 + 展开详情 */}
+                            <div className="ln-inv-tl-card" data-expanded={expanded ? 'true' : 'false'}>
+                              <button
+                                type="button"
+                                className="ln-inv-tl-btn"
+                                aria-expanded={expanded}
+                                onClick={() => toggleTl(ev.id)}
                               >
-                                {step.event_type}
-                              </span>
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  gap: 4,
-                                  marginLeft: 'auto',
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {step.evidence_ref && (
-                                  <span
-                                    style={{
-                                      fontSize: 9,
-                                      padding: '2px 6px',
-                                      borderRadius: 4,
-                                      background: 'rgba(74,222,128,0.12)',
-                                      color: '#4ade80',
-                                      fontFamily: 'var(--ln-mono)',
-                                    }}
-                                  >
-                                    {step.evidence_ref.slice(0, 14)}
+                                <Icon size={13} style={{ color, flexShrink: 0 }} />
+                                <span className="ln-inv-tl-label">{ev.label}</span>
+                                {/* 真实进程身份（process_events 精确关联；聚合信号无单一进程） */}
+                                {ev.aggregated === 0 && (ev.realComm || ev.pid != null) && (
+                                  <span className="ln-inv-tl-proc" title={ev.agentId ?? undefined}>
+                                    {ev.realComm ?? ''}
+                                    {ev.pid != null ? ` · pid ${ev.pid}` : ''}
+                                    {ev.agentId ? ` · ${shortAgentId(ev.agentId)}` : ''}
                                   </span>
                                 )}
-                                {step.evidence_level === 'L1Exact' && (
-                                  <span
-                                    style={{
-                                      fontSize: 9,
-                                      padding: '2px 5px',
-                                      borderRadius: 4,
-                                      background: 'var(--ln-accent-soft)',
-                                      color: 'var(--ln-accent)',
-                                      fontFamily: 'var(--ln-mono)',
-                                      fontWeight: 600,
-                                    }}
-                                  >
+                                {ev.aggregated > 1 && (
+                                  <span className="ln-chip" data-tone="muted">
+                                    ×{ev.aggregated}
+                                  </span>
+                                )}
+                                {ev.isBoundary && (
+                                  <span className="ln-chip" data-tone="danger">
+                                    边界
+                                  </span>
+                                )}
+                                {ev.evidenceLevel === 'L1Exact' && (
+                                  <span className="ln-chip" data-tone="success">
                                     L1
                                   </span>
                                 )}
+                                <span
+                                  className="ln-inv-tl-clock"
+                                  title={`真实时钟时间 · ${new Date(ev.tsNs / 1_000_000).toISOString().slice(0, 19).replace('T', ' ')} UTC`}
+                                >
+                                  {fmtClock(ev.tsNs)}
+                                </span>
+                                <span
+                                  className="ln-inv-tl-dur"
+                                  title="距下一事件的真实时间间隔（后端未提供事件实际耗时）"
+                                >
+                                  +{fmtMs(ev.durationMs)}
+                                </span>
+                                <ChevronDown
+                                  size={11}
+                                  className="ln-inv-tl-chev"
+                                  style={{
+                                    transform: expanded ? 'rotate(180deg)' : 'none',
+                                  }}
+                                />
+                              </button>
+                              <div className="ln-inv-tl-title">{ev.description}</div>
+                              {/* 瀑布条：事件在时间线上的真实位置与跨度 */}
+                              <div className="ln-inv-tl-bar">
+                                <span
+                                  className="ln-inv-tl-bar__fill"
+                                  style={{ left: `${barLeft}%`, width: `${barWidth}%`, background: color }}
+                                />
                               </div>
-                            </div>
-                            <div
-                              style={{
-                                fontSize: T.sm,
-                                color: 'var(--ln-text-secondary)',
-                                lineHeight: 1.6,
-                              }}
-                            >
-                              {step.description}
-                            </div>
-                            {step.resource && (
-                              <div
-                                style={{
-                                  fontSize: 10,
-                                  color: 'var(--ln-text-muted)',
-                                  fontFamily: 'var(--ln-mono)',
-                                  marginTop: 4,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {step.resource}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          </SectionPanel>
-
-          {/* evidence chain — premium cards */}
-          <SectionPanel
-            eyebrow="证据链"
-            title={evidenceLoading ? '同步中…' : `${model.linkedEvidence.length} 条`}
-            bodyClassName="ln-panel-body"
-          >
-            <div ref={evidenceRef}>
-              {evidenceLoading && model.linkedEvidence.length === 0 ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '28px 0' }}>
-                  <LoadingIndicator size={28} label="正在同步证据…" />
-                </div>
-              ) : evidenceError ? (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    padding: '20px 0',
-                    color: '#f87171',
-                    fontSize: T.sm,
-                  }}
-                >
-                  证据同步失败
-                </div>
-              ) : model.linkedEvidence.length === 0 ? (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    padding: '20px 0',
-                    color: 'var(--ln-text-muted)',
-                    fontSize: T.sm,
-                  }}
-                >
-                  暂无关联证据
-                </div>
-              ) : (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 0,
-                    maxHeight: 400,
-                    overflowY: 'auto',
-                    position: 'relative',
-                  }}
-                >
-                  {model.linkedEvidence.slice(0, 12).map((ev, idx) => {
-                    const confPct = Math.round(ev.confidence * 100);
-                    const confColor =
-                      ev.confidence > 0.8 ? '#4ade80' : ev.confidence > 0.5 ? '#fbbf24' : '#f87171';
-                    const isLast = idx === Math.min(model.linkedEvidence.length, 12) - 1;
-                    return (
-                      <div
-                        key={ev.evidence_id}
-                        className="ev-card"
-                        style={{ display: 'flex', gap: 0, position: 'relative' }}
-                      >
-                        {/* exhibit number + connector */}
-                        <div
-                          style={{
-                            width: 40,
-                            minWidth: 40,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            paddingTop: 14,
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: 6,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              background: `${confColor}18`,
-                              border: `1.5px solid ${confColor}40`,
-                              fontSize: 10,
-                              fontWeight: 700,
-                              fontFamily: 'var(--ln-mono)',
-                              color: confColor,
-                            }}
-                          >
-                            {idx + 1}
-                          </span>
-                          {!isLast && (
-                            <div
-                              style={{
-                                flex: 1,
-                                width: 1.5,
-                                minHeight: 12,
-                                background: `linear-gradient(180deg, ${confColor}30, var(--ln-border))`,
-                              }}
-                            />
-                          )}
-                        </div>
-                        {/* card */}
-                        <div
-                          style={{
-                            flex: 1,
-                            padding: '10px 14px',
-                            marginBottom: 2,
-                            borderRadius: 8,
-                            background: 'var(--ln-surface-0)',
-                            border: '1px solid var(--ln-border)',
-                            transition: 'border-color 150ms ease, box-shadow 150ms ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = confColor + '50';
-                            e.currentTarget.style.boxShadow = `0 0 16px ${confColor}10`;
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = 'var(--ln-border)';
-                            e.currentTarget.style.boxShadow = 'none';
-                          }}
-                        >
-                          {/* header */}
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 8,
-                              marginBottom: 6,
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontFamily: 'var(--ln-mono)',
-                                color: 'var(--ln-accent)',
-                                fontWeight: 600,
-                                flex: 1,
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {ev.evidence_id}
-                            </span>
-                            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                              <span
-                                style={{
-                                  fontSize: 9,
-                                  padding: '2px 6px',
-                                  borderRadius: 4,
-                                  background: `${confColor}16`,
-                                  color: confColor,
-                                  fontWeight: 600,
-                                  fontFamily: 'var(--ln-mono)',
-                                }}
-                              >
-                                {confPct}%
-                              </span>
-                              <span
-                                style={{
-                                  fontSize: 9,
-                                  padding: '2px 6px',
-                                  borderRadius: 4,
-                                  background: 'var(--ln-surface-2)',
-                                  color: 'var(--ln-text-muted)',
-                                  fontFamily: 'var(--ln-mono)',
-                                }}
-                              >
-                                {ev.match_level}
-                              </span>
-                            </div>
-                          </div>
-                          {/* confidence bar */}
-                          <div
-                            style={{
-                              height: 3,
-                              borderRadius: 999,
-                              background: 'var(--ln-surface-2)',
-                              marginBottom: 8,
-                              overflow: 'hidden',
-                            }}
-                          >
-                            <div
-                              style={{
-                                height: '100%',
-                                width: `${confPct}%`,
-                                borderRadius: 999,
-                                background: `linear-gradient(90deg, ${confColor}88, ${confColor})`,
-                                transition: 'width 300ms ease',
-                              }}
-                            />
-                          </div>
-                          {/* material — structured key:value rows */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            {ev.matched_fields.canonical_path && (
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  gap: 6,
-                                  fontSize: 10,
-                                  overflow: 'hidden',
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    color: '#4ade80',
-                                    flexShrink: 0,
-                                    fontWeight: 600,
-                                    fontFamily: 'var(--ln-mono)',
-                                    width: 36,
-                                  }}
-                                >
-                                  path
-                                </span>
-                                <span
-                                  style={{
-                                    color: 'var(--ln-text-secondary)',
-                                    fontFamily: 'var(--ln-mono)',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  {ev.matched_fields.canonical_path}
-                                </span>
-                              </div>
-                            )}
-                            {ev.matched_fields.command && (
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  gap: 6,
-                                  fontSize: 10,
-                                  overflow: 'hidden',
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    color: '#60a5fa',
-                                    flexShrink: 0,
-                                    fontWeight: 600,
-                                    fontFamily: 'var(--ln-mono)',
-                                    width: 36,
-                                  }}
-                                >
-                                  cmd
-                                </span>
-                                <span
-                                  style={{
-                                    color: 'var(--ln-text-secondary)',
-                                    fontFamily: 'var(--ln-mono)',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  {ev.matched_fields.command}
-                                </span>
-                              </div>
-                            )}
-                            {ev.matched_fields.host && (
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  gap: 6,
-                                  fontSize: 10,
-                                  overflow: 'hidden',
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    color: '#a78bfa',
-                                    flexShrink: 0,
-                                    fontWeight: 600,
-                                    fontFamily: 'var(--ln-mono)',
-                                    width: 36,
-                                  }}
-                                >
-                                  host
-                                </span>
-                                <span
-                                  style={{
-                                    color: 'var(--ln-text-secondary)',
-                                    fontFamily: 'var(--ln-mono)',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  {ev.matched_fields.host}
-                                  {ev.matched_fields.port ? `:${ev.matched_fields.port}` : ''}
-                                </span>
-                              </div>
-                            )}
-                            {ev.matched_fields.raw_args?.length ? (
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  gap: 6,
-                                  fontSize: 10,
-                                  overflow: 'hidden',
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    color: '#fb923c',
-                                    flexShrink: 0,
-                                    fontWeight: 600,
-                                    fontFamily: 'var(--ln-mono)',
-                                    width: 36,
-                                  }}
-                                >
-                                  args
-                                </span>
-                                <span
-                                  style={{
-                                    color: 'var(--ln-text-secondary)',
-                                    fontFamily: 'var(--ln-mono)',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  {ev.matched_fields.raw_args.join(' ')}
-                                </span>
-                              </div>
-                            ) : null}
-                            {!ev.matched_fields.canonical_path &&
-                              !ev.matched_fields.command &&
-                              !ev.matched_fields.host &&
-                              !ev.matched_fields.raw_args?.length && (
-                                <span
-                                  style={{
-                                    fontSize: 10,
-                                    color: 'var(--ln-text-muted)',
-                                    fontFamily: 'var(--ln-mono)',
-                                  }}
-                                >
-                                  {ev.evidence_id}
-                                </span>
+                              {/* 真实行为：该进程在 actions 表中的真实操作（文件/命令） */}
+                              {ev.aggregated === 0 && ev.actions.length > 0 && (
+                                <div className="ln-inv-tl-acts">
+                                  {ev.actions.slice(0, 3).map((a, ai) => (
+                                    <span key={ai} className="ln-inv-tl-act" title={a.target ?? undefined}>
+                                      <span
+                                        className="ln-inv-tl-act__type"
+                                        data-tone={actionTone(a.actionType)}
+                                      >
+                                        {a.actionLabel}
+                                      </span>
+                                      {a.target && <span className="ln-inv-tl-act__target">{a.target}</span>}
+                                    </span>
+                                  ))}
+                                  {ev.actions.length > 3 && (
+                                    <span className="ln-inv-tl-acts__more">
+                                      +{ev.actions.length - 3} 行为
+                                    </span>
+                                  )}
+                                </div>
                               )}
+                              {/* 元信息：进程 / 命令 / 路径 / 置信度 */}
+                              <div className="ln-inv-tl-meta">
+                                {ev.matchedCommand && (
+                                  <span className="ln-inv-tl-meta__item" title={ev.matchedCommand}>
+                                    {ev.matchedCommand}
+                                  </span>
+                                )}
+                                {ev.matchedCommand && (
+                                  <span className="ln-inv-tl-meta__item" title={ev.matchedCommand}>
+                                    {ev.matchedCommand}
+                                  </span>
+                                )}
+                                {ev.matchedPath && (
+                                  <span className="ln-inv-tl-meta__item" title={ev.matchedPath}>
+                                    {ev.matchedPath}
+                                  </span>
+                                )}
+                                {ev.matchedHost && (
+                                  <span className="ln-inv-tl-meta__item" title={ev.matchedHost}>
+                                    {ev.matchedHost}
+                                  </span>
+                                )}
+                                {ev.confidence != null && (
+                                  <span
+                                    className="ln-inv-tl-meta__item ln-inv-tl-meta__conf"
+                                    style={{ color }}
+                                  >
+                                    {Math.round(ev.confidence * 100)}%
+                                  </span>
+                                )}
+                              </div>
+                              {/* 展开详情 */}
+                              {expanded && (
+                                <div className="ln-inv-tl-detail">
+                                  {ev.aggregated > 1 && (
+                                    <div className="ln-inv-tl-detail__row">
+                                      <span className="ln-inv-tl-detail__k">折叠</span>
+                                      <span className="ln-inv-tl-detail__v">
+                                        聚合 {ev.aggregated} 条重复 SSL/TLS 连接信号
+                                      </span>
+                                    </div>
+                                  )}
+                                  {ev.tsNs > 0 && (
+                                    <div className="ln-inv-tl-detail__row">
+                                      <span className="ln-inv-tl-detail__k">时间</span>
+                                      <span className="ln-inv-tl-detail__v">
+                                        {new Date(ev.tsNs / 1_000_000)
+                                          .toISOString()
+                                          .slice(0, 19)
+                                          .replace('T', ' ')}{' '}
+                                        UTC
+                                      </span>
+                                    </div>
+                                  )}
+                                  {ev.agentId && (
+                                    <div className="ln-inv-tl-detail__row">
+                                      <span className="ln-inv-tl-detail__k">主体</span>
+                                      <span className="ln-inv-tl-detail__v">{ev.agentId}</span>
+                                    </div>
+                                  )}
+                                  {ev.sourceEventId && (
+                                    <div className="ln-inv-tl-detail__row">
+                                      <span className="ln-inv-tl-detail__k">事件源</span>
+                                      <span className="ln-inv-tl-detail__v">{ev.sourceEventId}</span>
+                                    </div>
+                                  )}
+                                  {/* 该进程的完整真实行为列表（actions 表，不编造） */}
+                                  {ev.aggregated === 0 && ev.actions.length > 0 && (
+                                    <div className="ln-inv-tl-detail__acts">
+                                      <div className="ln-inv-tl-detail__row">
+                                        <span className="ln-inv-tl-detail__k">行为</span>
+                                        <span className="ln-inv-tl-detail__v">
+                                          {ev.actions.length} 条真实操作
+                                        </span>
+                                      </div>
+                                      {ev.actions.map((a, ai) => (
+                                        <div key={ai} className="ln-inv-tl-detail__row">
+                                          <span className="ln-inv-tl-detail__k ln-inv-tl-detail__k--act">
+                                            {a.actionLabel}
+                                          </span>
+                                          <span
+                                            className="ln-inv-tl-detail__v"
+                                            title={a.target ?? undefined}
+                                          >
+                                            {a.target ?? '—'}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {ev.rawArgs.length > 0 && (
+                                    <div className="ln-inv-tl-detail__row">
+                                      <span className="ln-inv-tl-detail__k">args</span>
+                                      <span className="ln-inv-tl-detail__v">
+                                        {ev.rawArgs.join(' ')}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {ev.exitCode != null && (
+                                    <div className="ln-inv-tl-detail__row">
+                                      <span className="ln-inv-tl-detail__k">退出码</span>
+                                      <span className="ln-inv-tl-detail__v">{ev.exitCode}</span>
+                                    </div>
+                                  )}
+                                  {ev.evidenceRef && (
+                                    <div className="ln-inv-tl-detail__row">
+                                      <span className="ln-inv-tl-detail__k">证据</span>
+                                      <span className="ln-inv-tl-detail__v">{ev.evidenceRef}</span>
+                                    </div>
+                                  )}
+                                  {ev.ruleIds.length > 0 && (
+                                    <div className="ln-inv-tl-detail__row">
+                                      <span className="ln-inv-tl-detail__k">规则</span>
+                                      <span className="ln-inv-tl-detail__v">
+                                        {ev.ruleIds.join(', ')}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {ev.patternId && (
+                                    <div className="ln-inv-tl-detail__row">
+                                      <span className="ln-inv-tl-detail__k">模式</span>
+                                      <span className="ln-inv-tl-detail__v">{ev.patternId}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        );
+                      }}
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -816,25 +533,12 @@ export default function InvestigationWorkbench({
             <ClaimList
               claims={claims}
               tracebacksByClaimId={tracebacksByClaimId}
-              graph={graph}
-              evidence={model.linkedEvidence}
               alertEvidenceRefs={alertEvidenceRefs}
             />
           </SectionPanel>
-
-          {/* 取证链——M1 db 深链：引擎判定 / 污染传播链 / 策略矩阵 / 失配诊断 */}
-          <ForensicChain
-            alert={alert}
-            pollutionEvents={dbAssets?.pollutionEvents ?? []}
-            policyEvaluations={dbAssets?.policyEvaluations ?? []}
-            nonLinkDiagnostics={dbAssets?.nonLinkDiagnostics ?? []}
-            claims={claims}
-            evidence={evidence}
-            fallbackGraph={graph}
-          />
         </div>
 
-        {/* ── RIGHT: Verdict + reasoning + actions ── */}
+        {/* ── RIGHT: 判决 + 主体 + 操作 ── */}
         <div
           className="verdict-panel"
           style={{
@@ -845,104 +549,54 @@ export default function InvestigationWorkbench({
             top: 44,
           }}
         >
-          {/* verdict */}
+          {/* 判决 —— decision 中文标题 + 克制卡 */}
           <SectionPanel
             eyebrow="判决"
-            title={alert.decision}
-            meta={alert.authority}
+            title={decisionLabel(alert.decision).label}
+            meta={authorityLabel(alert.authority).label}
             bodyClassName="ln-panel-body"
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: S.md }}>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <StatusBadge tone={sevTone(alert.severity)}>{alert.severity}</StatusBadge>
-                <StatusBadge tone={decisionTone(alert.decision)}>
-                  {statusLabel(alert.decision)}
-                </StatusBadge>
+                <StatusBadge tone={sevTone(alert.severity)}>{severityLabel(alert.severity).label}</StatusBadge>
+                <StatusBadge tone={sevTone(alert.decision)}>{decisionLabel(alert.decision).label}</StatusBadge>
               </div>
 
-              {/* summary */}
-              <div
-                style={{
-                  fontSize: T.sm,
-                  color: 'var(--ln-text-secondary)',
-                  lineHeight: 1.65,
-                  padding: S.md,
-                  borderRadius: 7,
-                  background: 'var(--ln-surface-0)',
-                  border: '1px solid var(--ln-border)',
-                }}
-              >
+              <div className="ln-verdict-box">
                 {alert.summary}
               </div>
 
-              {/* reasoning */}
               {alert.reasoning && (
-                <div
-                  style={{
-                    padding: S.md,
-                    borderRadius: 7,
-                    background: 'rgba(94,106,210,0.05)',
-                    border: '1px solid rgba(94,106,210,0.14)',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: T.xs,
-                      fontWeight: 600,
-                      color: 'var(--ln-accent)',
-                      marginBottom: 4,
-                      letterSpacing: '0.03em',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    AI 推理
-                  </div>
-                  <div
-                    style={{ fontSize: T.xs, color: 'var(--ln-text-secondary)', lineHeight: 1.6 }}
-                  >
-                    {alert.reasoning}
-                  </div>
+                <div className="ln-verdict-box ln-verdict-box--accent">
+                  <div className="ln-verdict-box__label">AI 推理</div>
+                  <div className="ln-verdict-box__body">{alert.reasoning}</div>
                 </div>
               )}
 
-              {/* action hint */}
               {alert.action_hint && (
-                <div
-                  style={{
-                    padding: S.md,
-                    borderRadius: 7,
-                    background: 'rgba(248,113,113,0.05)',
-                    border: '1px solid rgba(248,113,113,0.15)',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: T.xs,
-                      fontWeight: 600,
-                      color: '#f87171',
-                      marginBottom: 4,
-                      letterSpacing: '0.03em',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    建议处置
-                  </div>
-                  <div
-                    style={{ fontSize: T.sm, color: 'var(--ln-text-secondary)', lineHeight: 1.55 }}
-                  >
-                    {alert.action_hint}
-                  </div>
+                <div className="ln-verdict-box ln-verdict-box--danger">
+                  <div className="ln-verdict-box__label">建议处置</div>
+                  <div className="ln-verdict-box__body">{alert.action_hint}</div>
                 </div>
               )}
             </div>
           </SectionPanel>
 
-          {/* agent info */}
+          {/* 主体信息 —— AgentAvatar + 权威度 */}
           <SectionPanel
             eyebrow="主体信息"
             title={alert.primary_agent.agent_id}
             bodyClassName="ln-panel-body"
           >
+            <div style={{ display: 'flex', alignItems: 'center', gap: S.md, marginBottom: S.md }}>
+              <AgentAvatar agentId={alert.primary_agent.agent_id} size={34} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span className="ln-panel__meta">身份权威度</span>
+                <div style={{ fontSize: T.sm, color: 'var(--ln-text)' }}>
+                  {authorityLabel(alert.authority).label}
+                </div>
+              </div>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: S.md }}>
               <div>
                 <span className="ln-panel__meta">角色</span>
@@ -973,7 +627,7 @@ export default function InvestigationWorkbench({
             </div>
           </SectionPanel>
 
-          {/* actions */}
+          {/* 操作 */}
           <SectionPanel eyebrow="操作" title="后续步骤" bodyClassName="ln-panel-body">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <Link
@@ -998,4 +652,10 @@ export default function InvestigationWorkbench({
       </div>
     </div>
   );
+}
+
+function sevTone(s: string): StatusTone {
+  if (s === 'Critical' || s === 'Unsafe') return 'danger';
+  if (s === 'Warning' || s === 'Uncertain') return 'warning';
+  return 'info';
 }

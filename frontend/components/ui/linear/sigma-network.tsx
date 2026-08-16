@@ -36,13 +36,13 @@ const EDGE_COLORS: Record<string, string> = {
 const EDGE_DEFAULT = '#3a3a3d';
 
 const NODE_SIZE: Record<string, number> = {
-  Agent: 8,
-  PolicyBoundary: 9,
-  Resource: 5,
-  Process: 5,
-  ToolCall: 5,
-  Credential: 4,
-  Context: 4,
+  Agent: 10,
+  PolicyBoundary: 12,
+  Resource: 6,
+  Process: 6,
+  ToolCall: 6,
+  Credential: 5,
+  Context: 5,
 };
 
 // Rendering budgets — beyond these, the WebGL canvas chokes and the main thread
@@ -267,14 +267,48 @@ export function SigmaNetwork({
         });
       }
 
+      // ── 官方社区可视化标准：节点按连接度（degree）分层尺寸 ──
+      // 核心节点（高连接）更大、边缘节点小，网络结构一目了然；并为核心节点
+      // 保留标签（大图全显示会卡顿、全隐藏无法识别 —— 按重要度分级是最优解）。
+      const topByDegree = Array.from(g.nodes())
+        .map((id) => ({ id, deg: g.degree(id) }))
+        .sort((a, b) => b.deg - a.deg)
+        .slice(0, NODE_LABEL_LIMIT)
+        .map((x) => x.id);
+      g.forEachNode((nodeId, attr) => {
+        const deg = g.degree(nodeId);
+        const base = (NODE_SIZE[attr.nodeType] as number) ?? 5;
+        attr.size = base + Math.min(8, Math.sqrt(deg) * 1.4);
+        if (!topByDegree.includes(nodeId)) attr.label = '';
+      });
+
       // ── Layout in a Web Worker (main thread stays interactive) ──
-      const nodeInputs: { id: string; x: number; y: number }[] = [];
-      g.forEachNode((id, attr) => nodeInputs.push({ id, x: attr.x, y: attr.y }));
+      const nodeInputs: { id: string; x: number; y: number; size?: number }[] = [];
+      g.forEachNode((id, attr) =>
+        nodeInputs.push({ id, x: attr.x, y: attr.y, size: attr.size as number | undefined }),
+      );
       const edgeInputs: { source: string; target: string }[] = [];
       g.forEachEdge((_e, _a, src, tgt) => edgeInputs.push({ source: src, target: tgt }));
 
+      // 力导迭代按图规模动态 + ForceAtlas2 顶级布局参数（让节点充分展开、
+      // 不挤成团）：默认设置对 1461 密集节点会聚成大团、什么都看不出。
+      // linLogMode + outboundAttractionDistribution 让社区结构清晰、节点分散
+      // 不重叠；scalingRatio 拉大间距。迭代按 n*0.35 适配（1461→~510 次），
+      // Worker 异步计算不阻塞主线程。
+      const layoutIterations = Math.min(600, Math.max(100, Math.round(n * 0.35)));
+      const layoutSettings = {
+        gravity: 0.7,
+        scalingRatio: 4,
+        linLogMode: true,
+        outboundAttractionDistribution: true,
+      };
       try {
-        const res = await requestLayout({ nodes: nodeInputs, edges: edgeInputs, iterations: 40 });
+        const res = await requestLayout({
+          nodes: nodeInputs,
+          edges: edgeInputs,
+          iterations: layoutIterations,
+          settings: layoutSettings,
+        });
         if (res.error || !res.positions) throw new Error(res.error ?? 'no positions');
         for (const [id, pos] of Object.entries(res.positions)) {
           g.setNodeAttribute(id, 'x', pos.x);
@@ -282,7 +316,7 @@ export function SigmaNetwork({
         }
       } catch {
         // Synchronous fallback — never leave the network blank.
-        const positions = runLayoutSync(nodeInputs, edgeInputs, 40);
+        const positions = runLayoutSync(nodeInputs, edgeInputs, layoutIterations, layoutSettings);
         for (const [id, pos] of Object.entries(positions)) {
           g.setNodeAttribute(id, 'x', pos.x);
           g.setNodeAttribute(id, 'y', pos.y);
@@ -349,14 +383,18 @@ export function SigmaNetwork({
       // create sigma renderer — budgets keep the WebGL canvas responsive on
       // large graphs: no labels, no edge events, and edges hidden while moving.
       const renderer = new Sigma(g, container, {
-        renderLabels: g.order < NODE_LABEL_LIMIT,
+        renderLabels: true, // 仅渲染有 label 的节点（大图为核心节点保留标签）
         hideEdgesOnMove: g.size > EDGE_RENDER_BUDGET / 2,
         hideLabelsOnMove: true,
         defaultNodeColor: NODE_DEFAULT,
         defaultEdgeColor: EDGE_DEFAULT,
-        labelColor: { color: '#8a8a8e' },
+        labelColor: { color: '#b4b4b8' },
         labelFont: 'Inter, system-ui, sans-serif',
         labelSize: 10,
+        // 强制渲染有 label 的节点（核心节点标签常显，无需放大——官方大图
+        // demo 的重要节点标签可见标准）。仅 top-degree 节点保留 label，
+        // 数量有限（≤60），不引入性能负担。
+        labelRenderedSizeThreshold: 0,
         minEdgeThickness: 0.3,
         zoomingRatio: 0.8,
         zoomDuration: 200,

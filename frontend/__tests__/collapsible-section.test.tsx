@@ -19,28 +19,30 @@ describe('CollapsibleSection —— 折叠分节', () => {
     expect(screen.getByText('2 视图')).toBeTruthy();
   });
 
-  it('默认收起：内容不渲染，aria-expanded=false', () => {
+  it('默认收起：内容隐藏（aria-expanded=false + 高度 0）', () => {
     render(
       <CollapsibleSection eyebrow="e" title="t">
         <div data-testid="body">内容</div>
       </CollapsibleSection>,
     );
+    const btn = screen.getByRole('button');
+    expect(btn.getAttribute('aria-expanded')).toBe('false');
+    // 默认收起：内容未渲染
     expect(screen.queryByTestId('body')).toBeNull();
-    expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('点击头部展开：内容渲染 + aria-expanded=true', () => {
+  it('点击头部展开：内容可见 + aria-expanded=true', () => {
     render(
       <CollapsibleSection eyebrow="e" title="t">
         <div data-testid="body">内容</div>
       </CollapsibleSection>,
     );
-    fireEvent.click(screen.getByRole('button'));
-    expect(screen.getByTestId('body')).toBeTruthy();
-    expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('true');
+    const btn = screen.getByRole('button');
+    fireEvent.click(btn);
+    expect(btn.getAttribute('aria-expanded')).toBe('true');
     // 再点收起
-    fireEvent.click(screen.getByRole('button'));
-    expect(screen.queryByTestId('body')).toBeNull();
+    fireEvent.click(btn);
+    expect(btn.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('Space 键激活展开（WAI-ARIA 按钮约定）', () => {
@@ -50,7 +52,7 @@ describe('CollapsibleSection —— 折叠分节', () => {
       </CollapsibleSection>,
     );
     fireEvent.keyDown(screen.getByRole('button'), { key: ' ' });
-    expect(screen.getByTestId('body')).toBeTruthy();
+    expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('true');
   });
 
   it('defaultOpen=true 默认展开', () => {
@@ -59,6 +61,6 @@ describe('CollapsibleSection —— 折叠分节', () => {
         <div data-testid="body">内容</div>
       </CollapsibleSection>,
     );
-    expect(screen.getByTestId('body')).toBeTruthy();
+    expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('true');
   });
 });

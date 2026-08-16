@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 type SectionPanelProps = {
   title?: string;
   eyebrow?: string;
-  meta?: string;
+  meta?: string | ReactNode;
   children: ReactNode;
   className?: string;
   hoverable?: boolean;

@@ -1,4 +1,5 @@
 import { deriveTracebackEdgeIds } from './traceback';
+import { claimTypeLabel, decisionLabel } from './investigation-labels';
 import type {
   CorrelationEvidence,
   GraphData,
@@ -11,6 +12,67 @@ export interface InvestigationNodeSummary {
   nodeId: string;
   label: string;
   nodeType: ResponsibilityNode['node_type'];
+}
+
+// ── 英文分析摘要 → 结构化中文（让用户一眼看懂） ──
+// Rust 后端的 alert.summary 是英文长文本（"Analysis of responsibility graph:
+// 317 agent(s)... Claim #1: ... Moderate confidence ..."），无法直读。这里解析
+// 为简洁中文：发生了什么、图规模、真实置信度、判定结论 —— 诚实呈现真实数据，
+// 绝不伪造。
+const DETECTION_LABEL: Record<string, string> = {
+  'tainted context use': '上下文污染使用',
+  'policy violation': '策略违规',
+  'context injection': '上下文注入',
+  'delegation issue': '委派异常',
+  'authority escalation': '权限升级',
+};
+
+function detectionTypeLabel(raw: string): string {
+  const norm = raw.trim().toLowerCase();
+  return DETECTION_LABEL[norm] ?? claimTypeLabel(raw.replace(/\s+/g, '')).label;
+}
+
+// 英文告警标题 → 中文：提取检测类型 + 判定方式 + 主体
+// "Observer reviewed: agent c7844354-66f — Tainted Context Use (Observed)"
+// → "上下文污染使用 · 已观测（主体 c7844354…）"
+const DETECTION_MODE_LABEL: Record<string, string> = {
+  Observed: '已观测',
+  Inferred: '推断',
+  Detected: '已检测',
+  Confirmed: '已确认',
+};
+
+export function buildAnalysisTitle(alert: ResponsibilityAlert): string {
+  const t = alert.title ?? '';
+  const typeM = t.match(/—\s*(.+?)\s*\((\w+)\)\s*$/);
+  if (typeM) {
+    const typeLabel = claimTypeLabel(typeM[1].replace(/\s+/g, '')).label;
+    const modeLabel = DETECTION_MODE_LABEL[typeM[2]] ?? typeM[2];
+    const agentShort = alert.primary_agent.agent_id.slice(0, 8);
+    return `${typeLabel} · ${modeLabel}（主体 ${agentShort}…）`;
+  }
+  return t;
+}
+
+export function buildAnalysisSummary(alert: ResponsibilityAlert): string {
+  const s = alert.summary ?? '';
+  const parts: string[] = [];
+
+  // 检测结论：Detected: 2 tainted context use(s).
+  const detect = s.match(/Detected:\s*(\d+)\s+(.+?)(?:\(s\))?\./i);
+  if (detect) parts.push(`检测到 ${detect[1]} 次${detectionTypeLabel(detect[2])}`);
+
+  // 图规模：317 agent(s), 1138 node(s), 3008 edge(s).
+  const agents = s.match(/(\d+)\s+agent\(s\)/i)?.[1];
+  const nodes = s.match(/(\d+)\s+node\(s\)/i)?.[1];
+  const edges = s.match(/(\d+)\s+edge\(s\)/i)?.[1];
+  if (agents) parts.push(`${agents} 主体 · ${nodes} 节点 · ${edges} 边`);
+
+  // 真实置信度 + 判定结论（结构化字段，非 summary 文本）
+  parts.push(`置信度 ${Math.round(alert.confidence * 100)}%`);
+  parts.push(`判定 ${decisionLabel(alert.decision).label}`);
+
+  return parts.join(' · ');
 }
 
 export interface InvestigationModel {
@@ -32,7 +94,7 @@ export interface InvestigationModel {
   boundaryCrossingCount: number;
   ruleCount: number;
   patternCount: number;
-  parentClusterId: string | null;
+  parentUnitId: string | null;
 }
 
 function getActiveGraph(alert: ResponsibilityAlert, fallbackGraph: GraphData): GraphData {
@@ -46,6 +108,11 @@ function getActiveGraph(alert: ResponsibilityAlert, fallbackGraph: GraphData): G
   return fallbackGraph;
 }
 
+// 模块级缓存：同一 (alertId, 图指纹) 的 evidence refs 只算一次。
+// 59MB db 的图有数千边，13 个告警 × O(edges) 重复扫描会拖慢模型构建
+// （useAlertModels rIC 分块）→ 侧边栏「构建中」长时间转。缓存消除重复扫描。
+const EVIDENCE_REFS_CACHE = new Map<string, string[]>();
+
 export function collectAlertEvidenceRefs(
   alert: ResponsibilityAlert,
   fallbackGraph: GraphData = { nodes: [], edges: [] },
@@ -55,6 +122,11 @@ export function collectAlertEvidenceRefs(
   // graph lives in the store. Derive evidence refs from the same effective graph
   // used for rendering (getActiveGraph), so evidence still links to alerts.
   const graph = getActiveGraph(alert, fallbackGraph);
+  const key = `${alert.alert_id}|${graph.nodes.length}|${graph.edges.length}|${opts?.skipAllEdgesFallback ?? false}`;
+  if (!opts?.skipAllEdgesFallback) {
+    const hit = EVIDENCE_REFS_CACHE.get(key);
+    if (hit) return hit;
+  }
   const refs = new Set<string>();
   const relevantEdgeIds = new Set(deriveTracebackEdgeIds(alert, graph.edges));
 
@@ -72,7 +144,9 @@ export function collectAlertEvidenceRefs(
     }
   }
 
-  return Array.from(refs).sort();
+  const result = Array.from(refs).sort();
+  if (!opts?.skipAllEdgesFallback) EVIDENCE_REFS_CACHE.set(key, result);
+  return result;
 }
 
 export function formatResponsibilityNodeLabel(node: ResponsibilityNode): string {
@@ -164,6 +238,6 @@ export function buildInvestigationModel(
       .length,
     ruleCount: alert.engine.rule_verdicts.length,
     patternCount: alert.engine.pattern_verdicts.length,
-    parentClusterId: alert.primary_agent?.agent_id ?? null,
+    parentUnitId: alert.primary_agent?.agent_id ?? null,
   };
 }

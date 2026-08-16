@@ -10117,7 +10117,8 @@ html:not(.dark) .investigation-empty-shell {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 40%, rgba(94, 106, 210, 0.04), transparent 55%);
+  /* 态势页原生纯黑背景 —— 移除中央紫色光晕杂质 */
+  background: none;
 }
 
 .command-theater__right-rail,
@@ -10271,10 +10272,9 @@ html:not(.dark) .investigation-empty-shell {
 }
 
 .incident-rail {
-  position: absolute;
-  top: 22px;
-  left: 18px;
-  z-index: 4;
+  /* 现代 rail 由布局容器定位（layoutMode=theater → 内联 position:relative; top:auto; left:auto）。
+     旧浮窗设计的绝对定位（top:22px / left:18px / z-index:4）会压过 32px 顶栏造成「超出顶部」——
+     已移除，杜绝任何状态（含 hydration 间隙）下 rail 浮出顶部。宽度由内联样式控制，此处兜底。 */
   width: 64px;
   pointer-events: auto;
 }
@@ -12962,6 +12962,11 @@ html:not(.dark) .investigation-empty-shell {
   justify-content: center;
   gap: 6px;
   height: 30px;
+  /* 展开宽度过渡期间工具栏容器变窄，white-space:normal 会把「打开调查」挤成两行、
+     按钮看起来残缺（展开不完全）。nowrap + 不收缩：按钮始终单行，宽度不足时整体被
+     面板 overflow 裁剪而非文字换行。 */
+  white-space: nowrap;
+  flex-shrink: 0;
   border-radius: 8px;
   border: 1px solid rgba(101, 122, 145, 0.24);
   background: rgba(255, 255, 255, 0.03);
@@ -12987,6 +12992,42 @@ html:not(.dark) .investigation-empty-shell {
   background: rgba(120, 214, 255, 0.08);
   color: rgba(244, 249, 252, 0.98);
   outline: none;
+}
+
+/* ── 侧边栏展开 / 切换工作台时的 RailCard 级联入场 ──
+   逐张卡片淡入 + 轻微上浮（GPU-composited opacity/transform，无卡顿），
+   配合 aside 宽度过渡形成「面板打开 → 内容逐块浮现」的顶级动态效果。
+   元素仅挂载时播放一次；只在宽度动画期间可见（fill-mode: both 使延迟期保持隐藏）。
+   选中器：flow > flex 容器 > rail-card（三种工作台结构一致）。 */
+.incident-panel-flow > .flex > .rail-card {
+  /* backwards 而非 both：动画结束后/被打断时卡片回归自然态（可见）—— 绝不因
+     动画中断而滞留 opacity:0 导致面板「全白、空无一物」。 */
+  animation: rail-card-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.incident-panel-flow > .flex > .rail-card:nth-child(1) { animation-delay: 0.03s; }
+.incident-panel-flow > .flex > .rail-card:nth-child(2) { animation-delay: 0.08s; }
+.incident-panel-flow > .flex > .rail-card:nth-child(3) { animation-delay: 0.13s; }
+.incident-panel-flow > .flex > .rail-card:nth-child(4) { animation-delay: 0.18s; }
+.incident-panel-flow > .flex > .rail-card:nth-child(5) { animation-delay: 0.23s; }
+.incident-panel-flow > .flex > .rail-card:nth-child(6) { animation-delay: 0.28s; }
+.incident-panel-flow > .flex > .rail-card:nth-child(7) { animation-delay: 0.33s; }
+.incident-panel-flow > .flex > .rail-card:nth-child(8) { animation-delay: 0.38s; }
+
+@keyframes rail-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .incident-panel-flow > .flex > .rail-card {
+    animation: none;
+  }
 }
 
 .incident-rail__status-strip {
@@ -25155,6 +25196,17 @@ html:not(.dark) .investigation-empty-shell {
   animation: mtl-word-breathe 2.2s ease-in-out infinite;
 }
 
+@keyframes mtl-load-pulse {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
 /* Network-embryo keyframes — compositor thread only */
 @keyframes mtl-node-fade {
   0%,
@@ -25188,16 +25240,6 @@ html:not(.dark) .investigation-empty-shell {
   }
 }
 
-@keyframes mtl-load-pulse {
-  0% {
-    transform: scale(0.3);
-    opacity: 0.6;
-  }
-  100% {
-    transform: scale(2.2);
-    opacity: 0;
-  }
-}
 
 .incident-rail__sash {
   position: absolute;
@@ -27103,4 +27145,1529 @@ html:not(.dark) .investigation-empty-shell {
   .landing-nav__brand-name {
     display: none;
   }
+}
+
+
+
+/* ═══════════ 运行监控 · 与 KPI 卡完全同构（v5） ═══════════
+ * 铁律：监控卡 = 与页面 KPI 卡（.ln-metric）同一 chrome —— 无装饰堆砌。
+ * 状态只用一个色点 + 状态色 delta，数字用 mono 大字，趋势用真实 sparkline。
+ * hover 轻抬自动继承页面对 .ln-metric 的统一 GSAP lift（见 overview-page-client）。 */
+
+/* LIVE 心跳（直播中面板 meta 处，克制琥珀点） */
+.ln-monitor-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--ln-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--ln-warning);
+}
+.ln-monitor-live i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ln-warning);
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.7);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ln-monitor-live i {
+    opacity: 0.6;
+  }
+}
+
+/* 聚合健康横条（与图表面板的 head meta 同语言） */
+.ln-monitor-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.ln-monitor-summary__counts {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.ln-monitor-summary__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--ln-mono);
+  font-size: 11px;
+  color: var(--ln-text-secondary);
+}
+.ln-monitor-summary__count i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.ln-monitor-summary__count[data-tone='critical'] {
+  color: var(--ln-danger);
+}
+.ln-monitor-summary__count[data-tone='warning'] {
+  color: var(--ln-warning);
+}
+.ln-monitor-summary__count[data-tone='success'] {
+  color: var(--ln-success);
+}
+.ln-monitor-summary__count[data-tone='muted'] {
+  color: var(--ln-text-muted);
+}
+.ln-monitor-summary__count[data-tone='muted'] i {
+  background: var(--ln-text-muted);
+  opacity: 0.55;
+}
+.ln-monitor-hint {
+  margin: 0 0 10px;
+  font-size: 11px;
+  color: var(--ln-warning);
+}
+
+/* 视角 tab */
+.ln-monitor-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+/* ── 网格：3 列等宽（同图表区 auto-fit） ── */
+.ln-monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+/* ── 监控卡 = ln-panel + ln-metric（与 KPI 卡同构） ── */
+.ln-monitor-card {
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  color: var(--ln-text);
+  font: inherit;
+  /* hover 轻抬由页面 .ln-metric GSAP lift 处理，此处仅过渡 */
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.ln-monitor-card:hover {
+  border-color: var(--ln-border-strong);
+  background: var(--ln-surface-2);
+}
+.ln-monitor-card:focus-visible {
+  outline: 2px solid var(--ln-accent);
+  outline-offset: 2px;
+}
+
+/* 头部：状态点 + 视角名（用 ln-metric__label 的 muted 小字） */
+.ln-monitor-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ln-monitor-card__name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ln-text-secondary);
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.ln-monitor-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--ln-mono);
+  font-size: 10px;
+  color: var(--ln-text-muted);
+  flex-shrink: 0;
+}
+.ln-monitor-card__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+/* 主数字行：mono 大字（同 .ln-metric__value）+ 单位 */
+.ln-monitor-card__metric {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.ln-monitor-card__value {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--ln-text);
+  font-family: var(--ln-mono);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.ln-monitor-card__unit {
+  font-family: var(--ln-mono);
+  font-size: 11px;
+  color: var(--ln-text-muted);
+}
+
+/* 真实迷你趋势（无轴 sparkline） */
+.ln-monitor-card__trend {
+  display: block;
+  margin: 0;
+  height: 32px;
+}
+
+/* 信号行：状态色 delta（同 .ln-metric__delta 语言） */
+.ln-monitor-card__signals {
+  font-family: var(--ln-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ln-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* DigitReel 翻牌动画 —— 数字位从下方滚入目标值（纯 transform，GPU 合成） */
+@keyframes digit-reel-roll {
+  from {
+    transform: translateY(1em);
+  }
+  to {
+    transform: translateY(var(--roll-target, 0em));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-reel-roll] {
+    animation: none !important;
+  }
+}
+
+/* ═══════════ 身份血缘 · 顶级身份关系工作台 ═══════════
+ * 语言与全站统一：AgentAvatar 渐变圆徽章、agentColor 品牌色、mono 数字。
+ * 信息架构：有进程树的 agent 优先，无进程 agent 优雅提示（非负面文案）。 */
+
+/* 血缘行（agent 折叠行） */
+.ln-lineage-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 10px;
+  color: var(--ln-text);
+  border-radius: 8px;
+  transition: background 140ms ease;
+}
+.ln-lineage-row:hover {
+  background: var(--ln-surface-2);
+}
+.ln-lineage-row[data-open='true'] {
+  background: var(--ln-surface-1);
+}
+
+/* 状态徽章（AUTH / PROV） */
+.ln-lineage-badge {
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-family: var(--ln-mono);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.ln-lineage-badge[data-tone='auth'] {
+  background: rgba(74, 222, 128, 0.14);
+  color: #4ade80;
+}
+.ln-lineage-badge[data-tone='prov'] {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fbbf24;
+}
+
+/* 进程数徽章 */
+.ln-lineage-count {
+  font-size: 9.5px;
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+  background: var(--ln-surface-3);
+  padding: 1px 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+/* 无进程 agent 优雅提示 */
+.ln-lineage-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--ln-text-muted);
+  padding: 6px 10px 8px;
+}
+.ln-lineage-note i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ln-info);
+  opacity: 0.7;
+}
+
+/* 进程树节点 */
+.ln-tree-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 3px 0;
+  color: var(--ln-text);
+  font-size: 10.5px;
+  text-align: left;
+  transition: background 140ms ease;
+  border-radius: 6px;
+  width: 100%;
+}
+.ln-tree-node:hover {
+  background: var(--ln-surface-2);
+}
+.ln-tree-node__comm {
+  color: var(--ln-text-secondary);
+}
+.ln-tree-node__pid {
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+  font-size: 9.5px;
+}
+.ln-tree-node__cross {
+  font-size: 9px;
+  color: var(--ln-info);
+  font-family: var(--ln-mono);
+  margin-left: auto;
+  padding-right: 4px;
+}
+
+/* 树连接线 */
+.ln-tree-children {
+  margin-left: 16px;
+  padding-left: 14px;
+  border-left: 1px solid var(--ln-border);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* 进程时间瀑布 —— 顶级深度调查视图 */
+
+/* ═══════════ 进程树 · 顶级深度调查视图 ═══════════ */
+.ln-tree-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  color: var(--ln-text);
+  font-size: 10.5px;
+  text-align: left;
+  transition: background 140ms ease;
+  border-radius: 6px;
+  width: 100%;
+}
+.ln-tree-node:hover {
+  background: var(--ln-surface-2);
+}
+/* 节点前的品牌色连接圆点（父级竖线延续） */
+.ln-tree-node::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  width: 5px;
+  height: 1px;
+  background: var(--ln-accent);
+  opacity: 0.6;
+}
+.ln-tree-node__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1px solid var(--ln-border);
+  background: var(--ln-surface-0);
+  flex-shrink: 0;
+}
+.ln-tree-node__pid {
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+  font-size: 9.5px;
+  min-width: 40px;
+}
+.ln-tree-node__comm {
+  color: var(--ln-text-secondary);
+  font-weight: 500;
+}
+/* 相对时间标注（右侧，等宽） */
+.ln-tree-node__time {
+  font-family: var(--ln-mono);
+  font-size: 9px;
+  color: var(--ln-text-muted);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.ln-tree-node__cross {
+  font-size: 8px;
+  color: var(--ln-info);
+  font-family: var(--ln-mono);
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+/* 树连接线：品牌色竖线 + 节点前的横线由 ::before 提供 */
+.ln-tree-children {
+  position: relative;
+  margin-left: 17px;
+  padding-left: 10px;
+  border-left: 1px solid var(--ln-accent);
+  border-left-color: rgba(94, 106, 210, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+/* 折叠内容高度过渡容器 */
+.ln-tree-collapse {
+  overflow: hidden;
+}
+
+/* 进程树 · 关联动作（行为语义） */
+.ln-tree-actions {
+  margin: 2px 0 4px 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ln-tree-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  transition: background 140ms ease;
+}
+.ln-tree-action:hover {
+  background: var(--ln-surface-2);
+}
+.ln-tree-action__type {
+  font-size: 9px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-family: var(--ln-mono);
+  flex-shrink: 0;
+}
+.ln-tree-action__type[data-tone='read'] {
+  background: rgba(108, 194, 255, 0.14);
+  color: #6cc2ff;
+}
+.ln-tree-action__type[data-tone='write'] {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fbbf24;
+}
+.ln-tree-action__type[data-tone='overwrite'] {
+  background: rgba(248, 113, 113, 0.14);
+  color: #f87171;
+}
+.ln-tree-action__type[data-tone='exec'] {
+  background: rgba(139, 125, 255, 0.14);
+  color: #8b7dff;
+}
+.ln-tree-action__type[data-tone='other'] {
+  background: var(--ln-surface-3);
+  color: var(--ln-text-muted);
+}
+.ln-tree-action__target {
+  font-family: var(--ln-mono);
+  color: var(--ln-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ═══════════ 运行概览 · 顶级身份画像 ═══════════ */
+
+/* ═══════════ 运行概览 · 与全站 ln-panel 统一 ═══════════
+ * 铁律：无光晕 / 无彩色渐变底 / 无发光点 —— 与 MetricCard/监控卡同 chrome。 */
+
+/* 风险信号行：克制 hover */
+.ln-run-signal {
+  border-radius: 8px;
+  padding: 6px 8px;
+  transition: background 140ms ease;
+}
+.ln-run-signal:hover {
+  background: var(--ln-surface-2);
+}
+
+/* 覆盖行：label + 细比例条 + mono 值（纯 accent，无渐变） */
+.ln-run-cover {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ln-run-cover__track {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--ln-surface-3);
+  overflow: hidden;
+}
+.ln-run-cover__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ln-accent);
+  transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ═══════════ 告警调查工作台 · 与全站 ln-panel 统一 ═══════════
+ * 铁律：无光晕 / 无彩色渐变底 / 无发光点 —— 与 MetricCard/监控卡同 chrome。
+ * 时间轴 / 证据 exhibit 均用克制色点 + 纯 token 色。 */
+
+/* ── 告警队列 ── */
+.ln-alert-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ln-alert-queue__btn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 10px 9px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--ln-border);
+  background: transparent;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
+}
+.ln-alert-queue__btn:hover {
+  background: var(--ln-surface-2);
+  border-color: var(--ln-border-strong);
+}
+.ln-alert-queue__btn[data-active='true'] {
+  background: var(--ln-accent-soft);
+  border-color: var(--ln-accent);
+}
+.ln-alert-queue__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ln-alert-queue__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.ln-alert-queue__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ln-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ln-alert-queue__btn[data-active='true'] .ln-alert-queue__title {
+  color: var(--ln-text);
+}
+.ln-alert-queue__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--ln-text-muted);
+}
+.ln-alert-queue__agent {
+  font-family: var(--ln-mono);
+  color: var(--ln-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* ── 证据链 ── */
+.ln-ev-axis {
+  width: 40px;
+  min-width: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 12px;
+}
+.ln-ev-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--ln-mono);
+  background: var(--ln-surface-3);
+  border: 1px solid var(--ln-border);
+}
+.ln-ev-line {
+  flex: 1;
+  width: 1px;
+  min-height: 12px;
+  background: var(--ln-border);
+}
+.ln-ev-card {
+  flex: 1;
+  padding: 10px 14px;
+  margin-bottom: 2px;
+  border-radius: 8px;
+  background: var(--ln-surface-0);
+  border: 1px solid var(--ln-border);
+  transition: border-color 150ms ease;
+}
+.ln-ev-card:hover {
+  border-color: var(--ln-border-strong);
+}
+.ln-ev-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.ln-ev-card__id {
+  font-size: 11px;
+  font-family: var(--ln-mono);
+  color: var(--ln-accent);
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ln-ev-card__tags {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.ln-ev-bar {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--ln-surface-2);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.ln-ev-bar__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ln-ev-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ln-ev-field {
+  display: flex;
+  gap: 6px;
+  font-size: 10px;
+  overflow: hidden;
+}
+.ln-ev-field__k {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-family: var(--ln-mono);
+  width: 36px;
+}
+.ln-ev-field__v {
+  color: var(--ln-text-secondary);
+  font-family: var(--ln-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ln-ev-field__id {
+  font-size: 10px;
+  color: var(--ln-text-muted);
+  font-family: var(--ln-mono);
+}
+
+/* ── 判决面板：克制摘要 / 推理 / 处置卡（无彩色渐变底） ── */
+.ln-verdict-box {
+  font-size: 12px;
+  color: var(--ln-text-secondary);
+  line-height: 1.65;
+  padding: 12px;
+  border-radius: 7px;
+  background: var(--ln-surface-0);
+  border: 1px solid var(--ln-border);
+}
+.ln-verdict-box--accent {
+  border-color: var(--ln-border);
+}
+.ln-verdict-box--danger {
+  border-color: var(--ln-border);
+}
+.ln-verdict-box__label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ln-text-muted);
+  margin-bottom: 4px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.ln-verdict-box__body {
+  font-size: 11.5px;
+  color: var(--ln-text-secondary);
+  line-height: 1.6;
+}
+
+/* ── 通用克制 chip（无圆点，mono）── 与 ln-tree-action__type 同 chrome ── */
+.ln-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 600;
+  font-family: var(--ln-mono);
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+.ln-chip[data-tone='success'] {
+  background: rgba(74, 222, 128, 0.12);
+  color: var(--ln-success);
+}
+.ln-chip[data-tone='danger'] {
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--ln-danger);
+}
+.ln-chip[data-tone='warning'] {
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--ln-warning);
+}
+.ln-chip[data-tone='info'] {
+  background: rgba(96, 165, 250, 0.12);
+  color: var(--ln-info);
+}
+.ln-chip[data-tone='muted'] {
+  background: var(--ln-surface-3);
+  color: var(--ln-text-muted);
+}
+
+/* ═══════════ 告警时间线 · 富化责任瀑布 ═══════════
+ * 折叠 SSL 噪声后的责任瀑布：时间刻度尺 + 真实时间跨度条 + pid/命令/证据元信息。
+ * 铁律：无光晕 / 无渐变底 —— 与全站 ln-panel 同 chrome。 */
+
+/* 顶部时间刻度尺（对齐时间轴列宽 64px） */
+.ln-inv-tl-scale {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px 6px 66px;
+  border-bottom: 1px solid var(--ln-border);
+  margin-bottom: 6px;
+}
+.ln-inv-tl-scale__tick {
+  font-size: 9px;
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+}
+
+/* 时间轴列 */
+.ln-inv-tl-axis {
+  width: 64px;
+  min-width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding-top: 6px;
+}
+.ln-inv-tl-time {
+  font-size: 9px;
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+  line-height: 1;
+  background: var(--ln-surface-0);
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--ln-border);
+}
+.ln-inv-tl-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+.ln-inv-tl-line {
+  flex: 1;
+  width: 1px;
+  min-height: 12px;
+  background: var(--ln-border);
+}
+
+/* 事件体 */
+.ln-inv-tl-card {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  margin: 0 0 6px 6px;
+  border-radius: 8px;
+  background: var(--ln-surface-0);
+  border: 1px solid var(--ln-border);
+  transition: border-color 150ms ease;
+}
+.ln-inv-tl-card:hover {
+  border-color: var(--ln-border-strong);
+}
+.ln-inv-tl-card[data-expanded='true'] {
+  border-color: var(--ln-border-strong);
+}
+.ln-inv-tl-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.ln-inv-tl-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ln-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.ln-inv-tl-dur {
+  margin-left: auto;
+  font-size: 9px;
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+  flex-shrink: 0;
+}
+.ln-inv-tl-chev {
+  color: var(--ln-text-muted);
+  flex-shrink: 0;
+  transition: transform 150ms ease;
+}
+
+/* 富标题（原始 description） */
+.ln-inv-tl-title {
+  font-size: 11px;
+  color: var(--ln-text-secondary);
+  line-height: 1.5;
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 瀑布条：事件在整条时间线上的真实位置与跨度（纯色，无光晕） */
+.ln-inv-tl-bar {
+  position: relative;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--ln-surface-3);
+  margin-top: 5px;
+  overflow: hidden;
+}
+.ln-inv-tl-bar__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  opacity: 0.75;
+}
+
+/* 元信息：进程 / 命令 / 路径 / 置信度 */
+.ln-inv-tl-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+}
+.ln-inv-tl-meta__item {
+  font-size: 9px;
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--ln-surface-2);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ln-inv-tl-meta__conf {
+  font-weight: 600;
+  background: none;
+  padding-left: 2px;
+}
+
+/* 展开详情 */
+.ln-inv-tl-detail {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--ln-border);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ln-inv-tl-detail__row {
+  display: flex;
+  gap: 6px;
+  font-size: 9.5px;
+  align-items: baseline;
+}
+.ln-inv-tl-detail__k {
+  width: 36px;
+  flex-shrink: 0;
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+  font-weight: 600;
+}
+.ln-inv-tl-detail__v {
+  font-family: var(--ln-mono);
+  color: var(--ln-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 真实进程身份（头部右侧，mono） */
+.ln-inv-tl-proc {
+  font-size: 9px;
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+  background: var(--ln-surface-2);
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 真实行为 chips（该进程在 actions 表中的操作） */
+.ln-inv-tl-acts {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+}
+.ln-inv-tl-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px 1px 3px;
+  border-radius: 4px;
+  background: var(--ln-surface-2);
+  border: 1px solid var(--ln-border);
+  max-width: 220px;
+  overflow: hidden;
+}
+.ln-inv-tl-act__type {
+  font-size: 9px;
+  font-weight: 600;
+  font-family: var(--ln-mono);
+  padding: 0 3px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.ln-inv-tl-act__type[data-tone='read'] { color: #6cc2ff; }
+.ln-inv-tl-act__type[data-tone='write'] { color: #fbbf24; }
+.ln-inv-tl-act__type[data-tone='overwrite'] { color: #f87171; }
+.ln-inv-tl-act__type[data-tone='exec'] { color: #8b7dff; }
+.ln-inv-tl-act__type[data-tone='other'] { color: var(--ln-text-muted); }
+.ln-inv-tl-act__target {
+  font-size: 9px;
+  font-family: var(--ln-mono);
+  color: var(--ln-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ln-inv-tl-acts__more {
+  font-size: 9px;
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+  padding: 1px 4px;
+}
+
+/* 展开详情：完整行为列表 */
+.ln-inv-tl-detail__acts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 0;
+}
+.ln-inv-tl-detail__k--act {
+  width: 52px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 展开详情入场动效（纯 CSS，无 JS 引用，避免 removeChild 竞态） */
+.ln-inv-tl-detail {
+  animation: ln-inv-tl-detail-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes ln-inv-tl-detail-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ln-inv-tl-detail {
+    animation: none;
+  }
+}
+
+/* ── 证据链：关键证据分级 ── */
+.ln-ev-section-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--ln-text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 2px 4px;
+}
+.ln-ev-weak {
+  margin-top: 2px;
+}
+.ln-ev-weak__toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--ln-border);
+  background: var(--ln-surface-0);
+  color: var(--ln-text-secondary);
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.ln-ev-weak__toggle:hover {
+  background: var(--ln-surface-2);
+  border-color: var(--ln-border-strong);
+}
+.ln-ev-weak__toggle .ln-ev-weak__bucket {
+  margin-left: auto;
+  font-family: var(--ln-mono);
+  font-size: 9px;
+  color: var(--ln-text-muted);
+  flex-shrink: 0;
+}
+.ln-ev-weak__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 4px 2px 12px;
+  border-left: 1px solid var(--ln-border);
+  margin-left: 8px;
+}
+.ln-ev-weak__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 10px;
+}
+.ln-ev-weak__row:hover {
+  background: var(--ln-surface-2);
+}
+.ln-ev-weak__id {
+  font-family: var(--ln-mono);
+  color: var(--ln-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+.ln-ev-weak__conf {
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+  flex-shrink: 0;
+}
+.ln-ev-weak__more {
+  font-size: 9px;
+  color: var(--ln-text-muted);
+  font-family: var(--ln-mono);
+  padding: 3px 4px;
+}
+
+/* 取证链分区「展开全部」按钮 */
+.ln-fc-more {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--ln-border);
+  background: transparent;
+  color: var(--ln-text-muted);
+  font-size: 10px;
+  font-family: var(--ln-mono);
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.ln-fc-more:hover {
+  background: var(--ln-surface-2);
+  border-color: var(--ln-border-strong);
+  color: var(--ln-text-secondary);
+}
+
+/* ═══════════ 可视化因果链（责任声明回溯链）═══════════
+ * Rust debug 文本 → AgentAvatar + 图标 + 可读标签 + 箭头流程。
+ * 铁律：无光晕 —— 与全站 ln-panel 同 chrome。 */
+
+.ln-tb {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0;
+}
+.ln-tb-step {
+  display: flex;
+  flex-direction: column;
+  animation: ln-tb-in 0.25s ease both;
+}
+.ln-tb-step:nth-child(1) { animation-delay: 0s; }
+.ln-tb-step:nth-child(2) { animation-delay: 0.04s; }
+.ln-tb-step:nth-child(3) { animation-delay: 0.08s; }
+.ln-tb-step:nth-child(4) { animation-delay: 0.12s; }
+.ln-tb-step:nth-child(5) { animation-delay: 0.16s; }
+.ln-tb-step:nth-child(6) { animation-delay: 0.2s; }
+.ln-tb-step:nth-child(7) { animation-delay: 0.24s; }
+.ln-tb-step:nth-child(8) { animation-delay: 0.28s; }
+.ln-tb-step:nth-child(n + 9) { animation-delay: 0.32s; }
+@keyframes ln-tb-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ln-tb-step__body {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10.5px;
+  min-width: 0;
+}
+.ln-tb-step__label {
+  color: var(--ln-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.ln-tb-arrow {
+  width: 1px;
+  height: 14px;
+  margin-left: 7px;
+  background: var(--ln-border);
+  position: relative;
+}
+.ln-tb-arrow::after {
+  content: '';
+  position: absolute;
+  left: -2.5px;
+  bottom: 0;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-top: 3.5px solid var(--ln-border);
+}
+.ln-tb-root {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(248, 113, 113, 0.06);
+  border: 1px solid rgba(248, 113, 113, 0.16);
+  font-size: 10.5px;
+}
+.ln-tb-root .ln-tb-step__label {
+  color: var(--ln-danger);
+  font-weight: 600;
+}
+.ln-tb-ev {
+  font-size: 9.5px;
+  color: var(--ln-text-muted);
+  font-family: var(--ln-mono);
+  margin-top: 5px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ln-tb-step {
+    animation: none;
+  }
+}
+
+/* 真实时钟时间（头部右侧，mono） */
+.ln-inv-tl-clock {
+  font-size: 9px;
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+  flex-shrink: 0;
+}
+
+/* ═══════════ 追踪页 · 责任链路瀑布（Jaeger 模式）═══════════
+ * 每行：左侧 kind+描述+actor，右侧瀑布条 + 时钟/耗时/徽章。
+ * 铁律：无光晕 / 无渐变底 —— 与全站 ln-panel 同 chrome。 */
+
+.ln-tr-row {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 150ms ease;
+}
+.ln-tr-row:hover {
+  background: var(--ln-surface-2);
+}
+.ln-tr-row[data-selected='true'] {
+  background: var(--ln-accent-soft);
+}
+.ln-tr-left {
+  width: 320px;
+  min-width: 320px;
+  max-width: 320px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 8px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.ln-tr-kind {
+  font-size: 9.5px;
+  font-weight: 600;
+  font-family: var(--ln-mono);
+  flex-shrink: 0;
+}
+.ln-tr-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ln-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ln-tr-actor {
+  width: 7px;
+  height: 7px;
+  min-width: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.ln-tr-body {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  min-width: 60px;
+}
+.ln-tr-track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--ln-border);
+  opacity: 0.2;
+}
+.ln-tr-bar {
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  border-radius: 4px;
+  opacity: 0.7;
+}
+.ln-tr-meta {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  z-index: 1;
+  background: transparent;
+}
+.ln-tr-clock {
+  font-size: 9.5px;
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+  white-space: nowrap;
+}
+.ln-tr-dur {
+  font-size: 9.5px;
+  font-family: var(--ln-mono);
+  color: var(--ln-text-secondary);
+  white-space: nowrap;
+  min-width: 34px;
+  text-align: right;
+}
+
+/* 真实进程身份徽章（责任链路行） */
+.ln-tr-proc {
+  font-size: 9px;
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+  background: var(--ln-surface-2);
+  padding: 1px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 详情面板 · 真实行为列表 */
+.ln-tr-acts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ln-tr-act {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.ln-tr-act:hover {
+  background: var(--ln-surface-2);
+}
+.ln-tr-act__type {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 600;
+  font-family: var(--ln-mono);
+  color: var(--ln-info);
+  background: rgba(96, 165, 250, 0.1);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.ln-tr-act__target {
+  font-family: var(--ln-mono);
+  color: var(--ln-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.ln-tr-acts__more {
+  font-size: 9px;
+  color: var(--ln-text-muted);
+  font-family: var(--ln-mono);
+  padding: 2px 4px;
+}
+
+/* 详情面板选中过渡（span 切换时淡入上浮） */
+.trace-detail-panel > .ln-panel {
+  animation: ln-tr-detail-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes ln-tr-detail-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trace-detail-panel > .ln-panel {
+    animation: none;
+  }
+}
+
+
+/* 详情面板 · 顶部关闭按钮（克制 X） */
+.ln-tr-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ln-text-muted);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.ln-tr-close:hover {
+  background: var(--ln-surface-2);
+  color: var(--ln-text);
+  border-color: var(--ln-border);
+}
+
+/* 追踪列表（左侧） */
+.ln-tr-trace-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 5px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--ln-border);
+  background: transparent;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.ln-tr-trace-btn:hover {
+  background: var(--ln-surface-2);
+  border-color: var(--ln-border-strong);
+}
+.ln-tr-trace-btn[data-active='true'] {
+  background: var(--ln-accent-soft);
+  border-color: var(--ln-accent);
+}
+.ln-tr-trace-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ln-tr-trace-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.ln-tr-trace-id {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--ln-mono);
+  color: var(--ln-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ln-tr-trace-conf {
+  font-size: 9px;
+  font-family: var(--ln-mono);
+  color: var(--ln-text-muted);
+  flex-shrink: 0;
+}
+.ln-tr-trace-title {
+  font-size: 9.5px;
+  color: var(--ln-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 态势页原生纯黑背景 ──
+ * 清理残余径向渐变 / 光晕 / 蓝黑底等「杂质」，统一为品牌纯黑 #010102。
+ * 态势页（console）作为沉浸式 3D 责任 stage，背景必须干净无干扰。 */
+.command-center,
+.command-theater,
+.command-theater__shell,
+.command-theater__canvas {
+  background: #010102;
+  background-image: none;
+}
+
+/* 态势页 3D canvas 光晕/渐变伪元素层 —— 根除「左侧巨大光晕」：
+ * ::before 左侧 rgba(20,20,22,.62) 深灰渐变提亮 + 上下灰带；
+ * ::after  22%/52% 暖白 radial 光晕 + 顶部两团杂色 + 底部暗角。
+ * 均为 3D 责任 stage 的残余杂质，与官方 3d-force-graph 大图 demo 的
+ * 纯黑原生背景冲突；全屏 immersive 无需裁切渐隐，彻底移除。 */
+.command-theater__canvas::before,
+.command-theater__canvas::after {
+  display: none;
+}
+
+/* ── 态势页沉浸式 · 纯黑净化 ──
+ * 态势页作为沉浸式 3D 责任 stage：隐藏 dock 环境蓝色光晕（ambient），
+ * body 底统一品牌纯黑（消除蓝黑 #0a0d13 透过顶部栏的杂质）。 */
+/* 态势页沉浸式 · 原生纯黑净化（仅态势页生效，其他页面 dock 不受影响）
+ * 侧边栏 IncidentRail 位于 layout，不在 .command-center 内 —— 用 :has 反向作用域。 */
+html:has(body .command-center) {
+  background: #010102;
+}
+body:has(.command-center) {
+  background: #010102;
+}
+body:has(.command-center) .incident-rail__ambient {
+  display: none;
+}
+/* 态势页 dock 纯黑原生（仅态势页作用域，其他页面 dock 保持）：
+ * 覆盖 theater 模式「浮动玻璃」高优先级渐变 —— 态势页 dock 统一品牌纯黑，借鉴顶级项目简洁原生 dock。 */
+:root body:has(.command-center) .incident-rail[data-theme='apple-pro'][data-layout='theater'] .incident-rail__dock-shell {
+  background: #010102 !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+body:has(.command-center) .incident-rail__dock-shell .liquid-glass-tint {
+  background: #010102 !important;
+}
+body:has(.command-center) .incident-rail__dock-shell .liquid-glass-effect {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }

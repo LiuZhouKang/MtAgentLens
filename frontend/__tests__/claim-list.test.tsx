@@ -49,37 +49,20 @@ const tracebacks: ResponsibilityTraceback[] = [
   {
     traceback_id: 'tb-1',
     claim_id: 'claim-1',
-    chain_node_ids: ['agent-a', 'root', 'agent-a'], // 含重复节点，去重后 2 个
-    chain_edge_ids: ['e1', 'e2'],
+    chain_node_ids: [],
+    chain_edge_ids: [],
     root_cause_node_id: 'root',
-    explanation_summary: 'Context flowed via shell',
+    explanation_summary: [
+      'Traceback for claim claim-1: Tainted Context Use (confidence 90%)',
+      'Causal chain:',
+      '  [start] Agent(agent-a)',
+      '  crossed boundary→ Resource(File { canonical_path: "/tmp/x.sh" })',
+      'Root cause: Agent(agent-a)',
+      'Supporting evidence: 3 record(s)',
+    ].join('\n'),
     confidence: 0.9,
   },
 ];
-
-const graph = {
-  nodes: [
-    {
-      node_id: 'agent-a',
-      node_type: 'Agent' as const,
-      agent_id: 'agent-a',
-      resource: null,
-      evidence_refs: [],
-      timestamp_ns: 0,
-      phase: { Provisional: { timestamp_ns: 0 } },
-    },
-    {
-      node_id: 'root',
-      node_type: 'Resource' as const,
-      agent_id: null,
-      resource: { File: { canonical_path: '/tmp/x.sh' } },
-      evidence_refs: [],
-      timestamp_ns: 0,
-      phase: { Provisional: { timestamp_ns: 0 } },
-    },
-  ],
-  edges: [],
-};
 
 const tracebacksByClaimId = new Map(tracebacks.map((t) => [t.claim_id, t]));
 
@@ -89,46 +72,46 @@ describe('ClaimList — 责任声明 + 回溯链', () => {
       <ClaimList
         claims={claims}
         tracebacksByClaimId={tracebacksByClaimId}
-        graph={graph}
-        evidence={[]}
         alertEvidenceRefs={[]}
       />,
     );
-    const titles = screen.getAllByText(/TaintedContextUse|PolicyViolation/);
+    const titles = screen.getAllByText(/污染上下文使用|策略违规/);
     expect(titles.length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('claim-1')).toBeDefined();
     expect(screen.getByText('claim-2')).toBeDefined();
   });
 
-  it('expands a claim to render the reverse-indexed traceback chain (deduped)', async () => {
+  it('展开声明渲染可视化因果链（可读标签 + 边界 + 根因 + 证据数）', async () => {
     render(
       <ClaimList
         claims={claims}
         tracebacksByClaimId={tracebacksByClaimId}
-        graph={graph}
-        evidence={[]}
         alertEvidenceRefs={[]}
       />,
     );
     const firstRow = screen.getByText('claim-1').closest('[data-claim-row]')!;
     (firstRow as HTMLElement).click();
-    expect(await screen.findByText('Context flowed via shell')).toBeDefined();
+    // 因果链起始 Agent + 根因 Agent（可读 short id）
+    expect((await screen.findAllByText('agent-a')).length).toBeGreaterThanOrEqual(1);
+    // 边界穿越文件路径（可读，非 Rust debug 格式）
+    expect(screen.getByText('/tmp/x.sh')).toBeDefined();
+    expect(screen.getByText(/边界穿越/)).toBeDefined();
     expect(screen.getByText(/根因/)).toBeDefined();
-    // 链去重：agent-a 出现两次但只渲染一次
-    expect(screen.getAllByText('agent-a').length).toBeLessThanOrEqual(2);
+    expect(screen.getByText(/支持证据 3 条/)).toBeDefined();
+    // 不再显示 Rust debug 原文
+    expect(screen.queryByText(/Resource\(File/)).toBeNull();
   });
 
-  it('renders unresolved evidence refs verbatim', () => {
+  it('无共享证据时不显示重复证据 chip（去重后仅保留共享计数）', () => {
     render(
       <ClaimList
         claims={claims}
         tracebacksByClaimId={tracebacksByClaimId}
-        graph={graph}
-        evidence={[]}
         alertEvidenceRefs={[]}
       />,
     );
-    expect(screen.getByText('ev-1')).toBeDefined();
+    // 证据清单已由上方证据链面板承载，声明行不再平铺 evidence refs
+    expect(screen.queryByText('ev-1')).toBeNull();
   });
 
   it('shows competing explanations when present', async () => {
@@ -136,8 +119,6 @@ describe('ClaimList — 责任声明 + 回溯链', () => {
       <ClaimList
         claims={claims}
         tracebacksByClaimId={tracebacksByClaimId}
-        graph={graph}
-        evidence={[]}
         alertEvidenceRefs={[]}
       />,
     );
@@ -151,8 +132,6 @@ describe('ClaimList — 责任声明 + 回溯链', () => {
       <ClaimList
         claims={[]}
         tracebacksByClaimId={new Map()}
-        graph={graph}
-        evidence={[]}
         alertEvidenceRefs={[]}
       />,
     );
@@ -164,12 +143,10 @@ describe('ClaimList — 责任声明 + 回溯链', () => {
       <ClaimList
         claims={claims}
         tracebacksByClaimId={tracebacksByClaimId}
-        graph={graph}
-        evidence={[]}
         alertEvidenceRefs={['ev-1', 'ev-9']}
       />,
     );
-    // claim-1 的 evidence_refs=['ev-1'] 与告警侧交叠 1 条
-    expect(screen.getByText(/共享 1 条证据/)).toBeDefined();
+    // claim-1 的 evidence_refs=['ev-1'] 与告警侧交叠 1 条 → 共享徽章
+    expect(screen.getByText(/共享证据 ×1/)).toBeDefined();
   });
 });

@@ -13,7 +13,7 @@ self.onmessage = (e: MessageEvent<LayoutRequest>) => {
   const { id, nodes, edges, iterations, settings } = e.data;
   try {
     const g = new Graph({ multi: true });
-    for (const n of nodes) g.addNode(n.id, { x: n.x, y: n.y });
+    for (const n of nodes) g.addNode(n.id, { x: n.x, y: n.y, size: n.size });
     for (const ed of edges) {
       if (g.hasNode(ed.source) && g.hasNode(ed.target)) g.addEdge(ed.source, ed.target);
     }

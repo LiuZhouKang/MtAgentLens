@@ -92,6 +92,14 @@ interface AppStore {
   investigationContext: InvestigationContext;
   errorMessage: string | null;
   engineRef: { current: EngineAPI | null };
+  /** 数据加载/导入进行中（init/loadRun/loadSample/importFile 期间 true，数据落库后 false）。
+   *  全屏 Observation Orbit 据此保持覆盖，直到真实数据就绪——消除「加载器先淡出、数据后切换」的跳变。 */
+  dataLoading: boolean;
+  /** 当前页面内容渲染就绪（页面在内容提交后置 true；路由切换时布局层重置 false）。
+   *  全屏加载层据此等待页面真正渲染完成，而非只看数据存在。 */
+  pageReady: boolean;
+  setDataLoading: (v: boolean) => void;
+  setPageReady: (v: boolean) => void;
 
   setAppState: (s: AppState) => void;
   setActiveRunId: (runId: string | null) => void;
@@ -191,6 +199,7 @@ function applySnapshot(
     appState: 'replay',
     errorMessage: null,
     liveSnapshotFrames: [], // 直播帧仅在 live 会话期间有效
+    dataLoading: false, // 数据已落库 → 全屏 Orbit 可就绪淡出（仍等 pageReady/sidebarReady）
   });
 }
 
@@ -226,6 +235,7 @@ function applyDbImport(
     errorMessage: null,
     // 直播帧随 run 结束/导入清空，防陈旧帧遮蔽导入的时间演化帧（审查 MEDIUM-3）
     liveSnapshotFrames: [],
+    dataLoading: false, // db 解析完成、数据落库 → 全屏 Orbit 可就绪淡出
   });
 }
 
@@ -261,9 +271,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
   investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
   errorMessage: null,
   engineRef: { current: null },
+  // 初始为「加载中」：initData 在客户端启动时异步加载数据，全屏 Orbit 覆盖首载
+  dataLoading: false,
+  pageReady: false,
   live: DEFAULT_LIVE_STATE,
 
   setAppState: (s) => set({ appState: s }),
+  setDataLoading: (v) => set({ dataLoading: v }),
+  setPageReady: (v) => set({ pageReady: v }),
   setActiveRunId: (runId) => set({ activeRunId: runId }),
   setZoomLevel: (l) => set({ zoomLevel: l }),
   setGraph: (nodes, edges) => {
@@ -315,6 +330,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       dataSource: { kind: 'run', runId },
       appState: 'replay',
       errorMessage: null,
+      // 数据加载中：下载 db / sql.js 解析期间全屏 Orbit 保持覆盖
+      dataLoading: true,
     });
 
     // The real run artifacts live in collector/collector.responsibility.db, so
@@ -353,17 +370,28 @@ export const useAppStore = create<AppStore>((set, get) => ({
         snapshotFrameIndex: 0,
         selectedNodeId: null,
         liveSnapshotFrames: [],
+        dataLoading: false, // API 回退路径同样结束加载
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       // 数据源不可用也清空 monitoring，防错误态残留上一次导入的运行监控信号
-      set({ errorMessage: message, appState: 'error', monitoring: null, liveSnapshotFrames: [] });
+      set({
+        errorMessage: message,
+        appState: 'error',
+        monitoring: null,
+        liveSnapshotFrames: [],
+        dataLoading: false, // 失败也结束加载，避免全屏 Orbit 永久滞留
+      });
     }
   },
 
   loadSample: async () => {
+    set({ dataLoading: true }); // 样例加载（含内置样例 db 解析）期间全屏 Orbit 覆盖
     const data = await loadSampleData();
-    if (!data) throw new Error('样例数据不可用（sample-run.json 未找到）');
+    if (!data) {
+      set({ dataLoading: false });
+      throw new Error('样例数据不可用（sample-run.json 未找到）');
+    }
 
     // 内置样例 db：让「样例运行」同时携带 db 资产（dbAssets/actions/intents/evidence 等），
     // 使 db 驱动视图（仪表盘/告警/追踪等）开箱可见。加载失败静默降级为纯图快照（与旧行为一致）。
@@ -404,6 +432,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       errorMessage: null,
       // MEDIUM-3：样例加载同样清空直播帧（此前唯一漏清的 loader，陈旧帧遮蔽样例图）
       liveSnapshotFrames: [],
+      dataLoading: false, // 样例数据落库 → 加载结束
     });
   },
   loadDemo: () => {
@@ -490,6 +519,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
 // ── Data loader: API (live) → sample JSON → demo fixtures ──
 async function initData() {
+  useAppStore.setState({ dataLoading: true }); // 首载数据拉取期间全屏 Orbit 覆盖
   try {
     // Try runs list — works with both Rust backend and Python data server
     const runs = await api.getRuns();
@@ -539,6 +569,7 @@ async function initData() {
         graphMetrics: data.metrics,
         monitoring: null,
         dataSource: { kind: 'sample', label: '样例运行' },
+        dataLoading: false,
       });
       return;
     }
@@ -554,6 +585,7 @@ async function initData() {
     graphMetrics: deriveGraphMetrics(demoGraph),
     monitoring: null,
     dataSource: { kind: 'demo', label: '演示数据' },
+    dataLoading: false,
   });
 }
 

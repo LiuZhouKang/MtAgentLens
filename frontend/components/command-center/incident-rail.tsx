@@ -2,23 +2,23 @@
 
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
-import { useState, Fragment, useMemo, useEffect, useRef } from 'react';
+import { useState, Fragment, useEffect, useRef } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { CountUp, Magnetic } from '@waffo/ui-fluid';
+import { Magnetic } from '@waffo/ui-fluid';
 import { FluidHeader, FLUID_PALETTES } from '@/components/ui/fluid-header';
 import { LiquidGlass, useLiquidGlassEffects } from '@/components/system/liquid-glass';
 import { AnimatedDock, type DockItemData } from '@/components/ui/animated-dock';
-import { BentoCard } from '@/components/ui/bento-grid';
+import { cn } from '@/lib/utils';
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { AnimatedList } from '@/components/ui/magic-animated-list';
 import { Codicon } from '@/components/ui/codicon';
-import { ResponsibilityMiniGraph } from '@/components/ui/responsibility-mini-graph';
 import type { InvestigationModel } from '@/lib/investigation';
 import { buildAgentHref } from '@/lib/agent-route';
 import { buildInvestigationHref } from '@/lib/investigation-route';
 import { buildTraceHref } from '@/lib/trace-route';
 import type { ResponsibilityAlert } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
+import { authorityLabel, decisionLabel as cnDecisionLabel } from '@/lib/investigation-labels';
 import RawEventBrowser from '@/components/command-center/raw-event-browser';
 
 type AlertWithModel = {
@@ -68,6 +68,26 @@ type IncidentRailProps = {
   onWidthChange?: (width: number) => void;
 };
 
+// 线性克制面板（与全站 ln-* 风格一致）：细边框、半透明底、小圆角。
+// 替换 BentoCard 的 Spotlight 聚光 / 32px 大圆角 / 高饱和毛玻璃 demo 风格，
+// 让侧边栏与其他页面的专业线性视觉统一。
+// `rail-card` 类供 globals.css 级联入场动画定位（展开/切换工作台时逐个淡入上浮）。
+function RailCard({
+  className,
+  children,
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={cn('rail-card rounded-xl border border-white/[0.06] bg-white/[0.02]', className)}
+    >
+      {children}
+    </div>
+  );
+}
+
 export const dockItems: DockItem[] = [
   { id: 'incident', label: '事件', icon: 'warning' },
   { id: 'evidence', label: '证据', icon: 'files' },
@@ -102,8 +122,8 @@ function severityLabel(severity: ResponsibilityAlert['severity']) {
 function buildFactRows(selectedAlert: ResponsibilityAlert, selectedModel: InvestigationModel) {
   return [
     { label: '主体', value: selectedAlert.primary_agent.agent_id },
-    { label: '判定', value: selectedAlert.decision },
-    { label: '权限', value: selectedAlert.authority },
+    { label: '判定', value: cnDecisionLabel(selectedAlert.decision).label },
+    { label: '权限', value: authorityLabel(selectedAlert.authority).label },
     { label: '边界', value: `${selectedModel.boundaryCrossingCount} 次` },
     { label: '证据', value: `${selectedModel.evidenceRefs.length} 条` },
     { label: '时长', value: formatDuration(selectedModel.timelineDurationMs) },
@@ -238,31 +258,14 @@ function AnimatedPathPreview({
   );
 }
 
-function buildReactFlowData(model: InvestigationModel) {
-  const nodes = model.pathNodes.map((node) => ({
-    id: node.nodeId,
-    label: node.label,
-    nodeType: node.nodeType || 'NODE',
-  }));
-
-  const edges = model.pathEdges.map((edge) => ({
-    id: edge.edge_id,
-    source: edge.source,
-    target: edge.target,
-    edgeType: edge.edge_type,
-    confidence: edge.confidence,
-    evidenceRefs: edge.evidence_refs,
-  }));
-
-  return { nodes, edges };
-}
-
 function buildNextAction(selectedAlert: ResponsibilityAlert) {
-  if (selectedAlert.action_hint) return selectedAlert.action_hint;
+  // 英文 action_hint（Rust 模板 "Investigate agent X for ..."）不可直读，
+  // 改用基于真实判定结论的中文操作建议 —— 用户一眼看懂该做什么。
   if (selectedAlert.decision === 'Unsafe')
-    return '优先打开调查视图，确认边界证据，然后安排隔离与处置。';
-  if (selectedAlert.decision === 'Uncertain') return '先补强链路与证据，再决定是否升级处置。';
-  return '保持当前事件受控，并持续观察是否再次出现边界活动。';
+    return '优先打开调查视图，确认边界证据后安排隔离与处置。';
+  if (selectedAlert.decision === 'Uncertain')
+    return '补强链路与证据后，再决定是否升级处置。';
+  return '保持事件受控，持续观察是否再次出现边界活动。';
 }
 
 function evidenceStatus(selectedModel: InvestigationModel, selectedAlert: ResponsibilityAlert) {
@@ -312,24 +315,11 @@ function firstBoundaryLabel(selectedModel: InvestigationModel) {
   return boundaryEdge?.target ?? '暂无边界锚点';
 }
 
-function riskPulse(selectedAlert: ResponsibilityAlert, selectedModel: InvestigationModel) {
-  const severityBoost =
-    selectedAlert.severity === 'Critical' ? 34 : selectedAlert.severity === 'Warning' ? 18 : 6;
-  const decisionBoost =
-    selectedAlert.decision === 'Unsafe' ? 26 : selectedAlert.decision === 'Uncertain' ? 14 : 0;
-  return Math.min(
-    99,
-    Math.max(
-      8,
-      Math.round(
-        selectedAlert.confidence * 36 +
-          selectedModel.boundaryCrossingCount * 12 +
-          selectedModel.evidenceRefs.length * 4 +
-          severityBoost +
-          decisionBoost,
-      ),
-    ),
-  );
+function riskPulse(selectedAlert: ResponsibilityAlert) {
+  // 真实告警置信度（0-100%）：此前用 confidence×36 + 边界×12 + 证据×4 等
+  // 人为加权公式「编造」出 99% 之类的风险值 —— 那是假数据。现在直接使用
+  // 数据库中的真实告警置信度，不再虚构。
+  return Math.round(selectedAlert.confidence * 100);
 }
 
 function buildNarrativeRailItems(
@@ -549,6 +539,7 @@ export default function IncidentRail({
   const layoutExpanded = expanded;
   const [activeTool, setActiveTool] = useState<DockTool>('incident');
   const [eventsOpen, setEventsOpen] = useState(false);
+  const dataSource = useAppStore((s) => s.dataSource);
   const dbAssets = useAppStore((s) => s.dbAssets);
   const dbIntents = useAppStore((s) => s.intents);
   const dbActions = useAppStore((s) => s.actions);
@@ -561,11 +552,10 @@ export default function IncidentRail({
   const readiness = evidenceStatus(selectedModel, selectedAlert);
   const readinessIcon = readiness.icon;
   const nextAction = buildNextAction(selectedAlert);
-  const traceFlowData = useMemo(() => buildReactFlowData(selectedModel), [selectedModel]);
   const pathPreview = buildPathPreview(selectedModel);
   const severity = severityTone(selectedAlert.severity);
   const boundaryLabel = firstBoundaryLabel(selectedModel);
-  const pulse = riskPulse(selectedAlert, selectedModel);
+  const pulse = riskPulse(selectedAlert);
   const handoffEdges = selectedModel.pathEdges.filter((edge) =>
     handoffEdgeTypes.has(edge.edge_type),
   );
@@ -595,24 +585,28 @@ export default function IncidentRail({
   const exactEvidenceCount = selectedModel.timelineSteps.filter(
     (step) => step.evidence_level === 'L1Exact',
   ).length;
-  const evidencePulse = Math.min(
-    98,
-    Math.max(
-      16,
-      selectedModel.evidenceRefs.length * 22 +
-        selectedModel.linkedEvidence.length * 9 +
-        exactEvidenceCount * 14,
-    ),
-  );
-  const tracePulse = Math.min(
-    98,
-    Math.max(
-      18,
-      selectedModel.pathEdges.length * 12 +
-        selectedModel.timelineSteps.length * 4 +
-        selectedModel.boundaryCrossingCount * 14,
-    ),
-  );
+  // ── 各工作台独立、真实的指标（此前用 evidenceRefs×22 + exact×14 等编造
+  // 加权公式产生 98% 假值，或全部复制告警置信度 —— 都不诚实）。现在每个
+  // 工作台展示「各自的真实数据」：
+  // 事件工作台 = 告警置信度（alert.confidence）；
+  // 证据工作台 = 已关联证据的最高真实置信度（correlation_evidence）；
+  // 链路工作台 = 责任路径边的平均真实置信度（graph_edges）。
+  // 证据工作台：证据引用关联责任边的最高真实置信度（graph_edges confidence，
+  // 边带 evidence_refs 即「这条边由证据支撑」）。无关联时回退告警置信度。
+  const evidenceConfs = selectedModel.pathEdges
+    .filter((e) => e.evidence_refs?.length)
+    .map((e) => e.confidence)
+    .filter((c): c is number => typeof c === 'number' && c > 0);
+  const evidencePulse = evidenceConfs.length
+    ? Math.round(Math.max(...evidenceConfs) * 100)
+    : Math.round(selectedAlert.confidence * 100);
+  // 链路工作台：责任路径边的平均真实置信度（graph_edges confidence）。
+  const traceConfs = selectedModel.pathEdges
+    .map((e) => e.confidence)
+    .filter((c): c is number => typeof c === 'number' && c > 0);
+  const tracePulse = traceConfs.length
+    ? Math.round((traceConfs.reduce((a, b) => a + b, 0) / traceConfs.length) * 100)
+    : Math.round(selectedAlert.confidence * 100);
   const incidentNarrative = buildNarrativeRailItems(
     selectedModel.pathNodes.map((node, index) => ({
       id: `${node.label}-${index}`,
@@ -689,18 +683,28 @@ export default function IncidentRail({
           : expanded
             ? 'min(612px, calc(100vw - 28px))'
             : '58px',
-        height: 'auto',
+        // 高度硬性绑定包装容器（100%）而非随内容增长（auto）——面板内容在
+        // calc(100vh-40px) 内自滚动，rail 任何状态下都不可能超出屏幕/撑高页面。
+        height: '100%',
+        maxHeight: '100%',
+        overflow: 'hidden',
         maxWidth: isResizable ? 'none' : 'min(612px, calc(100vw - 28px))',
+        // 收起/展开平滑过渡宽度（配合下方双列 grid）——此前宽度瞬间跳到 58px、
+        // 列随即消失，正在退场的面板被瞬间压扁重排 → 卡顿 + 内容跳变。transition
+        // 只在非拖拽时生效（sash 拖拽期间由 resize 处理器临时置 none，避免拖拽滞后）。
+        transition: 'width 240ms cubic-bezier(0.22, 1, 0.36, 1)',
       }
     : undefined;
   const theaterLayoutStyle: CSSProperties | undefined = isTheater
     ? {
         display: 'grid',
-        // responsive content column — fills whatever width the sash gives
-        gridTemplateColumns: layoutExpanded ? '58px minmax(0, 1fr)' : '58px',
+        // 始终保持双列：第二列由 aside 宽度驱动（收起时 aside=58px → 1fr 解析为 0）。
+        // 面板在自身 overflow:hidden 内随列宽平滑收窄 + 透明度淡出，而不是退场瞬间
+        // 失去网格列被 auto 放置、内容在 58px 空间里被压扁 —— 消除退场重排跳变。
+        gridTemplateColumns: '58px minmax(0, 1fr)',
         alignItems: 'start',
         gap: '8px',
-        width: layoutExpanded ? '100%' : 'fit-content',
+        width: '100%',
         height: 'auto',
       }
     : undefined;
@@ -845,6 +849,10 @@ export default function IncidentRail({
     ? {
         minHeight: 0,
         height: 'auto',
+        // flex-shrink:0：面板 flex 列中不收缩——工作台内容高度完整参与
+        // 面板滚动（此前被收缩 → 内容可见溢出但面板 scrollHeight 不增长，
+        // 造成卡片超出屏幕且无法滚动）。
+        flexShrink: 0,
         overflow: 'visible',
       }
     : undefined;
@@ -903,8 +911,21 @@ export default function IncidentRail({
       return next;
     };
 
+    // 拖拽/键盘调整宽度期间必须关闭 aside 的 width transition（收起/展开专用），
+    // 否则每次 pointermove 都触发 240ms 宽度过渡 → 拖拽明显滞后。
+    const pauseWidthTransition = () => {
+      aside.style.transition = 'none';
+    };
+    const resumeWidthTransition = () => {
+      // 下一帧恢复，避免与本次宽度写入同帧生效造成跳变
+      requestAnimationFrame(() => {
+        aside.style.transition = '';
+      });
+    };
+
     const onPointerDown = (e: PointerEvent) => {
       e.preventDefault();
+      pauseWidthTransition();
       resizingRef.current = true;
       resizeStartXRef.current = e.clientX;
       resizeStartWRef.current = aside.getBoundingClientRect().width;
@@ -922,6 +943,7 @@ export default function IncidentRail({
       resizingRef.current = false;
       const w = Math.round(aside.getBoundingClientRect().width);
       onWidthChange?.(w);
+      resumeWidthTransition();
     };
 
     const onDblClick = () => {
@@ -933,10 +955,12 @@ export default function IncidentRail({
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         e.preventDefault();
+        pauseWidthTransition();
         const cur = aside.getBoundingClientRect().width;
         const delta = e.key === 'ArrowRight' ? 20 : -20;
         const next = applyWidth(cur + delta);
         onWidthChange?.(next);
+        resumeWidthTransition();
       }
     };
 
@@ -966,7 +990,10 @@ export default function IncidentRail({
       data-finish={isTheater ? 'control-deck-v4' : undefined}
       data-theme="apple-pro"
       aria-label="事件调查控制轨"
-      style={theaterAsideStyle}
+      // 定位双保险：无条件 position:relative / top:auto / left:auto —— 位置一律由布局
+      // 容器（console 绝对包裹 / 其余 flex）决定，杜绝任何状态（含 theater 内联未生效
+      // 的间隙）下 rail 浮出顶部、压过顶栏。
+      style={{ position: 'relative', top: 'auto', left: 'auto', ...theaterAsideStyle }}
     >
       <h1 id="command-console-title" className="sr-only">
         {selectionSummary.title}
@@ -1017,26 +1044,20 @@ export default function IncidentRail({
               className="incident-rail__panel-shell"
               data-tool={activeTool}
               style={theaterPanelShellStyle}
+              // 入场/退场只用 GPU-composited 的 opacity + transform —— 不掺
+              // filter: blur / scale。前者每帧对整个面板重栅格化（卡顿），并把
+              // 面板里大量半透明层 + FluidHeader 渐变的颜色抹糊成「色彩残留」；
+              // scale 亦会触发合成层重排。收起时宽度过渡 + 透明淡出已足够优雅。
               initial={
-                reduceMotion
-                  ? { opacity: 1 }
-                  : { opacity: 0, x: -10, scale: 0.992, filter: 'blur(4px)' }
+                reduceMotion ? { opacity: 1 } : { opacity: 0, x: -8 }
               }
               animate={
                 reduceMotion
                   ? { opacity: 1 }
-                  : {
-                      opacity: 1,
-                      x: 0,
-                      scale: 1,
-                      filter: 'blur(0px)',
-                      transitionEnd: { transform: 'none' },
-                    }
+                  : { opacity: 1, x: 0, transitionEnd: { transform: 'none' } }
               }
               exit={
-                reduceMotion
-                  ? { opacity: 0 }
-                  : { opacity: 0, x: -8, scale: 0.996, filter: 'blur(3px)' }
+                reduceMotion ? { opacity: 0 } : { opacity: 0, x: -6 }
               }
               transition={panelTransition}
             >
@@ -1065,7 +1086,17 @@ export default function IncidentRail({
                     style={{ ...theaterPanelHeroStyle, position: 'relative', zIndex: 1 }}
                   >
                     <div className="incident-rail__panel-title mesh-text-layer">
-                      <span className="incident-rail__panel-kicker">MtAgentLens / 责任透镜</span>
+                      <span className="incident-rail__panel-kicker">
+                        MtAgentLens / 责任透镜
+                        {dataSource?.kind === 'sample' || dataSource?.kind === 'demo' ? (
+                          <em
+                            className="ml-2 rounded-sm border border-amber-400/25 bg-amber-400/10 px-1.5 py-px text-[9px] font-medium not-italic tracking-widest text-amber-300/80 uppercase"
+                            title="当前显示内置样例数据（非您的真实责任库）；导入真实数据库后即展示真实数据"
+                          >
+                            样例数据
+                          </em>
+                        ) : null}
+                      </span>
                       <div className="incident-rail__panel-heading">
                         <span className="incident-rail__panel-icon" data-tone={activeLens.tone}>
                           <Codicon name={activeIcon} size={17} />
@@ -1080,7 +1111,7 @@ export default function IncidentRail({
                       <span data-tone={severity}>{severityLabel(selectedAlert.severity)}</span>
                       <span>{decisionLabel(selectedAlert.decision)}</span>
                       <span>
-                        <CountUp value={pulse} />
+                        <AnimatedNumber value={pulse} />
                       </span>
                     </div>
                   </div>
@@ -1121,13 +1152,13 @@ export default function IncidentRail({
                       className="incident-inspector-view w-full"
                       style={theaterSurfaceStyle}
                       initial={
-                        reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10, filter: 'blur(5px)' }
+                        reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }
                       }
                       animate={
-                        reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' }
+                        reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }
                       }
                       exit={
-                        reduceMotion ? { opacity: 0 } : { opacity: 0, y: -5, filter: 'blur(2px)' }
+                        reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }
                       }
                       transition={{ duration: reduceMotion ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
                     >
@@ -1138,7 +1169,7 @@ export default function IncidentRail({
                           style={theaterSurfaceStyle}
                         >
                           <div className="flex flex-col gap-4 pb-12">
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex flex-wrap items-center gap-3">
                                   <ToolbenchStatus
@@ -1164,14 +1195,14 @@ export default function IncidentRail({
                                   </p>
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center justify-between">
                                   <div className="flex flex-col gap-1">
                                     <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
-                                      风险脉冲
+                                      置信度评估
                                     </span>
                                     <small className="text-xs font-light text-white/40">
                                       {selectedModel.boundaryCrossingCount} 次边界 ·{' '}
@@ -1180,7 +1211,7 @@ export default function IncidentRail({
                                   </div>
                                   <div className="flex items-baseline gap-1">
                                     <strong className="text-5xl font-extralight tracking-tighter text-white/90 tabular-nums">
-                                      <CountUp value={pulse} />
+                                      <AnimatedNumber value={pulse} />
                                     </strong>
                                     <span className="text-lg font-light text-white/30">%</span>
                                   </div>
@@ -1197,9 +1228,9 @@ export default function IncidentRail({
                                   />
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-4">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="zap" size={14} className="text-white/30" />
@@ -1238,9 +1269,9 @@ export default function IncidentRail({
                                   </button>
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="references" size={14} className="text-white/30" />
@@ -1264,9 +1295,9 @@ export default function IncidentRail({
                                   ))}
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="shield" size={14} className="text-white/30" />
@@ -1301,9 +1332,9 @@ export default function IncidentRail({
                                   </div>
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="graph-line" size={14} className="text-white/30" />
@@ -1335,7 +1366,7 @@ export default function IncidentRail({
                                   ))}
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
                           </div>
                         </section>
                       )}
@@ -1347,7 +1378,7 @@ export default function IncidentRail({
                           style={theaterSurfaceStyle}
                         >
                           <div className="flex flex-col gap-4 pb-12">
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex flex-wrap items-center gap-3">
                                   <ToolbenchStatus
@@ -1373,9 +1404,9 @@ export default function IncidentRail({
                                   </p>
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center justify-between">
                                   <div className="flex flex-col gap-1">
@@ -1406,9 +1437,9 @@ export default function IncidentRail({
                                   />
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-4">
                                 <div className="flex items-center gap-2">
                                   <Codicon
@@ -1434,9 +1465,9 @@ export default function IncidentRail({
                                   </Link>
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="references" size={14} className="text-white/30" />
@@ -1460,9 +1491,9 @@ export default function IncidentRail({
                                   ))}
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="references" size={14} className="text-white/30" />
@@ -1481,9 +1512,9 @@ export default function IncidentRail({
                                   ))}
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="search" size={14} className="text-white/30" />
@@ -1522,7 +1553,7 @@ export default function IncidentRail({
                                   ))}
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
                           </div>
                         </section>
                       )}
@@ -1534,7 +1565,7 @@ export default function IncidentRail({
                           style={theaterSurfaceStyle}
                         >
                           <div className="flex flex-col gap-4 pb-12">
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex flex-wrap items-center gap-3">
                                   <ToolbenchStatus
@@ -1560,9 +1591,9 @@ export default function IncidentRail({
                                   </p>
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center justify-between">
                                   <div className="flex flex-col gap-1">
@@ -1576,7 +1607,7 @@ export default function IncidentRail({
                                   </div>
                                   <div className="flex items-baseline gap-1">
                                     <strong className="text-5xl font-extralight tracking-tighter text-white/90 tabular-nums">
-                                      <CountUp value={tracePulse} />
+                                      <AnimatedNumber value={tracePulse} />
                                     </strong>
                                     <span className="text-lg font-light text-white/30">%</span>
                                   </div>
@@ -1593,9 +1624,9 @@ export default function IncidentRail({
                                   />
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-4">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="zap" size={14} className="text-white/30" />
@@ -1615,9 +1646,9 @@ export default function IncidentRail({
                                   </Link>
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="graph-line" size={14} className="text-white/30" />
@@ -1641,9 +1672,9 @@ export default function IncidentRail({
                                   ))}
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon name="git-commit" size={14} className="text-white/30" />
@@ -1675,9 +1706,9 @@ export default function IncidentRail({
                                   ))}
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon
@@ -1700,16 +1731,6 @@ export default function IncidentRail({
                                 </div>
                                 <div className="my-2 h-px w-full bg-white/5" />
                                 <div className="relative flex w-full flex-col gap-6">
-                                  <div className="flex w-full min-w-0 flex-col gap-3">
-                                    <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
-                                      交互式责任网络
-                                    </span>
-                                    <ResponsibilityMiniGraph
-                                      nodes={traceFlowData.nodes}
-                                      edges={traceFlowData.edges}
-                                      alertId={selectedAlert.alert_id}
-                                    />
-                                  </div>
                                   <div className="mt-2 flex w-full min-w-0 flex-col gap-3">
                                     <span className="text-[10px] font-medium tracking-[0.2em] text-white/40 uppercase">
                                       事件追踪流
@@ -1722,9 +1743,9 @@ export default function IncidentRail({
                                   </div>
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
 
-                            <BentoCard className="p-6">
+                            <RailCard className="p-6">
                               <div className="flex flex-col gap-5">
                                 <div className="flex items-center gap-2">
                                   <Codicon
@@ -1752,7 +1773,7 @@ export default function IncidentRail({
                                   />
                                 </div>
                               </div>
-                            </BentoCard>
+                            </RailCard>
                           </div>
                         </section>
                       )}
@@ -1786,6 +1807,10 @@ export default function IncidentRail({
             tlsSessions={dbAssets?.tlsSessions ?? []}
             intents={dbIntents}
             actions={dbActions}
+            pollutionEvents={dbAssets?.pollutionEvents ?? []}
+            identityProcessMap={dbAssets?.identityProcessMap ?? []}
+            processEventTruncated={dbAssets?.processEventTruncated ?? false}
+            tlsSessionTruncated={dbAssets?.tlsSessionTruncated ?? false}
             onClose={() => setEventsOpen(false)}
           />
         )}

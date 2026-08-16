@@ -17,6 +17,6 @@ export function deriveAgentIdsFromAlertsAndGraph(
   );
 }
 
-export function deriveClusterIds(alerts: ResponsibilityAlert[], graph: GraphData): string[] {
+export function deriveResponsibilityUnitIds(alerts: ResponsibilityAlert[], graph: GraphData): string[] {
   return deriveAgentIdsFromAlertsAndGraph(alerts, graph);
 }

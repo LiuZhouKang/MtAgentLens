@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { demoAlerts, demoEvidence, demoGraph } from '@/lib/demo-data';
-import { buildClusterModel, compareClusterModels } from '@/lib/cluster-model';
+import { buildResponsibilityUnit, compareResponsibilityUnits } from '@/lib/responsibility-unit';
 
 describe('stellar model builders', () => {
-  it('builds a cluster model from graph, alerts and evidence', () => {
-    const model = buildClusterModel('agent-security', demoGraph, demoAlerts, demoEvidence);
+  it('builds a responsibility unit from graph, alerts and evidence', () => {
+    const model = buildResponsibilityUnit('agent-security', demoGraph, demoAlerts, demoEvidence);
 
-    expect(model.clusterId).toBe('agent-security');
+    expect(model.unitId).toBe('agent-security');
     expect(model.alertIds).toEqual(['demo-alert-1']);
     expect(model.primaryAlertIds).toEqual(['demo-alert-1']);
     expect(model.supportingAlertIds).toEqual([]);
@@ -38,10 +38,10 @@ describe('stellar model builders', () => {
     expect(model.pressureScore).toBeGreaterThan(0);
   });
 
-  it('returns a stable empty cluster model when no matching data is found', () => {
-    const model = buildClusterModel('cluster-missing', demoGraph, demoAlerts, demoEvidence);
+  it('returns a stable empty responsibility unit when no matching data is found', () => {
+    const model = buildResponsibilityUnit('unit-missing', demoGraph, demoAlerts, demoEvidence);
 
-    expect(model.clusterId).toBe('cluster-missing');
+    expect(model.unitId).toBe('unit-missing');
     expect(model.alertIds).toEqual([]);
     expect(model.primaryAlertIds).toEqual([]);
     expect(model.supportingAlertIds).toEqual([]);
@@ -60,12 +60,12 @@ describe('stellar model builders', () => {
     });
   });
 
-  it('sorts cluster models by pressure before lower-signal anchors', () => {
+  it('sorts responsibility units by pressure before lower-signal anchors', () => {
     const models = ['agent-builder', 'agent-frontend', 'agent-security']
-      .map((clusterId) => buildClusterModel(clusterId, demoGraph, demoAlerts, demoEvidence))
-      .sort(compareClusterModels);
+      .map((unitId) => buildResponsibilityUnit(unitId, demoGraph, demoAlerts, demoEvidence))
+      .sort(compareResponsibilityUnits);
 
-    expect(models.map((model) => model.clusterId)).toEqual([
+    expect(models.map((model) => model.unitId)).toEqual([
       'agent-security',
       'agent-frontend',
       'agent-builder',

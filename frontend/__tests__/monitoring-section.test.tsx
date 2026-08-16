@@ -108,18 +108,18 @@ describe('MonitoringSection', () => {
     useAppStore.setState({ monitoring: makeMonitoring() });
     render(<MonitoringSection />);
     // 默认全部 → 卡片网格可见（无详情外壳，描述文案不存在）
-    expect(screen.queryByText(/逐帧演进/)).toBeNull();
+    expect(screen.queryByText(/随时间的演进/)).toBeNull();
     // 点击「拓扑漂移」健康格（name 为按钮完整可访问名，用正则子串匹配；[0]=健康格，先于 tab/卡片在 DOM 中）
     const driftCell = screen.getAllByRole('button', { name: /拓扑漂移/ })[0];
     act(() => {
       driftCell.click();
     });
     // 详情外壳出现唯一描述文案（card grid 已替换为外壳）
-    expect(screen.getByText(/逐帧演进/)).toBeTruthy();
+    expect(screen.getByText(/随时间的演进/)).toBeTruthy();
     // 返回全部恢复网格（返回按钮 aria-label="返回全部"，与「← 返回全部」正文不同）
     act(() => {
       screen.getByRole('button', { name: '返回全部' }).click();
     });
-    expect(screen.queryByText(/逐帧演进/)).toBeNull();
+    expect(screen.queryByText(/随时间的演进/)).toBeNull();
   });
 });

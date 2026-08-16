@@ -31,6 +31,7 @@ export default function InvestigationsPageClient() {
   const intents = useAppStore((s) => s.intents);
   const dbAssets = useAppStore((s) => s.dbAssets);
   const dataSource = useAppStore((s) => s.dataSource);
+  const setPageReady = useAppStore((s) => s.setPageReady);
   // 分面内点选告警不丢分面：告警深链保留当前 query（?facet=）
   const buildAlertHref = useCallback(
     (id?: string | null) => buildAlertHrefWithQuery(id, sp.toString()),
@@ -41,7 +42,7 @@ export default function InvestigationsPageClient() {
     parseValue: parseInvestigationAlertId,
     buildHref: buildAlertHref,
   });
-  const { evidenceItems, evidenceLoading, evidenceError } = useRunEvidence(activeRunId);
+  const { evidenceItems } = useRunEvidence(activeRunId);
 
   // 分面：live（无 db）时强制 all，避免「残留 facet 参数 → 空态」
   const facet = parseFacetSelection(sp);
@@ -78,6 +79,13 @@ export default function InvestigationsPageClient() {
     [models, hashAlertId],
   );
 
+  // 页面内容就绪信号（供布局层协调加载层）：无告警 → 空态即内容；有告警 → 等待
+  // 选中告警的 InvestigationModel 计算完成（否则页面显示「正在构建调查模型…」迷你
+  // Orbit，会被全屏加载层覆盖——布局层据此保持覆盖直到真正就绪，杜绝第二加载动画）。
+  useEffect(() => {
+    setPageReady(alerts.length === 0 || selected?.model != null);
+  }, [alerts.length, selected?.model, setPageReady]);
+
   const handleSelectAlert = useCallback(
     (alertId: string) => {
       setHashAlertId(alertId);
@@ -100,18 +108,13 @@ export default function InvestigationsPageClient() {
   const pageRef = useRef<HTMLDivElement>(null);
   useGSAP(
     () => {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
       tl.fromTo(
         '.ln-kpi-strip > *',
         { opacity: 0, y: 10 },
         { opacity: 1, y: 0, duration: 0.4, stagger: 0.05, clearProps: 'transform' },
         0,
-      );
-      tl.fromTo(
-        '.alert-list-btn',
-        { opacity: 0, x: -8 },
-        { opacity: 1, x: 0, duration: 0.35, stagger: 0.04, clearProps: 'transform' },
-        0.15,
       );
     },
     { scope: pageRef },
@@ -140,11 +143,8 @@ export default function InvestigationsPageClient() {
           <InvestigationWorkbench
             alert={selected.alert}
             model={selected.model}
-            activeRunId={activeRunId}
             availableAlerts={filteredAlerts}
             onSelectAlert={handleSelectAlert}
-            evidenceLoading={evidenceLoading}
-            evidenceError={evidenceError}
           />
         ) : (
           <div

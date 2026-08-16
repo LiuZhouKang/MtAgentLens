@@ -47,12 +47,4 @@ describe('frontend quality baseline', () => {
     expect(pkg.scripts['ci:quality']).toContain('audit:responsive');
   });
 
-  test('frontend workflow runs audits and stores artifacts', () => {
-    const workflow = read('../.github/workflows/frontend-quality.yml');
-
-    expect(workflow).toContain('ci:quality');
-    expect(workflow).toContain('audit:compat');
-    expect(workflow).toContain('audit:lighthouse');
-    expect(workflow).toContain('Upload quality artifacts');
-  });
 });

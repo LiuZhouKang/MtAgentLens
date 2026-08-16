@@ -1,9 +1,8 @@
 import { deriveTracebackEdgeIds } from './traceback';
-import { deriveClusterIds } from './stellar-directory';
+import { deriveResponsibilityUnitIds } from './stellar-directory';
 import type { CorrelationEvidence, GraphData, ResponsibilityAlert } from './types';
 import {
   collectAlertAgentIds,
-  collectLinkedEvidence,
   findAgentNode,
   findDirectlyConnectedNodeIds,
   findNodeById,
@@ -15,7 +14,7 @@ import {
   type SurfacedResource,
 } from './resource-surface';
 
-export interface ClusterAgentLane {
+export interface UnitAgentLane {
   agentId: string;
   label: string;
   alertCount: number;
@@ -25,8 +24,8 @@ export interface ClusterAgentLane {
   linkedEvidenceCount: number;
 }
 
-export interface ClusterModel {
-  clusterId: string;
+export interface ResponsibilityUnit {
+  unitId: string;
   title: string;
   summary: string;
   alertIds: string[];
@@ -36,7 +35,7 @@ export interface ClusterModel {
   leadAgentId: string | null;
   relatedAgentIds: string[];
   relatedAgentLabels: string[];
-  agentLanes: ClusterAgentLane[];
+  agentLanes: UnitAgentLane[];
   highlightEdgeIds: string[];
   linkedEvidence: CorrelationEvidence[];
   surfacedResources: SurfacedResource[];
@@ -68,13 +67,13 @@ function compareAlerts(left: ResponsibilityAlert, right: ResponsibilityAlert) {
   return right.timestamp_ns - left.timestamp_ns;
 }
 
-export function compareClusterModels(left: ClusterModel, right: ClusterModel) {
+export function compareResponsibilityUnits(left: ResponsibilityUnit, right: ResponsibilityUnit) {
   if (left.pressureScore !== right.pressureScore) {
     return right.pressureScore - left.pressureScore;
   }
 
-  const leftSelfAnchored = left.leadAgentId === left.clusterId ? 1 : 0;
-  const rightSelfAnchored = right.leadAgentId === right.clusterId ? 1 : 0;
+  const leftSelfAnchored = left.leadAgentId === left.unitId ? 1 : 0;
+  const rightSelfAnchored = right.leadAgentId === right.unitId ? 1 : 0;
   if (leftSelfAnchored !== rightSelfAnchored) {
     return rightSelfAnchored - leftSelfAnchored;
   }
@@ -94,33 +93,33 @@ export function compareClusterModels(left: ClusterModel, right: ClusterModel) {
     return right.linkedEvidence.length - left.linkedEvidence.length;
   }
 
-  return left.clusterId.localeCompare(right.clusterId);
+  return left.unitId.localeCompare(right.unitId);
 }
 
-export function buildClusterModel(
-  clusterId: string,
+export function buildResponsibilityUnit(
+  unitId: string,
   graph: GraphData,
   alerts: ResponsibilityAlert[],
   evidence: CorrelationEvidence[] = [],
-): ClusterModel {
-  const relevantAlerts = alerts.filter((alert) => collectAlertAgentIds(alert).includes(clusterId));
+): ResponsibilityUnit {
+  const relevantAlerts = alerts.filter((alert) => collectAlertAgentIds(alert).includes(unitId));
   const primaryAlerts = relevantAlerts.filter(
-    (alert) => alert.primary_agent?.agent_id === clusterId,
+    (alert) => alert.primary_agent?.agent_id === unitId,
   );
   const supportingAlerts = relevantAlerts.filter(
-    (alert) => alert.primary_agent?.agent_id !== clusterId,
+    (alert) => alert.primary_agent?.agent_id !== unitId,
   );
   const anchorAlerts = (primaryAlerts.length ? primaryAlerts : relevantAlerts)
     .slice()
     .sort(compareAlerts);
-  const directNode = findAgentNode(graph, clusterId);
+  const directNode = findAgentNode(graph, unitId);
   const connectedNodeIds = directNode
     ? findDirectlyConnectedNodeIds(graph, [directNode.node_id])
     : [];
   const relatedAgentIds = Array.from(
     new Set(
       [
-        ...(directNode || relevantAlerts.length ? [clusterId] : []),
+        ...(directNode || relevantAlerts.length ? [unitId] : []),
         ...relevantAlerts.flatMap((alert) => collectAlertAgentIds(alert)),
         ...connectedNodeIds
           .map((nodeId) => findNodeById(graph, nodeId))
@@ -178,10 +177,16 @@ export function buildClusterModel(
           return;
         }
 
-        collectLinkedEvidence([alert], evidence).forEach((item) =>
-          laneEvidenceIds.add(item.evidence_id),
-        );
+        // 完整证据关联通道：告警 timeline.evidence_ref + 该 agent 相关边的 evidence_refs
+        for (const step of alert.timeline.steps) {
+          if (step.evidence_ref) laneEvidenceIds.add(step.evidence_ref);
+        }
       });
+      for (const edge of highlightEdges) {
+        if (edge.source === agentNodeId || edge.target === agentNodeId) {
+          for (const ref of edge.evidence_refs ?? []) laneEvidenceIds.add(ref);
+        }
+      }
 
       return {
         agentId,
@@ -221,6 +226,20 @@ export function buildClusterModel(
   const delegationEdgeCount = highlightEdges.filter(
     (edge) => edge.edge_type === 'AgentDelegatesTo',
   ).length;
+  // 证据关联（与 investigation 模型一致的完整双通道）：告警 timeline.evidence_ref +
+  // 相关图边 edge.evidence_refs + 节点 evidence_refs。真实 db 的证据通过图边
+  // evidence_refs 关联（3300 边中 3262 带 refs，全匹配 correlation_evidence）——
+  // 仅用 timeline.ref（真实 db 告警为空）会漏关联，导致「证据分布」面板误显 0。
+  const linkedRefs = new Set<string>(directNode?.evidence_refs ?? []);
+  for (const alert of relevantAlerts) {
+    for (const step of alert.timeline.steps) {
+      if (step.evidence_ref) linkedRefs.add(step.evidence_ref);
+    }
+  }
+  for (const edge of highlightEdges) {
+    for (const ref of edge.evidence_refs ?? []) linkedRefs.add(ref);
+  }
+  const linkedEvidence = evidence.filter((item) => linkedRefs.has(item.evidence_id));
   const pressureScore = Math.max(
     10,
     Math.min(
@@ -231,18 +250,17 @@ export function buildClusterModel(
         delegationEdgeCount * 14 +
         highlightEdgeIds.length * 8 +
         surfacedResources.length * 6 +
-        collectLinkedEvidence(relevantAlerts, evidence, directNode?.evidence_refs ?? []).length *
-          10 +
+        linkedEvidence.length * 10 +
         severityBoost(highestSeverity),
     ),
   );
 
   return {
-    clusterId,
-    title: directNode ? formatNodeLabelById(graph, directNode.node_id) : clusterId,
+    unitId,
+    title: directNode ? formatNodeLabelById(graph, directNode.node_id) : unitId,
     summary:
       anchorAlerts[0]?.summary ??
-      '当前尚未发现与该集群直接绑定的告警，后续接入真实 cluster 识别后这里会显示成熟监测摘要。',
+      '当前尚未发现与该责任单元直接绑定的告警，后续接入真实单元识别后这里会显示成熟监测摘要。',
     alertIds: relevantAlerts.map((alert) => alert.alert_id),
     primaryAlertIds: primaryAlerts.map((alert) => alert.alert_id),
     supportingAlertIds: supportingAlerts.map((alert) => alert.alert_id),
@@ -252,11 +270,7 @@ export function buildClusterModel(
     relatedAgentLabels: relatedAgentIds.map((agentId) => formatNodeLabelById(graph, agentId)),
     agentLanes,
     highlightEdgeIds,
-    linkedEvidence: collectLinkedEvidence(
-      relevantAlerts,
-      evidence,
-      directNode?.evidence_refs ?? [],
-    ),
+    linkedEvidence,
     surfacedResources,
     resourceCounts,
     boundaryCrossingCount,
@@ -266,15 +280,15 @@ export function buildClusterModel(
   };
 }
 
-// ── Bounded cluster modeling ──
+// ── Bounded responsibility-unit modeling ──
 //
-// A full ClusterModel costs O(graph) per cluster to build (edge scans,
+// A full ResponsibilityUnit costs O(graph) per responsibility unit to build (edge scans,
 // tracebacks, resource surfacing). On a large graph — where every agent is its
-// own cluster, so thousands of them — modeling EVERY cluster stalls the main
+// own responsibility unit, so thousands of them — modeling EVERY unit stalls the main
 // thread for seconds and defeats the dashboard's skeleton-first loading. So we
-// rank all clusters with cheap signals (alert association + connectivity
+// rank all units with cheap signals (alert association + connectivity
 // degree, both computed in one pass) and deep-model only the top MAX.
-// Alert-referenced clusters always rank at the top, so the selected incident
+// Alert-referenced units always rank at the top, so the selected incident
 // remains findable in the top set.
 const MAX_MODELED_CLUSTERS = 16;
 
@@ -284,17 +298,17 @@ const cheapSeverityWeight: Record<ResponsibilityAlert['severity'], number> = {
   Critical: 3,
 };
 
-export function buildClusterModels(
+export function buildResponsibilityUnits(
   graph: GraphData,
   alerts: ResponsibilityAlert[],
   evidence: CorrelationEvidence[] = [],
-): ClusterModel[] {
-  const clusterIds = deriveClusterIds(alerts, graph);
-  if (clusterIds.length === 0) return [];
-  if (clusterIds.length <= MAX_MODELED_CLUSTERS) {
-    return clusterIds
-      .map((id) => buildClusterModel(id, graph, alerts, evidence))
-      .sort(compareClusterModels);
+): ResponsibilityUnit[] {
+  const unitIds = deriveResponsibilityUnitIds(alerts, graph);
+  if (unitIds.length === 0) return [];
+  if (unitIds.length <= MAX_MODELED_CLUSTERS) {
+    return unitIds
+      .map((id) => buildResponsibilityUnit(id, graph, alerts, evidence))
+      .sort(compareResponsibilityUnits);
   }
 
   // agent_id → node_id (agent nodes only)
@@ -312,27 +326,27 @@ export function buildClusterModels(
     degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
   }
 
-  // alert → referenced agent ids (collected ONCE, not per cluster)
+  // alert → referenced agent ids (collected ONCE, not per unit)
   const alertAgents = alerts.map((alert) => new Set(collectAlertAgentIds(alert)));
 
-  const scored = clusterIds.map((clusterId) => {
+  const scored = unitIds.map((unitId) => {
     let alertCount = 0;
     let maxSeverity = 0;
     for (let i = 0; i < alerts.length; i++) {
-      if (alertAgents[i].has(clusterId)) {
+      if (alertAgents[i].has(unitId)) {
         alertCount += 1;
         maxSeverity = Math.max(maxSeverity, cheapSeverityWeight[alerts[i].severity] ?? 0);
       }
     }
-    const nodeId = nodeIdByAgent.get(clusterId);
+    const nodeId = nodeIdByAgent.get(unitId);
     const degreeScore = nodeId ? (degree.get(nodeId) ?? 0) : 0;
-    return { clusterId, score: alertCount * 10000 + maxSeverity * 1000 + degreeScore };
+    return { unitId, score: alertCount * 10000 + maxSeverity * 1000 + degreeScore };
   });
 
   scored.sort((a, b) => b.score - a.score);
 
   return scored
     .slice(0, MAX_MODELED_CLUSTERS)
-    .map(({ clusterId }) => buildClusterModel(clusterId, graph, alerts, evidence))
-    .sort(compareClusterModels);
+    .map(({ unitId }) => buildResponsibilityUnit(unitId, graph, alerts, evidence))
+    .sort(compareResponsibilityUnits);
 }

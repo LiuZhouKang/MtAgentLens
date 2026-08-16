@@ -2,42 +2,116 @@
 
 import { useMemo, useState } from 'react';
 import {
+  Bot,
+  Box,
   ChevronDown,
   ChevronRight,
-  ShieldAlert,
   CircleAlert,
-  Info,
   FileSearch,
   GitBranch,
+  Globe,
+  HelpCircle,
+  Info,
+  KeyRound,
+  ShieldAlert,
+  Sparkles,
+  TerminalSquare,
+  Wrench,
 } from 'lucide-react';
 import type {
-  CorrelationEvidence,
-  GraphData,
   ResponsibilityClaim,
   ResponsibilityTraceback,
 } from '@/lib/types';
-import { formatResponsibilityNodeLabel } from '@/lib/investigation';
+import { claimStateLabel, claimTypeLabel, severityLabel, TONE_COLOR } from '@/lib/investigation-labels';
+import {
+  parseTracebackSummary,
+  TRACEBACK_KIND_LABEL,
+  type TracebackNodeKind,
+  type TracebackStep,
+} from '@/lib/traceback-visual';
 import AgentAvatar from '@/components/ui/agent-avatar';
 
 const T = { xs: 9.5, sm: 10.5, md: 12, lg: 14, xl: 16 };
 const S = { xs: 2, sm: 4, md: 8, lg: 12, xl: 16 };
 
-const sevColor: Record<string, string> = {
-  Critical: '#f87171',
-  Warning: '#fbbf24',
-  Info: '#60a5fa',
-};
 const sevIcon: Record<string, typeof ShieldAlert> = {
   Critical: ShieldAlert,
   Warning: CircleAlert,
   Info,
 };
 
+const KIND_ICONS: Record<TracebackNodeKind, typeof FileSearch> = {
+  agent: Bot,
+  file: FileSearch,
+  process: TerminalSquare,
+  network: Globe,
+  tool: Wrench,
+  credential: KeyRound,
+  context: Box,
+  llm: Sparkles,
+  unknown: HelpCircle,
+};
+
+/** 节点图标（Agent 用 AgentAvatar，其余用 kind 图标）。 */
+function StepIcon({ step, size }: { step: TracebackStep; size: number }) {
+  if (step.kind === 'agent') {
+    return <AgentAvatar agentId={step.detail ?? step.label} size={size} />;
+  }
+  const Icon = KIND_ICONS[step.kind] ?? HelpCircle;
+  return <Icon size={size} style={{ color: 'var(--ln-text-secondary)', flexShrink: 0 }} />;
+}
+
+/** 可视化因果链：Rust debug 文本 → AgentAvatar + 图标 + 可读标签 + 箭头流程。 */
+function CausalChain({ tb }: { tb: ResponsibilityTraceback }) {
+  const vis = parseTracebackSummary(tb.explanation_summary);
+  if (!vis || vis.steps.length === 0) {
+    return <span className="ln-panel__meta">此声明无回溯链</span>;
+  }
+  return (
+    <div className="ln-tb">
+      {vis.steps.map((step, i) => (
+        <div key={i} className="ln-tb-step">
+          <div className="ln-tb-step__body">
+            <span className="ln-chip" data-tone="muted">
+              {TRACEBACK_KIND_LABEL[step.kind]}
+            </span>
+            <StepIcon step={step} size={16} />
+            <span className="ln-tb-step__label" title={step.detail ?? step.label}>
+              {step.label}
+            </span>
+            {step.isBoundary && (
+              <span className="ln-chip" data-tone="danger">
+                边界穿越
+              </span>
+            )}
+          </div>
+          {i < vis.steps.length - 1 && <span className="ln-tb-arrow" aria-hidden />}
+        </div>
+      ))}
+      {vis.rootCause && (
+        <div className="ln-tb-root">
+          <span className="ln-chip" data-tone="danger">
+            根因
+          </span>
+          <span className="ln-chip" data-tone="muted">
+            {TRACEBACK_KIND_LABEL[vis.rootCause.kind]}
+          </span>
+          <StepIcon step={vis.rootCause} size={16} />
+          <span className="ln-tb-step__label" title={vis.rootCause.detail ?? vis.rootCause.label}>
+            {vis.rootCause.label}
+          </span>
+        </div>
+      )}
+      {vis.evidenceCount != null && (
+        <div className="ln-tb-ev">支持证据 {vis.evidenceCount} 条</div>
+      )}
+    </div>
+  );
+}
+
 export interface ClaimListProps {
   claims: ResponsibilityClaim[];
   tracebacksByClaimId: Map<string, ResponsibilityTraceback>;
-  graph: GraphData;
-  evidence: CorrelationEvidence[];
   /** 告警侧引用集合（weak link）——用于「与该告警共享 N 条证据」计数。 */
   alertEvidenceRefs: string[];
 }
@@ -45,8 +119,6 @@ export interface ClaimListProps {
 export default function ClaimList({
   claims,
   tracebacksByClaimId,
-  graph,
-  evidence,
   alertEvidenceRefs,
 }: ClaimListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -60,8 +132,6 @@ export default function ClaimList({
     [claims],
   );
 
-  const evidenceById = useMemo(() => new Map(evidence.map((e) => [e.evidence_id, e])), [evidence]);
-  const nodeById = useMemo(() => new Map(graph.nodes.map((n) => [n.node_id, n])), [graph.nodes]);
   const alertRefSet = useMemo(() => new Set(alertEvidenceRefs), [alertEvidenceRefs]);
 
   if (sorted.length === 0) {
@@ -90,17 +160,14 @@ export default function ClaimList({
       }}
     >
       {sorted.map((claim) => {
-        const sc = sevColor[claim.severity] ?? '#60a5fa';
+        const sev = severityLabel(claim.severity);
+        const sevColor = TONE_COLOR[sev.tone ?? 'info'];
         const Icon = sevIcon[claim.severity] ?? Info;
+        const type = claimTypeLabel(claim.claim_type);
+        const state = claimStateLabel(claim.claim_state);
         const expanded = expandedId === claim.claim_id;
         const sharedCount = claim.evidence_refs.filter((ref) => alertRefSet.has(ref)).length;
         const tb = tracebacksByClaimId.get(claim.claim_id) ?? null;
-        // 链节点去重（实测 4/22 链含重复 UUID）
-        const chainNodes = tb
-          ? Array.from(new Set(tb.chain_node_ids))
-              .map((id) => nodeById.get(id) ?? null)
-              .filter((n): n is NonNullable<typeof n> => n != null)
-          : [];
 
         return (
           <div key={claim.claim_id} style={{ display: 'flex', flexDirection: 'column' }}>
@@ -122,20 +189,9 @@ export default function ClaimList({
                 transition: 'border-color 120ms ease',
               }}
             >
-              <Icon size={14} style={{ color: sc, flexShrink: 0 }} />
-              <span
-                style={{
-                  padding: '1px 6px',
-                  borderRadius: 4,
-                  fontSize: 9,
-                  fontWeight: 600,
-                  background: `${sc}16`,
-                  color: sc,
-                  fontFamily: 'var(--ln-mono)',
-                  flexShrink: 0,
-                }}
-              >
-                {claim.claim_type}
+              <Icon size={14} style={{ color: sevColor, flexShrink: 0 }} />
+              <span className="ln-chip" data-tone={type.tone ?? 'muted'}>
+                {type.label}
               </span>
               {claim.subject_agent_id ? (
                 <AgentAvatar agentId={claim.subject_agent_id} size={16} />
@@ -163,15 +219,8 @@ export default function ClaimList({
                 {claim.policy_id ?? '—'}
                 {claim.boundary_id ? ` · ${claim.boundary_id}` : ''}
               </span>
-              <span
-                style={{
-                  fontSize: 9,
-                  fontFamily: 'var(--ln-mono)',
-                  color: 'var(--ln-text-muted)',
-                  flexShrink: 0,
-                }}
-              >
-                {claim.claim_state}
+              <span className="ln-chip" data-tone={state.tone ?? 'muted'}>
+                {state.label}
               </span>
               <span style={{ width: 48, flexShrink: 0 }}>
                 <div
@@ -186,138 +235,45 @@ export default function ClaimList({
                     style={{
                       height: '100%',
                       width: `${Math.round(claim.confidence * 100)}%`,
-                      background: sc,
+                      background: sevColor,
                     }}
                   />
                 </div>
               </span>
-              {tb && <GitBranch size={12} style={{ color: '#60a5fa', flexShrink: 0 }} />}
+              {tb && <GitBranch size={12} style={{ color: 'var(--ln-info)', flexShrink: 0 }} />}
               {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
             </button>
 
-            {/* Always-visible sub-row: evidence chips + shared count */}
-            <div
-              style={{
-                padding: '2px 10px 8px',
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 4,
-                alignItems: 'center',
-              }}
-            >
-              {claim.evidence_refs.length > 0 &&
-                claim.evidence_refs.map((ref) => {
-                  const ev = evidenceById.get(ref);
-                  const label = ev?.matched_fields.canonical_path ?? ref;
-                  return (
-                    <span
-                      key={ref}
-                      title={ref}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 3,
-                        fontSize: 9,
-                        padding: '2px 6px',
-                        borderRadius: 4,
-                        background: 'rgba(74,222,128,0.10)',
-                        color: '#4ade80',
-                        fontFamily: 'var(--ln-mono)',
-                        maxWidth: 220,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      <FileSearch size={9} />
-                      {label}
-                    </span>
-                  );
-                })}
-              {sharedCount > 0 && (
-                <span className="ln-panel__meta">与该告警共享 {sharedCount} 条证据</span>
-              )}
-            </div>
+            {/* 与告警共享证据数（具体证据清单见上方证据链，避免重复） */}
+            {sharedCount > 0 && (
+              <div
+                style={{
+                  padding: '2px 10px 8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <span className="ln-chip" data-tone="success">
+                  共享证据 ×{sharedCount}
+                </span>
+              </div>
+            )}
 
             {expanded && (
               <div
                 style={{
                   padding: S.sm,
                   marginLeft: S.md,
-                  borderLeft: `2px solid ${sc}30`,
+                  borderLeft: '1px solid var(--ln-border)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: S.sm,
                 }}
               >
-                {/* 回溯链 */}
+                {/* 回溯链 —— 可视化因果链（可读，非 Rust debug 文本） */}
                 {tb ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {chainNodes.map((node, idx) => (
-                      <div
-                        key={`${node.node_id}-${idx}`}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: T.xs }}
-                      >
-                        <span
-                          style={{
-                            width: 18,
-                            height: 18,
-                            borderRadius: 5,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 9,
-                            fontFamily: 'var(--ln-mono)',
-                            background: `${sc}18`,
-                            border: `1px solid ${sc}40`,
-                            color: sc,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {idx + 1}
-                        </span>
-                        <span
-                          style={{
-                            fontFamily: 'var(--ln-mono)',
-                            color:
-                              node.node_id === tb.root_cause_node_id
-                                ? '#f87171'
-                                : 'var(--ln-text-secondary)',
-                            fontWeight: node.node_id === tb.root_cause_node_id ? 700 : 400,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {formatResponsibilityNodeLabel(node)}
-                        </span>
-                        {node.node_id === tb.root_cause_node_id && (
-                          <span
-                            style={{
-                              fontSize: 9,
-                              padding: '1px 5px',
-                              borderRadius: 3,
-                              background: 'rgba(248,113,113,0.14)',
-                              color: '#f87171',
-                              flexShrink: 0,
-                            }}
-                          >
-                            根因
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                    <div
-                      style={{
-                        fontSize: T.xs,
-                        color: 'var(--ln-text-secondary)',
-                        lineHeight: 1.55,
-                        marginTop: 2,
-                      }}
-                    >
-                      {tb.explanation_summary}
-                    </div>
-                  </div>
+                  <CausalChain tb={tb} />
                 ) : (
                   <span className="ln-panel__meta">此声明无回溯链</span>
                 )}

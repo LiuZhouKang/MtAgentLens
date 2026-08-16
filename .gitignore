@@ -2,6 +2,8 @@
 /build
 collector/build/
 agentsight
+.next/
+test-results/
 
 # GitHub Actions（本平台为 GitLab，不使用 GitHub CI）
 .github/

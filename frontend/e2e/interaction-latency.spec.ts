@@ -106,10 +106,30 @@ test.describe('interaction latency audit', () => {
   test('sidebar workbench switching responds within 100ms on the home page', async ({ page }) => {
     await page.goto('/console', { waitUntil: 'domcontentloaded' });
 
+    // 等态势页全屏 Observation Orbit 覆盖（command-center 数据 loader）完全淡出——
+    // 覆盖期间 dock 不可交互（预期行为），仅度量稳态切换。
+    await page.waitForFunction(
+      () => {
+        for (const w of document.querySelectorAll('.mtl-load-word')) {
+          let cur = w as HTMLElement | null;
+          while (cur && cur !== document.body) {
+            if (cur.getAttribute?.('aria-hidden') !== null) {
+              if (getComputedStyle(cur).opacity !== '0') return false;
+              break;
+            }
+            cur = cur.parentElement;
+          }
+        }
+        return true;
+      },
+      undefined,
+      { timeout: 15000 },
+    );
+
     // 预热：先展开面板，度量稳态切换（冷启动展开会被首屏 3D 渲染/模型计算争抢主线程）
     const incidentBtn = page.getByRole('button', { name: '打开事件工作台' });
     await expect(incidentBtn).toBeVisible();
-    await incidentBtn.click({ force: true });
+    await incidentBtn.click(); // 等可点击（全屏加载淡出 + 模型就绪）
     await expect(page.locator('.incident-rail__panel')).toBeVisible();
 
     const evidenceBtn = page.getByRole('button', { name: '打开证据工作台' });
@@ -129,6 +149,26 @@ test.describe('interaction latency audit', () => {
     page,
   }) => {
     await page.goto('/investigations', { waitUntil: 'domcontentloaded' });
+
+    // 等布局层全屏 Observation Orbit 覆盖完全淡出——协调式加载下覆盖覆盖到页面内容 +
+    // 侧边栏模型就绪，期间 dock 不可交互（预期行为），仅度量稳态切换。
+    await page.waitForFunction(
+      () => {
+        for (const w of document.querySelectorAll('.mtl-load-word')) {
+          let cur = w as HTMLElement | null;
+          while (cur && cur !== document.body) {
+            if (cur.getAttribute?.('aria-hidden') !== null) {
+              if (getComputedStyle(cur).opacity !== '0') return false;
+              break;
+            }
+            cur = cur.parentElement;
+          }
+        }
+        return true;
+      },
+      undefined,
+      { timeout: 20000 },
+    );
 
     // 预热：先展开面板，度量稳态切换（冷启动展开会被首屏模型计算争抢主线程）
     const incidentBtn = page.getByRole('button', { name: '打开事件工作台' });

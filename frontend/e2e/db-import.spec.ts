@@ -113,7 +113,7 @@ test.describe('真实 db 导入（collector.responsibility.db）', () => {
 
     // 告警工作台：真实 13 条告警
     await page.getByRole('link', { name: '告警', exact: true }).click();
-    await expect(page.locator('.alert-list-btn')).toHaveCount(EXPECTED.alerts, {
+    await expect(page.locator('.ln-alert-queue__btn')).toHaveCount(EXPECTED.alerts, {
       timeout: 30000,
     });
 
@@ -131,7 +131,7 @@ test.describe('真实 db 导入（collector.responsibility.db）', () => {
     await expect(page.getByText('关联记录')).toBeVisible({ timeout: 10000 });
 
     // 选中告警的标题来自真实 db（非空）
-    const firstAlertTitle = (await page.locator('.alert-list-btn').first().textContent()) ?? '';
+    const firstAlertTitle = (await page.locator('.ln-alert-queue__btn').first().textContent()) ?? '';
     expect(firstAlertTitle.trim().length).toBeGreaterThan(0);
   });
 
@@ -210,7 +210,7 @@ test.describe('真实 db 导入（collector.responsibility.db）', () => {
 
     // 告警 / 证据来自 db：进入告警工作台核对
     await page.getByRole('link', { name: '告警', exact: true }).click();
-    await expect(page.locator('.alert-list-btn')).toHaveCount(EXPECTED.alerts, {
+    await expect(page.locator('.ln-alert-queue__btn')).toHaveCount(EXPECTED.alerts, {
       timeout: 30000,
     });
 

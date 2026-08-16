@@ -68,31 +68,33 @@ export function useAlertModels(
     const step = () => {
       if (cancelled) return;
       const budgetStart = performance.now();
-      while (i < uncached.length && performance.now() - budgetStart < 12) {
+      while (i < uncached.length && performance.now() - budgetStart < 40) {
         const a = uncached[i++];
         if (!cached(a.alert_id, fp)) {
           storeModel(a.alert_id, fp, buildInvestigationModel(a, graph, evidence));
         }
       }
       setProcessed(i);
+      // 用 rAF 逐帧推进（每帧算 40ms 预算）。rIC 在导入大 db 后主线程忙碌时
+      // 会被饿死（每轮 timeout 1000ms，13 个模型最坏 13s+，侧边栏「构建中」卡住）。
+      // rAF 按帧触发，即使帧率下降也持续推进，模型更快就绪。
       if (i < uncached.length) {
-        if (typeof requestIdleCallback === 'function') {
-          requestIdleCallback(step, { timeout: 1000 });
+        if (typeof requestAnimationFrame === 'function') {
+          rafHandle = requestAnimationFrame(step);
         } else {
           setTimeout(step, 0);
         }
       }
     };
-    if (typeof requestIdleCallback === 'function') {
-      const handle = requestIdleCallback(step, { timeout: 1000 });
-      return () => {
-        cancelled = true;
-        cancelIdleCallback(handle);
-      };
+    let rafHandle = 0;
+    if (typeof requestAnimationFrame === 'function') {
+      rafHandle = requestAnimationFrame(step);
+    } else {
+      step();
     }
-    step();
     return () => {
       cancelled = true;
+      if (rafHandle) cancelAnimationFrame(rafHandle);
     };
   }, [alerts, fp, graph, evidence]);
 

@@ -44,15 +44,15 @@ describe('OverviewPageClient', () => {
     expect(screen.getByText('实时责任网络')).toBeDefined();
     expect(screen.getByText('Collector Ready')).toBeDefined();
     // Rail panels
-    expect(screen.getByText('集群压力')).toBeDefined();
+    expect(screen.getByText('责任单元压力')).toBeDefined();
     expect(screen.getByText('责任告警')).toBeDefined();
     expect(screen.getByText('事件流')).toBeDefined();
   });
 
-  it('shows the lead cluster focus panel', () => {
+  it('shows the lead unit focus panel', () => {
     render(<OverviewPageClient />, { wrapper: createWrapper() });
 
-    expect(screen.getByText('Lead Cluster')).toBeDefined();
+    expect(screen.getByText('Lead Unit')).toBeDefined();
   });
 
   it('shows the full-page loader when there is no data yet', () => {
@@ -105,8 +105,8 @@ describe('OverviewPageClient', () => {
       },
     });
     render(<OverviewPageClient />, { wrapper: createWrapper() });
-    // 数据集概览为折叠分节（默认收起）——先展开再断言
-    fireEvent.click(screen.getByText('数据集概览'));
-    expect(screen.getByText('数据源详情')).toBeDefined();
+    // 运行概览为折叠分节（默认收起）——先展开再断言
+    fireEvent.click(screen.getByText('运行概览'));
+    expect(screen.getByText('运行详情')).toBeDefined();
   });
 });

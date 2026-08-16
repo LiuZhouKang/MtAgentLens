@@ -3,13 +3,11 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import LoadingIndicator from '@/components/ui/loading-indicator';
 import { LiveEventTail } from '@/components/live/live-event-tail';
 import { LiveRunningBadge } from '@/components/live/live-running-badge';
 import {
-  ArrowRight,
   CheckCircle2,
   Check,
   Clipboard,
@@ -24,14 +22,14 @@ import {
   X,
 } from 'lucide-react';
 import { SectionPanel } from '@/components/ui/linear/section-panel';
-import { StatusBadge, type StatusTone } from '@/components/ui/linear/status-badge';
+import type { StatusTone } from '@/components/ui/linear/status-badge';
+import { MetricCard } from '@/components/ui/linear/metric-card';
 import AgentAvatar from '@/components/ui/agent-avatar';
 import VirtualList from '@/components/ui/virtual-list';
-import IntentActionChain from '@/components/traces/intent-action-chain';
+import { decisionLabel, matchLevelLabel } from '@/lib/investigation-labels';
 import { agentColor, shortAgentId } from '@/lib/agent-identity';
 import { demoAlerts } from '@/lib/demo-data';
 import { useAppStore } from '@/lib/store';
-import { buildInvestigationHref } from '@/lib/investigation-route';
 import { buildTraceHref, parseTraceAlertId } from '@/lib/trace-route';
 import {
   buildTraceRunModel,
@@ -47,8 +45,7 @@ import { useHashRouteState } from '@/lib/use-hash-route-state';
 const T = { xs: 9.5, sm: 10.5, md: 12, lg: 14, xl: 16, h: 20 };
 const S = { xs: 2, sm: 4, md: 8, lg: 12, xl: 16 };
 
-type AnyIcon = React.FC<{ size?: number }>;
-const kindIcon: Record<TraceEventKind, AnyIcon> = {
+const kindIcon: Record<TraceEventKind, typeof FileSearch> = {
   agent: GitBranch,
   llm: Sparkles,
   tool: TerminalSquare,
@@ -58,22 +55,28 @@ const kindIcon: Record<TraceEventKind, AnyIcon> = {
   verdict: CheckCircle2,
 };
 const kindLabel: Record<TraceEventKind, string> = {
-  agent: 'Agent',
+  agent: '主体',
   llm: 'LLM',
-  tool: 'Tool',
+  tool: '工具',
   file: '文件',
   network: '网络',
   boundary: '边界',
   verdict: '判定',
 };
 const kindColor: Record<TraceEventKind, string> = {
-  agent: '#60a5fa',
-  llm: '#a78bfa',
-  tool: '#fb923c',
-  file: '#4ade80',
-  network: '#22d3ee',
-  boundary: '#f87171',
-  verdict: '#fbbf24',
+  agent: 'var(--ln-info)',
+  llm: 'var(--ln-accent)',
+  tool: 'var(--ln-success)',
+  file: 'var(--ln-text-muted)',
+  network: 'var(--ln-info)',
+  boundary: 'var(--ln-danger)',
+  verdict: 'var(--ln-warning)',
+};
+/** 追踪点 severity → ln token 色（左侧列表点） */
+const sevDotColor: Record<string, string> = {
+  Critical: 'var(--ln-danger)',
+  Warning: 'var(--ln-warning)',
+  Info: 'var(--ln-info)',
 };
 const FILTERS: Array<TraceEventKind | 'all'> = [
   'all',
@@ -88,6 +91,10 @@ const FILTERS: Array<TraceEventKind | 'all'> = [
 
 function fmtMs(ms: number) {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+}
+/** 墙钟毫秒 → HH:MM:SS（span 时钟） */
+function fmtClock(wallMs: number): string {
+  return new Date(wallMs).toISOString().slice(11, 19);
 }
 function sevTone(s: TraceRunModel['severity'] | 'Normal'): StatusTone {
   if (s === 'Critical') return 'danger';
@@ -220,9 +227,7 @@ function SectionLabel({ color, label }: { color: string; label: string }) {
 }
 
 // ── SpanRow ──
-const ROW_H = 34;
 const LEFT_W = 320;
-const BAR_H = 20;
 
 function SpanRow({
   event,
@@ -230,435 +235,83 @@ function SpanRow({
   maxDur,
   depth,
   isSelected,
-  expanded,
-  onToggle,
+  onSelect,
+  wallStartMs,
 }: {
   event: TraceEventModel;
   maxOff: number;
   maxDur: number;
   depth: number;
   isSelected: boolean;
-  expanded: boolean;
-  onToggle: () => void;
+  onSelect: () => void;
+  wallStartMs: number;
 }) {
   const c = kindColor[event.kind] ?? '#6b7280';
   const Icon = kindIcon[event.kind] ?? FileSearch;
   const leftPct = (event.offsetMs / Math.max(maxOff, 1)) * 100;
-  const wPct = Math.max((event.durationMs / Math.max(maxDur, 1)) * 100, 1.5);
+  const wPct = Math.max((event.durationMs / Math.max(maxDur, 1)) * 100, 0.6);
+  // 真实时钟 HH:MM:SS = 时间线起点墙钟 + 相对偏移
+  const clock = new Date(wallStartMs + event.offsetMs).toISOString().slice(11, 19);
+  const sevTone =
+    event.severity === 'Critical'
+      ? ('danger' as const)
+      : event.severity === 'Warning'
+        ? ('warning' as const)
+        : ('info' as const);
   return (
-    <div style={{ marginBottom: S.xs }}>
-      <div
-        role="button"
-        tabIndex={0}
-        aria-expanded={expanded}
-        onClick={onToggle}
-        onKeyDown={(e) => {
-          // WAI-ARIA 按钮：Enter + Space 均可激活（审查 H2）
-          if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
-            e.preventDefault();
-            onToggle();
-          }
-        }}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          height: ROW_H,
-          cursor: 'pointer',
-          borderRadius: 6,
-          paddingLeft: S.sm,
-          position: 'relative',
-          background: isSelected ? `${c}0e` : 'transparent',
-          border: isSelected ? `1px solid ${c}35` : '1px solid transparent',
-          outline: 'none',
-          transition: 'background 150ms ease, border-color 150ms ease',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'var(--ln-surface-2)';
-          e.currentTarget.style.borderColor = 'var(--ln-border)';
-        }}
-        onMouseLeave={(e) => {
-          if (!isSelected) {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.borderColor = 'transparent';
-          }
-        }}
-      >
-        {event.severity === 'Critical' && (
-          <span
-            style={{
-              position: 'absolute',
-              left: -1,
-              top: 5,
-              bottom: 5,
-              width: 2,
-              borderRadius: 2,
-              background: '#dc2626',
-              boxShadow: '0 0 6px rgba(220,38,38,0.6)',
-            }}
-          />
+    <div
+      role="button"
+      tabIndex={0}
+      aria-pressed={isSelected}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className="ln-tr-row"
+      data-selected={isSelected ? 'true' : 'false'}
+      style={{ paddingLeft: depth * 18 + 6 }}
+    >
+      {/* 左侧：图标 + kind 中文 + 进程身份 + 描述 + actor */}
+      <div className="ln-tr-left">
+        <Icon size={14} style={{ color: c, flexShrink: 0 }} />
+        <span className="ln-tr-kind" style={{ color: c }}>
+          {kindLabel[event.kind]}
+        </span>
+        {event.processComm && (
+          <span className="ln-tr-proc" title={event.processAgent ?? undefined}>
+            {event.processComm}
+            {event.pid != null ? ` · ${event.pid}` : ''}
+          </span>
         )}
-        <div
-          style={{
-            width: LEFT_W,
-            minWidth: LEFT_W,
-            maxWidth: LEFT_W,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 0,
-            paddingLeft: depth * 18 + S.sm,
-            flexShrink: 0,
-          }}
-        >
-          {depth > 0 && (
-            <span
-              style={{
-                display: 'inline-block',
-                width: 14,
-                height: ROW_H,
-                position: 'relative',
-                flexShrink: 0,
-                marginRight: 2,
-              }}
-            >
-              <span
-                style={{
-                  position: 'absolute',
-                  left: 6,
-                  top: 0,
-                  width: 8,
-                  height: ROW_H / 2,
-                  borderLeft: `1.5px solid ${c}30`,
-                  borderBottom: `1.5px solid ${c}30`,
-                  borderRadius: '0 0 0 5px',
-                }}
-              />
+        <span className="ln-tr-title" title={event.title}>
+          {event.title}
+        </span>
+        <span className="ln-tr-actor" title={event.actor} style={{ background: agentColor(event.actor) }} />
+      </div>
+      {/* 瀑布区：时间线背景 + span 条 + 元信息 */}
+      <div className="ln-tr-body">
+        <span className="ln-tr-track" aria-hidden />
+        <span
+          className="ln-tr-bar"
+          style={{ left: `${leftPct}%`, width: `max(${wPct}%, 3px)`, background: c }}
+        />
+        <span className="ln-tr-meta">
+          {event.severity !== 'Normal' && (
+            <span className="ln-chip" data-tone={sevTone}>
+              {event.severity}
             </span>
           )}
-          <span
-            title={kindLabel[event.kind]}
-            style={{ color: c, flexShrink: 0, display: 'flex', marginRight: 5 }}
-          >
-            <Icon size={14} />
-          </span>
-          <span
-            title={event.actor}
-            style={{
-              width: 7,
-              height: 7,
-              minWidth: 7,
-              borderRadius: '50%',
-              background: agentColor(event.actor),
-              boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.25)',
-              flexShrink: 0,
-              marginRight: 5,
-            }}
-          />
-          <span
-            style={{
-              flex: 1,
-              fontSize: T.sm,
-              fontWeight: 500,
-              color: 'var(--ln-text)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              minWidth: 0,
-            }}
-            title={event.title}
-          >
-            {event.title}
-          </span>
-          <span
-            style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 5 }}
-          >
-            <span
-              style={{
-                fontSize: T.xs,
-                fontFamily: 'var(--ln-mono)',
-                color: 'var(--ln-text-muted)',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {fmtMs(event.durationMs)}
+          {event.evidenceRef && (
+            <span className="ln-chip" data-tone="success">
+              证据
             </span>
-            {event.severity !== 'Normal' && (
-              <span
-                style={{
-                  padding: '1px 4px',
-                  borderRadius: 3,
-                  fontSize: T.xs,
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                  background:
-                    event.severity === 'Critical'
-                      ? 'rgba(248,113,113,0.14)'
-                      : 'rgba(251,191,36,0.14)',
-                  color: event.severity === 'Critical' ? '#f87171' : '#fbbf24',
-                }}
-              >
-                {event.severity}
-              </span>
-            )}
-            {event.evidenceRef && (
-              <span
-                style={{
-                  padding: '1px 4px',
-                  borderRadius: 3,
-                  fontSize: T.xs,
-                  fontWeight: 500,
-                  whiteSpace: 'nowrap',
-                  background: 'rgba(74,222,128,0.14)',
-                  color: '#4ade80',
-                }}
-              >
-                证据
-              </span>
-            )}
-          </span>
-        </div>
-        <div style={{ flex: 1, position: 'relative', height: BAR_H, minWidth: 40 }}>
-          <div
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: 0,
-              right: 0,
-              height: 1,
-              background: 'var(--ln-border)',
-              opacity: 0.15,
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              left: `${leftPct}%`,
-              width: `max(${wPct}%, 3px)`,
-              minWidth: 3,
-              top: 3,
-              bottom: 3,
-              borderRadius: 4,
-              background: event.severity === 'Critical' ? '#dc2626' : c,
-              opacity: isSelected ? 0.92 : 0.65,
-              boxShadow: isSelected
-                ? `0 0 8px ${c}40`
-                : event.severity === 'Critical'
-                  ? '0 0 10px rgba(220,38,38,0.55)'
-                  : 'none',
-            }}
-          />
-        </div>
-      </div>
-
-      {/* expand — CSS grid-rows transition, no JS height calc */}
-      <div className="trace-expand" data-open={expanded ? 'true' : 'false'}>
-        <div style={{ overflow: 'hidden' }}>
-          <div
-            style={{
-              padding: S.lg,
-              borderRadius: S.md,
-              margin: `${S.xs}px 0 ${S.md}px 28px`,
-              background: `linear-gradient(135deg, var(--ln-surface-0), var(--ln-surface-1))`,
-              border: '1px solid var(--ln-border)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: S.lg,
-              fontSize: T.sm,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: S.sm }}>
-              <span
-                style={{ width: 3, height: 18, borderRadius: 2, background: c, flexShrink: 0 }}
-              />
-              <span style={{ fontSize: T.md, fontWeight: 600, color: 'var(--ln-text)' }}>
-                {event.title}
-              </span>
-              <span
-                style={{
-                  fontSize: T.xs,
-                  fontFamily: 'var(--ln-mono)',
-                  color: 'var(--ln-text-muted)',
-                  marginLeft: 'auto',
-                }}
-              >
-                T+{fmtMs(event.offsetMs)} · {fmtMs(event.durationMs)}
-              </span>
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: S.sm,
-                padding: '6px 8px',
-                borderRadius: S.sm,
-                background: 'var(--ln-surface-0)',
-                border: '1px solid var(--ln-border)',
-              }}
-            >
-              <AgentAvatar agentId={event.actor} size={26} />
-              <div style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: T.sm,
-                    fontWeight: 600,
-                    color: agentColor(event.actor),
-                    fontFamily: 'var(--ln-mono)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {shortAgentId(event.actor)}
-                </div>
-                {event.actorRole && (
-                  <div style={{ fontSize: T.xs, color: 'var(--ln-text-muted)', marginTop: 1 }}>
-                    {event.actorRole}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-                gap: S.sm,
-              }}
-            >
-              {[
-                ['偏移', `T+${fmtMs(event.offsetMs)}`],
-                ['耗时', fmtMs(event.durationMs)],
-                ['置信度', `${Math.round(event.confidence * 100)}%`],
-                event.operation ? ['操作', event.operation] : null,
-                event.evidenceLevel ? ['证据等级', event.evidenceLevel] : null,
-              ]
-                .filter((x): x is [string, string] => x !== null)
-                .map(([label, value]) => (
-                  <div key={label}>
-                    <div
-                      style={{
-                        fontSize: T.xs,
-                        color: 'var(--ln-text-muted)',
-                        letterSpacing: '0.03em',
-                      }}
-                    >
-                      {label}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: T.sm,
-                        color: 'var(--ln-text-secondary)',
-                        fontFamily: 'var(--ln-mono)',
-                        marginTop: 1,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                      title={value}
-                    >
-                      {value}
-                    </div>
-                  </div>
-                ))}
-            </div>
-            {event.prompt && (
-              <>
-                <SectionLabel color="#a78bfa" label="LLM Prompt" />
-                <CodeBlock color="#a78bfa">{event.prompt}</CodeBlock>
-              </>
-            )}
-            {event.response && (
-              <>
-                <SectionLabel color="#a78bfa" label="LLM Response" />
-                <CodeBlock color="#a78bfa">{event.response}</CodeBlock>
-              </>
-            )}
-            {event.toolCall && (
-              <>
-                <SectionLabel color="#fb923c" label="Tool Call" />
-                <CodeBlock color="#fb923c">{event.toolCall}</CodeBlock>
-              </>
-            )}
-            {event.toolResult && (
-              <>
-                <SectionLabel color="#fb923c" label="Tool Result" />
-                <CodeBlock color="#fb923c">{event.toolResult}</CodeBlock>
-              </>
-            )}
-            {event.processTree && (
-              <>
-                <SectionLabel color="#60a5fa" label="Process Chain" />
-                <div
-                  style={{
-                    background: '#0a0a0f',
-                    borderRadius: S.sm,
-                    padding: S.sm + 4,
-                    border: '1px solid rgba(96,165,250,0.15)',
-                    fontFamily: 'var(--ln-mono)',
-                    fontSize: 10.5,
-                    lineHeight: 1.65,
-                    color: '#bfdbfe',
-                    whiteSpace: 'pre-wrap',
-                  }}
-                >
-                  {event.processTree}
-                </div>
-              </>
-            )}
-            {event.rawEvidence && Object.keys(event.rawEvidence).length > 0 && (
-              <>
-                <SectionLabel color="var(--ln-text-muted)" label="Raw Evidence" />
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: S.xs }}>
-                  {Object.entries(event.rawEvidence)
-                    .slice(0, 16)
-                    .map(([k, v]) => (
-                      <span
-                        key={k}
-                        style={{
-                          padding: '3px 7px',
-                          borderRadius: 4,
-                          fontSize: T.xs,
-                          background: 'var(--ln-surface-0)',
-                          border: '1px solid var(--ln-border)',
-                          fontFamily: 'var(--ln-mono)',
-                          color: 'var(--ln-text-secondary)',
-                          maxWidth: 320,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                        title={String(v)}
-                      >
-                        <span style={{ color: 'var(--ln-text-muted)' }}>{k}</span>
-                        <span style={{ margin: '0 3px', color: 'var(--ln-border)' }}>=</span>
-                        <span>{String(v)}</span>
-                      </span>
-                    ))}
-                </div>
-              </>
-            )}
-            {event.ruleIds.length > 0 && (
-              <>
-                <SectionLabel color="#fbbf24" label="Trigger Rules" />
-                <div style={{ display: 'flex', gap: S.xs, flexWrap: 'wrap' }}>
-                  {event.ruleIds.map((r) => (
-                    <span
-                      key={r}
-                      style={{
-                        padding: '3px 7px',
-                        borderRadius: 4,
-                        fontSize: T.xs,
-                        background: 'var(--ln-surface-0)',
-                        border: '1px solid var(--ln-border)',
-                        fontFamily: 'var(--ln-mono)',
-                        color: '#fbbf24',
-                      }}
-                    >
-                      {r}
-                    </span>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+          )}
+          <span className="ln-tr-clock">{clock}</span>
+          <span className="ln-tr-dur">{fmtMs(event.durationMs)}</span>
+        </span>
       </div>
     </div>
   );
@@ -668,6 +321,7 @@ export default function TracesPageClient() {
   const sp = useSearchParams();
   const storeAlerts = useAppStore((s) => s.alerts);
   const isLive = useAppStore((s) => s.appState === 'live');
+  const setPageReady = useAppStore((s) => s.setPageReady);
   const { selectedValue: routeAlertId, setRouteValue: setHashAlertId } = useHashRouteState({
     searchParams: sp,
     parseValue: parseTraceAlertId,
@@ -679,17 +333,41 @@ export default function TracesPageClient() {
   const alerts = deferredAlerts.length ? deferredAlerts : demoAlerts;
   const currentRunId = useAppStore((s) => s.activeRunId);
   const { evidenceItems } = useRunEvidence(currentRunId);
-  const storeIntents = useAppStore((s) => s.intents);
+  const dbAssets = useAppStore((s) => s.dbAssets);
   const storeActions = useAppStore((s) => s.actions);
+  const storeIntents = useAppStore((s) => s.intents);
   const runs = useMemo(
-    () => alerts.map((a) => buildTraceRunModel(a, evidenceItems)),
-    [alerts, evidenceItems],
+    () =>
+      alerts.map((a) =>
+        buildTraceRunModel(
+          a,
+          evidenceItems,
+          dbAssets?.processEvents ?? [],
+          storeActions,
+          storeIntents,
+          dbAssets?.policyEvaluations ?? [],
+          dbAssets?.pollutionEvents ?? [],
+        ),
+      ),
+    [
+      alerts,
+      evidenceItems,
+      dbAssets?.processEvents,
+      dbAssets?.policyEvaluations,
+      dbAssets?.pollutionEvents,
+      storeActions,
+      storeIntents,
+    ],
   );
   const [tid, setTid] = useState(routeAlertId ?? runs[0]?.id ?? '');
   const [filter, setFilter] = useState<TraceEventKind | 'all'>('all');
   const active = runs.find((r) => r.id === tid) ?? runs[0];
+  // 页面内容就绪信号（供布局层协调加载层）：active 就绪即渲染追踪工作台。
+  // （数据加载期由布局层 dataLoading 门保持覆盖，避免 demo 回退 → 真实数据切换跳变。）
+  useEffect(() => {
+    setPageReady(active != null);
+  }, [active, setPageReady]);
   const [sel, setSel] = useState<TraceEventModel | null>(null);
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [treeExp, setTreeExp] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -699,7 +377,6 @@ export default function TracesPageClient() {
   useEffect(() => {
     setFilter('all');
     setSel(null);
-    setExpandedRows(new Set());
   }, [active?.id]);
 
   const tl = useMemo(
@@ -720,6 +397,15 @@ export default function TracesPageClient() {
     return groups;
   }, [tl]);
 
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (actor: string) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(actor)) next.delete(actor);
+      else next.add(actor);
+      return next;
+    });
+
   const spansWithDepth = useMemo(() => {
     const result: {
       event: TraceEventModel;
@@ -730,11 +416,13 @@ export default function TracesPageClient() {
     for (const [actor, events] of actorGroups) {
       const sorted = events.sort((a, b) => a.offsetMs - b.offsetMs);
       result.push({ event: sorted[0], depth: 0, isGroupHead: true, groupActor: actor });
+      // 折叠的服务组：只保留组头（顶级展开/折叠交互）
+      if (collapsedGroups.has(actor)) continue;
       for (let i = 1; i < sorted.length; i++)
         result.push({ event: sorted[i], depth: 1, isGroupHead: false, groupActor: actor });
     }
     return result;
-  }, [actorGroups]);
+  }, [actorGroups, collapsedGroups]);
 
   // actor event counts (avoid O(n²) in render)
   const actorCounts = useMemo(() => {
@@ -760,34 +448,34 @@ export default function TracesPageClient() {
 
   const evidenceEvents = active.timeline.filter((e) => e.evidenceRef);
   const waterfallHeight = 'calc(100dvh - 340px)';
-  const toggleRow = (id: string) =>
-    setExpandedRows((p) => {
-      const n = new Set(p);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
 
   const pageRef = useRef<HTMLDivElement>(null);
 
-  // ── GSAP page entrance ──
+  // ── GSAP 顶级入场：KPI 翻牌 → 组头错峰 → 瀑布行左滑 ──
   useGSAP(
     () => {
-      gsap.fromTo(
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+      tl.fromTo(
         '.ln-kpi-strip > *',
         { opacity: 0, y: 10 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.4,
-          stagger: 0.05,
-          ease: 'power3.out',
-          delay: 0.05,
-          clearProps: 'transform',
-        },
+        { opacity: 1, y: 0, duration: 0.4, stagger: 0.05, clearProps: 'transform' },
+        0,
+      );
+      tl.fromTo(
+        '.ln-tr-group-head',
+        { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.35, stagger: 0.06, clearProps: 'transform' },
+        0.15,
+      );
+      tl.fromTo(
+        '.ln-tr-row',
+        { opacity: 0, x: -10 },
+        { opacity: 1, x: 0, duration: 0.35, stagger: 0.02, clearProps: 'transform' },
+        0.25,
       );
     },
-    { scope: pageRef },
+    { scope: pageRef, dependencies: [active?.id, filter, collapsedGroups] },
   );
 
   if (!active) {
@@ -812,31 +500,31 @@ export default function TracesPageClient() {
       label: 'Span 数',
       value: active.timeline.length,
       delta: `${evidenceEvents.length} 有证据`,
-      tone: 'info' as StatusTone,
+      deltaTone: 'info' as StatusTone,
     },
     {
       label: '总耗时',
       value: fmtMs(active.durationMs),
       delta: `${new Set(tl.map((e) => e.actor)).size} 进程源`,
-      tone: 'info' as StatusTone,
+      deltaTone: 'info' as StatusTone,
     },
     {
       label: '边界穿越',
       value: active.boundaryEvents,
-      delta: active.boundaryEvents > 0 ? '⚠️' : '安全',
-      tone: (active.boundaryEvents > 0 ? 'danger' : 'success') as StatusTone,
+      delta: active.boundaryEvents > 0 ? '需关注' : '安全',
+      deltaTone: (active.boundaryEvents > 0 ? 'danger' : 'success') as StatusTone,
     },
     {
       label: '置信度',
       value: `${Math.round(active.confidence * 100)}%`,
       delta: active.severity === 'Critical' ? '需复核' : '判定中',
-      tone: sevTone(active.severity),
+      deltaTone: sevTone(active.severity),
     },
     {
       label: '判决',
-      value: active.decision,
+      value: decisionLabel(active.decision).label,
       delta: active.verdict.headline,
-      tone: (active.decision === 'Unsafe' ? 'danger' : 'info') as StatusTone,
+      deltaTone: (active.decision === 'Unsafe' ? 'danger' : 'info') as StatusTone,
     },
   ];
 
@@ -856,16 +544,14 @@ export default function TracesPageClient() {
         </div>
       )}
       <div className="ln-kpi-strip" style={{ marginBottom: S.lg }}>
-        {kpi.map((i) => (
-          <div key={i.label} className="ln-panel ln-metric">
-            <span className="ln-metric__label">{i.label}</span>
-            <strong className="ln-metric__value" style={{ fontSize: 20 }}>
-              {i.value}
-            </strong>
-            <span className="ln-metric__delta" data-tone={i.tone}>
-              {i.delta}
-            </span>
-          </div>
+        {kpi.map((k) => (
+          <MetricCard
+            key={k.label}
+            label={k.label}
+            value={k.value}
+            delta={k.delta}
+            deltaTone={k.deltaTone}
+          />
         ))}
       </div>
       <div
@@ -889,12 +575,12 @@ export default function TracesPageClient() {
             paddingRight: 4,
           }}
         >
-          <span className="ln-eyebrow">Trace</span>
+          <span className="ln-eyebrow">追踪</span>
           <div
             style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 2,
+              gap: 3,
               maxHeight: 200,
               overflowY: 'auto',
             }}
@@ -902,30 +588,25 @@ export default function TracesPageClient() {
             {runs.map((run) => (
               <button
                 key={run.id}
+                type="button"
+                className="ln-tr-trace-btn"
+                data-active={run.id === tid ? 'true' : 'false'}
+                aria-pressed={run.id === tid}
                 onClick={() => {
                   setTid(run.id);
                   setHashAlertId(run.id);
                 }}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '5px 9px',
-                  borderRadius: 5,
-                  border: '1px solid var(--ln-border)',
-                  background: run.id === tid ? 'var(--ln-accent-soft)' : 'transparent',
-                  color: run.id === tid ? 'var(--ln-accent)' : 'var(--ln-text-secondary)',
-                  fontSize: T.sm,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--ln-mono)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 120ms ease',
-                }}
-                title={run.id}
+                title={run.title}
               >
-                {shortAgentId(run.id)}
+                <span className="ln-tr-trace-row">
+                  <span
+                    className="ln-tr-trace-dot"
+                    style={{ background: sevDotColor[run.severity] ?? 'var(--ln-info)' }}
+                  />
+                  <span className="ln-tr-trace-id">{shortAgentId(run.id)}</span>
+                  <span className="ln-tr-trace-conf">{Math.round(run.confidence * 100)}%</span>
+                </span>
+                <span className="ln-tr-trace-title">{run.title}</span>
               </button>
             ))}
           </div>
@@ -1070,8 +751,10 @@ export default function TracesPageClient() {
             style={{
               display: 'flex',
               justifyContent: 'space-between',
-              marginBottom: S.sm,
-              fontSize: T.xs,
+              marginBottom: 4,
+              paddingBottom: 4,
+              borderBottom: '1px solid var(--ln-border)',
+              fontSize: 9.5,
               color: 'var(--ln-text-muted)',
               fontFamily: 'var(--ln-mono)',
               paddingLeft: LEFT_W + S.sm,
@@ -1079,10 +762,10 @@ export default function TracesPageClient() {
           >
             {[
               'T+0',
-              `T+${Math.round(maxOff * 0.25)}ms`,
-              `T+${Math.round(maxOff * 0.5)}ms`,
-              `T+${Math.round(maxOff * 0.75)}ms`,
-              `T+${Math.round(maxOff)}ms`,
+              `T+${fmtMs(Math.round(maxOff * 0.25))}`,
+              `T+${fmtMs(Math.round(maxOff * 0.5))}`,
+              `T+${fmtMs(Math.round(maxOff * 0.75))}`,
+              `T+${fmtMs(maxOff)}`,
             ].map((t) => (
               <span key={t}>{t}</span>
             ))}
@@ -1114,6 +797,17 @@ export default function TracesPageClient() {
                         const summary = summarizeActorEvents(actorGroups.get(groupActor) ?? []);
                         return (
                           <div
+                            className="ln-tr-group-head"
+                            role="button"
+                            tabIndex={0}
+                            aria-expanded={!collapsedGroups.has(groupActor)}
+                            onClick={() => toggleGroup(groupActor)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                toggleGroup(groupActor);
+                              }
+                            }}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -1125,8 +819,19 @@ export default function TracesPageClient() {
                               background: 'var(--ln-surface-0)',
                               border: '1px solid var(--ln-border)',
                               borderLeft: `2px solid ${agentColor(groupActor)}`,
+                              cursor: 'pointer',
+                              transition: 'border-color 150ms ease, background 150ms ease',
                             }}
                           >
+                            <ChevronDown
+                              size={12}
+                              style={{
+                                color: 'var(--ln-text-muted)',
+                                flexShrink: 0,
+                                transform: collapsedGroups.has(groupActor) ? 'rotate(-90deg)' : 'none',
+                                transition: 'transform 150ms ease',
+                              }}
+                            />
                             <AgentAvatar agentId={groupActor} size={18} />
                             <span
                               style={{
@@ -1161,40 +866,43 @@ export default function TracesPageClient() {
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: 3,
+                                gap: 4,
                                 marginLeft: 'auto',
+                                flexWrap: 'wrap',
+                                justifyContent: 'flex-end',
                               }}
                             >
-                              {(actorKindDots.get(groupActor) ?? []).map(([kind, n]) => (
-                                <span
-                                  key={kind}
-                                  title={`${groupActor} · ${kindLabel[kind]} × ${n}`}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: 3,
-                                    padding: '1px 5px',
-                                    borderRadius: 999,
-                                    background: `${kindColor[kind]}14`,
-                                    border: `1px solid ${kindColor[kind]}30`,
-                                    fontSize: 9,
-                                    fontFamily: 'var(--ln-mono)',
-                                    color: kindColor[kind],
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
+                              {(actorKindDots.get(groupActor) ?? [])
+                                .filter(([, n]) => n > 0)
+                                .map(([kind, n], idx) => (
                                   <span
+                                    key={kind}
+                                    title={`${groupActor} · ${kindLabel[kind]} ${n}`}
                                     style={{
-                                      width: 4,
-                                      height: 4,
-                                      borderRadius: 999,
-                                      background: kindColor[kind],
-                                      flexShrink: 0,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 3,
+                                      fontSize: 9,
+                                      fontFamily: 'var(--ln-mono)',
+                                      color: kindColor[kind],
+                                      whiteSpace: 'nowrap',
                                     }}
-                                  />
-                                  {n}
-                                </span>
-                              ))}
+                                  >
+                                    {idx > 0 && (
+                                      <span style={{ color: 'var(--ln-text-muted)' }}>·</span>
+                                    )}
+                                    <span
+                                      style={{
+                                        width: 4,
+                                        height: 4,
+                                        borderRadius: 999,
+                                        background: kindColor[kind],
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                    {kindLabel[kind]} {n}
+                                  </span>
+                                ))}
                               <span
                                 style={{
                                   fontSize: 9,
@@ -1202,7 +910,7 @@ export default function TracesPageClient() {
                                   color: 'var(--ln-text-muted)',
                                 }}
                               >
-                                {summary.spans} spans
+                                共 {summary.spans} 事件
                               </span>
                             </span>
                             {summary.highestSeverity !== 'Normal' && (
@@ -1227,25 +935,14 @@ export default function TracesPageClient() {
                       maxDur={maxDur}
                       depth={isGroupHead ? 0 : depth}
                       isSelected={sel?.id === event.id}
-                      expanded={expandedRows.has(event.id)}
-                      onToggle={() => toggleRow(event.id)}
+                      onSelect={() => setSel(event)}
+                      wallStartMs={active.startWallMs}
                     />
                   </div>
                 )}
               />
             )}
           </div>
-        </SectionPanel>
-        <SectionPanel
-          eyebrow="意图动作链"
-          title={`${storeIntents.length} 意图 · ${storeActions.length} 动作`}
-          bodyClassName="ln-panel-body"
-        >
-          <IntentActionChain
-            intents={storeIntents}
-            actions={storeActions}
-            evidence={evidenceItems}
-          />
         </SectionPanel>
         <div
           className="trace-detail-panel"
@@ -1261,7 +958,23 @@ export default function TracesPageClient() {
             <SectionPanel
               eyebrow={kindLabel[sel.kind]}
               title={sel.title}
-              meta={sel.operation ?? undefined}
+              meta={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  {sel.operation && (
+                    <span className="ln-chip" data-tone="muted" title={sel.operation}>
+                      {sel.operation}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="ln-tr-close"
+                    aria-label="关闭详情"
+                    onClick={() => setSel(null)}
+                  >
+                    <X size={14} />
+                  </button>
+                </span>
+              }
               bodyClassName="ln-panel-body"
             >
               <div
@@ -1273,6 +986,7 @@ export default function TracesPageClient() {
                   overflowY: 'auto',
                 }}
               >
+                {/* 头部：actor 完整身份 */}
                 <div
                   style={{
                     display: 'flex',
@@ -1295,7 +1009,7 @@ export default function TracesPageClient() {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {shortAgentId(sel.actor)}
+                      {sel.actor}
                     </div>
                     {sel.actorRole && (
                       <div style={{ fontSize: T.xs, color: 'var(--ln-text-muted)', marginTop: 1 }}>
@@ -1304,23 +1018,23 @@ export default function TracesPageClient() {
                     )}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: S.xs + 2, flexWrap: 'wrap' }}>
-                  <StatusBadge tone={sevTone(sel.severity)}>{sel.severity}</StatusBadge>
-                  {sel.evidenceRef && <StatusBadge tone="success">证据链</StatusBadge>}
+                {/* 状态徽章 */}
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  <span className="ln-chip" data-tone={sevTone(sel.severity)}>
+                    {sel.severity}
+                  </span>
+                  {sel.evidenceRef && (
+                    <span className="ln-chip" data-tone="success">
+                      证据链
+                    </span>
+                  )}
                   {sel.evidenceLevel && (
-                    <span
-                      style={{
-                        fontSize: T.sm,
-                        color: 'var(--ln-accent)',
-                        background: 'var(--ln-accent-soft)',
-                        padding: '2px 7px',
-                        borderRadius: 5,
-                      }}
-                    >
-                      {sel.evidenceLevel}
+                    <span className="ln-chip" data-tone="info">
+                      {matchLevelLabel(sel.evidenceLevel).label}
                     </span>
                   )}
                 </div>
+                {/* 结构化属性表 */}
                 <div
                   style={{
                     display: 'grid',
@@ -1329,33 +1043,80 @@ export default function TracesPageClient() {
                     fontSize: T.xs,
                   }}
                 >
-                  {['主体', '偏移', '耗时', '置信度'].map((k, i) => {
-                    const v = [
-                      sel.actor,
-                      `T+${fmtMs(sel.offsetMs)}`,
-                      fmtMs(sel.durationMs),
-                      `${Math.round(sel.confidence * 100)}%`,
-                    ][i];
-                    return (
-                      <div key={k}>
-                        <span className="ln-panel__meta">{k}</span>
-                        <div
-                          style={{
-                            color: 'var(--ln-text)',
-                            fontFamily: 'var(--ln-mono)',
-                            fontSize: T.xs,
-                            marginTop: 1,
-                          }}
-                        >
-                          {v}
-                        </div>
+                  {[
+                    ['时钟', fmtClock(active.startWallMs + sel.offsetMs)],
+                    ['偏移', `T+${fmtMs(sel.offsetMs)}`],
+                    ['耗时', fmtMs(sel.durationMs)],
+                    // 仅展示真实置信度（intent/action/pollution 无该字段 → 诚实「—」）
+                    [
+                      '置信度',
+                      sel.confidence > 0 ? `${Math.round(sel.confidence * 100)}%` : '—',
+                    ],
+                    ['类型', kindLabel[sel.kind]],
+                    ['主体', shortAgentId(sel.actor)],
+                    ...(sel.processComm ? ([['进程', sel.processComm]] as [string, string][]) : []),
+                    ...(sel.pid != null ? ([['pid', String(sel.pid)]] as [string, string][]) : []),
+                    ...(sel.processAgent
+                      ? ([['归属 agent', shortAgentId(sel.processAgent)]] as [string, string][])
+                      : []),
+                  ].map(([k, v]) => (
+                    <div key={k}>
+                      <span className="ln-panel__meta">{k}</span>
+                      <div
+                        style={{
+                          color: 'var(--ln-text)',
+                          fontFamily: 'var(--ln-mono)',
+                          fontSize: T.xs,
+                          marginTop: 1,
+                        }}
+                      >
+                        {v}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
+
+                {/* 真实行为：该进程在 actions 表中的真实操作（不编造） */}
+                {sel.actions.length > 0 && (
+                  <div>
+                    <SectionLabel color="var(--ln-info)" label="真实行为" />
+                    <div className="ln-tr-acts">
+                      {sel.actions.slice(0, 10).map((a, i) => (
+                        <div key={i} className="ln-tr-act">
+                          <span className="ln-tr-act__type">{a.actionLabel}</span>
+                          <span className="ln-tr-act__target" title={a.target ?? undefined}>
+                            {a.target ?? '—'}
+                          </span>
+                        </div>
+                      ))}
+                      {sel.actions.length > 10 && (
+                        <div className="ln-tr-acts__more">
+                          +{sel.actions.length - 10} 条行为
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {/* span I/O */}
+                {sel.input && (
+                  <>
+                    <SectionLabel color="var(--ln-info)" label="Input" />
+                    <CodeBlock color="var(--ln-info)" maxH={140}>
+                      {sel.input}
+                    </CodeBlock>
+                  </>
+                )}
+                {sel.output && (
+                  <>
+                    <SectionLabel color="var(--ln-success)" label="Output" />
+                    <CodeBlock color="var(--ln-success)" maxH={140}>
+                      {sel.output}
+                    </CodeBlock>
+                  </>
+                )}
                 {sel.prompt && (
                   <>
-                    <SectionLabel color="#a78bfa" label="Prompt" />
+                    <SectionLabel color="#a78bfa" label="LLM Prompt" />
                     <CodeBlock color="#a78bfa" maxH={160}>
                       {sel.prompt}
                     </CodeBlock>
@@ -1363,7 +1124,7 @@ export default function TracesPageClient() {
                 )}
                 {sel.response && (
                   <>
-                    <SectionLabel color="#a78bfa" label="Response" />
+                    <SectionLabel color="#a78bfa" label="LLM Response" />
                     <CodeBlock color="#a78bfa" maxH={160}>
                       {sel.response}
                     </CodeBlock>
@@ -1383,6 +1144,46 @@ export default function TracesPageClient() {
                     <CodeBlock color="#fb923c" maxH={140}>
                       {sel.toolResult}
                     </CodeBlock>
+                  </>
+                )}
+                {sel.processTree && (
+                  <>
+                    <SectionLabel color="#60a5fa" label="进程链" />
+                    <CodeBlock color="#60a5fa" maxH={140}>
+                      {sel.processTree}
+                    </CodeBlock>
+                  </>
+                )}
+                {sel.rawEvidence && Object.keys(sel.rawEvidence).length > 0 && (
+                  <>
+                    <SectionLabel color="var(--ln-text-muted)" label="原始证据" />
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: S.xs }}>
+                      {Object.entries(sel.rawEvidence)
+                        .slice(0, 12)
+                        .map(([k, v]) => (
+                          <span
+                            key={k}
+                            title={String(v)}
+                            style={{
+                              padding: '3px 7px',
+                              borderRadius: 4,
+                              fontSize: T.xs,
+                              background: 'var(--ln-surface-0)',
+                              border: '1px solid var(--ln-border)',
+                              fontFamily: 'var(--ln-mono)',
+                              color: 'var(--ln-text-secondary)',
+                              maxWidth: 260,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            <span style={{ color: 'var(--ln-text-muted)' }}>{k}</span>
+                            <span style={{ margin: '0 3px', color: 'var(--ln-border)' }}>=</span>
+                            <span>{String(v)}</span>
+                          </span>
+                        ))}
+                    </div>
                   </>
                 )}
                 {sel.material && sel.material !== 'No linked material' && (
@@ -1414,7 +1215,7 @@ export default function TracesPageClient() {
                             border: '1px solid var(--ln-border)',
                             fontSize: 9,
                             fontFamily: 'var(--ln-mono)',
-                            color: '#fbbf24',
+                            color: 'var(--ln-warning)',
                           }}
                         >
                           {r}
@@ -1423,23 +1224,6 @@ export default function TracesPageClient() {
                     </div>
                   </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setSel(null)}
-                  style={{
-                    background: 'none',
-                    border: '1px solid var(--ln-border)',
-                    borderRadius: 7,
-                    padding: '6px 12px',
-                    color: 'var(--ln-text-muted)',
-                    fontSize: T.sm,
-                    cursor: 'pointer',
-                    marginTop: S.xs,
-                  }}
-                >
-                  <X size={13} style={{ verticalAlign: 'middle', marginRight: 5 }} />
-                  关闭
-                </button>
               </div>
             </SectionPanel>
           ) : (
@@ -1452,31 +1236,10 @@ export default function TracesPageClient() {
                   lineHeight: 1.6,
                 }}
               >
-                点击链路中的事件行展开完整上下文，或从左侧进程树选择查看详情。
+                从责任链路或左侧进程树选择事件，查看完整上下文（I/O、进程链、原始证据、触发规则）。
               </p>
             </SectionPanel>
-          )}
-          <SectionPanel eyebrow="快速操作" title="调查入口" bodyClassName="ln-panel-body">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: S.xs + 2 }}>
-              <Link
-                href={buildInvestigationHref(tid)}
-                className="ln-btn"
-                style={{ justifyContent: 'space-between', textDecoration: 'none' }}
-              >
-                进入告警详情
-                <ArrowRight size={14} />
-              </Link>
-              <Link
-                href="/overview"
-                className="ln-btn"
-                style={{ justifyContent: 'space-between', textDecoration: 'none' }}
-              >
-                返回仪表盘
-                <ArrowRight size={14} />
-              </Link>
-            </div>
-          </SectionPanel>
-        </div>
+          )}        </div>
       </div>
     </div>
   );

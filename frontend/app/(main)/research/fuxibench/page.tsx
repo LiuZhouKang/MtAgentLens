@@ -1,6 +1,16 @@
+'use client';
+
 import Link from 'next/link';
+import { useEffect } from 'react';
+import { useAppStore } from '@/lib/store';
 
 export default function FuxiBenchResearchPage() {
+  // 静态研究页：内容即时渲染 → 立即报告就绪（供布局层协调加载层，防 loader 滞留）
+  const setPageReady = useAppStore((s) => s.setPageReady);
+  useEffect(() => {
+    setPageReady(true);
+  }, [setPageReady]);
+
   return (
     <main
       style={{

@@ -17,11 +17,8 @@ describe('InvestigationWorkbench', () => {
       <InvestigationWorkbench
         alert={demoAlerts[0]}
         model={model}
-        activeRunId={null}
         availableAlerts={demoAlerts}
         onSelectAlert={vi.fn()}
-        evidenceLoading={false}
-        evidenceError={null}
       />,
     );
 
@@ -38,30 +35,6 @@ describe('InvestigationWorkbench', () => {
     expect(screen.getByText('后续步骤')).toBeDefined();
   });
 
-  it('渲染取证链面板（引擎判定 + 污染链 + 策略矩阵 + 诊断），空源显示空态', () => {
-    // 前提：真实 store 未导入 db（dbAssets=null）→ 取证链三区显示「无」而非伪造
-    const model = buildInvestigationModel(demoAlerts[0], demoGraph, demoEvidence);
-
-    render(
-      <InvestigationWorkbench
-        alert={demoAlerts[0]}
-        model={model}
-        activeRunId={null}
-        availableAlerts={demoAlerts}
-        onSelectAlert={vi.fn()}
-        evidenceLoading={false}
-        evidenceError={null}
-      />,
-    );
-
-    // 取证链面板标题（SectionPanel eyebrow）
-    expect(screen.getByText('取证链')).toBeDefined();
-    // 空源空态：pollution/policy/nld 均为空 → 显示「无污染传播」而非伪造
-    expect(screen.getByText(/无污染传播/i)).toBeDefined();
-    expect(screen.getByText(/无策略判定/i)).toBeDefined();
-    expect(screen.getByText(/无失配诊断/i)).toBeDefined();
-  });
-
   it('shows an empty state when the timeline has no steps', () => {
     const model = {
       ...buildInvestigationModel(demoAlerts[0], demoGraph, demoEvidence),
@@ -72,11 +45,8 @@ describe('InvestigationWorkbench', () => {
       <InvestigationWorkbench
         alert={demoAlerts[0]}
         model={model}
-        activeRunId={null}
         availableAlerts={demoAlerts}
         onSelectAlert={vi.fn()}
-        evidenceLoading={false}
-        evidenceError={null}
       />,
     );
 

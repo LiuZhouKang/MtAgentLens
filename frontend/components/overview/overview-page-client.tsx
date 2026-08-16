@@ -35,7 +35,7 @@ const SigmaNetwork = dynamic(
 );
 import { buildInvestigationModel } from '@/lib/investigation';
 import { useAppStore } from '@/lib/store';
-import { buildClusterModels } from '@/lib/cluster-model';
+import { buildResponsibilityUnits } from '@/lib/responsibility-unit';
 import { buildInvestigationHref } from '@/lib/investigation-route';
 import {
   parseOverviewFocus,
@@ -45,9 +45,12 @@ import {
 import type { GraphData, ResponsibilityAlert } from '@/lib/types';
 import { useRunEvidence } from '@/lib/use-run-evidence';
 import {
-  deriveEvidenceStats,
+  deriveEvidenceMatchDistribution,
   deriveSeverityBreakdown,
   deriveTopologyTrend,
+  EVIDENCE_MATCH_MEANING,
+  EVIDENCE_MATCH_COLORS,
+  EVIDENCE_MATCH_ORDER,
 } from '@/lib/overview-metrics';
 
 function formatCompactNumber(value: number) {
@@ -96,25 +99,27 @@ export default function OverviewPageClient() {
   const graph = useAppStore((state) => state.graph);
   const setInvestigationContext = useAppStore((state) => state.setInvestigationContext);
   const overview = useAppStore((state) => state.overview);
+  const setPageReady = useAppStore((state) => state.setPageReady);
   const dbAssets = useAppStore((state) => state.dbAssets);
+  const actions = useAppStore((state) => state.actions);
   const liveSnapshotFrames = useAppStore((state) => state.liveSnapshotFrames);
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [selectedSigmaNodeId, setSelectedSigmaNodeId] = useState<string | null>(null);
 
   const { evidenceItems } = useRunEvidence(activeRunId);
 
-  // Defer heavy cluster modeling — lets the page paint a skeleton first,
+  // Defer heavy responsibility-unit modeling — lets the page paint a skeleton first,
   // then computes in the background. Prevents mount-time thread blocking.
   const deferredGraph = useDeferredValue(graph);
   const deferredAlerts = useDeferredValue(alerts);
 
-  const clusterModels = useMemo(
-    () => buildClusterModels(deferredGraph, deferredAlerts, evidenceItems),
+  const responsibilityUnits = useMemo(
+    () => buildResponsibilityUnits(deferredGraph, deferredAlerts, evidenceItems),
     [deferredAlerts, deferredGraph, evidenceItems],
   );
 
-  const leadCluster = clusterModels[0] ?? null;
-  const criticalClusters = clusterModels.filter((model) => model.highestSeverity === 'Critical');
+  const leadUnit = responsibilityUnits[0] ?? null;
+  const criticalUnits = responsibilityUnits.filter((model) => model.highestSeverity === 'Critical');
 
   // ── 真实数据派生（铁律：算不出的诚实空态，不造数）──
   // 快照帧 = live 实时帧优先，回退 db 导入帧
@@ -124,7 +129,12 @@ export default function OverviewPageClient() {
   );
   const topologyTrend = useMemo(() => deriveTopologyTrend(snapshotFrames), [snapshotFrames]);
   const severityBreakdown = useMemo(() => deriveSeverityBreakdown(alerts), [alerts]);
-  const evidenceStats = useMemo(() => deriveEvidenceStats(clusterModels), [clusterModels]);
+  // 证据精确度分布：按全量关联证据 match_level（L1 精确 → L5 子串）分桶 —— 直接反映
+  // 归因证据的可靠度。消费全量 correlation_evidence（完整利用真实数据，非仅责任单元子集）。
+  const evidenceMatch = useMemo(
+    () => deriveEvidenceMatchDistribution(evidenceItems),
+    [evidenceItems],
+  );
   // 真实 KPI sparkline：有快照帧时按帧节点/agent 数派生；无帧诚实不画（顶级规范允许
   // 卡内一个 sparkline，但绝不用伪造曲线）。
   const nodeSpark = topologyTrend.length > 0 ? topologyTrend.map((p) => p.nodes) : undefined;
@@ -156,12 +166,12 @@ export default function OverviewPageClient() {
 
   const selectedAlert = selectedItem?.alert ?? null;
   const selectedModel = selectedItem?.model ?? null;
-  const selectedCluster = useMemo(() => {
-    if (!selectedAlert) return leadCluster;
+  const selectedUnit = useMemo(() => {
+    if (!selectedAlert) return leadUnit;
     return (
-      clusterModels.find((model) => model.alertIds.includes(selectedAlert.alert_id)) ?? leadCluster
+      responsibilityUnits.find((model) => model.alertIds.includes(selectedAlert.alert_id)) ?? leadUnit
     );
-  }, [clusterModels, leadCluster, selectedAlert]);
+  }, [responsibilityUnits, leadUnit, selectedAlert]);
 
   // KPI stat 卡（顶级规范：大数字 28-32px + 一个对比 + 一个真实 sparkline）。
   // 与运行监控「丰富健康卡」的区分在于密度：KPI 卡是 stat（干净数字+spark），
@@ -193,10 +203,10 @@ export default function OverviewPageClient() {
     },
     {
       label: 'Evidence',
-      value: overview ? overview.evidence.count : evidenceStats.total,
+      value: overview ? overview.evidence.count : evidenceMatch.total,
       delta: overview
         ? `L5 ${overview.evidence.by_match_level.L5Substring ?? 0}`
-        : `${evidenceStats.total} 条关联`,
+        : `${evidenceMatch.total} 条关联`,
       tone: 'success' as StatusTone,
     },
     {
@@ -213,13 +223,13 @@ export default function OverviewPageClient() {
     },
   ];
 
-  const actionLinks = leadCluster
+  const actionLinks = leadUnit
     ? [
-        leadCluster.leadAlertId
+        leadUnit.leadAlertId
           ? {
               label: '进入告警详情',
-              href: buildInvestigationHref(leadCluster.leadAlertId),
-              hint: `${leadCluster.linkedEvidence.length} 份可落证据`,
+              href: buildInvestigationHref(leadUnit.leadAlertId),
+              hint: `${leadUnit.linkedEvidence.length} 份可落证据`,
             }
           : null,
       ].filter((item): item is { label: string; href: string; hint: string } => item != null)
@@ -227,13 +237,13 @@ export default function OverviewPageClient() {
 
   useEffect(() => {
     if (!selectedAlertId) {
-      setSelectedAlertId(leadCluster?.leadAlertId ?? alertModels[0]?.alert.alert_id ?? null);
+      setSelectedAlertId(leadUnit?.leadAlertId ?? alertModels[0]?.alert.alert_id ?? null);
     }
-  }, [alertModels, leadCluster, selectedAlertId]);
+  }, [alertModels, leadUnit, selectedAlertId]);
 
   // ── Deep-link focus ──
-  // /overview#agentId=<id> and /overview#clusterId=<id> (from the consolidated
-  // agent/cluster affordances) resolve to the owning alert and reuse the
+  // /overview#agentId=<id> and /overview#unitId=<id> (from the consolidated
+  // agent/unit affordances) resolve to the owning alert and reuse the
   // existing focus chain — no new state beyond the selected alert id.
   const [focus, setFocus] = useState<OverviewFocus | null>(null);
   useEffect(() => {
@@ -252,48 +262,53 @@ export default function OverviewPageClient() {
 
   useEffect(() => {
     if (!focus) return;
-    const alertId = resolveOverviewFocus(focus, alertModels, clusterModels);
+    const alertId = resolveOverviewFocus(focus, alertModels, responsibilityUnits);
     if (alertId) setSelectedAlertId(alertId);
-  }, [focus, alertModels, clusterModels]);
+  }, [focus, alertModels, responsibilityUnits]);
 
   useEffect(() => {
     if (!selectedAlert || !selectedModel) return;
     setInvestigationContext({
-      activeClusterId: selectedCluster?.clusterId ?? leadCluster?.clusterId ?? null,
+      activeUnitId: selectedUnit?.unitId ?? leadUnit?.unitId ?? null,
       activeIncidentId: selectedAlert.alert_id,
       activeAgentId: selectedModel.primaryAgentId,
-      highlightedPathEdgeIds: selectedCluster?.highlightEdgeIds ?? [],
+      highlightedPathEdgeIds: selectedUnit?.highlightEdgeIds ?? [],
       graphFocus: {
         reason: 'incident',
         label: selectedAlert.title,
         nodeId: null,
-        edgeId: selectedModel.pathEdges[0]?.edge_id ?? selectedCluster?.highlightEdgeIds[0] ?? null,
+        edgeId: selectedModel.pathEdges[0]?.edge_id ?? selectedUnit?.highlightEdgeIds[0] ?? null,
         agentId: selectedModel.primaryAgentId,
       },
     });
-  }, [leadCluster, selectedAlert, selectedCluster, selectedModel, setInvestigationContext]);
+  }, [leadUnit, selectedAlert, selectedUnit, selectedModel, setInvestigationContext]);
 
-  // ── Recharts data derived from real cluster models ──
-  const clusterDonut = useMemo(
+  // ── Recharts data derived from real responsibility-unit models ──
+  const unitDonut = useMemo(
     () =>
-      clusterModels.slice(0, 6).map((m) => ({
-        name: m.clusterId,
+      responsibilityUnits.slice(0, 6).map((m) => ({
+        name: m.unitId,
         value: m.alertIds.length,
       })),
-    [clusterModels],
+    [responsibilityUnits],
   );
 
   // 拓扑演化趋势已由真实快照帧派生（topologyTrend）；伪造的 Math.sin driftArea / 假 Coverage 已移除。
 
-  const focusCluster = selectedCluster ?? leadCluster;
+  const focusUnit = selectedUnit ?? leadUnit;
 
   // ── Layered loading ──
   // The full-page brand loader shows ONLY while there is no data at all
   // (initial fetch). Once ANY data arrives the page shell renders immediately
   // — KPI cards, panels and the network area — and only the responsibility
   // network shows its skeleton (NetworkLoading) while Sigma builds. Heavy
-  // cluster/investigation modeling never gates first paint.
+  // responsibility-unit/investigation modeling never gates first paint.
   const hasData = graph.nodes.length > 0 || alerts.length > 0;
+
+  // 页面内容就绪信号（供布局层协调加载层）：有数据即渲染仪表盘 → 置就绪。
+  useEffect(() => {
+    setPageReady(hasData);
+  }, [hasData, setPageReady]);
 
   const pageRef = useRef<HTMLDivElement>(null);
 
@@ -334,7 +349,7 @@ export default function OverviewPageClient() {
         });
       });
 
-      // 4. Rail sections — ScrollTrigger fade-up
+      // 4. Rail sections — ScrollTrigger fade-up + 列表项错峰揭示
       const railPanels = gsap.utils.toArray<HTMLElement>('.ln-rail > .ln-panel');
       railPanels.forEach((panel) => {
         gsap.from(panel, {
@@ -345,6 +360,20 @@ export default function OverviewPageClient() {
           scrollTrigger: { trigger: panel, start: 'top 88%', once: true, scroller },
         });
       });
+      // rail 列表项错峰揭示（面板入场后 stagger）——独立 timeline 更稳，无 onEnter 嵌套
+      const railItems = gsap.utils.toArray<HTMLElement>('.ln-rail .ln-rail-item');
+      if (railItems.length > 0) {
+        gsap.from(railItems, {
+          opacity: 0,
+          x: -8,
+          duration: 0.35,
+          stagger: 0.05,
+          ease: 'power2.out',
+          delay: 0.55,
+          scrollTrigger: { trigger: '.ln-rail', start: 'top 90%', once: true, scroller },
+          clearProps: 'transform',
+        });
+      }
 
       // 5. KPI hover micro-interaction — gentle lift
       const kpiCards = gsap.utils.toArray<HTMLElement>('.ln-metric');
@@ -422,14 +451,14 @@ export default function OverviewPageClient() {
               </div>
               <SigmaNetwork
                 graph={graph}
-                height={360}
+                height={480}
                 onNodeClick={(nodeId) => {
                   // click-to-select: toggle current, or select new
                   setSelectedSigmaNodeId((prev) => (prev === nodeId ? null : nodeId));
                   const node = graph.nodes.find((n) => n.node_id === nodeId);
                   if (node?.agent_id) {
                     setInvestigationContext({
-                      activeClusterId: focusCluster?.clusterId ?? null,
+                      activeUnitId: focusUnit?.unitId ?? null,
                       activeIncidentId: selectedAlert?.alert_id ?? '',
                       activeAgentId: node.agent_id,
                       highlightedPathEdgeIds: [],
@@ -448,31 +477,31 @@ export default function OverviewPageClient() {
 
             <div className="ln-stage__focus">
               <SectionPanel
-                eyebrow="Lead Cluster"
-                title={focusCluster?.title ?? 'awaiting focus'}
-                meta={focusCluster ? `${focusCluster.alertIds.length} alerts` : undefined}
+                eyebrow="Lead Unit"
+                title={focusUnit?.title ?? 'awaiting focus'}
+                meta={focusUnit ? `${focusUnit.alertIds.length} alerts` : undefined}
                 bodyClassName="ln-panel-body"
               >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <StatusBadge
                       tone={
-                        (focusCluster?.highestSeverity ?? 'Info') === 'Critical'
+                        (focusUnit?.highestSeverity ?? 'Info') === 'Critical'
                           ? 'danger'
-                          : focusCluster?.highestSeverity === 'Warning'
+                          : focusUnit?.highestSeverity === 'Warning'
                             ? 'warning'
                             : 'info'
                       }
                     >
-                      {focusCluster?.highestSeverity ?? 'Info'}
+                      {focusUnit?.highestSeverity ?? 'Info'}
                     </StatusBadge>
                     <span className="ln-panel__meta">
-                      {focusCluster?.boundaryCrossingCount ?? 0} boundary seams
+                      {focusUnit?.boundaryCrossingCount ?? 0} boundary seams
                     </span>
                   </div>
                   <div className="ln-panel__meta" style={{ lineHeight: 1.6 }}>
-                    {focusCluster
-                      ? `${focusCluster.boundaryCrossingCount} 次边界穿越 · ${focusCluster.linkedEvidence.length} 份证据 · ${focusCluster.relatedAgentIds.length} 个相关主体`
+                    {focusUnit
+                      ? `${focusUnit.boundaryCrossingCount} 次边界穿越 · ${focusUnit.linkedEvidence.length} 份证据 · ${focusUnit.relatedAgentIds.length} 个相关主体`
                       : 'collector 与 analyzer 继续收敛拓扑'}
                   </div>
                   {actionLinks.map((item) => (
@@ -599,52 +628,98 @@ export default function OverviewPageClient() {
               )}
             </SectionPanel>
 
-            {/* 证据分布 —— 真实关联证据按集群 */}
+            {/* 证据精确度分布 —— 真实关联证据按 match_level（官方枚举）分桶。
+                始终展示完整 L1→L5 全谱（缺失等级如实为 0）；语义配色 L1 精确(绿)→L5 子串(红)
+                传达质量梯度；图例两列紧凑单行，悬浮显示完整释义（渐进披露，不拉高面板）。 */}
             <SectionPanel
               eyebrow="Evidence"
-              title="证据分布"
-              meta={`${evidenceStats.total} 条`}
+              title="证据精确度分布"
+              meta={`${evidenceMatch.total} 条关联证据`}
               bodyClassName="ln-panel-body"
             >
               <TrendChart
                 type="bar"
-                data={evidenceStats.byCluster}
-                xKey="name"
+                data={evidenceMatch.byLevel}
+                xKey="short"
                 seriesKey="value"
-                colors={CHART_COLORS}
-                height={160}
+                colors={EVIDENCE_MATCH_ORDER.map((l) => EVIDENCE_MATCH_COLORS[l])}
+                height={150}
               />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
-                <span className="ln-metric__label">关联证据</span>
-                <strong className="ln-metric__value" style={{ fontSize: 18, marginLeft: 'auto' }}>
-                  {evidenceStats.total}
-                </strong>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '4px 14px',
+                  marginTop: 10,
+                }}
+              >
+                {evidenceMatch.byLevel.map((l) => (
+                  <div
+                    key={l.name}
+                    title={`${l.name}：${EVIDENCE_MATCH_MEANING[l.name] ?? l.name}`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 10.5,
+                      minWidth: 0,
+                      cursor: 'help',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: 2,
+                        background: EVIDENCE_MATCH_COLORS[l.name],
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span
+                      className="ln-mono"
+                      style={{ color: 'var(--ln-text)', flexShrink: 0, whiteSpace: 'nowrap' }}
+                    >
+                      {l.name}
+                    </span>
+                    <span
+                      className="ln-mono"
+                      style={{
+                        color: 'var(--ln-text-muted)',
+                        flex: 1,
+                        textAlign: 'right',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {l.value} · {l.percent.toFixed(0)}%
+                    </span>
+                  </div>
+                ))}
               </div>
             </SectionPanel>
 
-            {/* 集群分布 —— 真实告警集群 */}
+            {/* 责任单元分布 —— 真实责任单元 */}
             <SectionPanel
-              eyebrow="Clusters"
-              title="集群分布"
-              meta={`${clusterModels.length} 集群`}
+              eyebrow="Units"
+              title="责任单元分布"
+              meta={`${responsibilityUnits.length} 责任单元`}
               bodyClassName="ln-panel-body"
             >
               <TrendChart
                 type="donut"
-                data={clusterDonut}
+                data={unitDonut}
                 xKey="name"
                 seriesKey="value"
                 colors={CHART_COLORS}
                 height={160}
               />
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
-                <span className="ln-metric__label">严重集群</span>
+                <span className="ln-metric__label">高危责任单元</span>
                 <strong
                   className="ln-metric__delta"
-                  data-tone={criticalClusters.length > 0 ? 'danger' : 'success'}
+                  data-tone={criticalUnits.length > 0 ? 'danger' : 'success'}
                   style={{ marginLeft: 'auto', fontSize: 13 }}
                 >
-                  {criticalClusters.length}
+                  {criticalUnits.length}
                 </strong>
               </div>
             </SectionPanel>
@@ -659,6 +734,7 @@ export default function OverviewPageClient() {
                 agentIdentities={dbAssets?.agentIdentities ?? []}
                 identityProcessMap={dbAssets?.identityProcessMap ?? []}
                 processEvents={dbAssets?.processEvents ?? []}
+                actions={actions}
                 processEventCount={dbAssets?.processEventCount}
                 processEventTruncated={dbAssets?.processEventTruncated}
               />
@@ -666,11 +742,11 @@ export default function OverviewPageClient() {
             </div>
           </CollapsibleSection>
 
-          {/* 数据集概览（折叠分节） */}
+          {/* 运行概览（折叠分节）——db 代表一次采集 run */}
           {overview && (
             <CollapsibleSection
-              eyebrow="数据资产"
-              title="数据集概览"
+              eyebrow="Run Summary"
+              title="运行概览"
               meta={`${overview.graph.nodes} 节点 · ${overview.graph.edges} 边`}
             >
               <OverviewDatasetPanel overview={overview} />
@@ -681,14 +757,15 @@ export default function OverviewPageClient() {
         <aside className="ln-rail">
           <SectionPanel
             eyebrow="Responsibility Graph"
-            title="集群压力"
+            title="责任单元压力"
             meta="Live"
             bodyClassName="ln-panel-body"
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {clusterModels.slice(0, 6).map((model) => (
+              {responsibilityUnits.slice(0, 6).map((model) => (
                 <div
-                  key={model.clusterId}
+                  key={model.unitId}
+                  className="ln-rail-item"
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -708,7 +785,7 @@ export default function OverviewPageClient() {
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {model.clusterId}
+                    {model.unitId}
                   </span>
                   <strong className="ln-mono" style={{ fontSize: 12, color: 'var(--ln-text)' }}>
                     {model.pressureScore}
@@ -732,6 +809,7 @@ export default function OverviewPageClient() {
                     key={alert.alert_id}
                     type="button"
                     onClick={() => setSelectedAlertId(alert.alert_id)}
+                    className="ln-rail-item"
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -786,6 +864,7 @@ export default function OverviewPageClient() {
               {graph.edges.slice(0, 6).map((edge) => (
                 <div
                   key={edge.edge_id}
+                  className="ln-rail-item"
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',

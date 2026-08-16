@@ -50,12 +50,12 @@ describe('TracesPageClient', () => {
     expect(screen.getByText('判决')).toBeDefined();
     // Panels + controls
     expect(screen.getByText('责任链路')).toBeDefined();
-    expect(screen.getByText('Trace')).toBeDefined();
+    expect(screen.getByText('追踪')).toBeDefined();
     expect(screen.getByText('进程树')).toBeDefined();
     expect(screen.getByText('过滤')).toBeDefined();
     // Filter buttons (aria-label "筛选 <kind>" disambiguates from event rows)
     expect(screen.getByRole('button', { name: /筛选 全部/ })).toBeDefined();
-    expect(screen.getByRole('button', { name: /筛选 Tool/ })).toBeDefined();
+    expect(screen.getByRole('button', { name: /筛选 工具/ })).toBeDefined();
   });
 
   it('filters timeline events by kind', async () => {
@@ -79,7 +79,7 @@ describe('TracesPageClient', () => {
 
     // every responsibility kind is populated by the enriched demo data
     // (tool + network added; llm comes from the observer verdicts)
-    for (const label of ['Agent', 'LLM', 'Tool', '文件', '网络', '边界']) {
+    for (const label of ['主体', 'LLM', '工具', '文件', '网络', '边界']) {
       const btn = screen.getByRole('button', { name: new RegExp(`筛选 ${label}\\s*[1-9]`) });
       expect(btn).toBeDefined();
       expect(btn.hasAttribute('disabled')).toBe(false);
@@ -117,8 +117,8 @@ describe('TracesPageClient', () => {
     render(<TracesPageClient />, { wrapper: createWrapper() });
 
     // agent-security group spans agent + file + boundary events
-    expect(screen.getByTitle(/agent-security · 文件 × 1/)).toBeDefined();
-    expect(screen.getByTitle(/agent-security · 边界 × 1/)).toBeDefined();
+    expect(screen.getByTitle(/agent-security · 文件 1/)).toBeDefined();
+    expect(screen.getByTitle(/agent-security · 边界 1/)).toBeDefined();
     // agent-frontend group only has agent events — no resource kind badges
     expect(screen.queryByTitle(/agent-frontend · 文件/)).toBeNull();
   });

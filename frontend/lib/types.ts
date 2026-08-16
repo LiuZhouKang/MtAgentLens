@@ -93,6 +93,11 @@ export interface EngineSection {
   classification_score: number;
   classification_route: string;
   score_breakdown: ScoreBreakdown;
+  /** LLM 观察者元数据（observer 判定，真实 db 可能缺失 → 可选） */
+  observer_trigger_reason?: string | null;
+  deberta_score?: number | null;
+  cusum_triggered?: boolean | null;
+  progressive_fused?: number | null;
 }
 
 export interface ScoreBreakdown {

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -10,19 +11,35 @@ import type { GraphMetrics, GraphSnapshotFrame } from '@/lib/types';
 
 // Mock the WebGL 3D stage (jsdom has no WebGL) and capture its callbacks so the
 // tests can simulate graph interactions.
+// readyDelay>0 → 延迟触发 onReady（模拟「图渲染中」阶段，验证全屏 Orbit 持续覆盖）；
+// readyDelay=0 → 挂载即触发（默认，图就绪后全屏 LoadingScreen 淡出）。
+let readyDelay = 0;
 const stageState: {
   onNodeClick:
     ((info: { id: string; node_type: string; agent_id: string; desc: string }) => void) | null;
   onBackgroundClick: (() => void) | null;
-} = { onNodeClick: null, onBackgroundClick: null };
+  onReady: (() => void) | null;
+} = { onNodeClick: null, onBackgroundClick: null, onReady: null };
 
 vi.mock('@/components/ui/mtagentlens-graph-stage', () => ({
   default: function MockGraphStage(props: {
     onNodeClick: (info: { id: string; node_type: string; agent_id: string; desc: string }) => void;
     onBackgroundClick: () => void;
+    onReady?: () => void;
   }) {
     stageState.onNodeClick = props.onNodeClick;
     stageState.onBackgroundClick = props.onBackgroundClick;
+    stageState.onReady = props.onReady ?? null;
+    // 模拟图渲染就绪：readyDelay=0 立即触发；>0 延迟（覆盖图渲染中阶段）。
+    // onReady 随每次渲染更新、readyDelay 为测试旋钮 → 依赖数组有意留空。
+    React.useEffect(() => {
+      if (readyDelay > 0) {
+        const t = setTimeout(() => props.onReady?.(), readyDelay);
+        return () => clearTimeout(t);
+      }
+      props.onReady?.();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     return <div data-testid="mtl-stage" />;
   },
 }));
@@ -115,8 +132,10 @@ function renderPage() {
 
 describe('CommandCenterPage', () => {
   beforeEach(() => {
+    readyDelay = 0;
     stageState.onNodeClick = null;
     stageState.onBackgroundClick = null;
+    stageState.onReady = null;
     useAppStore.setState({
       activeRunId: null,
       alerts: demoAlerts,
@@ -149,7 +168,21 @@ describe('CommandCenterPage', () => {
     useAppStore.setState({ alerts: [], graph: demoGraph });
     renderPage();
     await waitFor(() => expect(screen.getByTestId('mtl-stage')).toBeDefined());
-    expect(screen.queryByText('MtAgentLens')).toBeNull();
+    // 数据就绪 + 图渲染就绪（onReady 约 1200ms）后全屏 LoadingScreen 平滑淡出并卸载
+    await waitFor(() => expect(screen.queryByText('MtAgentLens')).toBeNull(), { timeout: 4000 });
+  });
+
+  it('数据就绪但图渲染未就绪时保持单一全屏 Orbit，图就绪后平滑淡出（无第二加载态）', async () => {
+    // 图渲染中（onReady 延迟 300ms）：态势页唯一加载态 = 全屏 Observation Orbit
+    // （Image 8，与全站统一）。图内不再自渲染迷你 Orbit → 无 Image 9 第二动画。
+    readyDelay = 300;
+    useAppStore.setState({ alerts: [], graph: demoGraph });
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('mtl-stage')).toBeDefined());
+    // 图渲染就绪前：全屏 Orbit 持续在场（品牌文字可测）
+    expect(screen.getByText('MtAgentLens')).toBeDefined();
+    // 图渲染就绪后：AnimatePresence exit 平滑淡出并卸载 → 只剩态势图
+    await waitFor(() => expect(screen.queryByText('MtAgentLens')).toBeNull(), { timeout: 4000 });
   });
 
   it('opens a node detail panel when a graph node is clicked and closes on background', () => {

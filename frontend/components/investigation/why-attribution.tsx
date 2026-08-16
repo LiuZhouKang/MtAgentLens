@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { SectionPanel } from '@/components/ui/linear/section-panel';
+import { TONE_COLOR } from '@/lib/investigation-labels';
 import type { FacetSelection, WhyFacets } from '@/lib/why-facets';
 
 const FACET_LABELS: Record<FacetSelection, string> = {
@@ -109,13 +110,6 @@ const monoLabel = {
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
   minWidth: 0,
-} as const;
-const hubChip = {
-  fontSize: T.xs,
-  padding: '2px 6px',
-  borderRadius: 999,
-  background: 'rgba(248,113,113,0.12)',
-  color: '#f87171',
 } as const;
 
 /** 归因三列共用骨架：标题 + 摘要行；无数据 → 占位。 */
@@ -276,14 +270,14 @@ export default function WhyAttribution({
                 {pollution.bySource.slice(0, 4).map((s) => (
                   <div key={s.agentId} style={rowBase}>
                     <span style={monoLabel}>{s.agentId}</span>
-                    <span style={{ color: '#f87171' }}>×{s.count}</span>
+                    <span style={{ color: 'var(--ln-danger)' }}>×{s.count}</span>
                   </div>
                 ))}
                 {pollution.hubAgents.length > 0 && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                     <span style={mutedXs}>枢纽</span>
                     {pollution.hubAgents.map((h) => (
-                      <span key={h} style={hubChip}>
+                      <span key={h} className="ln-chip" data-tone="danger">
                         {h}
                       </span>
                     ))}
@@ -303,9 +297,9 @@ export default function WhyAttribution({
                     value={policy.total ? j.count / policy.total : 0}
                     color={
                       j.result === 'Violation'
-                        ? '#f87171'
+                        ? TONE_COLOR.danger
                         : j.result === 'Allow'
-                          ? '#4ade80'
+                          ? TONE_COLOR.success
                           : 'var(--ln-accent)'
                     }
                   />
@@ -314,7 +308,7 @@ export default function WhyAttribution({
                   <div key={b.boundary} style={rowBase}>
                     <span style={monoLabel}>{b.boundary}</span>
                     <span
-                      style={{ color: b.violationCount > 0 ? '#f87171' : 'var(--ln-text-muted)' }}
+                      style={{ color: b.violationCount > 0 ? 'var(--ln-danger)' : 'var(--ln-text-muted)' }}
                     >
                       {b.violationCount}/{b.total}
                     </span>
@@ -332,13 +326,13 @@ export default function WhyAttribution({
                     key={r.reason}
                     label={r.reason}
                     value={diagnostic.total ? r.count / diagnostic.total : 0}
-                    color="#fbbf24"
+                    color={TONE_COLOR.warning}
                   />
                 ))}
                 {diagnostic.byIntentId.slice(0, 3).map((i) => (
                   <div key={i.intentId} style={rowBase}>
                     <span style={monoLabel}>{i.toolName ?? i.intentId}</span>
-                    <span style={{ color: '#fbbf24' }}>×{i.count}</span>
+                    <span style={{ color: 'var(--ln-warning)' }}>×{i.count}</span>
                   </div>
                 ))}
               </FacetColumn>

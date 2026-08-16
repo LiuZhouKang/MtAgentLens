@@ -2,13 +2,22 @@
 
 import { useMemo, useState } from 'react';
 import { SectionPanel } from '@/components/ui/linear/section-panel';
+import AgentAvatar from '@/components/ui/agent-avatar';
 import { buildAgentFamilyTree, type AgentFamilyNode } from '@/lib/identity-lineage';
 import type { SubagentBoundary } from '@/lib/types';
 
 const T = { xs: 9.5, sm: 10.5, md: 12 };
 
-/** 委派树节点：递归渲染 parent→child，reason + childPid 标注。 */
-function FamilyNode({ node, tree }: { node: AgentFamilyNode; tree: Map<string, AgentFamilyNode> }) {
+/** 委派树节点：AgentAvatar + 递归 parent→child，reason + childPid 标注。 */
+function FamilyNode({
+  node,
+  tree,
+  depth = 0,
+}: {
+  node: AgentFamilyNode;
+  tree: Map<string, AgentFamilyNode>;
+  depth?: number;
+}) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children.length > 0;
   return (
@@ -16,51 +25,32 @@ function FamilyNode({ node, tree }: { node: AgentFamilyNode; tree: Map<string, A
       <button
         type="button"
         onClick={() => hasChildren && setExpanded(!expanded)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          background: 'none',
-          border: 'none',
-          cursor: hasChildren ? 'pointer' : 'default',
-          padding: '3px 0',
-          color: 'var(--ln-text)',
-          fontSize: T.sm,
-          textAlign: 'left',
-        }}
+        className="ln-tree-node"
+        style={{ paddingLeft: depth > 0 ? 10 : 4 }}
       >
-        <span style={{ color: 'var(--ln-text-muted)', width: 12 }}>
+        <span style={{ color: 'var(--ln-text-muted)', width: 12, flexShrink: 0 }}>
           {hasChildren ? (expanded ? '▾' : '▸') : '·'}
         </span>
-        <span style={{ fontFamily: 'var(--ln-mono)', fontWeight: 600 }}>{node.agentId}</span>
+        <AgentAvatar agentId={node.agentId} size={16} ring={false} />
+        <span style={{ fontFamily: 'var(--ln-mono)', fontWeight: 600, fontSize: T.sm }}>
+          {node.agentId}
+        </span>
         {!hasChildren && (
           <span style={{ fontSize: T.xs, color: 'var(--ln-text-muted)' }}>无委派</span>
         )}
       </button>
       {expanded && hasChildren && (
-        <div
-          style={{
-            marginLeft: 18,
-            borderLeft: '1px solid var(--ln-border)',
-            paddingLeft: 10,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 2,
-          }}
-        >
+        <div className="ln-tree-children">
           {node.children.map((child) => {
             const childNode = tree.get(child.childAgentId);
             return (
-              <div
-                key={child.childAgentId}
-                style={{ display: 'flex', flexDirection: 'column', gap: 0 }}
-              >
-                {childNode && <FamilyNode node={childNode} tree={tree} />}
+              <div key={child.childAgentId} style={{ display: 'flex', flexDirection: 'column' }}>
+                {childNode && <FamilyNode node={childNode} tree={tree} depth={depth + 1} />}
                 <span
                   style={{
                     fontSize: 9,
                     color: 'var(--ln-text-muted)',
-                    marginLeft: 22,
+                    marginLeft: 32,
                     fontFamily: 'var(--ln-mono)',
                   }}
                 >
@@ -80,7 +70,8 @@ export type AgentFamilyTreeProps = {
 };
 
 /**
- * 委派家族树面板——由 subagent_boundaries 组 parent→child 委派树，从根（无父）开始递归。
+ * 委派家族树面板——由 subagent_boundaries 组 parent→child 委派树。
+ * AgentAvatar 渐变圆徽章 + reason/pid 标注，视觉与进程谱系统一。
  */
 export default function AgentFamilyTree({ subagentBoundaries }: AgentFamilyTreeProps) {
   const tree = useMemo(() => buildAgentFamilyTree(subagentBoundaries), [subagentBoundaries]);
@@ -96,7 +87,7 @@ export default function AgentFamilyTree({ subagentBoundaries }: AgentFamilyTreeP
       {tree.size === 0 ? (
         <div style={{ fontSize: T.sm, color: 'var(--ln-text-muted)' }}>此数据源无委派边界</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {roots.map((id) => (
             <FamilyNode key={id} node={tree.get(id)!} tree={tree} />
           ))}

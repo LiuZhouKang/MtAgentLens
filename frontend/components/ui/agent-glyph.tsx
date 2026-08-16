@@ -122,7 +122,16 @@ const KIND_GEOMETRY: Record<GlyphKind, (rotation: number) => Geometry> = {
   dotgrid: () => ({ stroke: [], dots: dotgridPaths() }),
 };
 
-export default function AgentGlyph({ spec, size }: { spec: AgentGlyphSpec; size: number }) {
+export default function AgentGlyph({
+  spec,
+  size,
+  color = 'rgba(255, 255, 255, 0.92)',
+}: {
+  spec: AgentGlyphSpec;
+  size: number;
+  /** 覆盖默认白色描边（如按状态着色） */
+  color?: string;
+}) {
   const { stroke, dots } = KIND_GEOMETRY[spec.kind](spec.rotation);
   const children: ReactNode[] = [];
   stroke.forEach((d, i) => children.push(<path key={`s${i}`} d={d} />));
@@ -143,7 +152,7 @@ export default function AgentGlyph({ spec, size }: { spec: AgentGlyphSpec; size:
       strokeWidth={STROKE}
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{ display: 'block', color: 'rgba(255, 255, 255, 0.92)' }}
+      style={{ display: 'block', color }}
     >
       <g transform={`rotate(${spec.rotation} 12 12)`}>{children}</g>
     </svg>

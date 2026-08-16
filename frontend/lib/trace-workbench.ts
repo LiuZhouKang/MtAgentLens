@@ -1,4 +1,15 @@
-import type { AlertSeverity, CorrelationEvidence, ResponsibilityAlert } from './types';
+import type {
+  Action,
+  AlertSeverity,
+  ContextPollutionEvent,
+  CorrelationEvidence,
+  Intent,
+  PolicyEvaluation,
+  ProcessEvent,
+  ResponsibilityAlert,
+} from './types';
+import { actionTypeLabel, toolLabel } from './monitoring/perspective-labels';
+import type { InvAction } from './investigation-timeline';
 
 export type TraceEventKind = 'agent' | 'llm' | 'tool' | 'file' | 'network' | 'boundary' | 'verdict';
 
@@ -30,6 +41,12 @@ export interface TraceEventModel {
   rawEvidence: Record<string, unknown> | null; // all matched_fields
   parentEventId: string | null;
   depth: number;
+  // 真实进程关联（process_events / actions 表，pid 精确关联，不编造）
+  pid: number | null;
+  processComm: string | null;
+  processAgent: string | null;
+  /** 该进程的真实行为（文件/命令），时间升序 */
+  actions: InvAction[];
 }
 
 export interface TraceRunModel {
@@ -45,6 +62,8 @@ export interface TraceRunModel {
   evidenceCount: number;
   boundaryEvents: number;
   timeline: TraceEventModel[];
+  /** 时间线起点墙钟时间（毫秒），供 span 时钟 HH:MM:SS */
+  startWallMs: number;
   verdict: {
     headline: string;
     body: string;
@@ -203,6 +222,10 @@ function buildObserverEvents(alert: ResponsibilityAlert): TraceEventModel[] {
       rawEvidence: null,
       parentEventId: null,
       depth: 0,
+      pid: null,
+      processComm: null,
+      processAgent: null,
+      actions: [],
     });
   };
 
@@ -233,15 +256,281 @@ function buildObserverEvents(alert: ResponsibilityAlert): TraceEventModel[] {
   return events;
 }
 
+/**
+ * 融合全数据源事件（不编造，全部来自真实表）：
+ *  - intents → tool（真实工具调用 + 参数）
+ *  - actions → file / tool（真实文件读/写/覆写路径）
+ *  - policy_evaluations → verdict（真实边界判定结果，按 boundary 聚合）
+ *  - context_pollution_events → boundary（真实污染传播，按 source→artifact 聚合）
+ * 这些事件与 timeline 进程事件按 offsetMs 合并，构成完整责任图谱。
+ */
+function buildEnrichedEvents(input: {
+  actions?: Action[];
+  intents?: Intent[];
+  policyEvaluations?: PolicyEvaluation[];
+  pollutionEvents?: ContextPollutionEvent[];
+  startNs: number;
+  /** 策略判定无时间戳，用告警形成时间作锚点 */
+  policyAnchorNs: number;
+  pidAgent: Map<number, string>;
+  actorFallback: string;
+}): TraceEventModel[] {
+  const {
+    actions,
+    intents,
+    policyEvaluations,
+    pollutionEvents,
+    startNs,
+    policyAnchorNs,
+    pidAgent,
+    actorFallback,
+  } = input;
+  const T = 1_000_000;
+  const events: TraceEventModel[] = [];
+  const agentFor = (pid: number | null | undefined): string =>
+    pid != null && pidAgent.has(pid) ? pidAgent.get(pid)! : actorFallback;
+  const off = (ns: number): number => Math.max(0, Math.round((ns - startNs) / T));
+
+  const mk = (partial: Partial<TraceEventModel>): TraceEventModel => ({
+    id: '',
+    offsetMs: 0,
+    durationMs: 1,
+    kind: 'file',
+    title: '',
+    actor: actorFallback,
+    actorRole: null,
+    material: '',
+    evidenceRef: null,
+    evidenceLevel: null,
+    operation: null,
+    ruleIds: [],
+    patternId: null,
+    confidence: 0,
+    severity: 'Normal',
+    input: null,
+    output: null,
+    prompt: null,
+    response: null,
+    toolCall: null,
+    toolResult: null,
+    processTree: null,
+    rawEvidence: null,
+    parentEventId: null,
+    depth: 0,
+    pid: null,
+    processComm: null,
+    processAgent: null,
+    actions: [],
+    ...partial,
+  });
+
+  // 意图 → 工具调用
+  for (const intent of intents ?? []) {
+    events.push(
+      mk({
+        id: `intent-${intent.intent_id}`,
+        offsetMs: off(intent.timestamp_ns),
+        kind: 'tool',
+        title: `工具调用 · ${toolLabel(intent.tool_name).label}`,
+        actor: agentFor(intent.process_id?.pid),
+        operation: intent.tool_name,
+        input: intent.tool_args?.length ? JSON.stringify(intent.tool_args).slice(0, 500) : null,
+        output: intent.authority_source || null,
+      }),
+    );
+  }
+
+  // 行为 → 文件读/写/覆写（真实路径）
+  for (const action of actions ?? []) {
+    const target = extractActionTarget(action.normalized_args ?? []);
+    const isFile = action.action_type.startsWith('File');
+    events.push(
+      mk({
+        id: `action-${action.action_id}`,
+        offsetMs: off(action.timestamp_ns),
+        kind: isFile ? 'file' : 'tool',
+        title: `${actionTypeLabel(action.action_type).label}${target ? ` ${target}` : ''}`,
+        actor: agentFor(action.process_id?.pid),
+        operation: action.action_type,
+        input: target,
+        output: action.signal_class === 'HighSignal' ? '高信号' : '低信号',
+      }),
+    );
+  }
+
+  // 策略判定 → 判定（按 boundary 聚合，避免 755 条同质事件；判定时间 = 告警形成锚点）
+  // confidence 用该 boundary 的真实平均置信度（policy 表有 confidence 字段，不编造）
+  const policyByBoundary = new Map<
+    string,
+    { boundary: string; count: number; agent: string; confSum: number }
+  >();
+  for (const p of policyEvaluations ?? []) {
+    const key = p.boundary || '未知';
+    const cur =
+      policyByBoundary.get(key) ??
+      { boundary: key, count: 0, agent: p.subject_agent_id, confSum: 0 };
+    cur.count += 1;
+    cur.confSum += p.confidence || 0;
+    policyByBoundary.set(key, cur);
+  }
+  for (const row of policyByBoundary.values()) {
+    events.push(
+      mk({
+        id: `policy-${row.boundary}`,
+        offsetMs: off(policyAnchorNs),
+        kind: 'verdict',
+        title: `策略判定 · ${row.boundary} · 违规 ×${row.count}`,
+        actor: row.agent || actorFallback,
+        confidence: row.confSum / Math.max(1, row.count),
+        operation: row.boundary,
+        input: `违规评估 ${row.count} 次`,
+        output: 'Violation',
+      }),
+    );
+  }
+
+  // 污染传播 → 边界（按 source→artifact 聚合）
+  const pollutionKey = new Map<string, { source: string; artifact: string; count: number; tsNs: number }>();
+  for (const p of pollutionEvents ?? []) {
+    const key = `${p.source_agent_id}→${p.contaminated_artifact}`;
+    const cur = pollutionKey.get(key) ?? { source: p.source_agent_id, artifact: p.contaminated_artifact, count: 0, tsNs: p.detected_at_ns };
+    cur.count += 1;
+    if (!cur.tsNs || p.detected_at_ns < cur.tsNs) cur.tsNs = p.detected_at_ns;
+    pollutionKey.set(key, cur);
+  }
+  for (const row of pollutionKey.values()) {
+    events.push(
+      mk({
+        id: `pollution-${row.source}-${row.artifact}`,
+        offsetMs: off(row.tsNs),
+        kind: 'boundary',
+        title: `污染传播 · ${row.artifact.slice(0, 48)}`,
+        actor: row.source || actorFallback,
+        operation: 'Taint',
+        input: `污染源 ${row.source}`,
+        output: `受影响资源 ${row.artifact}`,
+      }),
+    );
+  }
+
+  return events;
+}
+
+const OBSERVER_ROUTE_LABEL: Record<string, string> = {
+  observer_uncertain: '待定',
+  observer_safe: '安全',
+  observer_unsafe: '风险',
+  observer_judged: '观察器判定',
+};
+
+/**
+ * 基于 alert.engine 的 LLM observer 元数据创建 `llm` 事件（真实数据，不编造）：
+ * classification_route / observer_trigger_reason / deberta_score / reasoning。
+ * 无 observer 数据（route 非 observer 且无触发原因）→ null（诚实空态）。
+ */
+function buildLlmEvent(alert: ResponsibilityAlert): TraceEventModel | null {
+  const engine = alert.engine;
+  const route = engine?.classification_route ?? '';
+  // 完整 observer 路由（observer_uncertain/safe/unsafe...）；demo 简化值 'observer' 不算
+  const isObserver =
+    (route.startsWith('observer_') && route.length > 'observer_'.length) ||
+    engine?.observer_trigger_reason != null;
+  if (!isObserver) return null;
+  const reason = alert.reasoning ?? '';
+  const trigger = engine?.observer_trigger_reason ?? null;
+  const score = typeof engine?.deberta_score === 'number' ? engine.deberta_score : null;
+  const label = OBSERVER_ROUTE_LABEL[route] ?? route;
+  const uncertain = route.includes('uncertain') || route.includes('unsafe');
+  return {
+    id: `llm-${alert.alert_id}`,
+    offsetMs: alert.timeline.total_duration_ms,
+    durationMs: 10,
+    kind: 'llm',
+    title: `LLM 观察者 · ${label}`,
+    actor: alert.primary_agent.agent_id,
+    actorRole: null,
+    material: reason,
+    evidenceRef: null,
+    evidenceLevel: 'observer',
+    operation: route,
+    ruleIds: [],
+    patternId: null,
+    confidence: score ?? alert.confidence,
+    severity: uncertain ? 'Warning' : 'Info',
+    input: trigger ?? null,
+    output: label,
+    prompt: reason || null,
+    response: trigger ?? null,
+    toolCall: null,
+    toolResult: null,
+    processTree: null,
+    rawEvidence: {
+      classification_route: route,
+      observer_trigger_reason: trigger,
+      deberta_score: score,
+      cusum_triggered: engine?.cusum_triggered ?? null,
+      progressive_fused: engine?.progressive_fused ?? null,
+    },
+    parentEventId: null,
+    depth: 0,
+    pid: null,
+    processComm: null,
+    processAgent: null,
+    actions: [],
+  };
+}
+
+/** 从 actions.normalized_args 提取真实 Path / command（与 identity-lineage 同模式）。 */
+function extractActionTarget(args: unknown[]): string | null {
+  for (const arg of args ?? []) {
+    if (arg && typeof arg === 'object') {
+      const obj = arg as Record<string, unknown>;
+      if (typeof obj.Path === 'string' && obj.Path) return obj.Path;
+      if (typeof obj.command === 'string' && obj.command) return obj.command;
+      if (typeof obj.path === 'string' && obj.path) return obj.path;
+    }
+  }
+  return null;
+}
+
 export function buildTraceRunModel(
   alert: ResponsibilityAlert,
   evidenceItems: CorrelationEvidence[],
+  processEvents?: ProcessEvent[],
+  actions?: Action[],
+  intents?: Intent[],
+  policyEvaluations?: PolicyEvaluation[],
+  pollutionEvents?: ContextPollutionEvent[],
 ): TraceRunModel {
   const evidenceById = new Map(evidenceItems.map((item) => [item.evidence_id, item]));
   const actorRoles: Record<string, string> = {};
   for (const entry of [alert.primary_agent, ...alert.involved_agents]) {
     if (entry.claimed_role) actorRoles[entry.agent_id] = entry.claimed_role;
   }
+  // 真实进程索引（pid → comm / agent / 行为，来自 process_events / actions 表）
+  const pidComm = new Map<number, string>();
+  const pidAgent = new Map<number, string>();
+  for (const pe of processEvents ?? []) {
+    if (pe.pid == null) continue;
+    if (pe.comm && !pidComm.has(pe.pid)) pidComm.set(pe.pid, pe.comm);
+    if (pe.agent_id && !pidAgent.has(pe.pid)) pidAgent.set(pe.pid, pe.agent_id);
+  }
+  const pidActions = new Map<number, InvAction[]>();
+  for (const a of actions ?? []) {
+    const pid = a.process_id?.pid;
+    if (pid == null || pid <= 0) continue;
+    const list = pidActions.get(pid) ?? [];
+    list.push({
+      actionType: a.action_type,
+      actionLabel: actionTypeLabel(a.action_type).label,
+      target: extractActionTarget(a.normalized_args ?? []),
+      signalClass: a.signal_class,
+      tsNs: a.timestamp_ns,
+    });
+    pidActions.set(pid, list);
+  }
+  for (const list of pidActions.values()) list.sort((x, y) => x.tsNs - y.tsNs);
+
   const sortedSteps = [...alert.timeline.steps].sort(
     (left, right) => left.timestamp_ns - right.timestamp_ns,
   );
@@ -294,6 +583,13 @@ export function buildTraceRunModel(
         ? `${step.operation} · ${step.agent_id ?? alert.primary_agent.agent_id}${command ? ' · ' + command : ''}`
         : null;
 
+    // 真实进程关联：从 description 解析 pid → process_events/actions 表（不编造）
+    const pidMatch = (step.description ?? '').match(/pid=(\d+)/);
+    const pid = pidMatch ? Number(pidMatch[1]) : null;
+    const processComm = pid != null && pidComm.has(pid) ? pidComm.get(pid)! : null;
+    const processAgent = pid != null && pidAgent.has(pid) ? pidAgent.get(pid)! : null;
+    const realActions = pid != null ? (pidActions.get(pid) ?? []) : [];
+
     return {
       id: step.source_event_id ?? `${alert.alert_id}-step-${index}`,
       offsetMs: Math.max(0, Math.round((step.timestamp_ns - startNs) / 1_000_000)),
@@ -320,11 +616,31 @@ export function buildTraceRunModel(
       rawEvidence: rawEv,
       parentEventId: parentId,
       depth: parentId ? 1 : 0,
+      pid,
+      processComm,
+      processAgent,
+      actions: realActions,
     };
   });
 
-  // phase-2 LLM observer judgments sit at the tail of the trace
-  const timeline = [...stepEvents, ...buildObserverEvents(alert)];
+  // 融合全数据源事件（文件/工具/判定/边界）+ LLM 观察者，构成完整责任图谱
+  const enriched = buildEnrichedEvents({
+    actions,
+    intents,
+    policyEvaluations,
+    pollutionEvents,
+    startNs,
+    policyAnchorNs: alert.timestamp_ns,
+    pidAgent,
+    actorFallback: alert.primary_agent.agent_id,
+  });
+  const llmEvent = buildLlmEvent(alert);
+  const timeline = [
+    ...stepEvents,
+    ...buildObserverEvents(alert),
+    ...(llmEvent ? [llmEvent] : []),
+    ...enriched,
+  ].sort((a, b) => a.offsetMs - b.offsetMs || a.id.localeCompare(b.id));
 
   const kindCounts = timeline.reduce<Record<TraceEventKind, number>>(
     (counts, event) => {
@@ -366,6 +682,7 @@ export function buildTraceRunModel(
     evidenceCount: evidenceItems.length,
     boundaryEvents,
     timeline,
+    startWallMs: Math.floor(startNs / 1_000_000),
     verdict: {
       headline: `${alert.decision} / ${alert.authority}`,
       body: alert.action_hint || alert.summary || alert.reasoning,

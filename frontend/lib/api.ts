@@ -67,7 +67,13 @@ export interface RunEvent {
 export const api = {
   getRuns: (): Promise<RunSummary[]> => fetchJson<RunSummary[]>('/api/runs'),
 
-  getActiveRun: (): Promise<RunSummary | null> => fetchJson<RunSummary | null>('/api/runs/active'),
+  getActiveRun: async (): Promise<RunSummary | null> => {
+    const data = await fetchJson<RunSummary | null>('/api/runs/active');
+    // middleware 在后端不可达时优雅降级返回 { data: null } —— fetchJson 的
+    // `body.data ?? body` 会解析成 truthy 对象，这里归一为 null（无活跃 run），
+    // 避免被误判为「有活跃 run」而错误连接 SSE。
+    return data && typeof data === 'object' && 'data' in data ? null : data;
+  },
 
   getRun: (id: string): Promise<RunSummary> => fetchJson<RunSummary>(`/api/runs/${id}`),
 

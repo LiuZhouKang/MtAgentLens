@@ -2,6 +2,7 @@
 
 import { useId } from 'react';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
+import { DigitReel } from '@/components/motion-primitives/digit-reel';
 import type { StatusTone } from './status-badge';
 
 type MetricCardProps = {
@@ -51,7 +52,11 @@ export function MetricCard({
           </div>
         ) : null}
       </div>
-      <strong className="ln-metric__value">{value}</strong>
+      {typeof value === 'number' ? (
+        <DigitReel value={value} className="ln-metric__value" />
+      ) : (
+        <strong className="ln-metric__value">{value}</strong>
+      )}
       {delta ? (
         <span className="ln-metric__delta" data-tone={deltaTone}>
           {delta}

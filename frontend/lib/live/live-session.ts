@@ -31,6 +31,8 @@ import type {
 
 /** 活跃 run 轮询间隔。 */
 export const RUN_POLL_INTERVAL_MS = 2000;
+/** 后端不可达时轮询退避上限（指数退避，避免持续无效探测持续刷 500）。 */
+export const MAX_POLL_BACKOFF_MS = 60_000;
 /** 直播周期同步间隔（快照帧推进 + 运行监控重派生）。 */
 export const LIVE_SYNC_INTERVAL_MS = 10000;
 
@@ -63,6 +65,8 @@ export interface LiveSession {
 export function createLiveSession(deps: LiveSessionDeps): LiveSession {
   let es: EventSource | null = null;
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 轮询退避增量：0 = 正常节奏；>0 = 后端不可达时指数退避。 */
+  let pollBackoffMs = 0;
   let activeRunId: string | null = null;
   let stopped = false;
 
@@ -246,7 +250,10 @@ export function createLiveSession(deps: LiveSessionDeps): LiveSession {
     let run: Pick<RunSummary, 'run_id' | 'started_at_ns'> | null = null;
     try {
       run = await deps.fetchActiveRun();
+      pollBackoffMs = 0; // 后端可达 → 恢复正常轮询节奏
     } catch {
+      // 后端不可达：指数退避轮询间隔（2s→…→60s），减少无效探测
+      pollBackoffMs = Math.min((pollBackoffMs || RUN_POLL_INTERVAL_MS) * 2, MAX_POLL_BACKOFF_MS);
       // MEDIUM-1：stop 后在途续体不得再写 store / 触发副作用
       if (stopped) return;
       // 服务器不可达（record 进程退出 / 断网）：若曾有活跃 run，视为 run 结束转回放。
@@ -329,7 +336,7 @@ export function createLiveSession(deps: LiveSessionDeps): LiveSession {
       void tick().finally(() => {
         if (!stopped) schedulePoll();
       });
-    }, RUN_POLL_INTERVAL_MS);
+    }, RUN_POLL_INTERVAL_MS + pollBackoffMs);
   }
 
   function start(): void {

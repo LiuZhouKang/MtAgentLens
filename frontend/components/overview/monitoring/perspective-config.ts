@@ -4,28 +4,27 @@ export const PERSPECTIVE_META: Record<PerspectiveKey, { label: string; descripti
   topologyDrift: {
     label: '拓扑漂移',
     description:
-      'graph_snapshots.metrics_json 逐帧演进：节点/边/agent 数随快照帧的变化与首末差分。',
+      '责任网络随时间的演进：节点 / 边 / Agent 逐帧变化，以及首末状态的差分。',
   },
   topologyHealth: {
     label: '拓扑健康',
-    description: '最新帧拓扑足迹 + 告警严重度 + 上下文污染，度量拓扑生长而非时延健康。',
+    description: '最新拓扑足迹、告警严重度与上下文污染，衡量网络生长与运行健康。',
   },
   intentMismatch: {
     label: '意图-动作失配',
-    description:
-      'non_link_diagnostics 诊断量、按 reason 分布与证据匹配强度（L5Substring 为弱证据）。',
+    description: '意图与动作的失配诊断量、成因分布，以及证据匹配强度（弱 / 强）。',
   },
   policyCompliance: {
     label: '策略合规',
-    description: 'policy_evaluations 中 judgment_json.result=Violation 的真实违规率与边界分布。',
+    description: '策略评估中的真实违规率与边界分布，识别越界行为。',
   },
   toolFootprint: {
     label: '工具足迹',
-    description: '意图工具调用 / 动作类型 / 信号类 / top 文件路径（normalized_args.Path）。',
+    description: '意图工具调用、动作类型、信号强度与高频文件路径。',
   },
   networkSessions: {
     label: '网络会话',
-    description: 'tls_sessions 会话计数、60s 时间分桶与按 pid 分布。',
+    description: 'TLS 会话总量、按分钟的会话趋势与按进程的分布。',
   },
 };
 

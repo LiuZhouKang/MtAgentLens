@@ -14,7 +14,7 @@ import { landingCopy } from '@/lib/landing/landing-copy';
  *
  * 开场（~0–3.6s）是「品牌时刻」：黑洞深空底上巨大 M 缓缓画出后淡出，让位给
  * 视频 + 文案。文案错峰浮现（eyebrow → slogan 两行 → 专业副行 → CTA → 滚动提示）。
- * 主标题是「看得见 / 才可信」——超大 slogan 式两行（Apple/Linear 级），逐行
+ * 主标题是信任结论「看得见 / 才信赖」——超大 slogan 式两行（Apple/Linear 级），逐行
  * mask 错峰揭示；副行一句话说清产品实际价值；玻璃拟态 CTA 直达观测台。
  * 滚动时视频帧按 Zentry 帐篷形折叠让位给下一区块。
  *

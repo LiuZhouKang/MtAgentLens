@@ -78,9 +78,9 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
 
 ## 功能演示
 
-[![MtAgentLens 完整功能演示（65 秒）](docs/demo/demo-poster.jpg)](docs/demo/demo.mp4)
+[![MtAgentLens 完整功能演示（约 1 分 48 秒）](docs/demo/demo.png)](docs/demo/demo.mp4)
 
-*完整功能演示（65 秒）：eBPF 内核级零插桩采集 → 跨进程责任图构建 → 结构化告警与证据回溯的端到端流程*
+*完整功能演示（约 1 分 48 秒）：eBPF 内核级零插桩采集 → 跨进程责任图构建 → 结构化告警与证据回溯的端到端流程*
 
 ---
 
@@ -95,15 +95,15 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |  +----------+  +----------+  +----------+  +----------+         |
   |  | Agent A  |  | Agent B  |  | Agent C  |  |   ...    |         |
   |  +----+-----+  +----+-----+  +----+-----+  +----+-----+         |
-  |       |              |              |              |             |
+  |       |              |              |              |            |
   |       |  App-level logs (mutable, bypassable) — untrusted       |
-  +-------+--------------+--------------+--------------+-------------+
+  +-------+--------------+--------------+--------------+------------+
           |              |              |              |
   ========+==============+==============+==============+=============
           |              |  SYSCALL BOUNDARY           |
   ========+==============+==============+==============+=============
           |              |              |              |
-  +-------+--------------+--------------+--------------+-------------+
+  +-------+--------------+--------------+--------------+------------+
   |                      eBPF PROBES                                |
   |                                                                 |
   |  tls_capture         process           stdiocap                 |
@@ -111,7 +111,7 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |  | SSL_read      |   | exec / exit |   | read / write   |       |
   |  | SSL_write     |   | fork / clone|   | stdin / stdout |       |
   |  | uprobe (L3)   |   | open / unlink|  | MCP plaintext  |       |
-  |  | decrypt plain |   | bind / connect|  | uprobe capture |       |
+  |  | decrypt plain |   | bind / connect|  | uprobe capture|       |
   |  +---------------+   +-------------+   +----------------+       |
   |                                                                 |
   |  fileaccess          browsertrace       system                  |
@@ -127,76 +127,80 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   +---------------------------------+-------------------------------+
   |                    RUST STREAMING ENGINE                        |
   |                                                                 |
-  |  +-----------------------------------------------------------+ |
-  |  | Runner Layer (7 runners)                                   | |
-  |  | SslRunner  ProcessRunner  StdioRunner                     | |
-  |  | SystemRunner  AgentRunner  FakeRunner (test)              | |
-  |  | -> Pin<Box<dyn Stream<Item = Event> + Send>>             | |
-  |  +-----------------------------+-----------------------------+ |
-  |                                | EventStream                   |
-  |  +-----------------------------+-----------------------------+ |
-  |  | Analyzer Pipeline (29 analyzers, add_analyzer() chain)    | |
-  |  |                                                            | |
-  |  |  +-----------+  +-----------+  +------------------------+  | |
-  |  |  | SSE reass |  | HTTP parse|  | TimestampNormalizer   |  | |
-  |  |  | chunk mg  |  | req / resp |  | btime -> epoch ms     |  | |
-  |  |  +-----+-----+  +-----+-----+  +-----------+------------+  | |
-  |  |        +--------------+--------------------+                | |
-  |  |                      v                                      | |
-  |  |  +---------------------------------------------------+     | |
-  |  |  |            ResponsibilityRuntime                   |     | |
-  |  |  |                                                   |     | |
-  |  |  |  Phase 1 (streaming, per-event)                   |     | |
-  |  |  |  +---------------------------------------------+  |     | |
-  |  |  |  | PhaseClassificationEngine                   |  |     | |
-  |  |  |  |   -> 2,595 rules, 6-dim combinatorial score  |  |     | |
-  |  |  |  |   -> Process Boundary Crossing (PBC) detect  |  |     | |
-  |  |  |  +---------------------+-----------------------+  |     | |
-  |  |  |                        v                          |     | |
-  |  |  |  +---------------------------------------------+  |     | |
-  |  |  |  | GraphBuilder -> IdentityResolver             |  |     | |
-  |  |  |  |   -> nodes + edges (responsibility_graph)     |  |     | |
-  |  |  |  |   -> UnionFind identity resolution           |  |     | |
-  |  |  |  |      root_pid | tls_session | conversation_id |  |     | |
-  |  |  |  |   -> TaintTracker cross-process propagation  |  |     | |
-  |  |  |  +---------------------+-----------------------+  |     | |
-  |  |  |                        v                          |     | |
-  |  |  |  +---------------------------------------------+  |     | |
-  |  |  |  | Observer LLM (triggered on conflict signals) |  |     | |
-  |  |  |  |   -> CachePrior (L1 exact / L2 semantic)     |  |     | |
-  |  |  |  |   -> 34/86 scenarios triggered (FuxiBench)   |  |     | |
-  |  |  |  |   -> 84.2% directional accuracy              |  |     | |
-  |  |  |  +---------------------------------------------+  |     | |
-  |  |  |                                                   |     | |
-  |  |  |  Phase 2 (on SIGINT, batch finalization)          |     | |
-  |  |  |  +---------------------------------------------+  |     | |
-  |  |  |  | TracebackBuilder -> ClaimBuilder             |  |     | |
-  |  |  |  |   -> AlertBuilder (structured security alert) |  |     | |
-  |  |  |  |   -> evidence correlation + causal chain     |  |     | |
-  |  |  |  +---------------------------------------------+  |     | |
-  |  |  +---------------------------------------------------+     | |
-  |  +-----------------------------+-----------------------------+ |
-  |                                |                               |
-  |  Dual-write: SQLite (responsibility.db) + JSONL (streaming)   |
+  |  +-----------------------------------------------------------+  |
+  |  | Runner Layer (7 runners)                                  |  |
+  |  | SslRunner  ProcessRunner  StdioRunner                     |  |
+  |  | SystemRunner  AgentRunner  FakeRunner (test)              |  |
+  |  | -> Pin<Box<dyn Stream<Item = Event> + Send>>              |  |
+  |  +-----------------------------+-----------------------------+  |
+  |                                | EventStream                    |
+  |  +-----------------------------+-----------------------------+  |
+  |  | Analyzer Pipeline (29 analyzers, add_analyzer() chain)    |  |
+  |  |                                                           |  |
+  |  |  +-----------+  +-----------+  +------------------------+ |  |
+  |  |  | SSE reass |  | HTTP parse|  | TimestampNormalizer    | |  |
+  |  |  | chunk mg  |  | req / resp| | btime -> epoch ms       | |  |
+  |  |  +-----+-----+  +-----+-----+  +-----------+------------+ |  |
+  |  |        +------------------+--------------------+          |  |
+  |  |                           v                               |  |
+  |  |  +---------------------------------------------------+    |  |
+  |  |  |            ResponsibilityRuntime                  |    |  |
+  |  |  |                                                   |    |  |
+  |  |  |  Phase 1 (streaming, per-event)                   |    |  |
+  |  |  |  +---------------------------------------------+  |    |  |
+  |  |  |  | PhaseClassificationEngine                   |  |    |  |
+  |  |  |  |   -> 2,595 rules, 6-dim combinatorial score |  |    |  |
+  |  |  |  |   -> Process Boundary Crossing (PBC) detect |  |    |  |
+  |  |  |  +---------------------+-----------------------+  |    |  |
+  |  |  |                        v                          |    |  |
+  |  |  |  +---------------------------------------------+  |    |  |
+  |  |  |  | GraphBuilder -> IdentityResolver            |  |    |  |
+  |  |  |  |   -> nodes + edges (responsibility_graph)   |  |    |  |
+  |  |  |  |   -> UnionFind identity resolution          |  |    |  |
+  |  |  |  |     root_pid | tls_session | conversation_id|  |    |  |
+  |  |  |  |   -> TaintTracker cross-process propagation |  |    |  |
+  |  |  |  +---------------------+-----------------------+  |    |  |
+  |  |  |                        v                          |    |  |
+  |  |  |  +---------------------------------------------+  |    |  |
+  |  |  |  | Observer LLM (triggered on conflict signals)|  |    |  |
+  |  |  |  |   -> CachePrior (L1 exact / L2 semantic)    |  |    |  |
+  |  |  |  |   -> 34/86 scenarios triggered (FuxiBench)  |  |    |  |
+  |  |  |  |   -> 84.2% directional accuracy             |  |    |  |
+  |  |  |  +---------------------------------------------+  |    |  |
+  |  |  |                                                   |    |  |
+  |  |  |  Phase 2 (on SIGINT, batch finalization)          |    |  |
+  |  |  |  +---------------------------------------------+  |    |  |
+  |  |  |  | TracebackBuilder -> ClaimBuilder             | |    |  |
+  |  |  |  |   -> AlertBuilder (structured security alert)| |    |  |
+  |  |  |  |   -> evidence correlation + causal chain     | |    |  |
+  |  |  |  +---------------------------------------------+  |    |  |
+  |  |  +---------------------------------------------------+    |  |
+  |  +-----------------------------+-----------------------------+  |
+  |                                |                                |
+  |  Dual-write: SQLite (responsibility.db) + JSONL (streaming)     |
   +---------------------------------+-------------------------------+
-                                    |
-  ==================================+================================
-                                    |
-  +---------------------------------+-------------------------------+
-  |                 FRONTEND + HTTP API (:7395)                     |
+                                   |
+  =================================+================================
+                                   |
+  +-----------------------------------------------------------------+
+  |  FRONTEND + HTTP API (:7395)                                    |
   |                                                                 |
   |  Next.js 16 · React 19 · TypeScript 5 · Tailwind CSS 4          |
-  |  rust-embed: compiled into mtagentlens binary at build time    |
+  |  rust-embed: compiled into mtagentlens binary at build time     |
   |                                                                 |
-  |  /           态势 · 3D responsibility stage + alert entry         |
-  |  /overview   仪表盘 · global posture, probe coverage & cluster    |
-  |  /investigations  告警 · claim, evidence and traceback workbench  |
-  |  /traces     追踪 · trace workbench and replay timeline           |
-  |  (agent/cluster deep links land on /overview#agentId=/#clusterId=) |
-  |  db 深链四件套 · 取证链 / 身份血缘 / 原始事件流 / 图时间演化        |
-  |  /api/live/events  统一实时 SSE（告警 + 原始事件 + 心跳，record 直播）|
-  |  /api/runs/{id}/{alerts,correlation-evidence,events,diff,...}    |
-  |  /api/events legacy log-backed event stream（已废弃）              |
+  |  /                   Landing · brand intro + demo entry         |
+  |  /console            Command Center · 3D responsibility stage   |
+  |  /overview           Dashboard · posture, probes & clusters     |
+  |  /investigations     Alerts · claims, evidence & traceback      |
+  |  /traces             Tracing · workbench & replay timeline      |
+  |  /research/fuxibench FuxiBench · dataset & evaluation           |
+  |                                                                 |
+  |  db deep-links: forensic chain · identity lineage · raw events  |
+  |               · graph time evolution                            |
+  |                                                                 |
+  |  /api/live/events  live SSE: alerts + raw events + heartbeat    |
+  |  /api/runs/{id}/{alerts,correlation-evidence,events,diff,...}   |
+  |  /api/events  legacy log-backed stream (deprecated)             |
   +-----------------------------------------------------------------+
 ```
 

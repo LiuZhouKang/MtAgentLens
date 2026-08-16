@@ -22,12 +22,12 @@ export const landingCopy = {
   },
   hero: {
     eyebrow: 'eBPF · RUST · NEXT.JS — 零插桩观测',
-    // 惊艳 slogan 式两行（Apple/Linear 级）：看得见（观测）→ 才可信（责任归因/审计）。
-    // 全白大字，无彩色强调。逐行错峰 reveal。
+    // 惊艳 slogan 两行（Apple/Linear 级）：大字 = 信任结论「看得见 / 才信赖」，
+    // 小字 = 四层价值（可观测 / 可辨析 / 可追溯 / 可预警）。全白大字，无彩色强调。
     titleLine1: '看得见',
-    titleLine2: '才可信',
-    // 专业副行：一句话说清产品实际价值（零插桩 + 看见 what/why + 责任归因）
-    sub: '内核级零插桩 · 看见每个 Agent 做了什么、为什么 —— 责任归因，一目了然。',
+    titleLine2: '才信赖',
+    // 专业副行：四层价值一句话 —— 跨层可观测 → 风险可预警
+    sub: '跨层可观测，异常可辨析，根因可追溯，风险可预警',
     cta: '进入观测台',
     scrollHint: '向下滚动探索',
   },

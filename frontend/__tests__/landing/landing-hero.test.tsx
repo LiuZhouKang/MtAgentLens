@@ -13,9 +13,10 @@ describe('LandingHero — HERO 区块', () => {
     // h1 逐词标题（惊艳 slogan 两行）
     expect(screen.getByRole('heading', { level: 1 })).toBeTruthy();
     expect(screen.getAllByText('看得见').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('才可信').length).toBeGreaterThan(0);
-    // 专业副行 + 玻璃 CTA
-    expect(screen.getByText(/责任归因/)).toBeTruthy();
+    expect(screen.getAllByText('才信赖').length).toBeGreaterThan(0);
+    expect(screen.getByText(/跨层可观测/)).toBeTruthy();
+    // 专业副行（四层价值）+ 玻璃 CTA
+    expect(screen.getByText(/风险可预警/)).toBeTruthy();
     expect(screen.getByTestId('hero-cta')).toBeTruthy();
     // 滚动提示
     expect(screen.getByTestId('hero-scroll-hint')).toBeTruthy();

@@ -16,11 +16,12 @@ test.describe('landing 初始进入页 /', () => {
     // ① HERO — 巨型 h1 逐词标题 + 英文副行 + 滚动提示
     const hero = page.getByRole('heading', { level: 1 });
     await expect(hero).toBeVisible();
-    // 惊艳 slogan 两行（全白）：看得见 → 才可信
+    // 惊艳 slogan 两行（全白）：大字 = 信任结论，小字 = 四层价值
     await expect(hero).toContainText('看得见');
-    await expect(hero).toContainText('才可信');
-    // 专业副行 + 玻璃 CTA + 滚动提示
-    await expect(page.locator('.landing-hero__sub')).toContainText('责任归因');
+    await expect(hero).toContainText('才信赖');
+    await expect(page.locator('.landing-hero__sub')).toContainText('跨层可观测');
+    // 专业副行（四层价值 slogan）+ 玻璃 CTA + 滚动提示
+    await expect(page.locator('.landing-hero__sub')).toContainText('风险可预警');
     await expect(page.getByTestId('hero-cta')).toBeVisible();
     await expect(page.getByTestId('hero-scroll-hint')).toBeVisible();
 

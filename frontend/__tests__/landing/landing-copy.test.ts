@@ -17,13 +17,13 @@ describe('landing-copy — 六区块文案结构', () => {
 
   it('hero: eyebrow + slogan title + professional sub + CTA + scroll hint', () => {
     expect(landingCopy.hero.eyebrow).toContain('eBPF');
-    // 惊艳 slogan 两行（无彩色强调）：看得见（观测）→ 才可信（责任归因/审计）
+    // 惊艳 slogan 两行（无彩色强调）：大字 = 信任结论「看得见 / 才信赖」
     expect(landingCopy.hero.titleLine1).toBe('看得见');
-    expect(landingCopy.hero.titleLine2).toBe('才可信');
+    expect(landingCopy.hero.titleLine2).toBe('才信赖');
     expect(landingCopy.hero.titleLine1.endsWith('，')).toBe(false); // 不以逗号收尾
-    // 专业副行：一句话说清产品实际价值（零插桩 + what/why + 责任归因）
-    expect(landingCopy.hero.sub).toContain('零插桩');
-    expect(landingCopy.hero.sub).toContain('责任归因');
+    // 专业副行：四层价值一句话（跨层可观测 → 风险可预警）
+    expect(landingCopy.hero.sub).toContain('跨层可观测');
+    expect(landingCopy.hero.sub).toContain('风险可预警');
     // hero CTA
     expect(landingCopy.hero.cta.length).toBeGreaterThan(0);
     expect(landingCopy.hero.scrollHint.length).toBeGreaterThan(0);

@@ -132,3 +132,6 @@ compare/models/
 # Collector local models
 collector/models/
 web/
+
+# 答辩准备材料（本地专属，不上传远程 gitlab）
+docs/prepare/

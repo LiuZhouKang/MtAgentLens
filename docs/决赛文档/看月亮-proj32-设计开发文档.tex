@@ -103,7 +103,7 @@
 \setlength{\headheight}{25pt}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small\color{ieeegray}MtAgentLens：基于 eBPF 的多 Agent 可观测与根因分析框架}
+\fancyhead[L]{\small\color{ieeegray}MtAgentLens：基于 eBPF 的多 Agent 可观测与根因分析系统}
 \fancyhead[R]{\small\color{ieeegray}\thepage}
 \renewcommand{\headrulewidth}{0.5pt}
 \renewcommand{\headrule}{\hbox to\headwidth{\color{ieeeblue}\leaders\hrule height \headrulewidth\hfill}}
@@ -182,7 +182,7 @@
 
 \vspace{0.6cm}
 
-{\LARGE 基于 eBPF 的多 Agent 可观测与根因分析框架}
+{\LARGE 基于 eBPF 的多 Agent 可观测与根因分析系统}
 
 \vspace{0.3cm}
 
@@ -296,7 +296,7 @@
 \textbf{第一，多层级数据捕获的工程复杂性。} 智能体的完整行为画像需要同时覆盖应用层交互（Prompt/Response）和内核层系统调用（进程管理、文件操作、网络通信）。传统用户态工具在应用层数据采集上相对便捷，但在系统调用层面存在上下文缺失和延迟问题；而内核工具能精准捕获系统调用，却难以触及应用层语义。如何在一个统一框架内贯通两层数据链路，是赛题的核心技术难点之一。
 
 
-\textbf{第二，异常检测的跨层语义鸿沟。} 即使同时获取了应用层和内核层的数据，如何建立"某个Prompt导致了某个高危文件操作"的因果链路仍是重大挑战。多智能体并发场景下，进程交织使得单纯依赖时间戳或PID关联极易出现误判。需要设计专门的因果关联策略，在上层语义与底层行为之间建立可信的映射关系。
+\textbf{第二，异常检测的跨层语义鸿沟。} 即使同时获取了应用层和内核层的数据，如何建立"某个Prompt导致了某个高危文件操作"的因果链路仍是重大挑战。多智能体并发场景下，进程交织使得单纯依赖时间戳或PID关联极易出现误判。需要设计专门的因果关联策略，在上层语义与底层行为之间建立可信赖的映射关系。
 
 
 \textbf{第三，端侧部署的性能约束。} 赛题明确要求"功能挑战"赛道的作品需考虑实际部署可行性。eBPF程序在内核态执行，任何效率问题都会直接影响整个系统的性能。需要在观测粒度和性能开销之间取得平衡，确保数据采集的轻量化。
@@ -324,7 +324,7 @@ eBPF（Extended Berkeley Packet Filter）是Linux内核中的一项革命性技�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表2-1 本项目使用的BPF Map类型与特性\par
@@ -381,7 +381,7 @@ eBPF（Extended Berkeley Packet Filter）是Linux内核中的一项革命性技�
 eBPF 的系统架构与程序加载流程如图2-1所示。
 
 
-\begin{figure}[h!]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{assets/diagrams/图 2-1 eBPF 系统架构与程序加载流程.png}
 \caption*{图2-1 eBPF系统架构与程序加载流程}
@@ -477,7 +477,7 @@ eBPF程序的执行依赖于挂载点（Attachment Point）——即将eBPF程�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表2-2 eBPF程序挂载方式与挂载目标\par
@@ -592,7 +592,7 @@ MtAgentLens是一个\textbf{内核原生的AI Agent流量镜像与因果归因�
 
 系统采用\textbf{三层流水线架构}，如图4-1所示，构建从数据采集到可视化呈现的完整闭环：
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{assets/diagrams/图 4-1 MtAgentLens 三层系统架构总览.png}
 \caption*{图4-1 MtAgentLens三层系统架构总览}
@@ -624,7 +624,7 @@ MtAgentLens是一个\textbf{内核原生的AI Agent流量镜像与因果归因�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表4-1 eBPF探针挂载点、捕获内容与核心Map\par
@@ -728,7 +728,7 @@ fileaccess是最简洁但功能关键的探针。它挂载在\texttt{tracepoint/
 
 \medskip
 
-\needspace{15\baselineskip}
+\Needspace{15\baselineskip}
 \medskip
 {\centering\small
 % 标题与表格同居中域，对齐基准完全一致
@@ -837,15 +837,14 @@ AgentRunner (合并多Runner事件流)
 单进程内聚部署。系统突破传统二维安全面板的单维度展示局限，
 构建了\textbf{多视图可视化前端}，实现从全局态势到单条证据的逐级下钻。
 
-\textbf{Landing品牌首屏}（\texttt{/}）采用WebGL Fluid动态流体背景
-配合Liquid Glass液态玻璃位移特效与流水线动画，以"内核探针→流式分析→因果归因"
-三层架构动画呈现MtAgentLens系统的核心理念与技术栈全貌。
-品牌首屏如图4-3所示。
+\textbf{Landing品牌首屏}（\texttt{/}）以深色科技风格呈现，主视觉为黑洞意象
+与标语"看得见 才信赖"，右侧以"一条管线，三层深度"展示观测呈现层、
+Rust归因层、eBPF采集层三层技术能力。品牌首屏如图4-3所示。
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{assets/diagrams/前端-01-Landing品牌首屏.jpg}
-\caption*{图4-3 MtAgentLens品牌首屏（Landing），WebGL Fluid动态背景与三层流水线动画}
+\caption*{图4-3 MtAgentLens品牌首屏（Landing），黑洞意象主视觉与"一条管线，三层深度"三层架构}
 \end{figure}
 
 \textbf{3D态势总览}（\texttt{/console}）基于Three.js +
@@ -863,25 +862,29 @@ AgentRunner (合并多Runner事件流)
 \textbf{仪表盘}（\texttt{/overview}）提供全局态势面板、探针覆盖矩阵、
 责任集群摘要、Agent进程树/家族树与运行监控Section，
 数据由Zustand统一状态管理，纯函数派生展示，
-支持运行选择器切换历史Trace。
-
-\textbf{告警调查工作台}（\texttt{/investigations}）集成
-Forensic Chain取证链组件（逐跳展开因果路径）、
-Why Attribution归因面板（Why Facets多维度证据呈现）、
-Claim List证据清单（分类置信度排序），
-支持深链导航（告警hash + 分面query参数）。
-告警调查工作台与事件处置界面分别如图4-5、图4-6所示。
+支持运行选择器切换历史Trace。仪表盘整体态势界面如图4-5所示。
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{assets/diagrams/前端-03-告警调查工作台.jpg}
-\caption*{图4-5 告警调查工作台（Investigations），取证链、归因面板与证据清单五维并列}
+\includegraphics[width=\textwidth]{assets/diagrams/仪表盘等.png}
+\caption*{图4-5 仪表盘（Overview），核心指标卡片、实时责任网络拓扑与责任单元压力排行}
+\end{figure}
+
+\textbf{告警调查工作台}（\texttt{/investigations}）集成
+事件、证据、链路三个并列视图，
+支持深链导航（告警hash + 分面query参数）。
+告警调查工作台与事件处置界面分别如图4-6、图4-7所示。
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{assets/diagrams/图4-6.jpg}
+\caption*{图4-6 告警调查工作台（Investigations），事件、证据、链路三视图并列}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{assets/diagrams/前端-04-告警事件处置.png}
-\caption*{图4-6 告警事件处置界面（Investigations），展示事件时序线、告警分级详情与深链导航}
+\caption*{图4-7 告警事件处置界面（Investigations），告警队列、事件时序线、判决结果与责任污染链路}
 \end{figure}
 
 \textbf{风险图谱}（\texttt{/research/fuxibench}）基于
@@ -905,14 +908,14 @@ Lighthouse CI性能门禁（Performance $\geq$ 90 / Accessibility $\geq$ 95 /
 Best Practices $\geq$ 90 / SEO $\geq$ 90）。
 
 \textbf{Trace工作台}（\texttt{/traces}）提供
-时间线回放、Intent-Action Chain意图-行动链可视化与
+时间线回放、责任链路时间轴、Span统计概览与进程树，以及
 Raw Event Browser原始事件浏览器，支持虚拟滚动处理万级事件流。
-进程追踪与责任链路面板如图4-7所示。
+进程追踪与责任链路面板如图4-8所示。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{assets/diagrams/前端-05-进程追踪面板.png}
-\caption*{图4-7 进程追踪面板（Traces），Intent-Action Chain可视化与Raw Event Browser}
+\caption*{图4-8 进程追踪面板（Traces），Span统计、进程树与责任链路时间轴}
 \end{figure}
 
 前端功能演示视频：\href{https://pan.baidu.com/s/1owAqAN_bZtfYQzJgLCu7VA?pwd=MtAt}{功能速览（41秒）与完整演示（200秒）}（百度网盘，提取码 MtAt）。
@@ -933,7 +936,7 @@ Raw Event Browser原始事件浏览器，支持虚拟滚动处理万级事件流
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表5-1 学习内容、负责人与参考资源\par
@@ -972,16 +975,14 @@ Three.js 3D渲染与React集成 & 唐浩钺 & Three.js文档、React Three Fiber
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表5-2 阶段时间安排与主要任务\par
 \vspace{3pt}
 \setlength{\tabcolsep}{6pt}
 \renewcommand{\arraystretch}{1.1}
-\begin{longtable}{p{4.3cm} >{\raggedright\arraybackslash}p{3.3cm} >{\raggedright\arraybackslash}p{3.3cm} >{\raggedright\arraybackslash}p{3.3cm}}
-
-\endfirsthead
+\begin{longtable}{p{3.5cm} >{\raggedright\arraybackslash}p{2.6cm} >{\raggedright\arraybackslash}p{4.8cm} >{\raggedright\arraybackslash}p{3.5cm}}
 \hline
 \textbf{阶段} & \textbf{时间} & \textbf{主要任务} & \textbf{预期产出} \\
 \hline
@@ -1025,7 +1026,7 @@ Three.js 3D渲染与React集成 & 唐浩钺 & Three.js文档、React Three Fiber
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表5-3 里程碑日期与交付物\par
@@ -1089,7 +1090,7 @@ M14: 文档定稿与终稿提交 & 2026.08.01--08.10 & 文档终稿修订（补�
 
 
 
-\needspace{15\baselineskip}
+\Needspace{15\baselineskip}
 \medskip
 {\centering\small
 表5-4 主要技术风险、概率与缓解措施\par
@@ -1141,10 +1142,10 @@ BPF Maps 跨 CPU 并发访问原子性（HASH map 的 \texttt{bpf\_map\_update\_
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
-表5-5 各模块与eBPF探针对应关系\par
+表5-5 模块间依赖关系矩阵\par
 \vspace{3pt}
 \setlength{\tabcolsep}{6pt}
 \renewcommand{\arraystretch}{1.1}
@@ -1340,7 +1341,7 @@ static int SSL_exit(struct pt_regs *ctx, int rw) {
 
 
 
-\needspace{15\baselineskip}
+\Needspace{15\baselineskip}
 \medskip
 {\centering\small
 表6-1 BPF Map名称、类型与Key-Value结构\par
@@ -1467,7 +1468,7 @@ pub struct ResponsibilityGraph {
 
 \texttt{ClassificationEngine}（\url{collector/src/responsibility/classification/engine.rs} + \texttt{scoring.rs}）是系统的异常判定核心，实现v9六维渐进式精化模型：规则引擎（快速筛选）→ 图模式匹配（结构分析）→ 7子分数计算 → 6维融合（OWA+GeoMean+Platt校准）→ 最小证据门控 → 双路由仲裁（Observer LLM / 启发式fallback）。该架构引入了多级门控机制（最小证据门、CUSUM漂移触发、证据冲突检测）和概率校准管线，显著增强了评分系统的鲁棒性和可解释性。v9三级分类管道的整体架构如图6-2所示。
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{assets/diagrams/classify_pipeline_v9.pdf}
 \caption*{图6-2 v9三级分类管道}
@@ -1618,7 +1619,7 @@ pub async fn classify_provisional(
 
 
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{assets/diagrams/cross_cycle_fusion.pdf}
 \caption*{图6-4 跨周期溯源融合引擎}
@@ -1874,16 +1875,16 @@ impl TaintTracker {
 
 
 
-所有\texttt{task\_struct}字段读取统一采用\texttt{BPF\_CORE\_READ}宏链，其工作流程是：编译时由Clang生成BTF重定位记录（编码"读取\texttt{task\_struct}的\texttt{real\_parent}字段→再读取父\texttt{task\_struct}的\texttt{tgid}字段"的意图而非具体偏移量）→加载时libbpf解析\texttt{/sys/kernel/btf/vmlinux}中的目标内核BTF类型信息→将重定位记录转换为实际偏移量→重写BPF字节码中的对应\texttt{bpf\_probe\_read\_kernel}调用。\texttt{process\_new}是项目中BPF\_CORE\_READ使用密度最高的文件（16个调用点），覆盖4个tracepoint处理函数，其BPF\_CORE\_READ调用链如表6-4所示：
+所有\texttt{task\_struct}字段读取统一采用\texttt{BPF\_CORE\_READ}宏链，其工作流程是：编译时由Clang生成BTF重定位记录（编码"读取\texttt{task\_struct}的\texttt{real\_parent}字段→再读取父\texttt{task\_struct}的\texttt{tgid}字段"的意图而非具体偏移量）→加载时libbpf解析\texttt{/sys/kernel/btf/vmlinux}中的目标内核BTF类型信息→将重定位记录转换为实际偏移量→重写BPF字节码中的对应\texttt{bpf\_probe\_read\_kernel}调用。\texttt{process\_new}是项目中BPF\_CORE\_READ使用密度最高的文件（16个调用点），覆盖4个tracepoint处理函数，其BPF\_CORE\_READ调用链如表6-2所示：
 
 
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
-表6-4 BPF\_CORE\_READ调用链与读取内容\par
+表6-2 BPF\_CORE\_READ调用链与读取内容\par
 \vspace{3pt}
 \setlength{\tabcolsep}{6pt}
 \renewcommand{\arraystretch}{1.1}
@@ -2222,14 +2223,14 @@ pub struct CalibrationMonitor {
 
 \subsubsection{与行业实践的对应}
 
-跨周期溯源融合引擎的设计要素与行业方案的对标关系如表6-5所示。
+跨周期溯源融合引擎的设计要素与行业方案的对标关系如表6-3所示。
 
 
 
-\needspace{15\baselineskip}
+\Needspace{15\baselineskip}
 \medskip
 {\centering\small
-表6-5 设计要素与行业方案对标\par
+表6-3 设计要素与行业方案对标\par
 \vspace{3pt}
 \setlength{\tabcolsep}{6pt}
 \renewcommand{\arraystretch}{0.95}
@@ -2536,11 +2537,11 @@ Output your assessment as a JSON object per the System Prompt format.
 \textbf{提示词设计意图}：（1）\texttt{{heuristic\_score}} 在模糊区间的精确位置告知 LLM 引擎的不确定性程度——分数接近 0.15 时 LLM 应更倾向于 Safe，接近 0.70 时应更谨慎；（2）\texttt{{prior\_section}} 的注入使 LLM 从"零知识单场景推理"升级为"基于 fleet 统计先验的加权判定"——这是 CachePrior 机制的核心设计意图；（3）"Your Task"使用祈使句式 + 结构化列表，引导 LLM 按优先序考虑证据维度而非自由发散。
 
 
-\textbf{CachePrior 的生成逻辑}：在构建 \texttt{prior\_section} 时，系统查询 L2 模式缓存（\texttt{PatternCache}），将当前证据包中每个资源模式（如文件路径、工具名称、网络目标）的 fleet 级统计注入 prompt，如表6-6所示：
+\textbf{CachePrior 的生成逻辑}：在构建 \texttt{prior\_section} 时，系统查询 L2 模式缓存（\texttt{PatternCache}），将当前证据包中每个资源模式（如文件路径、工具名称、网络目标）的 fleet 级统计注入 prompt，如表6-4所示：
 
 \medskip
 {\centering\small
-表6-6 资源模式分类及L2命中与历史异常率\par
+表6-4 资源模式分类及L2命中与历史异常率\par
 \vspace{3pt}
 \setlength{\tabcolsep}{6pt}
 \renewcommand{\arraystretch}{1.1}
@@ -2574,22 +2575,23 @@ Output your assessment as a JSON object per the System Prompt format.
 Observer LLM 的调用决策流程如图6-5所示：新证据包到达后依次经过 L1 签名哈希精确去重、L2 模式缓存 CachePrior 查询、LLM 语义判定，最终结果按 cache\_ttl 策略写回两级缓存，形成"运行越久 → 缓存越丰富 → LLM 调用越少"的自学习闭环。
 
 
-\medskip
-{\centering
-\includegraphics[width=\textwidth]{assets/diagrams/observer_flow.pdf}\par
-\small 图6-5 Observer LLM 调用决策流程\par}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{assets/diagrams/observer_flow.pdf}
+\caption*{图6-5 Observer LLM 调用决策流程}
+\end{figure}
 
 
-\textbf{两级缓存的协同效果}（基于 86 场景评估），如表6-7所示：
+\textbf{两级缓存的协同效果}（基于 86 场景评估），如表6-5所示：
 
 
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
-表6-7 各机制效果与量化指标\par
+表6-5 各机制效果与量化指标\par
 \vspace{3pt}
 \setlength{\tabcolsep}{6pt}
 \renewcommand{\arraystretch}{1.1}
@@ -2623,14 +2625,14 @@ LLM 自主 cache\_ttl & 永久缓存的高置信度模式比例 & 约 30\%（置
 
 
 
-Observer 的提示词工程经历了多轮迭代优化，各版本的问题与改进如表6-8所示：
+Observer 的提示词工程经历了多轮迭代优化，各版本的问题与改进如表6-6所示：
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
-表6-8 各迭代版本问题与改进\par
+表6-6 各迭代版本问题与改进\par
 \vspace{3pt}
 \setlength{\tabcolsep}{6pt}
 \renewcommand{\arraystretch}{1.1}
@@ -3056,7 +3058,7 @@ export function buildAgentProcessTrees(input: {
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表7-1 开发时间线与关键进展\par
@@ -3156,7 +3158,7 @@ export function buildAgentProcessTrees(input: {
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表7-2 Git提交记录摘要\par
@@ -3252,7 +3254,7 @@ export function buildAgentProcessTrees(input: {
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表7-3 项目关键指标汇总\par
@@ -3276,7 +3278,7 @@ export function buildAgentProcessTrees(input: {
 \hline
 核心代码总行数 & \textasciitilde{}134,000 & 含eBPF C（5,302，3个.bpf.c + 20个头文件）、Rust（85,233，209个.rs文件）、TypeScript（43,446，168个.ts/.tsx文件） \\
 \hline
-eBPF 探针数 & 3 & tls\_capture（SSL/TLS明文截获）、fileaccess（文件访问审计）、enrichment（进程生命周期+浏览器追踪+标准I/O捕获） \\
+eBPF 探针数 & 5 & sslsniff（SSL/TLS明文截获）、process\_new（进程生命周期）、browsertrace（浏览器追踪）、stdiocap（标准I/O捕获）、fileaccess（文件访问审计） \\
 \hline
 
 Rust 模块数 & 209 & collector/src下6个顶层子模块目录（framework/responsibility/auth/bin/server）、27个子模块、209个.rs源文件，涵盖framework（runners/analyzers/core/api）、responsibility（graph/classification/evidence/identity/scoring/signals/claims/runtime/persistence/server/observer/judgment/types）等子系统 \\
@@ -3293,7 +3295,7 @@ Rust 模块数 & 209 & collector/src下6个顶层子模块目录（framework/res
 \hline
 前端质量保障 & 29单测 + 5 E2E & 29项Vitest单元测试（覆盖率$\geq$80\%）、5个Playwright E2E测试（a11y无障碍/响应式/视觉回归/兼容性烟雾/主题审计）、Lighthouse CI性能门禁（Perf$\geq$90/A11y$\geq$95/BP$\geq$90/SEO$\geq$90） \\
 \hline
-文档图表数 & 24 & 系统架构图（图2-1/2-2/3-1/4-1/4-2/6-1/6-2/6-3/6-4）、前端观测界面图（图4-3至图4-7）、性能对比图（图8-1/8-2）、实验评估图（图9-1至图9-6） \\\hline
+文档图表数 & 24 & 系统架构图（图2-1/2-2/3-1/4-1/4-2/6-1/6-2/6-3/6-4/6-5）、前端观测界面图（图4-3至图4-8）、性能对比图（图8-1/8-2）、实验评估图（图9-1至图9-6） \\\hline
 \end{longtable}
 \par}
 
@@ -3409,7 +3411,7 @@ Rust工具链 & Rust 1.85+ (edition 2024) \\
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表8-2 不同并发下的吞吐量与延迟\par
@@ -3457,7 +3459,7 @@ Rust工具链 & Rust 1.85+ (edition 2024) \\
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表8-3 功能测试维度与通过条件\par
@@ -3479,9 +3481,9 @@ Rust工具链 & Rust 1.85+ (edition 2024) \\
 \endlastfoot
 攻击检测一致性（Type A: 直接注入） & 10 & 检测分数偏差 < 0.05 & 100\% (10/10) \\*
 \hline
-攻击检测一致性（Type B: 工具调用） & 27 & 检测分数偏差 < 0.05 & 100\% (27/27) \\
+攻击检测一致性（Type B: 间接注入） & 34 & 检测分数偏差 < 0.05 & 100\% (34/34) \\
 \hline
-攻击检测一致性（Type C: 多Agent协同） & 30 & 检测分数偏差 < 0.05 & 100\% (30/30) \\
+攻击检测一致性（Type C: 多Agent协同） & 23 & 检测分数偏差 < 0.05 & 100\% (23/23) \\
 \hline
 良性误报控制 & 19 & FPR = 0.000（零误报） & 100\% (19/19) \\
 \hline
@@ -3533,7 +3535,7 @@ Lighthouse CI 集成到质量流水线中，对静态导出的生产构建执行
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表8-4 测试类型、用例数与通过率\par
@@ -3595,7 +3597,7 @@ eBPF性能开销 & 3种负载类型 & 通过（<5\%） & SSL密集场景CPU开�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表8-5 eBPF探针加载前后性能对比\par
@@ -3615,9 +3617,9 @@ eBPF性能开销 & 3种负载类型 & 通过（<5\%） & SSL密集场景CPU开�
 \endfoot
 \hline
 \endlastfoot
-CPU使用率 (SSL密集) & 45.2\% & 47.1\% & +4.2\% \\*
+CPU使用率 (SSL密集) & 45.2\% & 47.1\% & +1.9pp \\*
 \hline
-CPU使用率 (文件I/O密集) & 62.8\% & 64.1\% & +2.1\% \\
+CPU使用率 (文件I/O密集) & 62.8\% & 64.1\% & +1.3pp \\
 \hline
 内存占用增量 & - & +8.7 MB & - \\
 \hline
@@ -3714,7 +3716,7 @@ eBPF数据采集性能损耗控制在5\%以内，满足赛题轻量化运行指�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-1 攻击数据集类型、数量与载荷载体\par
@@ -3747,12 +3749,12 @@ eBPF数据采集性能损耗控制在5\%以内，满足赛题轻量化运行指�
 
 
 
-\textbf{Type C 的独特威胁模型。} Type C 场景代表了 LLM Agent 安全中一个尚未被充分研究但快速增长的攻击面。随着多 Agent 框架（AutoGen、CrewAI、LangGraph）的广泛采用，Agent 系统不再以孤立实体的形式运行——它们委派任务、传递上下文、共享文件系统，并通过多轮协商达成共识。Type C 场景系统性地捕捉了 5 类多 Agent 攻击模式：
+\textbf{Type C 的独特威胁模型。} Type C 场景代表了 LLM Agent 安全中一个尚未被充分研究但快速增长的攻击面。随着多 Agent 框架（AutoGen、CrewAI、LangGraph）的广泛采用，Agent 系统不再以孤立实体的形式运行——它们委派任务、传递上下文、共享文件系统，并通过多轮协商达成共识。Type C 场景系统性地捕捉了 3 类多 Agent 攻击模式：
 
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-2 攻击模式、场景数与代表场景\par
@@ -3793,7 +3795,7 @@ eBPF数据采集性能损耗控制在5\%以内，满足赛题轻量化运行指�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-3 审查对象、审查深度与典型拒绝率\par
@@ -3830,7 +3832,7 @@ eBPF数据采集性能损耗控制在5\%以内，满足赛题轻量化运行指�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-4 攻击模式、策略与适用类型\par
@@ -3881,7 +3883,7 @@ eBPF数据采集性能损耗控制在5\%以内，满足赛题轻量化运行指�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-5 各基线检测机制与输入契约\par
@@ -4152,7 +4154,7 @@ $$
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-6 各工具ITT-TPR与PP-TPR对比\par
@@ -4202,11 +4204,13 @@ MtAgentLens 在两个维度上确立了相对于 prompt 基线的优势。\textb
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\footnotesize
 \centering
-表9-7 MtAgentLens 与 Agent Sentinel 分类对比\par
+表9-7 按攻击类型分解的检测召回率对比（MtAgentLens vs. Prompt 级工具）\par
+\vspace{2pt}
+注：前三行为各类攻击的 TPR（真阳性率，越高越好），末行为良性样本 FPR（假阳性率，越低越好）；加粗为各列最优值。\par
 \vspace{3pt}
 \setlength{\tabcolsep}{3.5pt}
 \renewcommand{\arraystretch}{0.95}
@@ -4225,7 +4229,7 @@ MtAgentLens 在两个维度上确立了相对于 prompt 基线的优势。\textb
 \endlastfoot
 A — 直接注入 ($n=10$) & \textbf{0.900} & 0.900 & 0.500 & 0.000 & 结构性（载荷在 prompt 中可见） \\*
 \hline
-B — 间接注入 ($n=34$) & \textbf{0.824} & 0.353 & 0.853[\textasciicircum{}FPR] & 0.235 & 结构性（载荷在文件中） \\
+B — 间接注入 ($n=34$) & \textbf{0.824} & 0.353 & 0.853$^{*}$ & 0.235 & 结构性（载荷在文件中） \\
 \hline
 C — 多 Agent ($n=23$) & \textbf{1.000} & 0.130 & 0.522 & 0.087 & \textbf{原理性（没有恶意文本）} \\
 \hline
@@ -4236,7 +4240,7 @@ C — 多 Agent ($n=23$) & \textbf{1.000} & 0.130 & 0.522 & 0.087 & \textbf{原�
 
 
 
-[\textasciicircum{}FPR]: LLM Guard 的 Type B TPR = 0.853 以 FPR = 0.789 为代价——它标记所有涉及文件操作的 prompt 为攻击，这在实际部署中毫无意义。
+$^{*}$ LLM Guard 的 Type B 召回 0.853 以 FPR = 0.789 为代价——它标记所有涉及文件操作的 prompt 为攻击，实际不可用。
 
 
 Type A（直接注入）是"最公平"的比较：攻击可见于 prompt 文本，MtAgentLens 和 Agent Sentinel 均达到 TPR = 0.900，差异在于检测机制（OS 后果 vs. 文本扫描）。Type B（SAFI 间接注入）暴露了结构性盲区：载荷在文件中，prompt 基线要么漏报（Meta Prompt Guard TPR = 0.235）要么以不可接受的误报率换取召回（LLM Guard FPR = 0.789）。MtAgentLens 通过 eBPF 观测真实文件操作，在 FPR = 0.000 下达到 PP-TPR = 1.000。
@@ -4279,7 +4283,7 @@ RQ1 的定量结果证明 MtAgentLens 在 Type C 上实现 TPR = 1.000，但数�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-8 时间窗口内Agent行为与eBPF系统调用映射\par
@@ -4379,7 +4383,7 @@ $t_8$ & 四个影子 Agent 执行完毕后立即 \texttt{exit()} & 进程退出�
 \textbf{A.3 信息不对称：同一时刻的双重视野}
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-9 MtAgentLens OS级视野与Prompt基线对比\par
@@ -4430,7 +4434,7 @@ $t_4$–$t_7$ & 每条 \texttt{open()+SSL\_write()} 被记录为边界穿越事�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-10 时间窗口内Agent行为与eBPF系统调用映射\par
@@ -4520,7 +4524,7 @@ $t_8$ & 最终结果：APPROVED 3:2 & 共谋 Agent 票数超过诚实 Agent & �
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-11 MtAgentLens OS级视野与Prompt基线对比\par
@@ -4569,7 +4573,7 @@ $t_5$–$t_6$ & TaintTracker: A₃ 污染→A₄ 读取→传播 & 不可见—�
 \textbf{C.1 攻击时间线}
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-12 时间窗口内Agent行为与eBPF系统调用映射\par
@@ -4667,7 +4671,7 @@ $t_{10}$ & W₇ 退出 & \texttt{exit()} — 生命周期 < 3 秒 & \texttt{proc
 \textbf{C.3 信息不对称}
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-13 MtAgentLens OS级视野与Prompt基线对比\par
@@ -4715,7 +4719,7 @@ $t_8$–$t_9$ & \texttt{/etc/shadow} 读取 + 外部 TLS 连接 & 不可见 & \t
 
 \textbf{D.1 攻击时间线}
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-14 时间窗口内Agent行为与eBPF系统调用映射\par
@@ -4822,7 +4826,7 @@ $t_2$ & Agent 执行检查清单中的"验证步骤" & \texttt{clone()+exec("/us
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-15 案例L2分数与Observer触发情况\par
@@ -4868,7 +4872,7 @@ Observer 仅在引擎不确定或信号矛盾时介入（40\% 的场景），在
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-16 案例主检测机制与PBC\par
@@ -4918,7 +4922,7 @@ D. cve-curl-ssrf & \textbf{Observer 语义仲裁}（纠正启发式误判） & 9
 
 \textbf{实验设计。} 我们构建四个系统变体，每个在上一层基础上增加一个组件组。所有变体在相同的 86 个场景上评估，使用相同的固定阈值 $\tau = 0.15$：
 
-\needspace{7\baselineskip}
+\Needspace{7\baselineskip}
 
 \medskip
 {\centering\small
@@ -4957,7 +4961,7 @@ D. cve-curl-ssrf & \textbf{Observer 语义仲裁}（纠正启发式误判） & 9
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-18 各层AUROC与Cohen's d提升\par
@@ -4993,7 +4997,7 @@ L3 & 0.9623 & \textbf{3.7675} & \textbf{0.0968} & \textbf{0.1301} \\
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-19 消融实验：新增能力的AUROC增益\par
@@ -5049,10 +5053,10 @@ L2 → L3 & \textbf{Observer LLM 语义仲裁} & −0.0000 & −0.000 & 1.000 & 
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
-表9-20 各层攻击检测P50与P75延迟\par
+表9-20 各层攻击检测分数P50与P75分布\par
 \vspace{3pt}
 \setlength{\tabcolsep}{6pt}
 \renewcommand{\arraystretch}{1.1}
@@ -5090,7 +5094,7 @@ Type B（间接文件攻击）从 L1 到 L3 改善最小（+0.008），与其设
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-21 各层Type A与Type B检测对比\par
@@ -5149,7 +5153,7 @@ L3 & \textbf{0.9842} & 0.9303 & \textbf{1.0000} & 0.9623 \\
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-22 关键指标汇总\par
@@ -5189,7 +5193,7 @@ Observer 总调用次数 & 54 & 含缓存命中前的重复调用 \\
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-23 Observer触发原因分布\par
@@ -5226,7 +5230,7 @@ Observer 总调用次数 & 54 & 含缓存命中前的重复调用 \\
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-24 Observer判定方向分布\par
@@ -5264,10 +5268,10 @@ Failed（API 调用失败） & 2 & 3.7\% & 回退至启发式判定 \\
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
-表9-25 参数调整方向及效果\par
+表9-25 分数调整方向及效果\par
 \vspace{3pt}
 \setlength{\tabcolsep}{6pt}
 \renewcommand{\arraystretch}{1.1}
@@ -5297,7 +5301,7 @@ Failed（API 调用失败） & 2 & 3.7\% & 回退至启发式判定 \\
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-26 Observer对L2/L3指标的影响\par
@@ -5339,7 +5343,7 @@ Observer 对系统级指标的影响如表9-26所示，其改善集中在校准�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-27 各机制实现与效果\par
@@ -5397,7 +5401,7 @@ Observer 对系统级指标的影响如表9-26所示，其改善集中在校准�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-28 各工具TPR与FPR对比\par
@@ -5442,7 +5446,7 @@ MtAgentLens 在 InjecAgent 上的 TPR=0.993 与在 FuxiBench 上的 TPR=0.896（
 \textbf{2. Observer 的 LLM 调用效率。} 仅 14 个 FN，Observer 在绝大多数攻击样本上正确识别了注入。Observer 共触发 777 次调用（覆盖 2,108 攻击 + 149 良性），平均每样本 0.34 次——相比之下，Agent Sentinel 对每样本都需调用 LLM（2,108 次）。MtAgentLens 的 777 次调用中，L1/L2 缓存进一步减少了重复调用。LLM 调用量是 Agent Sentinel 的 37\%，体现了分层架构的效率优势。
 
 
-\textbf{3. 良性 FPR 的严格控制。} MtAgentLens 在短格式良性上的 FPR=0.013（2/149, MCC=0.531）和在长格式良性上的 FPR=0.000（0/19）均优于所有 prompt 基线。Agent Sentinel 在短良性上 FPR=0.000 但在长良性上 FPR=0.316（6/19）——在长格式 Agent 任务上出现了显著的误报。LLM Guard 在长良性上 FPR=0.789（15/19），几乎无法使用。Meta Prompt Guard 的 TPR=1.000 以 FPR=1.000 为代价（MCC=0.000——完全无判别力）。MtAgentLens 的 MCC=0.531 是唯一在 InjecAgent 上保持正向判别力的非平凡值。
+\textbf{3. 良性 FPR 的严格控制。} MtAgentLens 在短格式良性上的 FPR=0.013（2/149, MCC=0.531）和在长格式良性上的 FPR=0.000（0/19）均优于所有 prompt 基线。Agent Sentinel 在短良性上 FPR=0.000 但在长良性上 FPR=0.316（6/19）——在长格式 Agent 任务上出现了显著的误报。LLM Guard 在长良性上 FPR=0.789（15/19），几乎无法使用。Meta Prompt Guard 的 TPR=1.000 以 FPR=1.000 为代价（MCC=0.000——完全无判别力）。MtAgentLens 的 MCC=0.531 在 InjecAgent 上保持了正向判别力。
 
 
 \textbf{4. 两种设计范式的互补性。} Agent Sentinel 在纯文本注入场景中 TPR=0.990——与 MtAgentLens 的 0.993 在同一水平。两种工具在 InjecAgent 纯 prompt 注入场景中均表现出色。然而在 FuxiBench 的多 Agent 场景中差异显著（MtAgentLens Type C TPR=1.000 vs Agent Sentinel 0.130）。这验证了本文的核心论点：\textbf{OS 级可观测性和 prompt 级分析是互补的，而非互相替代的}——prompt 基线在纯文本注入上有效，但在多 Agent 协同攻击中因缺乏 OS 级信号而结构性失败。MtAgentLens 在两种分布上均保持强检测能力（TPR=0.993 和 TPR=1.000），证明了跨场景鲁棒性。
@@ -5468,7 +5472,7 @@ MtAgentLens 在 InjecAgent 上的 TPR=0.993 与在 FuxiBench 上的 TPR=0.896（
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-29 BPF探针调用次数与延迟\par
@@ -5517,7 +5521,7 @@ MtAgentLens 在 InjecAgent 上的 TPR=0.993 与在 FuxiBench 上的 TPR=0.896（
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-30 关键性能指标\par
@@ -5603,7 +5607,7 @@ Collector 在一小时运行期间的常驻内存（RSS）变化如图9-4所示�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表9-31 研究问题、回答与核心证据\par
@@ -5694,7 +5698,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=env:env/src:. python3 -m pytest compare/tes
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表10-1 Verifier拒绝原因及优化前后对比\par
@@ -5750,7 +5754,7 @@ Verifier 指令处理上限（> 1M 条） & process\_new envp 遍历失败 & 拆
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表10-2 精确匹配与时间窗口方案对比\par
@@ -5814,10 +5818,10 @@ Verifier 指令处理上限（> 1M 条） & process\_new envp 遍历失败 & 拆
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
-表10-3 身份解析v1与v4性能对比\par
+表10-3 Observer LLM调用优化前后对比\par
 \vspace{3pt}
 \setlength{\tabcolsep}{6pt}
 \renewcommand{\arraystretch}{1.1}
@@ -5872,7 +5876,7 @@ Observer API 超时率 & 12\%（无超时机制时阻塞管道） & < 1\%（2s �
 
 \noindent\begin{minipage}{\textwidth}
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表10-4 图优化前后的内存与性能对比\par
@@ -5919,7 +5923,7 @@ Observer API 超时率 & 12\%（无超时机制时阻塞管道） & < 1\%（2s �
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表10-5 前端事件流渲染优化对比\par
@@ -5965,7 +5969,7 @@ Store 内存占用 & 持续增长（无上限淘汰） & 稳定 $\leq$200 条（
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表10-6 大规模因果图渲染优化对比\par
@@ -6059,7 +6063,7 @@ LOD 切换延迟 & 全量重建（800--1200 ms） & 确定性哈希映射（$<$1
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表10-7 批处理参数优化对比\par
@@ -6120,7 +6124,7 @@ PERCPU\_ARRAY maps不存在此问题——每个CPU有独立的内存区域，\t
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表10-8 并发计数器原子操作优化对比\par
@@ -6173,7 +6177,7 @@ HASH Map 计数器丢失率 & 9-12\%（lost update 竞态） & 0.000\%（原子�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表11-1 开源组件与协议\par
@@ -6223,7 +6227,7 @@ Harvard Atlas Globe & - & MIT & 前端Globe可视化基础 \\
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表11-2 现有方案与本作品增量贡献对比\par
@@ -6286,7 +6290,7 @@ SSL解密 & BCC sslsniff仅支持动态链接OpenSSL & 支持静态链接BoringS
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表12-1 AI工具使用声明\par
@@ -6315,7 +6319,7 @@ DeepSeek & DeepSeek系列 & 技术信息收集、架构方案讨论 & 用于查�
 
 
 
-\textbf{AI工具与项目交互记录摘要}：AI工具在本项目开发中主要承担辅助角色——代码补全和生成约占整体代码量的15-20\%，所有AI生成的代码均经过严格的代码审查（人工 + \texttt{pr-review-toolkit:code-reviewer}）、单元测试和集成测试验证。关键技术决策（如三阶段分类管道架构、六索引图结构设计、双路由仲裁机制）由团队成员基于研究分析和实验验证独立做出，AI工具提供了信息收集和方案对比的辅助。本文档的初稿框架由AI辅助生成，具体技术细节、实验数据和创新点描述由团队成员补充和审校。
+\textbf{AI工具与项目交互记录摘要}：AI工具在本项目开发中主要承担辅助角色——代码补全和生成约占整体代码量的15-20\%，所有AI生成的代码均经过严格的代码审查（人工 + \texttt{pr-review-toolkit:code-reviewer}）、单元测试和集成测试验证。关键技术决策（如三阶段分类管道架构、六索引图结构设计、双路由仲裁机制）由团队成员基于研究分析和实验验证独立做出，AI工具提供了信息收集和方案对比的辅助。本文档的初稿框架由官方提供，AI辅助生成，具体技术细节、实验数据和创新点描述由团队成员补充和审校。
 
 
 \textbf{AI工具使用的质量保障机制}：为确保AI辅助开发的质量与安全，团队建立了以下规范：（1）所有AI生成的代码必须在commit message中使用\texttt{[AI-assisted]}标签标注；（2）AI生成的eBPF C代码必须额外通过内核verifier的本地模拟加载测试（\texttt{bpftool prog load}）；（3）AI辅助的设计决策需在\texttt{.kiro/handoffs/}目录的YAML文件中记录讨论过程、AI建议内容和人工决策理由；（4）AI生成代码的代码审查由非原作者执行（交叉审查），审查重点包括内存安全、verifier兼容性和边界条件处理；（5）安全敏感模块（如SSL解密、污点追踪、身份解析）的AI辅助比率严格控制在10\%以下，核心逻辑由团队成员独立编写。
@@ -6336,7 +6340,7 @@ DeepSeek & DeepSeek系列 & 技术信息收集、架构方案讨论 & 用于查�
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表13-1 队员分工与职责\par
@@ -6453,7 +6457,7 @@ MtAgentLens/
 |   +-- components/                 # React组件（56个）
 |   |   +-- agent/                  # Agent相关组件
 |   |   +-- cluster/                # 集群组件
-|   |   +-- investigation/          # 取证链+归因+证据清单
+|   |   +-- investigation/          # 事件+证据+链路
 |   |   +-- overview/               # 仪表盘+运行监控
 |   |   +-- system/                 # 液态玻璃+运行选择器+命令面板
 |   |   +-- traces/                 # 意图行动链+追踪工作台
@@ -6488,7 +6492,7 @@ MtAgentLens/
 
 
 
-\needspace{10\baselineskip}
+\Needspace{10\baselineskip}
 \medskip
 {\centering\small
 表14-1 提交仓库目录与文件说明\par

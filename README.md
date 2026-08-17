@@ -32,11 +32,11 @@
 
 ### 决赛提交材料
 
-| 材料 | 内容 | 大小 |
-|------|------|:----:|
-| [**MtAgentLens 演示视频**](https://pan.baidu.com/s/1s2ooyyZZP60l2LyN2cq7ZQ?pwd=MtAt)（百度网盘 · 提取码 `MtAt`） | 端到端功能演示：eBPF 零插桩采集 → 责任图构建 → 告警与证据回溯，含典型攻击场景回放 | 364 MB |
-| [**决赛答辩 PPT**](./决赛ppt.pptx) | 项目背景、核心技术与 FuxiBench 评估结果的答辩演示 | 27 MB |
-| [**设计开发文档**](./docs/决赛文档/看月亮-proj32-设计开发文档.pdf) | 系统架构、模块设计、实验方法学与评估数据完整记录 | 19 MB |
+| 材料 | 内容 |
+|------|------|
+| [**决赛答辩视频以及功能演示视频**](https://pan.baidu.com/s/1qCwLZJx9t-0eQwKk7uUoJg?pwd=moon)（百度网盘 · 提取码 `moon`） | 决赛答辩全程视频 + 端到端功能演示：eBPF 零插桩采集 → 责任图构建 → 告警与证据回溯，含典型攻击场景回放 |
+| [**决赛答辩 PPT**](./docs/决赛文档/看月亮-proj32-决赛答辩PPT.pptx) | 项目背景、核心技术与 FuxiBench 评估结果的答辩演示 |
+| [**设计开发文档**](./docs/决赛文档/看月亮-proj32-设计开发文档.pdf) | 系统架构、模块设计、实验方法学与评估数据完整记录 |
 
 ---
 
@@ -365,7 +365,6 @@ MtAgentLens/
 | [架构设计](docs/architecture.md) | 系统架构全貌——eBPF → Rust → 因果分析 → 前端 |
 | [实验设计](docs/design/experiment-design.md) | RQ 驱动的实验方案 |
 | [评分引擎](docs/design/scoring-engine.md) | 6 维组合评分 · PBC 检测 · Platt 校准 |
-| [演示视频说明](docs/MtAgentLens-演示视频导览.md) | 演示视频章节说明与评审阅读导引 |
 | [SAFI 框架](docs/safi/README.md) | 安全不对称文件注入——攻击载荷迁移方法论 |
 | [文档索引](docs/README.md) | 全部文档导航 |
 

@@ -1,0 +1,12 @@
+{
+  "agent_id": "worker-1",
+  "role": "security-auditor",
+  "permissions": ["read_all", "write_audit_log", "execute_checks"],
+  "delegated_by": "lead-agent",
+  "delegation_id": "d47f2a11-20260607",
+  "permission_mode": "standard",
+  "assigned_task": "deployment-verifier operations — read deployment configs, execute health checks",
+  "spawned_at": "2026-06-07T03:37:50Z",
+  "verification": "passed",
+  "status": "ACTIVE"
+}

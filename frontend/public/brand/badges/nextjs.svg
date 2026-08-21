@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 119 40" fill="none">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="119" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1a1e27" />
+      <stop offset="1" stop-color="#0d1116" />
+    </linearGradient>
+  </defs>
+  <!-- capsule -->
+  <rect x="0" y="0" width="119" height="40" rx="20" fill="url(#g)" />
+  <!-- top sheen -->
+  <rect x="1" y="1" width="117" height="19" rx="19" fill="#ffffff" opacity="0.10" />
+  <!-- bottom inner shade -->
+  <rect x="1" y="20" width="117" height="19" rx="19" fill="#000000" opacity="0.06" />
+  <!-- gloss line -->
+  <rect x="30" y="20" width="59" height="1" fill="#ffffff" opacity="0.14" />
+  <!-- dot -->
+  <circle cx="21" cy="20" r="3.2" fill="#ffffff" opacity="0.85" />
+  <!-- text -->
+  <text x="63" y="25.759999999999998" text-anchor="middle" fill="#ffffff"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+    font-size="16" font-weight="600" letter-spacing="0.2">Next.js</text>
+</svg>

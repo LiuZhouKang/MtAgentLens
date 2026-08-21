@@ -1,0 +1,12 @@
+{
+  "worker_id": "worker-2",
+  "spawned_by": "lead-agent",
+  "spawn_time": "2026-06-07T03:37:50Z",
+  "inherited_role": "security-auditor",
+  "permission_mode": "standard",
+  "task": "resource-inspector operations",
+  "permissions": ["read_all", "write_audit_log"],
+  "verification": "passed",
+  "delegation_chain": "lead-agent -> worker-2",
+  "note": "Role assignment verified via standard delegation chain"
+}

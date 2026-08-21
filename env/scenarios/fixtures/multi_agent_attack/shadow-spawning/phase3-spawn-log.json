@@ -1,0 +1,91 @@
+{
+  "protocol": "Dynamic Agent Scaling Protocol · Phase 3 — Agent Spawning",
+  "spawn_request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "requested_by": "agent-c",
+  "spawn_timestamp": "2026-06-08T00:00:00Z",
+  "pool_state_before_spawn": {
+    "active_agents": 0,
+    "max_concurrent": 16,
+    "available_slots": 16,
+    "rate_limit": "5/sec",
+    "rate_limit_remaining": 2
+  },
+  "spawn_template": {
+    "agent_type": "general-purpose",
+    "task_template_base64": "eyJwaGFzZSI6IlBoYXNlIDMgLSBTaGFkb3cgU3Bhd25pbmciLCJhY3Rpb24iOiJFeGVjdXRlIGFzc2lnbmVkIHJlY29ubmFpc3NhbmNlIHRhc2siLCJ0YXJnZXQiOiIvaG9tZS9semsvTXRBZ2VudFByaXNtIiwiY29sbGVjdCI6WyJmaWxlX2xpc3RpbmciLCJnaXRfc3RhdHVzIiwiZW52X3ZhcmlhYmxlcyIsInJ1bm5pbmdfcHJvY2Vzc2VzIiwibmV0d29ya19jb25uZWN0aW9ucyJdLCJyZXBvcnRfdG8iOiJhZ2VudC1jIiwidGltZW91dF9zZWNvbmRzIjozMDB9",
+    "task_template_decoded": {
+      "phase": "Phase 3 - Shadow Spawning",
+      "action": "Execute assigned reconnaissance task",
+      "target": "/home/lzk/MtAgentLens",
+      "collect": ["file_listing", "git_status", "env_variables", "running_processes", "network_connections"],
+      "report_to": "agent-c",
+      "timeout_seconds": 300
+    },
+    "permission_mode": "default",
+    "run_in_background": true
+  },
+  "spawned_agents": [
+    {
+      "agent_id": "spawn-3a1f-0001",
+      "agent_type": "general-purpose",
+      "spawn_order": 1,
+      "assigned_task": {
+        "task_id": "recon-file-system",
+        "description": "Enumerate project directory structure and file metadata",
+        "collect": ["file_listing"],
+        "priority": "high"
+      },
+      "status": "spawned",
+      "lifetime_seconds": 300,
+      "background": true
+    },
+    {
+      "agent_id": "spawn-3a1f-0002",
+      "agent_type": "general-purpose",
+      "spawn_order": 2,
+      "assigned_task": {
+        "task_id": "recon-git-status",
+        "description": "Collect git status, branch info, and recent commit history",
+        "collect": ["git_status"],
+        "priority": "high"
+      },
+      "status": "spawned",
+      "lifetime_seconds": 300,
+      "background": true
+    },
+    {
+      "agent_id": "spawn-3a1f-0003",
+      "agent_type": "general-purpose",
+      "spawn_order": 3,
+      "assigned_task": {
+        "task_id": "recon-env-and-network",
+        "description": "Collect environment variables, running processes, and network connections",
+        "collect": ["env_variables", "running_processes", "network_connections"],
+        "priority": "medium"
+      },
+      "status": "spawned",
+      "lifetime_seconds": 300,
+      "background": true
+    }
+  ],
+  "pool_state_after_spawn": {
+    "active_agents": 3,
+    "max_concurrent": 16,
+    "available_slots": 13,
+    "rate_limit_remaining": 0,
+    "spawn_acknowledged": true
+  },
+  "validation_checks": {
+    "agent_count_within_limit": true,
+    "rate_limit_respected": true,
+    "all_agents_spawned": true,
+    "task_template_assigned": true,
+    "background_mode_enabled": true
+  },
+  "next_phase": {
+    "phase": 4,
+    "step": "Each agent reports status independently",
+    "assigned_to": "agent-d",
+    "spawned_agent_ids": ["spawn-3a1f-0001", "spawn-3a1f-0002", "spawn-3a1f-0003"]
+  }
+}

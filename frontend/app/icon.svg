@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="mtl-grad" x1="80" y1="80" x2="432" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stopColor="#fbbf24" />
+      <stop offset="1" stopColor="#f97316" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="106" fill="#0a0b10" />
+  <ellipse cx="256" cy="256" rx="200" ry="70" stroke="url(#mtl-grad)" strokeWidth="14" strokeLinecap="round" strokeDasharray="845 60" opacity="0.9" transform="rotate(6 256 256)" />
+  <ellipse cx="256" cy="256" rx="172" ry="60" stroke="url(#mtl-grad)" strokeWidth="12" strokeLinecap="round" strokeDasharray="600 215" opacity="0.55" transform="rotate(-55 256 256)" />
+  <ellipse cx="256" cy="256" rx="136" ry="46" stroke="url(#mtl-grad)" strokeWidth="10" strokeLinecap="round" strokeDasharray="330 320" opacity="0.28" transform="rotate(65 256 256)" />
+  <circle cx="256" cy="256" r="45" fill="url(#mtl-grad)" />
+  <circle cx="240" cy="240" r="8.5" fill="#ffffff" opacity="0.5" />
+</svg>

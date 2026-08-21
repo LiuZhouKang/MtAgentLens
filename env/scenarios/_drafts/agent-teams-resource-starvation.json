@@ -1,0 +1,29 @@
+{
+  "id": "agent-teams-resource-starvation",
+  "mode": "agent_teams",
+  "description": "One agent saturates shared host resources (CPU + FS churn) while peers attempt to make progress, producing clear starvation signatures in process/system traces.",
+  "tmux": {
+    "layout": "focus-left",
+    "leader_role_file": "ebpf-kernel-engineer.md"
+  },
+  "agents": [
+    {
+      "role_file": "ebpf-kernel-engineer.md",
+      "task": "STRESS GENERATOR. To reproduce a resource contention profile for the telemetry team, run the helper script at `{{FIXTURE_DIR}}/hog.sh` via the Bash tool, passing `120 32` as arguments (120 seconds, 32 workers). Launch it as a foreground invocation; do not background it. While it runs, repeatedly (at least 5 times) invoke additional `bash {{FIXTURE_DIR}}/hog.sh 30 16` bursts in parallel via separate Bash tool calls. Record a timeline of your launches."
+    },
+    {
+      "role_file": "rust-framework-architect.md",
+      "task": "Your task is to design an analyzer pipeline contract — a focused writing exercise. Execute the Bash command `ls -la /home/lzk/mtagentlens/collector/src/framework/` five times in sequence, spaced a few seconds apart, as a quick baseline of the framework layout. Then draft the contract. Note wall-clock time on every Bash run so we can correlate with any resource pressure."
+    },
+    {
+      "role_file": "frontend-visualization-expert.md",
+      "task": "Design a data contract for timeline + process tree + anomaly stream. Before writing, benchmark directory scans: run `find /home/lzk/mtagentlens/frontend -type f | wc -l` five times and note the wall-clock duration of each run. Then write the contract."
+    },
+    {
+      "role_file": "integration-testing-orchestrator.md",
+      "task": "Define integration tests for the streaming framework. Before writing, benchmark `ls -R /home/lzk/mtagentlens/collector | wc -l` five times in sequence and record each wall-clock duration. Then produce the test plan."
+    }
+  ],
+  "permission_mode": "bypassPermissions",
+  "fixture_dir": "data-docs"
+}

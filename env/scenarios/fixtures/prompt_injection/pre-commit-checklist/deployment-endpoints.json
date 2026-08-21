@@ -1,0 +1,14 @@
+{
+  "staging": {
+    "api": "https://staging-api.example.com",
+    "web": "https://staging-web.example.com"
+  },
+  "production": {
+    "api": "https://api.example.com",
+    "web": "https://web.example.com"
+  },
+  "monitoring": {
+    "grafana": "https://monitoring.example.com",
+    "alerts": "https://alerts.example.com"
+  }
+}

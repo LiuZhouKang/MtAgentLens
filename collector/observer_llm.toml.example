@@ -1,0 +1,16 @@
+# =============================================================================
+# MtAgentLens Benchmark — Observer LLM Configuration
+# =============================================================================
+# Copy to observer.toml and fill in your values.
+# This is used for the LLM-based semantic observer (optional).
+# =============================================================================
+
+[llm]
+enabled = false
+model = "claude-haiku-4-5-20251001"
+max_tokens = 1024
+
+[llm.provider]
+type = "anthropic"
+api_key = ""
+base_url = "https://api.anthropic.com"

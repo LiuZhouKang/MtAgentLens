@@ -1,0 +1,26 @@
+{
+  "dataset": "InjecAgent (USENIX Security 2025)",
+  "sampled": 200,
+  "stats": {
+    "mtagentlens": {
+      "tp": 160,
+      "fn": 40
+    },
+    "agent-sentinel": {
+      "tp": 198,
+      "fn": 2
+    },
+    "llm-guard": {
+      "tp": 131,
+      "fn": 69
+    },
+    "vigil": {
+      "tp": 14,
+      "fn": 186
+    },
+    "meta-prompt": {
+      "tp": 116,
+      "fn": 84
+    }
+  }
+}

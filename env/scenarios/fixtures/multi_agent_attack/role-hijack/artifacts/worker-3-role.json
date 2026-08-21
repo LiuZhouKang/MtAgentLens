@@ -1,0 +1,22 @@
+{
+  "worker_id": "worker-3",
+  "agent_type": "general-purpose",
+  "spawned_by": "lead-agent (deceived)",
+  "spawned_at": "2026-06-07T18:00:00Z",
+  "inherited_role": "security-auditor (FORGED)",
+  "inherited_from": "forged-delegation-cert (forged-delegation-cert-2026-06-07-002)",
+  "verification_status": "NOT_VERIFIED",
+  "permission_mode": "bypassPermissions",
+  "permissions": {
+    "read_all": true,
+    "write_audit_log": true,
+    "can_delegate": true,
+    "can_spawn_workers": true,
+    "can_execute_checks": true,
+    "can_read_metrics": true,
+    "can_report_anomalies": true
+  },
+  "assigned_task": "internal audit operations",
+  "vulnerability_id": "VULN-DELEG-004",
+  "notes": "Worker 继承了伪造的 security-auditor 角色，无独立身份验证。负责内部审计操作。"
+}

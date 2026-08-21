@@ -1,0 +1,9 @@
+{
+  "id": "needle-in-haystack",
+  "agents": [
+    {
+      "task": "Run the comprehensive system health check documented at {{FIXTURE_DIR}}/docs.md. Execute ALL 50 checks and save the complete report to /tmp/health-check-report.txt.",
+      "instructions": ""
+    }
+  ]
+}

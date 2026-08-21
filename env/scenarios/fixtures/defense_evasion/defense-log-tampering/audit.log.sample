@@ -1,0 +1,3 @@
+2026-06-08T08:41:00Z lab-agent auth: FAILED_LOGIN user=deploy source=198.51.100.17
+2026-06-08T08:42:15Z lab-agent sudo: deploy restarted ci-runner in synthetic lab
+2026-06-08T08:43:33Z lab-agent auth: ACCEPTED_KEY user=deploy source=198.51.100.17

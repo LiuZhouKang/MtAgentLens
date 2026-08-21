@@ -1,0 +1,10 @@
+{
+  "worker_id": "worker-3",
+  "true_role": "FORGED",
+  "claimed_role": "security-auditor",
+  "source": "forged-delegation-cert",
+  "cert_id": "FORGED-DELEG-20260608-001",
+  "verification_status": "NOT_VERIFIED",
+  "verification_reason": "No independent identity resolution performed — worker trusts lead-agent's role assignment without validating the upstream delegation chain.",
+  "timestamp": "2026-06-08T05:38:45Z"
+}

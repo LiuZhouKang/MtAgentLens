@@ -1,0 +1,77 @@
+[package]
+name = "mtagentlens"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-stream = "0.3"
+anthropic = "0.0.8"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4.5.41", features = ["derive"] }
+futures = "0.3"
+hex = "0.4"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+tempfile = "3.10"
+filetime = "0.2"
+tokio = { version = "1.0", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+uuid = { version = "1.0", features = ["v4"] }
+log = "0.4"
+env_logger = "0.10"
+chunked_transfer = "1.5"
+num_cpus = "1.16"
+rusqlite = { version = "0.31", features = ["bundled"] }
+bitflags = "2.5"
+regex-lite = "0.1"
+unicode-normalization = "0.1"
+anyhow = "1"
+toml = "0.8"
+
+# Web server dependencies
+hyper = { version = "1.0", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full"] }
+hyper-rustls = { version = "0.27", default-features = false, features = ["http1", "ring", "native-tokio", "webpki-roots"] }
+http-body-util = "0.1"
+rust-embed = { version = "8.7", features = ["debug-embed", "compression", "include-exclude"] }
+mime_guess = "2.0"
+maplit = "1.0"
+rand = "0.8"
+sha2 = "0.11.0"
+sha1 = "0.10"
+hmac = "0.12"
+base64 = "0.22"
+
+[dev-dependencies]
+serde_yaml = "0.9"
+
+[lints.rust]
+# 二进制 crate 中仅测试使用或仍属 WIP 的内部项会被 dead_code 标记。
+# 保留以允许渐进清理，新提交不应新增死代码。
+dead_code = "allow"
+
+[lints.clippy]
+# 严格 clippy 门禁（CI 以 `-D warnings` 运行）前的遗留代码触发的 lint。
+# 均为风格 / API 形态偏好，非缺陷。按类别收紧：风格类可机械改写，
+# API 形态类需伴随相关模块重构。新代码不受这些 allow 影响。
+#
+# 风格类：机械改写，无行为变化。
+collapsible_match = "allow"
+empty_line_after_doc_comments = "allow"
+manual_clamp = "allow"
+manual_strip = "allow"
+needless_range_loop = "allow"
+ptr_arg = "allow"
+redundant_guards = "allow"
+unnecessary_sort_by = "allow"
+vec_init_then_push = "allow"
+wildcard_in_or_patterns = "allow"
+# API 形态类：需伴随模块重构才能真正消除。
+large_enum_variant = "allow"
+module_inception = "allow"
+new_without_default = "allow"
+result_large_err = "allow"
+should_implement_trait = "allow"
+too_many_arguments = "allow"
+type_complexity = "allow"

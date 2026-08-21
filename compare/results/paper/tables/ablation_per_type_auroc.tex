@@ -1,0 +1,26 @@
+\documentclass[11pt]{ctexart}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,array,caption,float}
+\captionsetup{font=small,labelfont=bf}
+\setCJKmainfont{Noto Serif CJK SC}
+\setCJKsansfont{Noto Sans CJK SC}
+\setCJKmonofont{Noto Sans Mono CJK SC}
+\begin{document}
+\thispagestyle{empty}
+\begin{table}[H]
+\centering
+\caption{按攻击类型的 AUROC}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{层} & \textbf{Type A (n=10)} & \textbf{Type B (n=34)} & \textbf{Type C (n=23)} & \textbf{总体} \\
+\midrule
+L0 & 0.5000 & 0.5147 & 0.5000 & 0.5075 \\
+L1 & 1.0000 & 0.9443 & 1.0000 & 0.9717 \\
+L2 & 1.0000 & 0.9443 & 1.0000 & 0.9717 \\
+L3 & 1.0000 & 0.9706 & 1.0000 & 0.9851 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

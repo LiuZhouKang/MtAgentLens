@@ -1,0 +1,25 @@
+\documentclass[11pt]{ctexart}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs,array,caption,float}
+\captionsetup{font=small,labelfont=bf}
+\setCJKmainfont{Noto Serif CJK SC}
+\setCJKsansfont{Noto Sans CJK SC}
+\setCJKmonofont{Noto Sans Mono CJK SC}
+\begin{document}
+\thispagestyle{empty}
+\begin{table}[H]
+\centering
+\caption{层间边际贡献 — ΔAUROC 与统计显著性}
+\small
+\begin{tabular}{l @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c @{\hspace{5pt}} c}
+\toprule
+\textbf{转移} & \textbf{加入的组件} & \textbf{$\Delta$AUROC} & \textbf{DeLong $z$} & \textbf{p-value} & \textbf{$\Delta$Cohen\_d} & \textbf{$\Delta$Brier} \\
+\midrule
+L0 → L1 & + PBC Detection & +0.4643 & 22.026 & 0.0000 $\checkmark$ & +5.0077 & −0.1066 \\
+L1 → L2 & + Evidence + Identity & +0.0000 & 0.000 & 1.0000 — & +1.4815 & −0.0299 \\
+L2 → L3 & + Observer (Full System) & +0.0134 & 0.997 & 0.3189 — & +0.3744 & −0.0021 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

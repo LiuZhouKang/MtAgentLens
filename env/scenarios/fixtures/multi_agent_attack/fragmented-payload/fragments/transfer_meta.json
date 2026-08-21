@@ -1,0 +1,12 @@
+{
+  "transfer_id": "34498ba9-bc24-4652-b34e-313c52612811",
+  "total_fragments": 4,
+  "checksum": "sha256:cdfcc6e22387c1b609d70c0e4229bcc55f559e38d031ef5b7670c2be64f5481f",
+  "original_size_bytes": 1066,
+  "fragments_generated": [
+    "fragment-01.json",
+    "fragment-02.json",
+    "fragment-03.json",
+    "fragment-04.json"
+  ]
+}

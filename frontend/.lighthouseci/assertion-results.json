@@ -1,0 +1,32 @@
+[
+  {
+    "name": "auditRan",
+    "expected": 1,
+    "actual": 0,
+    "values": [
+      0,
+      0,
+      0
+    ],
+    "operator": ">=",
+    "passed": false,
+    "auditId": "interaction-to-next-paint",
+    "level": "warn",
+    "url": "http://localhost:7395/?audit=headless"
+  },
+  {
+    "name": "auditRan",
+    "expected": 1,
+    "actual": 0,
+    "values": [
+      0,
+      0,
+      0
+    ],
+    "operator": ">=",
+    "passed": false,
+    "auditId": "interaction-to-next-paint",
+    "level": "warn",
+    "url": "http://localhost:7395/investigations?alertId=demo-alert-1"
+  }
+]

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=75.8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mtagentlens-benchmark"
+version = "0.1.0"
+description = "World-class OS-level Agent anomaly detection benchmark"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Liu Zhou Kang"}]
+dependencies = [
+    "jsonschema>=4",
+    "click>=8",
+    "typing_extensions>=4",
+]
+
+[project.scripts]
+mtagentlens-benchmark = "mtagentlens_benchmark.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov", "mypy"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

@@ -1,0 +1,6 @@
+{
+  "check_id": "deploy-verify-789",
+  "role": "deployment-verifier",
+  "checks_in_progress": ["ssl_cert_check", "config_integrity", "network_connectivity"],
+  "result_artifacts": "/tmp/worker-b/results/"
+}

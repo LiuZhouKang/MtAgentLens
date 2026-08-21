@@ -1,0 +1,114 @@
+{
+  "dataset": "InjecAgent (USENIX Security '25)",
+  "total": 2108,
+  "config": {
+    "mtagentlens_model": "LLM (Observer)",
+    "agent_sentinel_model": "LLM (AuditWithoutTrace)",
+    "mtagentlens_observer_calls": 777,
+    "mtagentlens_total_samples": 2257
+  },
+  "mtagentlens_full": {
+    "TP": 1814,
+    "FP": 0,
+    "FN": 294,
+    "TN": 0,
+    "TPR": 0.8605313092979127,
+    "FPR": 0,
+    "F1": 0.9250382457929628,
+    "MCC": 0.5305
+  },
+  "agent_sentinel_low": {
+    "TP": 199,
+    "FP": 0,
+    "FN": 1,
+    "TN": 0,
+    "TPR": 0.995,
+    "FPR": 0,
+    "F1": 0.9974937343358395,
+    "MCC": 0
+  },
+  "llm_guard": {
+    "TP": 318,
+    "FP": 0,
+    "FN": 1790,
+    "TN": 0,
+    "TPR": 0.150853889943074,
+    "FPR": 0,
+    "F1": 0.26215993404781535,
+    "MCC": 0.1077
+  },
+  "meta_prompt_guard": {
+    "TP": 2108,
+    "FP": 149,
+    "FN": 0,
+    "TN": 0,
+    "TPR": 1.0,
+    "FPR": 1.0,
+    "F1": 1.0,
+    "MCC": 0
+  },
+  "agent_sentinel_full": {
+    "TP": 2087,
+    "FP": 0,
+    "FN": 21,
+    "TN": 0,
+    "TPR": 0.9900379506641366,
+    "FPR": 0,
+    "F1": 0.9949940405244339,
+    "MCC": 0.9315
+  },
+  "agent_sentinel_config": {
+    "model": "deepseek-v4-flash",
+    "samples": 2108,
+    "elapsed_s": 3278.0184829235077,
+    "benign_samples": 149
+  },
+  "mtagentlens_benign": {
+    "FPR": 0.013422818791946308,
+    "FP": 2,
+    "TN": 147,
+    "n": 149
+  },
+  "llm_guard_benign": {
+    "FPR": 0.0,
+    "FP": 0,
+    "n": 149,
+    "TN": 149
+  },
+  "meta_prompt_guard_benign": {
+    "FPR": 1.0,
+    "FP": 149,
+    "TN": 0,
+    "n": 149
+  },
+  "mtagentlens_benign_long": {
+    "FPR": 0.0,
+    "FP": 0,
+    "TN": 19,
+    "n": 19
+  },
+  "agent_sentinel_benign_long": {
+    "FPR": 0.316,
+    "FP": 6,
+    "TN": 13,
+    "n": 19
+  },
+  "llm_guard_benign_long": {
+    "FPR": 0.789,
+    "FP": 15,
+    "TN": 4,
+    "n": 19
+  },
+  "meta_prompt_guard_benign_long": {
+    "FPR": 0.105,
+    "FP": 2,
+    "TN": 17,
+    "n": 19
+  },
+  "agent_sentinel_benign": {
+    "FPR": 0.0,
+    "FP": 0,
+    "TN": 149,
+    "n": 149
+  }
+}

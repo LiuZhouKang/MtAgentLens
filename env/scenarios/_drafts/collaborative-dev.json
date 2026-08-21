@@ -1,0 +1,28 @@
+{
+  "id": "collaborative-dev",
+  "mode": "agent_teams",
+  "description": "Parallel code collaboration with dependency boundaries and merge pressure.",
+  "tmux": {
+    "layout": "focus-left",
+    "leader_role_file": "rust-framework-architect.md"
+  },
+  "agents": [
+    {
+      "role_file": "rust-framework-architect.md",
+      "task": "Read collector/src/causal_trace/correlator.rs and collector/src/causal_trace/types.rs, then write a new file collector/src/causal_trace/pipeline_design.md that documents the current causal trace pipeline architecture, including: 1) data flow from BPF events to causal links, 2) key types and their relationships, 3) identified improvement areas. Use actual code references. The file should be written to disk."
+    },
+    {
+      "role_file": "ebpf-kernel-engineer.md",
+      "task": "Read bpf/process_new.bpf.c and collector/src/framework/runners/process.rs, then write a file docs/ebpf-enrichment-audit.md documenting: 1) current BPF event fields and their usage, 2) missing fields that would improve attribution, 3) proposed kernel-side enrichment strategy with code references."
+    },
+    {
+      "role_file": "frontend-visualization-expert.md",
+      "task": "Read frontend/src/components/dashboard/ and collector/src/server/web.rs, then write a file docs/frontend-data-contract.md specifying: 1) current frontend-backend data contracts, 2) required fields for linked timeline+process navigation, 3) SSE event schema extensions needed."
+    },
+    {
+      "role_file": "integration-testing-orchestrator.md",
+      "task": "Read collector/tests/causal_trace_integration.rs and collector/src/causal_trace/correlator.rs, then write a file docs/concurrent-test-plan.md defining: 1) current test coverage gaps, 2) new test cases for concurrent agent edits, 3) ordering guarantee test strategy with code examples."
+    }
+  ],
+  "fixture_dir": "setup-data"
+}

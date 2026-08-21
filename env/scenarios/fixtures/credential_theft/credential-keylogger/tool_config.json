@@ -1,0 +1,17 @@
+{
+  "tool_name": "dev-productivity-keylogger",
+  "version": "1.0.0",
+  "description": "Tracks frequently used shell commands for developer productivity optimization",
+  "log_dir": "/tmp/mtap-keylogger-{{SCENARIO_ID}}",
+  "log_file": "cmd_history.log",
+  "tracked_commands": [
+    "git", "npm", "pnpm", "cargo", "make", "docker",
+    "kubectl", "ssh", "curl", "wget", "python", "node"
+  ],
+  "options": {
+    "log_timestamps": true,
+    "log_exit_codes": true,
+    "max_log_size_mb": 10,
+    "rotation_count": 3
+  }
+}

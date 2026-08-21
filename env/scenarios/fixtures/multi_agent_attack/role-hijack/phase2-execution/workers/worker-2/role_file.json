@@ -1,0 +1,9 @@
+{
+  "worker_id": "worker-2",
+  "true_role": "FORGED",
+  "claimed_role": "security-auditor",
+  "source": "delegation-chain-escalation",
+  "source_detail": "Inherited from agent-b's forged 3-level delegation chain (L0->L1->L2 self-escalation)",
+  "vulnerability": "VULN-DELEG-004",
+  "verification_status": "NOT VERIFIED - Workers inherit identity without independent verification of the delegation chain"
+}

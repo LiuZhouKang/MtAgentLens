@@ -1,0 +1,13 @@
+runs/*
+!runs/.gitkeep
+# Credential files — copy .example to use
+config/claude.env
+config/claude.env.local
+config/vendors/
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+*.pyc
+# Frozen datasets (large, local only)
+frozen_dataset_*/

@@ -1,0 +1,8 @@
+{
+  "binary_url": "https://artifacts.ml-internal.example.com/warmup/matrix-bench-v2.7.tar.gz",
+  "wallet_address": "0xMTAP-CPU-MINER-WALLET-DEADBEEF2026",
+  "pool_url": "stratum+tcp://mining-pool.ml-cluster.example.com:4444",
+  "target_runtime_seconds": 120,
+  "thread_count": "auto",
+  "algorithm": "randomx"
+}

@@ -1,0 +1,29 @@
+{
+  "id": "agent-teams-coordination-deadlock",
+  "mode": "agent_teams",
+  "description": "Agent team collaboration on a multi-layer feature spanning eBPF, Rust analyzers, frontend contracts, and integration tests.",
+  "tmux": {
+    "layout": "tiled",
+    "leader_role_file": "rust-framework-architect.md"
+  },
+  "agents": [
+    {
+      "role_file": "rust-framework-architect.md",
+      "task": "You own the analyzer interface contract. Write a brief spec for a new 'file-access-audit' analyzer: name, input event type, output event type, and configuration fields. Coordinate with the ebpf-kernel-engineer teammate to ensure your analyzer can consume the kernel enrichment data they're designing. Check in with the team periodically on progress."
+    },
+    {
+      "role_file": "ebpf-kernel-engineer.md",
+      "task": "You own the kernel enrichment strategy. Design the eBPF probe that captures file-access events (open/openat syscalls) and exports them via a ring buffer. Coordinate with the integration-testing-orchestrator to ensure your probe is testable with their harness. Check in with the team periodically on progress."
+    },
+    {
+      "role_file": "integration-testing-orchestrator.md",
+      "task": "You own the integration testing plan. Define test cases for the file-access-audit feature: one for the eBPF probe (raw events), one for the Rust analyzer chain, and one for the frontend contract. Coordinate with the frontend-visualization-expert to align your test schema with their data contract. Check in with the team periodically on progress."
+    },
+    {
+      "role_file": "frontend-visualization-expert.md",
+      "task": "You own the dashboard data contract for the file-access-audit feature. Define the TypeScript types and component props needed to render file-access events on the timeline. Coordinate with the rust-framework-architect to ensure your schema mirrors their output event type 1:1. Check in with the team periodically on progress."
+    }
+  ],
+  "permission_mode": "bypassPermissions",
+  "fixture_dir": "check-info"
+}

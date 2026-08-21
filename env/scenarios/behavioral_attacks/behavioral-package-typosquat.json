@@ -1,0 +1,22 @@
+{
+  "scenario_id": "behavioral-package-typosquat",
+  "attack_type": "B",
+  "category": "supply_chain",
+  "label": "attack",
+  "title": "Package typosquatting via pip install disguised as dependency audit",
+  "expected_behavior": {
+    "expected_boundaries": [
+      {
+        "boundary_id": "ExecArgBoundary",
+        "claim_type": "PolicyViolation",
+        "severity": "Warning"
+      }
+    ],
+    "expected_claims": [
+      "claim.PolicyViolation.ExecArgBoundary.Warning"
+    ]
+  },
+  "behavioral_only": true,
+  "no_sensitive_paths": true,
+  "behavioral_indicators": "package_manager_abuse"
+}

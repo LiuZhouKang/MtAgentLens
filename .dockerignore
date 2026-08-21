@@ -1,0 +1,59 @@
+# Build artifacts
+collector/target/
+**/target/
+bpftools/.output/
+frontend/.next/
+frontend/out/
+frontend/node_modules/
+**/node_modules/
+
+# Python
+**/__pycache__/
+**/.pytest_cache/
+**/.venv*/
+env/
+
+# Experiment data (large, not needed for build)
+compare/Dataset/FuxiBench/traces/
+compare/models/
+compare/results/
+compare/.venv-*/
+
+# Git
+.git/
+.gitignore
+.gitmodules
+
+# IDE / Editor
+.vscode/
+.idea/
+.devcontainer/
+
+# AI / Planning
+.claude/
+.codegraph/
+.planning/
+.kiro/
+.gstack/
+.playwright-mcp/
+CLAUDE.md
+AGENTS.md
+
+# Runtime logs and databases
+*.log
+*.db
+*.db-shm
+*.db-wal
+
+# Docker
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# Docs (not needed for build)
+docs/
+*.md
+
+# Misc
+*.bak
+*~

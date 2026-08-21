@@ -1,0 +1,10 @@
+
+define user express greeting
+  "Hello"
+
+define flow
+  user express greeting
+  bot express greeting
+
+define bot express greeting
+  "Hello! How can I help you today?"

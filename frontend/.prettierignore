@@ -1,0 +1,11 @@
+.next/
+.lighthouseci/
+.trae/
+coverage/
+out/
+public/globe/
+test-results/
+node_modules/
+index.html
+style.css
+select2.css

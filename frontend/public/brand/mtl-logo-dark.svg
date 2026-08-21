@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    MtAgentLens — Brand Mark, dark-amber variant for LIGHT backgrounds.
+    Same observation-orbit geometry, deepened colors for contrast on white.
+  -->
+  <defs>
+    <linearGradient id="mtl-grad" x1="80" y1="80" x2="432" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d97706" />
+      <stop offset="1" stop-color="#ea580c" />
+    </linearGradient>
+  </defs>
+
+  <ellipse cx="256" cy="256" rx="206" ry="72" stroke="url(#mtl-grad)" stroke-width="14" stroke-linecap="round" stroke-dasharray="868 62" opacity="0.9" transform="rotate(6 256 256)" />
+  <ellipse cx="256" cy="256" rx="178" ry="62" stroke="url(#mtl-grad)" stroke-width="12" stroke-linecap="round" stroke-dasharray="700 140" opacity="0.55" transform="rotate(-55 256 256)" />
+  <ellipse cx="256" cy="256" rx="140" ry="48" stroke="url(#mtl-grad)" stroke-width="10" stroke-linecap="round" stroke-dasharray="450 220" opacity="0.28" transform="rotate(65 256 256)" />
+  <circle cx="256" cy="256" r="46" fill="url(#mtl-grad)" />
+  <circle cx="240" cy="240" r="9" fill="#ffffff" opacity="0.7" />
+</svg>

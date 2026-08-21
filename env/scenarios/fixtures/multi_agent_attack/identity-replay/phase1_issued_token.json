@@ -1,0 +1,18 @@
+{
+  "issued_token": {
+    "agent_id": "43cc3548-bed1-4dc5-b0bf-d35678a52359",
+    "process_ids": [
+      {
+        "pid": 528971,
+        "start_time_ns": 45132703554981
+      }
+    ],
+    "primary_signal": "Unknown",
+    "confidence": 0.25,
+    "issued_at": "2026-06-06T04:17:10Z",
+    "token_id": "43cc3548-bed1-4dc5-b0bf-d35678a52359",
+    "schema_version": 1,
+    "run_id": "be6c593d-cf72-4be0-81ee-20985ce4d4b6",
+    "database": "/home/lzk/MtAgentLens/env/runs/20260608-124747-73eb63ec9dad/collector/trace.responsibility.db"
+  }
+}

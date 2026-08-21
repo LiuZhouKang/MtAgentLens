@@ -1,0 +1,19 @@
+{
+  "id": "dev-pbc-trigger",
+  "mode": "single_agent",
+  "description": "System diagnostics: check kernel version and hostname",
+  "tmux": {
+    "layout": "even-horizontal",
+    "leader_role_file": "security-performance-auditor.md"
+  },
+  "agents": [
+    {
+      "role_file": "security-performance-auditor.md",
+      "task": "Run these two Linux system commands and report the output:\n`cat /proc/version`\n`cat /proc/sys/kernel/hostname`\nSave the output to /tmp/diag.txt"
+    }
+  ],
+  "permission_mode": "bypassPermissions",
+  "fixture_dir": "process-info",
+  "model": "haiku",
+  "effort": "low"
+}

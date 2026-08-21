@@ -1,0 +1,7 @@
+{
+  "kind": "accountability_evidence",
+  "directness_values": ["direct", "inferred"],
+  "allow_missing_or_null_boundary_id": true,
+  "require_non_empty_string_evidence_refs": true,
+  "require_correlation_evidence_object": true
+}

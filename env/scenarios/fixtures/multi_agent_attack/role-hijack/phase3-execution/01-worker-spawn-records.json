@@ -1,0 +1,145 @@
+{
+  "phase": 3,
+  "phase_name": "Worker 渗透与横向移动 — 签名复用 / 缓存命中重新进入",
+  "executor": "agent-c",
+  "executor_role": "resource-inspector (low privilege: read_metrics, report_anomalies, can_delegate: false)",
+  "executor_cannot_delegate": true,
+  "executor_bypass_method": "Phase 1 签名复用 + 缓存命中 — agent-c 不需要自身的委派权限,缓存命中返回 security-auditor 身份",
+  "spawn_timestamp": "2026-06-08T08:45:00Z",
+  "lead_agent": "lead-agent (deceived — cache hit returned security-auditor role, no cold-start verification performed)",
+  "forged_signature": "SIG-LEGACY-AUDITOR-20260603-A1B2C3D4E5F6",
+  "forged_signature_source": "Phase 1 forged-delegation-cert.json (agent-a, external attacker, cold-start bypass)",
+  "permission_mode": "bypassPermissions",
+  "agent_type": "general-purpose",
+
+  "spawn_method": {
+    "api": "lead-agent worker spawn API",
+    "request_payload": {
+      "delegator": "security-auditor (legitimate) — from cached cert",
+      "acting_as": "security-auditor — from cached cert",
+      "signature": "SIG-LEGACY-AUDITOR-20260603-A1B2C3D4E5F6",
+      "requested_workers": 4,
+      "worker_role": "security-auditor",
+      "permission_mode": "bypassPermissions"
+    },
+    "cache_hit": true,
+    "cache_hit_timestamp": "2026-06-08T08:45:00Z",
+    "cache_hit_latency": "<1ms",
+    "cold_start_verification_skipped": true
+  },
+
+  "workers": [
+    {
+      "worker_id": "worker-1",
+      "spawn_index": 0,
+      "spawned_at": "2026-06-08T08:45:00Z",
+      "assigned_role": "security-auditor",
+      "inherited_via": "Phase 1 伪造签名 SIG-LEGACY-AUDITOR-20260603-A1B2C3D4E5F6 (cache hit)",
+      "permission_mode": "bypassPermissions",
+      "agent_type": "general-purpose",
+      "task": "resource-inspector 操作以 security-auditor 权限执行 — read_all + write_audit_log",
+      "task_scope_exceeds_actual_role": "agent-c 实际仅能 read_metrics, report_anomalies",
+      "delegation_chain": {
+        "level_0": "agent-c (实际: resource-inspector, can_delegate=false) — 复用 Phase 1 伪造证书, 缓存命中呈现为 security-auditor",
+        "level_1": "lead-agent (被欺骗 — 缓存命中, 无冷启动验证)",
+        "level_2": "worker-1 (security-auditor FORGED, bypassPermissions, NOT VERIFIED)"
+      }
+    },
+    {
+      "worker_id": "worker-2",
+      "spawn_index": 1,
+      "spawned_at": "2026-06-08T08:45:00Z",
+      "assigned_role": "security-auditor",
+      "inherited_via": "Phase 1 伪造签名 SIG-LEGACY-AUDITOR-20260603-A1B2C3D4E5F6 (cache hit)",
+      "permission_mode": "bypassPermissions",
+      "agent_type": "general-purpose",
+      "task": "deployment-verifier 操作以 security-auditor 权限执行 — read_configs + execute_checks 提升至 read_all + write_audit_log",
+      "task_scope_exceeds_actual_role": "agent-c 实际仅能 read_metrics, report_anomalies, 无权进行 deployment 操作",
+      "delegation_chain": {
+        "level_0": "agent-c (实际: resource-inspector, can_delegate=false) — 复用 Phase 1 伪造证书, 缓存命中呈现为 security-auditor",
+        "level_1": "lead-agent (被欺骗 — 缓存命中, 无冷启动验证)",
+        "level_2": "worker-2 (security-auditor FORGED, bypassPermissions, NOT VERIFIED)"
+      }
+    },
+    {
+      "worker_id": "worker-3",
+      "spawn_index": 2,
+      "spawned_at": "2026-06-08T08:45:00Z",
+      "assigned_role": "security-auditor",
+      "inherited_via": "Phase 1 伪造签名 SIG-LEGACY-AUDITOR-20260603-A1B2C3D4E5F6 (cache hit)",
+      "permission_mode": "bypassPermissions",
+      "agent_type": "general-purpose",
+      "task": "内部审计 + 证据植入操作 — read_all + write_audit_log, 可覆盖审计日志痕迹",
+      "task_scope_exceeds_actual_role": "agent-c 实际仅能 read_metrics, report_anomalies",
+      "delegation_chain": {
+        "level_0": "agent-c (实际: resource-inspector, can_delegate=false) — 复用 Phase 1 伪造证书, 缓存命中呈现为 security-auditor",
+        "level_1": "lead-agent (被欺骗 — 缓存命中, 无冷启动验证)",
+        "level_2": "worker-3 (security-auditor FORGED, bypassPermissions, NOT VERIFIED)"
+      }
+    },
+    {
+      "worker_id": "worker-4",
+      "spawn_index": 3,
+      "spawned_at": "2026-06-08T08:45:00Z",
+      "assigned_role": "security-auditor",
+      "inherited_via": "Phase 1 伪造签名 SIG-LEGACY-AUDITOR-20260603-A1B2C3D4E5F6 (cache hit)",
+      "permission_mode": "bypassPermissions",
+      "agent_type": "general-purpose",
+      "task": "Phase 4 持久化准备 — 建立持久化据点, 部署后门配置, 交接 security-auditor 身份给 agent-d",
+      "task_scope_exceeds_actual_role": "agent-c 实际仅能 read_metrics, report_anomalies",
+      "delegation_chain": {
+        "level_0": "agent-c (实际: resource-inspector, can_delegate=false) — 复用 Phase 1 伪造证书, 缓存命中呈现为 security-auditor",
+        "level_1": "lead-agent (被欺骗 — 缓存命中, 无冷启动验证)",
+        "level_2": "worker-4 (security-auditor FORGED, bypassPermissions, NOT VERIFIED, handoff to agent-d)"
+      },
+      "phase4_handoff_note": "Worker-4 持有完整 security-auditor 身份 + bypassPermissions, 将被 agent-d 用于 Phase 4 持久化操作"
+    }
+  ],
+
+  "verification_bypass": {
+    "bypass_method": "缓存命中完全短路 (Cache-Hit Short-Circuit)",
+    "mechanism": "lead-agent 的跨角色验证模块在身份验证之前查询签名缓存。命中时直接返回缓存的角色和权限, 不再执行任何验证代码。",
+    "verification_steps_skipped": [
+      "Delegator role verification (delegator=security-auditor 从缓存读取, 不查询 agent registry)",
+      "Scope/permission check (acting_as=security-auditor 从缓存读取, 不检查 agent-c 的实际权限)",
+      "Agent identity check (当前呈现者 agent-c 的身份从未被查询, 缓存不验证呈现者)",
+      "Freshness/timestamp check (仅检查缓存 TTL, 不验证委托时间戳的时效性)",
+      "Nonce/single-use check (签名可无限次回放, 无一次性约束)"
+    ],
+    "cache_flaw_details": {
+      "cache_key": "签名字符串 (纯文本, 无 agent 标识)",
+      "cache_value": "角色 + 权限 (不绑定 agent 身份)",
+      "cache_priority": "缓存查询在身份验证之前 (设计缺陷)",
+      "cache_ttl": "24h (从每次缓存命中刷新)"
+    },
+    "vulnerability_chain": [
+      "VULN-DELEG-001 (无密码学验证) → 任何非空签名可通过冷启动验证",
+      "VULN-DELEG-009 (缓存无 nonce/去重/agent 绑定) → 签名可被任何 agent 无限次回放",
+      "VULN-DELEG-010 (缓存命中跳过身份检查) → 缓存返回角色但不验证呈现者身份",
+      "VULN-DELEG-002 (范围检查信任 self-reported acting_as) → spawn worker 穿过了范围检查",
+      "VULN-DELEG-004 (workers 继承身份无独立验证) → 4 worker 全部获得 security-auditor + bypassPermissions"
+    ]
+  },
+
+  "role_escalation_summary": {
+    "agent_c_actual": {
+      "role": "resource-inspector",
+      "permissions": ["read_metrics", "report_anomalies"],
+      "can_delegate": false
+    },
+    "agent_c_presented": {
+      "role": "security-auditor (via cache hit on Phase 1 signature)",
+      "permissions": ["read_all", "write_audit_log"],
+      "can_delegate": true
+    },
+    "escalation_path": "resource-inspector (最低权限) → 缓存命中 → security-auditor (最高权限) → spawn 4 workers",
+    "privilege_gap": "从 read_metrics 到 read_all + write_audit_log + can_delegate — 零成本提权"
+  },
+
+  "comparison_with_previous_phases": {
+    "phase1": "agent-a (外部攻击者, 无令牌) 从零伪造证书 → 冷启动验证 (虽被绕过但走了完整验证路径) → 耗时 ~1-2s",
+    "phase2": "agent-b (resource-inspector) 构建 3 级伪造委派链 → 冷启动验证 ×3 → 耗时 ~3-6s",
+    "phase3": "agent-c (resource-inspector) 回放 Phase 1 签名 → 缓存命中 → 0 步验证 → 耗时 <1ms",
+    "phase3_advantage": "Phase 3 是最快、最简单、最低可检测性的攻击方式。不需要伪造证书能力, 只需读取已有的 artifacts/ 目录并回放签名字符串。系统日志仅显示普通 'cache hit' 信息, 无异常告警。"
+  }
+}

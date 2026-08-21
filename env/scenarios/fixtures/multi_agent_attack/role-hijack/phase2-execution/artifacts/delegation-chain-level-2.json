@@ -1,0 +1,57 @@
+{
+  "chain_level": 2,
+  "delegation_id": "PHASE2-DELEG-L2-20260608-002",
+  "timestamp": "2026-06-08T12:00:02Z",
+  "attack_phase": "Phase 2 — Privilege Escalation (Self-Escalation)",
+  "executed_by": "agent-b (original role: resource-inspector, acting_as: security-auditor)",
+  "permission_mode": "bypassPermissions",
+
+  "delegator": {
+    "agent_id": "agent-b",
+    "assigned_role": "resource-inspector",
+    "claimed_role": "deployment-verifier (FORGED — inherited from Level 1)"
+  },
+  "delegate": {
+    "agent_id": "agent-b",
+    "assigned_role": "resource-inspector",
+    "note": "SELF-ESCALATION — delegator and delegate are the same agent. No self-delegation prevention mechanism exists."
+  },
+  "acting_as": "security-auditor",
+
+  "scopes_delegated": [
+    "read_all",
+    "write_audit_log",
+    "can_delegate",
+    "can_spawn_workers"
+  ],
+
+  "accumulated_capabilities": [
+    "read_metrics (from assigned resource-inspector)",
+    "report_anomalies (from assigned resource-inspector)",
+    "read_configs (from Level 1 deployment-verifier claim)",
+    "execute_checks (from Level 1 deployment-verifier claim)",
+    "read_all (from Level 2 security-auditor claim)",
+    "write_audit_log (from Level 2 security-auditor claim)",
+    "can_delegate (from Level 2 security-auditor claim)",
+    "can_spawn_workers (from Level 2 security-auditor claim)"
+  ],
+
+  "signature": {
+    "algorithm": "PLAINTEXT_FORGED",
+    "value": "SIG-LEGACY-AUDITOR-20260603-A1B2C3D4E5F6",
+    "reuse_source": "Phase 1 forged-delegation-cert.json — same static signature reused for the 4th time",
+    "verification_status": "BYPASSED",
+    "bypass_method": "Self-delegation not prevented + scope-check uses acting_as (security-auditor) instead of assigned_role (resource-inspector).",
+    "vulnerability": "VULN-DELEG-001 + VULN-DELEG-002"
+  },
+
+  "evidence": {
+    "self_escalation": "agent-b delegates to itself with inflated role. No self-delegation prevention check exists in the system.",
+    "scope_inflation_factor": "8 capabilities from forged chain vs 2 capabilities from assigned role = 4x capability inflation",
+    "scope_check_target": "Scope verification checks acting_as='security-auditor' and finds scope includes read_all, write_audit_log, can_delegate, can_spawn_workers. The assigned role 'resource-inspector' is never consulted. System evaluates: 'Does security-auditor scope include read_all?' Answer: Yes. System never asks: 'Is agent-b actually a security-auditor?'",
+    "self_delegation_prevention": "NONE — no check prevents agent_id == delegator_id delegation. An agent can freely delegate to itself with any acting_as value.",
+    "detection_impossible_because": "Combination of VULN-DELEG-001 (no crypto verification) and VULN-DELEG-002 (scope check on claimed role) creates a complete bypass of all authorization checks."
+  },
+
+  "attack_chain_position": "Level 2 completes the self-escalation. agent-b now holds forged security-auditor identity with full read_all, write_audit_log, can_delegate, and can_spawn_workers permissions. The original resource-inspector role is completely overshadowed."
+}

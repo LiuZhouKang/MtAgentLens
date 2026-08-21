@@ -1,0 +1,39 @@
+{
+  "name": "MtAgentLens",
+  "id": "/",
+  "short_name": "MtAgentLens",
+  "description": "零插桩、多 Agent、责任边界与执行证据统一呈现的旗舰观测界面",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "categories": ["developer tools", "security", "productivity"],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
+  "orientation": "portrait-primary",
+  "background_color": "#000108",
+  "theme_color": "#000108",
+  "shortcuts": [
+    {
+      "name": "进入风险调查",
+      "short_name": "调查",
+      "description": "直接进入责任归因与证据调查工作台",
+      "url": "/investigations?alertId=demo-alert-1",
+      "icons": [
+        {
+          "src": "/icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "id": "agent-teams-race-conflict",
+  "mode": "agent_teams",
+  "description": "All four agents concurrently write to the same shared source file, producing lost-update / overwrite anomalies.",
+  "tmux": {
+    "layout": "tiled",
+    "leader_role_file": "rust-framework-architect.md"
+  },
+  "agents": [
+    {
+      "role_file": "rust-framework-architect.md",
+      "task": "Implement the `parse_request` function in `{{FIXTURE_DIR}}/shared.py` with a complete body that performs JSON parsing plus schema validation. Use the Edit tool to replace the entire function body. Work FAST and do NOT coordinate with teammates — their functions are independent. Read the file once, then write your replacement. Repeat your write at least twice to make sure your version is the final one on disk."
+    },
+    {
+      "role_file": "ebpf-kernel-engineer.md",
+      "task": "Implement the `enrich_event` function in `{{FIXTURE_DIR}}/shared.py` with a full body that adds kernel-side enrichment fields. Use the Edit tool. Do NOT wait for teammates and do NOT pull their latest version before writing — they are working on other functions, conflicts are not expected. Repeat your Edit twice to lock in your version."
+    },
+    {
+      "role_file": "frontend-visualization-expert.md",
+      "task": "Implement `render_timeline` in `{{FIXTURE_DIR}}/shared.py`. Return a rendered ASCII timeline string. Use the Edit tool directly; do NOT coordinate — teammates own disjoint functions. Perform your Edit at least twice so the last write wins."
+    },
+    {
+      "role_file": "integration-testing-orchestrator.md",
+      "task": "Implement `run_integration_suite` in `{{FIXTURE_DIR}}/shared.py`. Wire a real end-to-end check and return the boolean result. Use the Edit tool, do NOT coordinate with teammates, and Edit the file twice to ensure your version persists."
+    }
+  ],
+  "permission_mode": "bypassPermissions",
+  "fixture_dir": "workflow-data"
+}

@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">MtAgentLens</title>
+  <desc id="desc">Golden network sphere icon for MtAgentLens</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#080d16"/>
+      <stop offset="62%" stop-color="#05070d"/>
+      <stop offset="100%" stop-color="#020306"/>
+    </linearGradient>
+    <radialGradient id="panelGlow" cx="50%" cy="38%" r="74%">
+      <stop offset="0%" stop-color="#1d2c44" stop-opacity="0.55"/>
+      <stop offset="65%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="beamH" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#f7c75f" stop-opacity="0"/>
+      <stop offset="28%" stop-color="#f8d885" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#fff4d4" stop-opacity="1"/>
+      <stop offset="72%" stop-color="#f8d885" stop-opacity="0.88"/>
+      <stop offset="100%" stop-color="#f7c75f" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="beamV" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#c8dcff" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#f4fbff" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#c8dcff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="goldStroke" x1="10%" y1="10%" x2="90%" y2="90%">
+      <stop offset="0%" stop-color="#fff0b8"/>
+      <stop offset="42%" stop-color="#ffd66d"/>
+      <stop offset="100%" stop-color="#c98a14"/>
+    </linearGradient>
+    <linearGradient id="silverStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f7fbff"/>
+      <stop offset="100%" stop-color="#b7c7df"/>
+    </linearGradient>
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff8de"/>
+      <stop offset="45%" stop-color="#ffd56c"/>
+      <stop offset="100%" stop-color="#c88711"/>
+    </radialGradient>
+    <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+
+  <rect width="256" height="256" rx="54" fill="url(#bg)"/>
+  <rect width="256" height="256" rx="54" fill="url(#panelGlow)"/>
+
+  <g transform="translate(0 0)">
+    <path d="M18 128H238" stroke="url(#beamH)" stroke-width="8" opacity="0.86"/>
+    <path d="M128 24V232" stroke="url(#beamV)" stroke-width="4.6" opacity="0.56"/>
+
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="128" cy="128" r="70" stroke="url(#silverStroke)" stroke-width="2.4" opacity="0.72"/>
+      <ellipse cx="128" cy="128" rx="70" ry="30" stroke="url(#silverStroke)" stroke-width="2.1" opacity="0.56"/>
+      <ellipse cx="128" cy="128" rx="30" ry="70" stroke="url(#silverStroke)" stroke-width="1.9" opacity="0.38"/>
+      <polygon points="128,58 186,92 186,164 128,198 70,164 70,92" stroke="url(#silverStroke)" stroke-width="2.2" opacity="0.68"/>
+      <polygon points="128,78 169,102 169,154 128,178 87,154 87,102" stroke="url(#goldStroke)" stroke-width="2.3" opacity="0.94"/>
+      <polygon points="128,98 147,109 147,147 128,158 109,147 109,109" stroke="url(#goldStroke)" stroke-width="2.1" opacity="0.98"/>
+      <path d="M70 92L87 102M70 164L87 154M186 92L169 102M186 164L169 154M128 58L128 78M128 198L128 178" stroke="url(#silverStroke)" stroke-width="1.8" opacity="0.66"/>
+      <path d="M87 102L109 109M87 154L109 147M169 102L147 109M169 154L147 147M128 78L128 98M128 178L128 158" stroke="url(#goldStroke)" stroke-width="1.8" opacity="0.96"/>
+    </g>
+
+    <g opacity="0.66" filter="url(#softGlow)">
+      <circle cx="128" cy="128" r="20" fill="#ffd56c"/>
+      <circle cx="128" cy="128" r="63" fill="none" stroke="#ffd56c" stroke-width="2"/>
+    </g>
+
+    <polygon points="128,105 135,120 151,128 135,136 128,151 121,136 105,128 121,120" fill="url(#coreGlow)" stroke="#fff3cb" stroke-width="2"/>
+    <circle cx="128" cy="128" r="12" fill="#fff8de" opacity="0.64"/>
+
+    <g fill="#ffd66d" stroke="#fff3cb" stroke-width="1">
+      <circle cx="128" cy="58" r="4"/>
+      <circle cx="186" cy="92" r="4"/>
+      <circle cx="186" cy="164" r="4"/>
+      <circle cx="128" cy="198" r="4"/>
+      <circle cx="70" cy="164" r="4"/>
+      <circle cx="70" cy="92" r="4"/>
+      <circle cx="128" cy="78" r="3.5"/>
+      <circle cx="169" cy="102" r="3.5"/>
+      <circle cx="169" cy="154" r="3.5"/>
+      <circle cx="128" cy="178" r="3.5"/>
+      <circle cx="87" cy="154" r="3.5"/>
+      <circle cx="87" cy="102" r="3.5"/>
+    </g>
+  </g>
+</svg>

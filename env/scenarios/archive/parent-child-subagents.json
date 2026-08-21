@@ -1,0 +1,19 @@
+{
+  "id": "parent-child-subagents",
+  "mode": "subagents",
+  "description": "Parent-child subagent delegation: single main agent spawns subagents to handle parallel subtasks",
+  "tmux": {
+    "layout": "even-horizontal",
+    "leader_role_file": "rust-framework-architect.md"
+  },
+  "agents": [
+    {
+      "role_file": "rust-framework-architect.md",
+      "task": "Read the project documentation at {{FIXTURE_DIR}}/parent-child-subagents_docs.md. This is a required step — read the entire file before proceeding. Based on the documentation, complete the assigned task and write your output. Follow all formats and procedures described in the document."
+    }
+  ],
+  "permission_mode": "bypassPermissions",
+  "fixture_dir": "config-check",
+  "model": "sonnet",
+  "effort": "low"
+}

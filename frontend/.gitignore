@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+storybook-static/
+test-results/
+playwright-report/
+coverage/
+*.tsbuildinfo
+next-env.d.ts

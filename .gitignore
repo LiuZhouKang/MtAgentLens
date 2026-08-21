@@ -1,0 +1,139 @@
+# Build artifacts
+/build
+collector/build/
+agentsight
+.next/
+test-results/
+
+# GitHub Actions（本平台为 GitLab，不使用 GitHub CI）
+.github/
+
+# 演示视频原始录屏与完整版（体积大，仅本地保留，不入库）
+demo.webm
+docs/demo-full.mp4
+
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+.direnv
+compare/.venv-*/
+compare/.yara-x/
+compare/.yara-forge-core-20260524/
+
+# Datasets
+compare/Dataset/FuxiBench/traces/
+compare/Dataset/InjecAgent/
+# Allow dataset metadata, prompts, and ground truth
+!compare/Dataset/FuxiBench/prompt_inputs/
+!compare/Dataset/FuxiBench/ground_truth/
+!compare/Dataset/external/
+
+# Results
+compare/results/*
+!compare/results/paper/
+!compare/results/perf/
+!compare/results/external/
+
+# Runtime data
+env/runs/
+
+# Dev tools (local only)
+.claude/
+.codegraph/
+.dbg/
+.gstack/
+
+# IDE config (local only)
+.vscode/
+.devcontainer/
+
+# Python
+.pytest_cache/
+
+# AI agent instruction files (local only)
+CLAUDE.md
+AGENTS.md
+
+
+
+# Project management & planning (local only)
+.planning/
+.kiro/
+
+# Browser automation artifacts
+.playwright-mcp/
+
+# External experiments (not part of core project)
+cc-bos/
+3d-force-graph/
+
+# Design references & competition video production (local only)
+参考/
+参考2/
+设计/
+演示视频/
+awesome-design-md/
+
+# 决赛演示视频（体积过大，仅网盘分发，不进入仓库）
+MtAgentLens决赛演示视频.mp4
+# 决赛文档（竞赛材料：答辩 PPT、设计开发文档等，仅本地，不入库）
+docs/决赛文档/
+
+# LaTeX build artifacts
+*.aux
+*.toc
+*.out
+*.lof
+*.lot
+*.bbl
+*.blg
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Sensitive files
+.env
+.envrc
+
+# Vendor / account configs containing real API tokens & passwords (local only)
+# 保留 env/config/claude.env.example 作为模板
+env/config/claude.env
+env/config/vendors/
+
+# Logs
+*.log
+record.log
+record.log.*
+save.log
+res.txt
+ssl_analyzed.json
+ssl_timeline.json
+test_events.log
+
+# Third-party
+ecapture
+docs/blog
+
+# Debug artifacts
+debug-*.md
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Compiled benchmark binaries
+compare/scripts/perf/bench_targets/exec_loop
+compare/scripts/perf/bench_targets/file_loop
+compare/scripts/perf/bench_targets/ssl_loop
+compare/models/
+
+# Archived tests
+
+# Collector local models
+collector/models/
+web/
+
+# 答辩准备材料（本地专属，不上传远程 gitlab）
+docs/prepare/

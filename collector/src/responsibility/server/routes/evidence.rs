@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Route handler: GET /api/runs/{id}/evidence — return all correlation evidence,
 // intents, actions, and non-link diagnostics for a run.
 

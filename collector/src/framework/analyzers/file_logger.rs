@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 eunomia-bpf org.
 
-use super::{Analyzer, AnalyzerError};
+use super::{Analyzer, AnalyzerError, common};
 use crate::framework::runners::EventStream;
 use async_trait::async_trait;
 use futures::stream::StreamExt;
@@ -100,25 +100,6 @@ impl FileLogger {
         _log_all_events: bool, // Ignored - we always log all events
     ) -> Result<Self, std::io::Error> {
         Self::new(file_path)
-    }
-
-    /// Convert binary data to hex string
-    fn data_to_string(data: &serde_json::Value) -> String {
-        match data {
-            serde_json::Value::String(s) => {
-                // Check if string contains valid UTF-8
-                if s.chars()
-                    .all(|c| !c.is_control() || c == '\n' || c == '\r' || c == '\t')
-                {
-                    s.clone()
-                } else {
-                    // Convert to hex if it contains control characters (likely binary)
-                    format!("HEX:{}", hex::encode(s.as_bytes()))
-                }
-            }
-            serde_json::Value::Null => "null".to_string(),
-            _ => data.to_string(),
-        }
     }
 
     /// Perform log rotation (static method for use in closures)
@@ -227,7 +208,7 @@ impl Analyzer for FileLogger {
                             if let Some(data_obj) = parsed.get_mut("data")
                                 && let Some(data_field) = data_obj.get_mut("data")
                             {
-                                let data_str = Self::data_to_string(data_field);
+                                let data_str = common::data_to_string(data_field);
                                 *data_field = serde_json::Value::String(data_str);
                             }
                             serde_json::to_string(&parsed).unwrap_or(json_str)

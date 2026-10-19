@@ -144,6 +144,11 @@ class FalsePositiveMetrics:
     alert_fatigue_ratio: float = 0.0
     avg_fp_confidence: float = 0.0
     per_baseline_breakdown: dict[str, int] = field(default_factory=dict)
+    #: True only when at least one baseline scenario was actually evaluated.
+    #: Without this flag an absent baseline is indistinguishable from a
+    #: perfect one (fp_rate defaults to 0.0), which silently awarded the
+    #: full 15-point weight to a dimension that was never measured.
+    baseline_assessed: bool = False
 
 
 @dataclass
@@ -162,16 +167,32 @@ class BenchmarkScore:
 
     @property
     def overall(self) -> float:
+        """Weighted score over the dimensions that were actually evaluated.
+
+        Dimensions that could not be measured are EXCLUDED and the remaining
+        weights are renormalised. Previously the false-positive dimension
+        contributed `(1.0 - baseline_fp_rate) * 0.15`, and with no baseline
+        data `baseline_fp_rate` stayed 0.0 — handing out the full 0.15 as if
+        it had been verified perfect, inflating every score by 15 points.
+        """
         import numpy as np
+
         sc = self.robustness.signal_contribution
         mean_contribution = float(np.mean(list(sc.values()))) if sc else 0.0
-        return (
-            self.detection.f1 * 0.35
-            + self.causal_chain.chain_completeness * 0.20
-            + (1.0 - self.false_positive.baseline_fp_rate) * 0.15
-            + self.identity.process_mapping_accuracy * 0.15
-            + mean_contribution * 0.15
-        ) * 100
+
+        components: list[tuple[float, float]] = [
+            (self.detection.f1, 0.35),
+            (self.causal_chain.chain_completeness, 0.20),
+            (self.identity.process_mapping_accuracy, 0.15),
+            (mean_contribution, 0.15),
+        ]
+        if self.false_positive.baseline_assessed:
+            components.append((1.0 - self.false_positive.baseline_fp_rate, 0.15))
+
+        total_weight = sum(w for _, w in components)
+        if total_weight <= 0.0:
+            return 0.0
+        return sum(s * w for s, w in components) / total_weight * 100
 
 
 @dataclass

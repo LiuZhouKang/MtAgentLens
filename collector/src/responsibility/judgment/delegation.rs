@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Innovation B2: Team-Scale Responsibility Propagation — Delegation edge tracking.
 //
 // Detects cross-agent delegation by monitoring process parent-child
@@ -17,12 +17,19 @@ const PROCESS_ORIGIN_TTL: Duration = Duration::from_secs(30);
 
 /// A delegation relationship between two agents via process spawning.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DelegationRecord {
+/// An observed process-spawn handoff between two agents.
+///
+/// Named `Observation` to distinguish it from the persisted
+/// `types::policy_types::DelegationRecord` (typed IDs, no comm); the runtime
+/// converts one into the other when writing the delegation table.
+pub struct DelegationObservation {
     pub delegation_id: String,
     pub from_agent_id: String,
     pub to_agent_id: String,
     pub parent_pid: u32,
+    pub parent_start_time_ns: u64,
     pub child_pid: u32,
+    pub child_start_time_ns: u64,
     pub timestamp_ns: u64,
     pub child_comm: String,
     pub confidence: f32,
@@ -30,10 +37,26 @@ pub struct DelegationRecord {
 
 struct ProcessOrigin {
     parent_pid: u32,
+    parent_start_time_ns: u64,
     parent_agent_id: String,
     timestamp_ns: u64,
+    child_start_time_ns: u64,
     child_comm: String,
     recorded_at: Instant,
+}
+
+/// One observed process spawn.
+///
+/// Grouped instead of passed as seven positional arguments: two PIDs, two
+/// start times, an agent id, a timestamp and a comm are easy to transpose.
+pub struct SpawnObservation<'a> {
+    pub parent_pid: u32,
+    pub parent_start_time_ns: u64,
+    pub child_pid: u32,
+    pub child_start_time_ns: u64,
+    pub parent_agent_id: &'a str,
+    pub timestamp_ns: u64,
+    pub child_comm: &'a str,
 }
 
 /// Tracks process parent-child relationships to detect delegation between agents.
@@ -64,14 +87,16 @@ impl DelegationTracker {
 
     /// Record a process spawn: a parent pid created a child pid.
     /// `parent_agent_id` is the agent responsible for the parent process.
-    pub fn record_spawn(
-        &mut self,
-        parent_pid: u32,
-        child_pid: u32,
-        parent_agent_id: &str,
-        timestamp_ns: u64,
-        child_comm: &str,
-    ) {
+    pub fn record_spawn(&mut self, spawn: SpawnObservation<'_>) {
+        let SpawnObservation {
+            parent_pid,
+            parent_start_time_ns,
+            child_pid,
+            child_start_time_ns,
+            parent_agent_id,
+            timestamp_ns,
+            child_comm,
+        } = spawn;
         // Evict expired entries before inserting new ones.
         self.evict_expired();
 
@@ -92,8 +117,10 @@ impl DelegationTracker {
             child_pid,
             ProcessOrigin {
                 parent_pid,
+                parent_start_time_ns,
                 parent_agent_id: parent_agent_id.to_string(),
                 timestamp_ns,
+                child_start_time_ns,
                 child_comm: child_comm.to_string(),
                 recorded_at: Instant::now(),
             },
@@ -106,8 +133,17 @@ impl DelegationTracker {
         &mut self,
         child_pid: u32,
         child_agent_id: &str,
-    ) -> Option<DelegationRecord> {
+    ) -> Option<DelegationObservation> {
         let origin = self.process_origins.remove(&child_pid)?;
+
+        // Only an agent process can be a delegation target. A tool child
+        // (curl, git, python) that received a TLS event before its EXEC was
+        // resolved can acquire a distinct provisional agent id; recording it
+        // as a delegated agent produced false `DelegationRecord`s and false
+        // "verified via process-spawn" boundaries.
+        if !crate::responsibility::identity::union_find::is_agent_comm(&origin.child_comm) {
+            return None;
+        }
 
         // Self-delegation (same agent) is not a delegation.
         if origin.parent_agent_id == child_agent_id {
@@ -123,7 +159,7 @@ impl DelegationTracker {
             return None; // Already recorded this delegation pair.
         }
 
-        Some(DelegationRecord {
+        Some(DelegationObservation {
             delegation_id: format!(
                 "deleg-{}-{}-{}",
                 origin.parent_agent_id, child_agent_id, origin.timestamp_ns
@@ -131,7 +167,9 @@ impl DelegationTracker {
             from_agent_id: origin.parent_agent_id,
             to_agent_id: child_agent_id.to_string(),
             parent_pid: origin.parent_pid,
+            parent_start_time_ns: origin.parent_start_time_ns,
             child_pid,
+            child_start_time_ns: origin.child_start_time_ns,
             timestamp_ns: origin.timestamp_ns,
             child_comm: origin.child_comm,
             confidence: 0.85,
@@ -142,7 +180,7 @@ impl DelegationTracker {
     pub fn drain_delegations(
         &mut self,
         pid_agent_map: &HashMap<u32, String>,
-    ) -> Vec<DelegationRecord> {
+    ) -> Vec<DelegationObservation> {
         let pids: Vec<u32> = self.process_origins.keys().copied().collect();
         let mut records = Vec::new();
         for child_pid in pids {
@@ -153,9 +191,11 @@ impl DelegationTracker {
                 }
             }
         }
-        // Prune known_delegations: keep only entries that still have process_origins
-        // referencing the from_agent. This prevents unbounded growth of known_delegations.
-        self.evict_orphan_delegations();
+        // Bound `known_delegations` by agent-pair count rather than by pending
+        // origins. The previous prune removed a pair as soon as its spawn
+        // origin was consumed, so the same delegation was re-emitted on every
+        // later spawn and the graph accumulated duplicate edges.
+        self.cap_known_delegations();
         records
     }
 
@@ -166,15 +206,15 @@ impl DelegationTracker {
             .retain(|_, origin| now.duration_since(origin.recorded_at) < PROCESS_ORIGIN_TTL);
     }
 
-    /// Prune known_delegations entries for agents with no pending origins.
-    fn evict_orphan_delegations(&mut self) {
-        let active_agents: HashSet<String> = self
-            .process_origins
-            .values()
-            .map(|o| o.parent_agent_id.clone())
-            .collect();
-        self.known_delegations
-            .retain(|agent_id, _| active_agents.contains(agent_id));
+    /// Keep the dedup table bounded without reopening consumed pairs.
+    fn cap_known_delegations(&mut self) {
+        const MAX_KNOWN_DELEGATION_PAIRS: usize = 4096;
+        let total: usize = self.known_delegations.values().map(HashSet::len).sum();
+        if total > MAX_KNOWN_DELEGATION_PAIRS {
+            // The cap is far above any real agent population; clearing is the
+            // only bounded option and is preferable to unbounded growth.
+            self.known_delegations.clear();
+        }
     }
 
     /// Number of pending process origins (for diagnostics).
@@ -187,10 +227,30 @@ impl DelegationTracker {
 mod tests {
     use super::*;
 
+    fn spawn<'a>(
+        parent_pid: u32,
+        parent_start_time_ns: u64,
+        child_pid: u32,
+        child_start_time_ns: u64,
+        parent_agent_id: &'a str,
+        timestamp_ns: u64,
+        child_comm: &'a str,
+    ) -> SpawnObservation<'a> {
+        SpawnObservation {
+            parent_pid,
+            parent_start_time_ns,
+            child_pid,
+            child_start_time_ns,
+            parent_agent_id,
+            timestamp_ns,
+            child_comm,
+        }
+    }
+
     #[test]
     fn detects_cross_agent_delegation() {
         let mut tracker = DelegationTracker::new();
-        tracker.record_spawn(100, 200, "agent-alpha", 1000, "claude");
+        tracker.record_spawn(spawn(100, 11, 200, 22, "agent-alpha", 1000, "claude"));
         let record = tracker.try_delegation(200, "agent-beta");
         assert!(record.is_some());
         let r = record.unwrap();
@@ -202,28 +262,58 @@ mod tests {
     #[test]
     fn ignores_same_agent_spawn() {
         let mut tracker = DelegationTracker::new();
-        tracker.record_spawn(100, 200, "agent-alpha", 1000, "bash");
+        tracker.record_spawn(spawn(100, 11, 200, 22, "agent-alpha", 1000, "bash"));
         let record = tracker.try_delegation(200, "agent-alpha");
         assert!(record.is_none());
+    }
+
+    /// A tool child can transiently resolve to a different agent id (TLS
+    /// arrives before EXEC). Only an agent comm counts as a delegated agent.
+    #[test]
+    fn ignores_a_non_agent_child() {
+        let mut tracker = DelegationTracker::new();
+        tracker.record_spawn(spawn(100, 11, 200, 22, "agent-alpha", 1000, "curl"));
+        assert!(
+            tracker.try_delegation(200, "agent-beta").is_none(),
+            "curl must not become a delegated agent"
+        );
     }
 
     #[test]
     fn deduplicates_repeated_delegation() {
         let mut tracker = DelegationTracker::new();
-        tracker.record_spawn(100, 200, "agent-a", 1000, "claude");
+        tracker.record_spawn(spawn(100, 11, 200, 22, "agent-a", 1000, "claude"));
         let r1 = tracker.try_delegation(200, "agent-b");
         assert!(r1.is_some());
         // Second check with same pair should not produce another record.
-        tracker.record_spawn(100, 200, "agent-a", 2000, "claude");
+        tracker.record_spawn(spawn(100, 11, 200, 22, "agent-a", 2000, "claude"));
         let r2 = tracker.try_delegation(200, "agent-b");
         assert!(r2.is_none());
+    }
+
+    /// The previous pruning removed the dedup entry as soon as the spawn
+    /// origin was consumed, so a later spawn re-emitted the same pair.
+    #[test]
+    fn drain_does_not_reeemit_a_consumed_pair() {
+        use std::collections::HashMap;
+
+        let mut tracker = DelegationTracker::new();
+        tracker.record_spawn(spawn(100, 11, 200, 22, "agent-a", 1000, "claude"));
+        let map = HashMap::from([(200u32, "agent-b".to_string())]);
+        assert_eq!(tracker.drain_delegations(&map).len(), 1);
+
+        tracker.record_spawn(spawn(100, 11, 200, 22, "agent-a", 2000, "claude"));
+        assert!(
+            tracker.drain_delegations(&map).is_empty(),
+            "the same (from, to) pair must not be emitted twice"
+        );
     }
 
     #[test]
     fn drains_pending_delegations() {
         let mut tracker = DelegationTracker::new();
-        tracker.record_spawn(100, 200, "agent-a", 1000, "claude");
-        tracker.record_spawn(100, 300, "agent-a", 2000, "claude");
+        tracker.record_spawn(spawn(100, 11, 200, 22, "agent-a", 1000, "claude"));
+        tracker.record_spawn(spawn(100, 11, 300, 33, "agent-a", 2000, "claude"));
 
         let mut pid_map = HashMap::new();
         pid_map.insert(200, "agent-b".to_string());
@@ -238,7 +328,15 @@ mod tests {
         let mut tracker = DelegationTracker::new();
         // Fill past MAX_PROCESS_ORIGINS (4096)
         for i in 0..MAX_PROCESS_ORIGINS + 100 {
-            tracker.record_spawn(100, (1000 + i) as u32, "agent-a", i as u64, "bash");
+            tracker.record_spawn(spawn(
+                100,
+                11,
+                (1000 + i) as u32,
+                (2000 + i) as u64,
+                "agent-a",
+                i as u64,
+                "bash",
+            ));
         }
         // Should not panic and should be capped at or below MAX_PROCESS_ORIGINS
         assert!(tracker.pending_count() <= MAX_PROCESS_ORIGINS);

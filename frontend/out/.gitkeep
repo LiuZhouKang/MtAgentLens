@@ -1,0 +1,2 @@
+# Placeholder so rust-embed (`FrontendDist`) can derive on a fresh clone.
+# `make build-frontend` populates this directory with the Next.js export.

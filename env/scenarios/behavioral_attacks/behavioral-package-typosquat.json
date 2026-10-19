@@ -1,5 +1,5 @@
 {
-  "scenario_id": "behavioral-package-typosquat",
+  "id": "behavioral-package-typosquat",
   "attack_type": "B",
   "category": "supply_chain",
   "label": "attack",

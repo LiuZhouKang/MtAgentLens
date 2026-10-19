@@ -1,12 +1,11 @@
 /.output
-/bootstrap
-/sslsniff
-/browsertrace
-/stdiocap
-/process
-/test_process_utils
-/test_process_filter
-/process_new
-/test_process_new_map_flush
-/test_process_new_mem_info
-/test_process_new_header
+
+# Only build output is ignored. Never list a program's *name* here.
+#
+# An earlier version ignored /process, /stdiocap and /browsertrace as build
+# artifacts. Build output later moved to .output/ (Makefile: OUTPUT := .output),
+# so those rules stopped matching artifacts and started matching the *source
+# directories* of the same name — silently keeping three eBPF programs out of
+# version control. collector/src/framework/binary_extractor.rs include_bytes!-
+# embeds .output/bin/{process,tls_capture,stdiocap}, so a fresh clone could not
+# build at all. Do not re-add them; ignore .output, not program names.

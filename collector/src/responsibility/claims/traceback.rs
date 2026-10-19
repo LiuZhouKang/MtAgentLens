@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // traceback.rs — TracebackBuilder: reverse-edge traversal from a
 // ResponsibilityClaim through the ResponsibilityGraph to produce a
@@ -380,7 +380,6 @@ mod tests {
             evidence_refs: vec![],
             confidence,
             phase: PhaseIndicator::Provisional { timestamp_ns: 1000 },
-            signal: None,
         }
     }
 

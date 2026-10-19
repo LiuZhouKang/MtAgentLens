@@ -1,9 +1,7 @@
-use mtagentlens::responsibility::evidence::correlator_legacy::edge_has_non_temporal_support;
-use mtagentlens::responsibility::evidence::normalizer::normalize_file_resource;
 use mtagentlens::responsibility::types::support_types::{
     AgentId, AlertId, BoundaryId, CausalEdge, CausalNode, CausalNodeType, CausalityType, EdgeId,
     EventId, EvidenceDirectness, EvidenceId, EvidenceRecord, NodeId, PolicyId, ProcessId,
-    ResourceId,
+    ResourceId, edge_has_non_temporal_support,
 };
 use serde_json::json;
 
@@ -61,28 +59,6 @@ fn resource_id_distinguishes_display_target_from_join_key() {
     match node.resource_id {
         Some(ResourceId::File { canonical_path }) => assert_eq!(canonical_path, "/tmp/demo.txt"),
         _ => panic!("expected normalized file resource"),
-    }
-}
-
-#[test]
-fn normalize_file_resource_returns_file_resource_id() {
-    match normalize_file_resource("/tmp/demo.txt") {
-        ResourceId::File { canonical_path } => assert_eq!(canonical_path, "/tmp/demo.txt"),
-        _ => panic!("expected file resource id"),
-    }
-}
-
-#[test]
-fn normalize_file_resource_canonicalizes_relative_paths() {
-    let cwd = std::env::current_dir().expect("current dir");
-    match normalize_file_resource("./tmp/demo.txt") {
-        ResourceId::File { canonical_path } => {
-            assert_eq!(
-                canonical_path,
-                cwd.join("./tmp/demo.txt").to_string_lossy().to_string()
-            )
-        }
-        _ => panic!("expected file resource id"),
     }
 }
 

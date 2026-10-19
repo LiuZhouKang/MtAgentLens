@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // SignalSnapshot — immutable point-in-time view of the signal graph.
 // Packaged in Arc for shared ownership across async tasks and queries.
@@ -27,6 +27,34 @@ pub struct ProcessMetadata {
     pub exit_code: Option<i32>,
     /// Whether the process is still running.
     pub is_alive: bool,
+    /// Full command line, from the EXEC event's `full_command`.
+    ///
+    /// This is the strongest runtime-identity signal for long-lived services:
+    /// a systemd unit's process carries its identifying argv, while `comm` is
+    /// often useless (Node sets it to "MainThread" for every app).
+    pub cmdline: Option<String>,
+    /// Executable path, from the EXEC event's `filename`.
+    pub exe_path: Option<String>,
+    /// cgroup unit name, captured in user space from `/proc/<pid>/cgroup`.
+    ///
+    /// See `runtime::cgroup` for why this is read outside eBPF.
+    pub cgroup_unit: Option<String>,
+}
+
+/// Runtime identity data carried by an EXEC event.
+///
+/// Bundled rather than passed as loose parameters so that adding a future
+/// signal does not ripple through every call site again.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ProcessExecInfo {
+    /// Process name (comm) — may be uninformative for Node/Java services.
+    pub comm: String,
+    /// Full command line.
+    pub cmdline: Option<String>,
+    /// Executable path.
+    pub exe_path: Option<String>,
+    /// cgroup unit name.
+    pub cgroup_unit: Option<String>,
 }
 
 // ─── Orphan types ────────────────────────────────────────────────────
@@ -200,14 +228,28 @@ impl SignalSnapshot {
     /// Both signals independently indicate agent ownership. Tool-child
     /// processes (bash, git, etc.) are covered via ancestor traversal.
     pub fn has_agent_ancestry(&self, process_id: ProcessId) -> bool {
-        const AGENT_COMMS: &[&str] = &["claude", "claude-code"];
+        use crate::responsibility::identity::union_find::{
+            has_identity_boundary, is_agent_cgroup, is_agent_comm, is_agent_exe,
+        };
 
+        // With an explicit cgroup/exe boundary, TLS alone must not qualify a
+        // process: every Node app runs as `MainThread` and can open TLS.
+        let strict = has_identity_boundary();
         let is_agent = |pid: ProcessId| -> bool {
-            if !self.tls_sessions_for_process(pid).is_empty() {
+            if !strict && !self.tls_sessions_for_process(pid).is_empty() {
                 return true;
             }
-            if let Some(meta) = self.get_process(pid.pid, pid.start_time_ns)
-                && AGENT_COMMS.contains(&meta.comm.as_str())
+            let Some(meta) = self.get_process(pid.pid, pid.start_time_ns) else {
+                return false;
+            };
+            if is_agent_comm(&meta.comm) {
+                return true;
+            }
+            if meta.cgroup_unit.as_deref().is_some_and(is_agent_cgroup) {
+                return true;
+            }
+            if meta.exe_path.as_deref().is_some_and(is_agent_exe)
+                || meta.cmdline.as_deref().is_some_and(is_agent_exe)
             {
                 return true;
             }

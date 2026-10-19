@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // IdentityResolver — Agent identity resolution (Phase 1 + Phase 2).
 //
@@ -16,6 +16,8 @@
 // to look up agent assignments without depending on resolver internals.
 
 use crate::responsibility::signals::SignalSnapshot;
+#[cfg(test)]
+use crate::responsibility::signals::signal_snapshot::ProcessExecInfo;
 use crate::responsibility::types::{AgentId, IdentitySignal, ProcessId, ProvisionalIdentity};
 use std::collections::{HashMap, HashSet};
 
@@ -282,7 +284,16 @@ mod tests {
     fn test_provisional_tls_new_agent() {
         let mut g = SignalGraph::new();
         let p = pid(100, 1);
-        g.observe_exec(p, pid(1, 0), "claude", None, 1);
+        g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         g.observe_tls(p, tls("sess-1"), 10);
         let snap = g.snapshot();
 
@@ -300,9 +311,27 @@ mod tests {
         let parent = pid(100, 1);
         let child = pid(200, 2);
 
-        g.observe_exec(parent, pid(1, 0), "claude", None, 1);
+        g.observe_exec(
+            parent,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         g.observe_tls(parent, tls("sess-1"), 10);
-        g.observe_exec(child, parent, "cat", None, 2);
+        g.observe_exec(
+            child,
+            parent,
+            ProcessExecInfo {
+                comm: "cat".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
         let snap = g.snapshot();
 
         let mut resolver = IdentityResolver::new();
@@ -323,7 +352,16 @@ mod tests {
     fn test_provisional_no_ancestor_unknown() {
         let mut g = SignalGraph::new();
         let p = pid(100, 1);
-        g.observe_exec(p, pid(1, 0), "unknown-tool", None, 1);
+        g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "unknown-tool".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         let snap = g.snapshot();
 
         let mut resolver = IdentityResolver::new();
@@ -339,8 +377,26 @@ mod tests {
         let a = pid(100, 1);
         let b = pid(200, 2);
 
-        g.observe_exec(a, pid(1, 0), "claude", None, 1);
-        g.observe_exec(b, pid(1, 0), "claude", None, 2);
+        g.observe_exec(
+            a,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        g.observe_exec(
+            b,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
 
         let shared = tls("shared-sess");
         g.observe_tls(a, shared.clone(), 10);
@@ -365,10 +421,28 @@ mod tests {
         let parent = pid(100, 1);
         let child = pid(200, 2);
 
-        g.observe_exec(parent, pid(1, 0), "claude", None, 1);
+        g.observe_exec(
+            parent,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         g.observe_tls(parent, tls("sess-parent"), 10);
         // Child is also "claude" but has no TLS yet
-        g.observe_exec(child, parent, "claude", None, 2);
+        g.observe_exec(
+            child,
+            parent,
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
         let snap = g.snapshot();
 
         let mut resolver = IdentityResolver::new();
@@ -384,7 +458,16 @@ mod tests {
     fn test_identity_provider_trait() {
         let mut g = SignalGraph::new();
         let p = pid(100, 1);
-        g.observe_exec(p, pid(1, 0), "claude", None, 1);
+        g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         g.observe_tls(p, tls("sess-1"), 10);
         let snap = g.snapshot();
 
@@ -405,9 +488,27 @@ mod tests {
         let claude = pid(100, 1);
         let tool = pid(200, 2);
 
-        g.observe_exec(claude, pid(1, 0), "claude", None, 1);
+        g.observe_exec(
+            claude,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         g.observe_tls(claude, tls("sess-1"), 10);
-        g.observe_exec(tool, claude, "cat", None, 2);
+        g.observe_exec(
+            tool,
+            claude,
+            ProcessExecInfo {
+                comm: "cat".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
 
         let snap = g.snapshot();
 

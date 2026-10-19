@@ -45,6 +45,7 @@ function actionTone(actionType: string): string {
   if (actionType === 'FileRead') return 'read';
   if (actionType === 'FileWrite') return 'write';
   if (actionType === 'FileOverwrite') return 'overwrite';
+  if (actionType === 'FileRename') return 'overwrite';
   if (actionType === 'ProcessExec') return 'exec';
   return 'other';
 }

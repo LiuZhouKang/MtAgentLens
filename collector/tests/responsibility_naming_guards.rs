@@ -1,125 +1,85 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright (c) 2026 MtAgentLens Project
+//
+// Retirement guard for the causal-link vocabulary.
+//
+// The previous version of this file listed 41 paths under
+// `src/accountability/` and used a `read_file_if_exists` helper that
+// `continue`d on a missing file. When that tree was deleted with the causal
+// schema (ADR 0005), every path was skipped and both tests passed while
+// checking nothing — the cautionary tale in ADR 0001.
+//
+// A guard must assert that its subject exists. Here the subject is an
+// *absence*: the retired tree must not come back, and the live
+// `responsibility/` sources must not reintroduce the retired API names.
+
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-/// Read file content, returning None if the file doesn't exist (graceful skip).
-fn read_file_if_exists(path: &std::path::Path) -> Option<String> {
-    fs::read_to_string(path).ok()
+fn manifest_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+
+/// API names that belonged to the retired causal-link surface.
+///
+/// Plain strings such as the retired table name `"causal_links"` are
+/// deliberately not listed: `persistence/schema.rs::CAUSAL_MARKERS` must keep
+/// naming them to recognise a legacy database and refuse to write DDL. The
+/// guard is about code, not about a denylist's data.
+const RETIRED_API_TERMS: &[&str] = &[
+    "causal_link::",
+    "CausalLinkStreaming",
+    "CausalLinksAnalyzer",
+    "causalLinkIds",
+];
+
+#[test]
+fn retired_accountability_tree_has_not_returned() {
+    let path = manifest_dir().join("src/accountability");
+    assert!(
+        !path.exists(),
+        "{} exists again: the accountability tree was retired with the causal \
+         schema (ADR 0005). Reintroducing it needs an ADR, not a directory.",
+        path.display()
+    );
 }
 
 #[test]
-fn new_responsibility_contract_files_are_old_term_free() {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let strict_paths = [
-        "src/accountability/observation/mod.rs",
-        "src/accountability/observation/event_model.rs",
-        "src/accountability/observation/normalizer.rs",
-        "src/accountability/identity/binding.rs",
-        "src/accountability/identity/resolver.rs",
-        "src/accountability/evidence/evidence_record.rs",
-        "src/accountability/evidence/reconstructor.rs",
-        "src/accountability/graph/builder.rs",
-        "src/accountability/graph/responsibility_node.rs",
-        "src/accountability/graph/responsibility_edge.rs",
-        "src/accountability/judgment/judgment_record.rs",
-        "src/accountability/judgment/policy_rule.rs",
-        "src/accountability/observer/mod.rs",
-        "src/accountability/observer/provider.rs",
-        "src/accountability/observer/mock.rs",
-        "src/accountability/observer/system_prompt.rs",
-        "src/accountability/claims/accountability_claim.rs",
-        "src/accountability/claims/alert_writer.rs",
-        "src/accountability/claims/alert.rs",
-        "src/accountability/claims/alert_builder.rs",
-        "src/accountability/claims/alert_builder_title.rs",
-        "src/accountability/claims/claim_builder.rs",
-        "src/accountability/claims/persistence.rs",
-        "src/accountability/claims/projection.rs",
-        "src/accountability/claims/traceback.rs",
-        "src/accountability/graph/pattern_matcher.rs",
-        "src/accountability/persistence/responsibility_schema.rs",
-        "tests/responsibility_alert_builder.rs",
-        "tests/responsibility_claim_builder.rs",
-        "tests/responsibility_projection.rs",
-        "tests/responsibility_traceback.rs",
-        "tests/responsibility_pattern_matcher.rs",
-        "tests/responsibility_persistence.rs",
-        "tests/responsibility_core_contracts.rs",
-        "tests/responsibility_evidence_reconstruction.rs",
-        "tests/responsibility_graph_builder.rs",
-        "tests/responsibility_observation_identity.rs",
-        "src/accountability/classification/types.rs",
-        "src/accountability/classification/rules.rs",
-        "src/accountability/classification/rule_engine.rs",
-        "src/accountability/classification/pattern_matcher.rs",
-        "src/accountability/classification/scoring.rs",
-        "src/accountability/classification/observer_llm.rs",
-        "src/accountability/classification/observer_cache.rs",
-        "src/accountability/classification/mod.rs",
-        "src/accountability/runtime/buffer_new.rs",
-        "src/accountability/runtime/runtime_new.rs",
-        "src/accountability/runtime/mod.rs",
-    ];
-    let forbidden = [
-        "causal_link",
-        "causal_links",
-        "causal_trace",
-        "/causal-links",
-        "causalLinkIds",
-    ];
-
+fn live_responsibility_sources_do_not_reintroduce_the_retired_api() {
+    let root = manifest_dir().join("src/responsibility");
+    let mut scanned = 0usize;
     let mut violations = Vec::new();
-    for relative in strict_paths {
-        let path = manifest_dir.join(relative);
-        let Some(content) = read_file_if_exists(&path) else {
-            // File was removed during refactoring — skip silently
-            continue;
-        };
-        for term in forbidden {
-            if content.contains(term) {
-                violations.push(format!("{} contains {}", relative, term));
+    let mut stack = vec![root];
+    while let Some(dir) = stack.pop() {
+        for entry in fs::read_dir(&dir)
+            .unwrap_or_else(|e| panic!("cannot read {}: {e}", dir.display()))
+            .flatten()
+        {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                scanned += 1;
+                let relative = path
+                    .strip_prefix(manifest_dir())
+                    .unwrap_or(Path::new(""))
+                    .display()
+                    .to_string();
+                let content = fs::read_to_string(&path).unwrap_or_default();
+                for term in RETIRED_API_TERMS {
+                    if content.contains(term) {
+                        violations.push(format!("{relative} contains {term}"));
+                    }
+                }
             }
         }
     }
 
-    assert!(violations.is_empty(), "{}", violations.join("\n"));
-}
-
-#[test]
-fn phase_a_export_points_do_not_introduce_new_old_terms() {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let export_paths = [
-        "src/accountability/observation/mod.rs",
-        "src/accountability/observer/mod.rs",
-        "src/accountability/identity/mod.rs",
-        "src/accountability/evidence/mod.rs",
-        "src/accountability/graph/mod.rs",
-        "src/accountability/judgment/mod.rs",
-        "src/accountability/claims/mod.rs",
-        "src/accountability/classification/mod.rs",
-        "src/accountability/persistence/mod.rs",
-        "src/accountability/runtime/mod.rs",
-    ];
-    let forbidden = [
-        "causal_link",
-        "causal_links",
-        "causal_trace",
-        "/causal-links",
-        "causalLinkIds",
-    ];
-
-    let mut violations = Vec::new();
-    for relative in export_paths {
-        let path = manifest_dir.join(relative);
-        let Some(content) = read_file_if_exists(&path) else {
-            // File was removed during refactoring — skip silently
-            continue;
-        };
-        for term in forbidden {
-            if content.contains(term) {
-                violations.push(format!("{} contains {}", relative, term));
-            }
-        }
-    }
-
+    // Non-vacuous: the live tree is large and must be present.
+    assert!(
+        scanned > 50,
+        "scanned only {scanned} files under src/responsibility — the tree moved, \
+         which would make this guard meaningless"
+    );
     assert!(violations.is_empty(), "{}", violations.join("\n"));
 }

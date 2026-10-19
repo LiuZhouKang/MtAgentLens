@@ -13,6 +13,8 @@ An advanced eBPF-based process monitoring tool that traces process lifecycles an
 **Key Features:**
 - Monitor process creation and termination
 - Track file open operations with deduplication
+- Track file delete/truncate/rename (`FILE_DELETE` / `FILE_TRUNCATE` / `FILE_RENAME`)
+- Track network egress (`NETWORK_CONNECT` / `NETWORK_SEND`; AF_INET decoded, AF_INET6 explicitly marked unsupported)
 - Configurable filtering modes for different monitoring levels
 - 60-second sliding window aggregation for repetitive file opens
 - JSON output format for integration with analysis frameworks
@@ -34,7 +36,7 @@ sudo ./process [OPTIONS]
 | `--duration=MS` | `-d MS` | Minimum process duration (ms) to report | 0 |
 | `--commands=LIST` | `-c LIST` | Comma-separated list of commands to trace | all |
 | `--pid=PID` | `-p PID` | Trace only this specific PID | all |
-| `--mode=MODE` | `-m MODE` | Filter mode (0=all, 1=proc, 2=filter) | 2 |
+| `--mode=MODE` | `-m MODE` | Filter mode (0=all, 1=proc, 2=filter) | 1 |
 | `--all` | `-a` | Deprecated: use `-m 0` instead | - |
 
 **Filter Modes:**
@@ -69,6 +71,18 @@ sudo ./process -c "curl,wget" -d 500
 - Aggregated results reported when window expires (`count=N`)
 - All pending aggregations flushed on process exit
 - Reduces event volume by 80-95% for repetitive file opens
+
+**Network Events (`NETWORK_CONNECT` / `NETWORK_SEND`):**
+- Produced from `sys_enter_connect` and `sys_enter_sendto` (tracepoints).
+- `AF_INET` is decoded into `net_op: {family, host, port}`; the port is
+  byte-order corrected with `bpf_ntohs`, the address is rendered as dotted
+  decimal from the four wire bytes.
+- `AF_INET6` is reported as `family: "AF_INET6"` with `unsupported_family: true`
+  and **no** host/port — no address is invented. `AF_UNIX` and other families
+  are local IPC and are dropped in the kernel before the ring buffer.
+- One syscall produces one event; the volume baseline and the E2E contract are
+  in `docs/evaluation/network-noise-budget.json` and
+  `scripts/spikes/network-e2e.sh`.
 
 **Verbose Debug Output (`-v`):**
 - Shows when events are deduplicated/aggregated
@@ -176,7 +190,7 @@ When `--binary-path` is specified, tls_capture:
 
 **Output Format:**
 - Each SSL event is output as a JSON object
-- eBPF capture is limited to 32KB per event due to kernel constraints
+- eBPF capture is limited to 256 KiB per event due to kernel constraints
 - Events include timestamps, process info, and SSL data
 - Handshake events show SSL negotiation details
 
@@ -305,9 +319,16 @@ All events follow a common base schema with event-specific fields:
 
 **SSL Event Fields:**
 - `uid`: User ID of the process (uint32)
-- `data`: SSL traffic data (string, max 32KB)
+- `data`: Display form of the captured bytes (string, max 256 KiB). Bytes that
+  are not valid UTF-8 are escaped, and a JSON decoder maps those escapes back to
+  a different byte string — **do not use this field as the byte source**.
+- `data_b64`: Authoritative payload bytes, RFC 4648 standard base64 with `=`
+  padding (string, or `null` when nothing was captured). The field is absent in
+  captures produced before P1. Decoding must assert
+  `decoded_len == buf_size`.
 - `data_len`: Length of data captured (uint32)
 - `truncated`: Whether data was truncated due to size limits (boolean)
+- `bytes_lost`: Raw bytes not captured when `truncated` is true (uint32)
 
 ### Process Tracer JSON Events
 
@@ -396,7 +417,7 @@ Each SSL event is a single JSON line with the following schema:
 | `latency_ms` | float | Time between entry and exit of SSL_read/SSL_write, in milliseconds |
 | `is_handshake` | bool | `true` if this is a handshake event |
 | `data` | string\|null | Decrypted plaintext content (JSON-escaped), or `null` if no data |
-| `truncated` | bool | `true` if `buf_size < len` (data exceeded 512KB buffer) |
+| `truncated` | bool | `true` if `buf_size < len` (data exceeded 256 KiB buffer) |
 | `bytes_lost` | int | Only present when `truncated` is `true`: `len - buf_size` |
 
 **SSL Read/Write Events:**
@@ -432,7 +453,7 @@ Each SSL event is a single JSON line with the following schema:
 }
 ```
 
-**Truncated event** (when data exceeds 512KB buffer):
+**Truncated event** (when data exceeds 256 KiB buffer):
 ```json
 {
   "function": "WRITE/SEND",
@@ -442,10 +463,10 @@ Each SSL event is a single JSON line with the following schema:
   "tid": 959035,
   "uid": 1000,
   "len": 600000,
-  "buf_size": 524288,
+  "buf_size": 262144,
   "latency_ms": 0.100,
   "is_handshake": false,
-  "data": "POST /v1/messages ...(first 512KB)...",
+  "data": "POST /v1/messages ...(first 256 KiB)...",
   "truncated": true,
   "bytes_lost": 75712
 }
@@ -472,7 +493,7 @@ Each SSL event is a single JSON line with the following schema:
 **Notes:**
 - `comm` is the **thread name** from `bpf_get_current_comm()`, not the process name. For example, Claude Code's SSL traffic shows `"HTTP Client"`, not `"claude"`.
 - `data` contains the decrypted plaintext. Control characters are JSON-escaped (`\n`, `\r`, `\t`, `\uXXXX`). Valid UTF-8 sequences are passed through.
-- `len` is what SSL_read/SSL_write returned. `buf_size` is what was actually copied (capped at 512KB).
+- `len` is what SSL_read/SSL_write returned. `buf_size` is what was actually copied (capped at 256 KiB).
 
 ### Common Usage Patterns
 

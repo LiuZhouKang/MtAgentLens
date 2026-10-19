@@ -25,8 +25,8 @@ CHECK  := $(GREEN)✓$(NC)
 COLLECTOR_DIR := collector
 BPFTOOLS_DIR  := bpftools
 FRONTEND_DIR  := frontend
-BINARY        := $(COLLECTOR_DIR)/target/release/mtagentlens
-BINARY_DEBUG  := $(COLLECTOR_DIR)/target/debug/mtagentlens
+BINARY        := $(COLLECTOR_DIR)/build/release/mtagentlens
+BINARY_DEBUG  := $(COLLECTOR_DIR)/build/debug/mtagentlens
 
 # ── 清理列表 ────────────────────────────────────────────────────────────
 PYTHON_CACHE_DIRS := \
@@ -38,7 +38,6 @@ PYTHON_CACHE_DIRS := \
 
 FRONTEND_BUILD_ARTIFACTS := \
 	frontend/.next \
-	frontend/out \
 	frontend/dist \
 	frontend/coverage \
 	frontend/test-results \
@@ -107,6 +106,14 @@ dev-rust: ## 仅 Rust debug 构建
 .PHONY: dev-frontend
 dev-frontend: ## 启动前端开发服务器 (:7395)
 	@cd $(FRONTEND_DIR) && npm run dev
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 门禁
+# ═══════════════════════════════════════════════════════════════════════════
+
+.PHONY: verify
+verify: ## 运行唯一门禁（本地/任何自动化都逐字调用）
+	@./scripts/verify.sh
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 测试
@@ -181,8 +188,8 @@ docker-dev: ## 构建开发 Docker 镜像（含完整编译环境）
 install: ## 一键安装构建依赖（交互式）
 	@bash install.sh
 
-.PHONY: install-ci
-install-ci: ## CI 环境安装依赖（非交互式）
+.PHONY: install-noninteractive
+install-noninteractive: ## 非交互式安装依赖（无人值守环境）
 	@bash install.sh --yes
 
 .PHONY: clean
@@ -191,6 +198,9 @@ clean: ## 清理所有构建产物
 	@$(MAKE) -C $(BPFTOOLS_DIR) clean
 	@cd $(COLLECTOR_DIR) && cargo clean
 	@rm -rf $(FRONTEND_BUILD_ARTIFACTS)
+	# `frontend/out/.gitkeep` is tracked so rust-embed can derive on a fresh
+	# clone; clear the export but keep the directory marker.
+	@find frontend/out -mindepth 1 ! -name '.gitkeep' -delete 2>/dev/null || true
 	@rm -rf $(PYTHON_CACHE_DIRS)
 	@printf "  $(CHECK) 清理完成\n"
 
@@ -239,6 +249,6 @@ help: ## 显示此帮助信息
 	@printf "  ${CYAN}其他:${NC}\n"
 	@printf "    make check             环境预检\n"
 	@printf "    make install           安装依赖\n"
-	@printf "    make install-ci        CI 环境安装\n"
+	@printf "    make install-noninteractive  非交互式安装\n"
 	@printf "    make clean             清理\n"
 	@printf "\n"

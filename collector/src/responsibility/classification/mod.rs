@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright (c) 2026 MtAgentLens Project
+
 pub mod engine;
 pub mod pattern_matcher;
 pub mod rule_engine;
@@ -12,7 +15,7 @@ pub mod types;
 pub use engine::ClassificationEngine;
 pub use engine::ClassificationEngine as PhaseClassificationEngine; // backward compat
 
-// Rule engine (5 Safe + 18 Unsafe)
+// Rule engine (5 Safe + 20 Unsafe)
 pub use rule_engine::RuleEngine;
 
 // Standalone scoring functions

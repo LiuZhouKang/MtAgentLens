@@ -1,5 +1,5 @@
 {
-  "scenario_id": "behavioral-covert-dns",
+  "id": "behavioral-covert-dns",
   "attack_type": "B",
   "category": "data_exfiltration",
   "label": "attack",

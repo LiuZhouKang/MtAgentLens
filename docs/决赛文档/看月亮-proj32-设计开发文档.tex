@@ -398,7 +398,7 @@ eBPF 的系统架构与程序加载流程如图2-1所示。
 
 
 \begin{quote}
-\textbf{学术引用。} Moshkovich 和 Zeltyn 在 ASE 2025 [4] 中首次系统化分析了 Agentic AI 系统的可观测性挑战，指出 LLM Agent 的三大不确定性来源——"模型不确定性（输出不可预测）、工具不确定性（工具调用可能失败或产生副作用）、以及环境不确定性（Agent 对系统状态的理解可能不完整）"，并论证了"自动化可观测性管道是将 Agent 从实验室推向生产的关键使能技术"。Greshake 等人 [5] 在 AISec '23 上首次定义了间接提示词注入（Indirect Prompt Injection）的威胁模型——"攻击者不直接修改用户 prompt，而是通过 Agent 可访问的外部数据源（文件、网页、邮件）注入恶意指令"，并证明"传统 LLM 安全过滤器对间接注入的检测率低于 20\%"。Z. Li 等人 [6] 在 USENIX Security '25 提出了 InjecAgent 基准，系统评估了 30 个 LLM 在工具集成场景下的间接注入脆弱性，发现"即使是最先进的 LLM，在工具调用参数中遇到注入时的拒绝率也不足 50\%"——这为本项目的 SAFI 文件注入框架（§9.1.1）提供了理论基础。
+\textbf{学术引用。} Moshkovich 和 Zeltyn 在 ASE 2025 [4] 中首次系统化分析了 Agentic AI 系统的可观测性挑战，指出 LLM Agent 的三大不确定性来源——"模型不确定性（输出不可预测）、工具不确定性（工具调用可能失败或产生副作用）、以及环境不确定性（Agent 对系统状态的理解可能不完整）"，并论证了"自动化可观测性管道是将 Agent 从实验室推向生产的关键使能技术"。Greshake 等人 [5] 在 AISec '23 上首次定义了间接提示词注入（Indirect Prompt Injection）的威胁模型——"攻击者不直接修改用户 prompt，而是通过 Agent 可访问的外部数据源（文件、网页、邮件）注入恶意指令"，并证明"传统 LLM 安全过滤器对间接注入的检测率低于 20\%"。Zhan 等人 [6] 在 ACL 2024 Findings 上提出了 InjecAgent 基准，系统评估了 30 个 LLM 在工具集成场景下的间接注入脆弱性，发现"即使是最先进的 LLM，在工具调用参数中遇到注入时的拒绝率也不足 50\%"——这为本项目的 SAFI 文件注入框架（§9.1.1）提供了理论基础。
 
 \end{quote}
 
@@ -3707,7 +3707,7 @@ eBPF数据采集性能损耗控制在5\%以内，满足赛题轻量化运行指�
 
 
 \begin{quote}
-\textbf{学术引用。} InjecAgent [6] 是首个系统评估 LLM Agent 间接提示词注入脆弱性的大规模基准（1,054 样本 × 2 种格式，覆盖 30 个 LLM），发现"工具调用参数中的注入比用户 prompt 中的注入更难检测，即使是最先进的 LLM 的拒绝率也不足 50\%"。Greshake 等人 [5] 首次在真实 LLM 集成应用中演示了间接注入攻击，证明"通过检索增强生成（RAG）管道中注入的恶意指令可以持久控制 LLM 的输出行为"。Z. Li 等人 [6] 将攻击场景分类为直接注入、间接注入（工具参数）、和间接注入（工具输出）三类，FuxiBench 在此基础上新增了第四类——多 Agent 协同攻击（Type C），这是现有基准中尚未覆盖的攻击面。Moshkovich 和 Zeltyn [4] 提出的"Agent 可观测性成熟度模型"为本基准的分层标注协议（GT v3）提供了理论框架——从 L1 行为标注到 L3 因果链标注的三级递进。
+\textbf{学术引用。} InjecAgent [6] 是首个系统评估 LLM Agent 间接提示词注入脆弱性的大规模基准（1,054 样本 × 2 种格式，覆盖 30 个 LLM），发现"工具调用参数中的注入比用户 prompt 中的注入更难检测，即使是最先进的 LLM 的拒绝率也不足 50\%"。Greshake 等人 [5] 首次在真实 LLM 集成应用中演示了间接注入攻击，证明"通过检索增强生成（RAG）管道中注入的恶意指令可以持久控制 LLM 的输出行为"。Zhan 等人 [6] 将攻击场景分类为直接注入、间接注入（工具参数）、和间接注入（工具输出）三类，FuxiBench 在此基础上新增了第四类——多 Agent 协同攻击（Type C），这是现有基准中尚未覆盖的攻击面。Moshkovich 和 Zeltyn [4] 提出的"Agent 可观测性成熟度模型"为本基准的分层标注协议（GT v3）提供了理论框架——从 L1 行为标注到 L3 因果链标注的三级递进。
 
 \end{quote}
 
@@ -5390,7 +5390,7 @@ Observer 对系统级指标的影响如表9-26所示，其改善集中在校准�
 
 
 
-\textbf{动机。} FuxiBench 上的强结果可能源于对特定场景结构的过拟合。本 RQ 在独立分布上检验泛化能力——\textbf{InjecAgent}（USENIX Security '25）是一个公开可用的 prompt 注入基准，包含 2,108 个短格式攻击样本。其短格式结构与 FuxiBench 的长格式 Agent 任务场景形成互补：InjecAgent 攻击是单轮、嵌入工具参数的微注入，而 FuxiBench 攻击是多轮、嵌入文件的多步 Agent 交互。我们构建了匹配的 149 个短格式良性样本（遵循 InjecAgent 格式），并以 19 个 FuxiBench 长格式良性场景作为辅助参考。
+\textbf{动机。} FuxiBench 上的强结果可能源于对特定场景结构的过拟合。本 RQ 在独立分布上检验泛化能力——\textbf{InjecAgent}（ACL 2024 Findings）是一个公开可用的 prompt 注入基准，包含 2,108 个短格式攻击样本。其短格式结构与 FuxiBench 的长格式 Agent 任务场景形成互补：InjecAgent 攻击是单轮、嵌入工具参数的微注入，而 FuxiBench 攻击是多轮、嵌入文件的多步 Agent 交互。我们构建了匹配的 149 个短格式良性样本（遵循 InjecAgent 格式），并以 19 个 FuxiBench 长格式良性场景作为辅助参考。
 
 
 \textbf{实验设计。} 在 InjecAgent 上的评估与 FuxiBench 主评估存在一个关键差异：InjecAgent 的短格式样本不包含完整的多步 Agent 交互过程——每个样本仅包含单轮 prompt 和 tool\_use 描述。这意味着 MtAgentLens 的 eBPF 探针无法捕获完整的 OS 级事件流（短格式攻击通常只产生少量系统调用甚至不产生）。因此，本实验中的 MtAgentLens 判定主要依赖 Observer LLM——启发式引擎的 PBC 信号在大多数短格式样本中不可用。这构成了一个\textbf{最不利配置下的压力测试}：MtAgentLens 在失去其核心优势（OS 级信号）的情况下，仅凭 Observer 的语义理解能力进行判定。Observer 共触发 777 次调用（覆盖全部 2,108 攻击 + 149 短良性样本）。
@@ -6595,7 +6595,7 @@ MtAgentLens/
 
 \section*{参考文献}
 
-[1] Brendan Gregg. \textbf{BPF Performance Tools（英文版）：洞悉Linux系统和应用性能}[M]. 北京: 电子工业出版社, 2021.
+[1] Brendan Gregg. \textbf{BPF之巅：洞悉Linux系统和应用性能}[M]. 孙宇聪, 吕宏利, 刘晓舟, 译. 北京: 电子工业出版社, 2021.
 
 
 [2] Liz Rice. \textbf{Learning eBPF: Programming the Linux Kernel for Enhanced Observability, Networking, and Security}[M]. Sebastopol: O\textquoteright Reilly Media, 2023.
@@ -6610,7 +6610,7 @@ MtAgentLens/
 [5] K. Greshake, S. Abdelnabi, S. Mishra, C. Endres, T. Holz, M. Fritz. \textbf{Not What You\textquoteright ve Signed Up For: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection}[C]//Proceedings of the 16th ACM Workshop on Artificial Intelligence and Security (AISec'23). New York: ACM, 2023. arXiv:2302.12173.
 
 
-[6] Z. Li, S. Wu, H. Zhu, et al. \textbf{InjecAgent: Benchmarking Indirect Prompt Injections in Tool-Integrated Large Language Model Agents}[C]//Proceedings of the 34th USENIX Security Symposium (USENIX Security'25). Berkeley: USENIX Association, 2025. arXiv:2404.03592.
+[6] Q. Zhan, Z. Liang, Z. Ying, et al. \textbf{InjecAgent: Benchmarking Indirect Prompt Injections in Tool-Integrated Large Language Model Agents}[C]//Findings of the Association for Computational Linguistics: ACL 2024. Bangkok: Association for Computational Linguistics, 2024: 10471-10506. arXiv:2403.02691.
 
 
 [7] OWASP基金会. \textbf{OWASP Top 10 for LLM Applications}[CP/OL]. [2026-06-29]. https://owasp.org/www-project-top-10-for-large-language-model-applications/.

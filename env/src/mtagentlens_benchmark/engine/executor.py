@@ -16,6 +16,7 @@ import time
 import uuid
 from pathlib import Path
 
+from mtagentlens_benchmark.engine import clean_profile
 from mtagentlens_benchmark.engine.collector_manager import _find_claude_binary
 from mtagentlens_benchmark.engine.collector_manager import _find_claude_binary_with_diagnostics
 from mtagentlens_benchmark.types import CollectorInterface, RunResult, ScenarioConfig
@@ -272,6 +273,11 @@ def _run_process_mode(
 
     _apply_benchmark_env(env, run_dir)
     _inject_mode_env(env, config)
+    clean_artifacts = (
+        clean_profile.create_artifacts(run_dir) if clean_profile.enabled() else None
+    )
+    if clean_artifacts:
+        env = clean_profile.sanitize_env(env)
 
     tls_keylog = Path(f"/tmp/mtagentlens-tls-{uuid.uuid4().hex[:8]}.keys")
     tls_keylog_opt = f"--tls-keylog={tls_keylog}"
@@ -313,12 +319,20 @@ def _run_process_mode(
             "state": "running", "agent_index": i, "scenario": config.id,
         })
 
-        perm_flag = (
-            f" --permission-mode {config.permission_mode}"
-            if config.permission_mode != "default" else ""
-        )
+        claude_args = [
+            "-p", str(agent.task),
+            "--model", config.model,
+            "--effort", str(getattr(config, "effort", "low")),
+            "--output-format", "text",
+        ]
+        if config.permission_mode != "default":
+            claude_args.extend(["--permission-mode", config.permission_mode])
+        if clean_artifacts:
+            claude_args = clean_profile.augment_claude_args(
+                claude_args, clean_artifacts
+            )
+
         if is_root and original_user:
-            task_escaped = agent.task.replace('"', '\\"')
             nvm_bin = os.path.join(user_home, ".nvm/versions/node")
             nvm_node_dirs = []
             if os.path.isdir(nvm_bin):
@@ -333,21 +347,13 @@ def _run_process_mode(
                 else os.environ.get("PATH", "")
             )
             inner_cmd = (
-                f'export HOME="{user_home}" PATH="{full_path}" '
-                f'NODE_OPTIONS="{tls_keylog_opt}"; '
-                f'{claude_bin} -p "{task_escaped}" '
-                f'--model {config.model} --effort {getattr(config, "effort", "low")} --output-format text{perm_flag}'
+                f'export HOME={shlex.quote(user_home)} PATH={shlex.quote(full_path)} '
+                f'NODE_OPTIONS={shlex.quote(tls_keylog_opt)}; '
+                f'exec {shlex.join([claude_bin] + claude_args)}'
             )
             cmd = agent_prefix + ["bash", "-c", inner_cmd]
         else:
-            cmd = agent_prefix + [
-                claude_bin, "-p", str(agent.task),
-                "--model", config.model,
-                "--effort", str(getattr(config, "effort", "low")),
-                "--output-format", "text",
-            ]
-            if config.permission_mode != "default":
-                cmd.extend(["--permission-mode", config.permission_mode])
+            cmd = agent_prefix + [claude_bin] + claude_args
 
         agent_start = time.time()
         try:
@@ -399,10 +405,13 @@ def _run_process_mode(
 
     _capture_agent_artifacts(run_dir, logs_dir, config)
 
-    return all(agent_statuses), {
+    summary = {
         "agents_succeeded": sum(agent_statuses),
         "agents_total": len(config.agents),
     }
+    if clean_artifacts:
+        summary["clean_profile"] = clean_artifacts
+    return all(agent_statuses), summary
 
 
 # ── Tmux mode ────────────────────────────────────────────────────────
@@ -421,6 +430,11 @@ def _run_tmux_mode(
     env = os.environ.copy()
     _apply_benchmark_env(env, run_dir)
     _inject_mode_env(env, config)
+    clean_artifacts = (
+        clean_profile.create_artifacts(run_dir) if clean_profile.enabled() else None
+    )
+    if clean_artifacts:
+        env = clean_profile.sanitize_env(env)
 
     # ── Root → user de-escalation (same as process mode) ──
     # Claude Code refuses --permission-mode bypassPermissions as root.
@@ -446,6 +460,7 @@ def _run_tmux_mode(
         "ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL",
         "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_REASONING_MODEL",
         "CLAUDE_CONFIG_DIR", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+        "CLAUDE_CODE_SIMPLE",
         "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "CLAUDE_SUBAGENTS_MODE",
         "HOME", "USER", "PATH", "API_TIMEOUT_MS", "LANGUAGE",
         "ENABLE_TOOL_SEARCH", "MODEL", "MTAGENTLENS_SUDO_USER",
@@ -474,6 +489,8 @@ def _run_tmux_mode(
     effort = getattr(config, "effort", None)
     if effort:
         extra_args.extend(["--effort", effort])
+    if clean_artifacts:
+        extra_args = clean_profile.augment_claude_args(extra_args, clean_artifacts)
 
     for i, agent in enumerate(config.agents):
         status_file = status_dir / f"agent_{i}.json"
@@ -513,10 +530,13 @@ def _run_tmux_mode(
     # ── Capture agent artifacts (parity with process mode) ──
     _capture_agent_artifacts(run_dir, logs_dir, config)
 
-    return all(agent_statuses), {
+    summary = {
         "agents_succeeded": sum(agent_statuses),
         "agents_total": agent_count,
     }
+    if clean_artifacts:
+        summary["clean_profile"] = clean_artifacts
+    return all(agent_statuses), summary
 
 
 # ── Helpers ──────────────────────────────────────────────────────────

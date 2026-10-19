@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // perf_throughput.rs — Collector 管道吞吐量基准测试
 //
 // 使用 FakeRunner 生成 N 个合成 SSL 事件, 以 0ms 延迟注入管道,

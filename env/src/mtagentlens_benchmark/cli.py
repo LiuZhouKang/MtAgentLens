@@ -23,6 +23,12 @@ def main() -> None:
               help="Start MtAgentLens eBPF collector (requires sudo)")
 @click.option("--disable-responsibility-observer", is_flag=True,
               help="Disable responsibility-layer Observer LLM during collector runs")
+@click.option("--clean-profile", is_flag=True,
+              help="Isolate the agent's settings/MCP/hooks/skills/memory and environment")
+@click.option("--agent-binary", default=None, type=click.Path(),
+              help="Launch the agent from this ELF (e.g. a uniquely named symlink for capture isolation)")
+@click.option("--agent-comm", default=None,
+              help="Collector comm filter; defaults to the agent binary's basename")
 def run(
     scenario: str | None,
     run_all: bool,
@@ -31,8 +37,19 @@ def run(
     output: str,
     with_collector: bool,
     disable_responsibility_observer: bool,
+    clean_profile: bool,
+    agent_binary: str | None,
+    agent_comm: str | None,
 ) -> None:
     """Run scenarios — live or batch mode."""
+    import os
+
+    if clean_profile:
+        os.environ["MTAGENTLENS_CLEAN_PROFILE"] = "1"
+    if agent_binary:
+        os.environ["MTAGENTLENS_AGENT_BINARY"] = agent_binary
+    if agent_comm:
+        os.environ["MTAGENTLENS_AGENT_COMM"] = agent_comm
     if not scenario and not run_all:
         raise click.UsageError("Must specify --scenario or --all")
     if scenario and run_all:
@@ -96,10 +113,10 @@ def evaluate(dataset: str, output: str, fmt: str) -> None:
 
     if not traces_dir.exists():
         click.echo(f"Error: traces directory not found: {traces_dir}")
-        return
+        raise SystemExit(1)
     if not gt_root.exists():
         click.echo(f"Error: ground truth directory not found: {gt_root}")
-        return
+        raise SystemExit(1)
 
     # Build GT index: scenario_id → GT path
     gt_index: dict[str, Path] = {}
@@ -130,7 +147,9 @@ def evaluate(dataset: str, output: str, fmt: str) -> None:
 
     if not results:
         click.echo("No valid result pairs found. Run scenarios with --collector first.")
-        return
+        # Non-zero exit: a bare `return` made click exit 0, so CI and `&&`
+        # chains recorded "evaluation succeeded" after evaluating nothing.
+        raise SystemExit(1)
 
     score = compute_benchmark_score(results, [])
     report_path = generate_report(score, Path(output), fmt)

@@ -13,6 +13,8 @@
 **核心特性：**
 - 监控进程创建和终止
 - 追踪文件打开操作并去重
+- 追踪文件删除/截断/重命名（`FILE_DELETE` / `FILE_TRUNCATE` / `FILE_RENAME`）
+- 追踪网络出站连接（`NETWORK_CONNECT` / `NETWORK_SEND`，AF_INET 解析，AF_INET6 显式标记未支持）
 - 可配置的过滤模式，适用于不同监控级别
 - 60 秒滑动窗口聚合重复文件打开事件
 - JSON 输出格式，便于与分析框架集成
@@ -34,7 +36,7 @@ sudo ./process [OPTIONS]
 | `--duration=MS` | `-d MS` | 报告的最小进程持续时间（毫秒） | 0 |
 | `--commands=LIST` | `-c LIST` | 逗号分隔的要追踪的命令列表 | 全部 |
 | `--pid=PID` | `-p PID` | 仅追踪指定 PID | 全部 |
-| `--mode=MODE` | `-m MODE` | 过滤模式（0=全部, 1=进程, 2=过滤） | 2 |
+| `--mode=MODE` | `-m MODE` | 过滤模式（0=全部, 1=进程, 2=过滤） | 1 |
 | `--all` | `-a` | 已弃用：请使用 `-m 0` | - |
 
 **过滤模式：**
@@ -69,6 +71,16 @@ sudo ./process -c "curl,wget" -d 500
 - 窗口过期时报告聚合结果（`count=N`）
 - 进程退出时刷新所有待处理的聚合
 - 对于重复的文件打开操作，事件量减少 80-95%
+
+**网络事件（`NETWORK_CONNECT` / `NETWORK_SEND`）：**
+- 由 `sys_enter_connect` / `sys_enter_sendto` tracepoint 生产。
+- `AF_INET` 解析为 `net_op: {family, host, port}`：端口经 `bpf_ntohs` 转成
+  主机字节序，地址按四个 wire 字节渲染为点分十进制。
+- `AF_INET6` 报告为 `family: "AF_INET6"` + `unsupported_family: true`，
+  **不输出** host/port——不伪造地址。`AF_UNIX` 等本地 IPC 族在内核侧丢弃，
+  不进入 ring buffer。
+- 一次系统调用对应一条事件；体积基线与 E2E 契约见
+  `docs/evaluation/network-noise-budget.json` 与 `scripts/spikes/network-e2e.sh`。
 
 **详细调试输出（`-v`）：**
 - 显示事件去重/聚合时机
@@ -170,7 +182,7 @@ sudo ./tls_capture --binary-path ~/.local/share/claude/versions/2.1.39 --verbose
 
 **输出格式：**
 - 每个 SSL 事件以 JSON 对象输出
-- 受内核限制，eBPF 捕获每个事件最大 32KB
+- 受内核限制，eBPF 捕获每个事件最大 256 KiB
 - 事件包含时间戳、进程信息和 SSL 数据
 - 握手事件显示 SSL 协商详情
 
@@ -297,9 +309,14 @@ make clean
 
 **SSL 事件字段：**
 - `uid`：进程的用户 ID（uint32）
-- `data`：SSL 流量数据（字符串，最大 32KB）
+- `data`：捕获字节的**显示形式**（字符串，最大 256 KiB）。非 UTF-8 字节会被
+  转义，而 JSON 解码器会把这些转义还原成不同的字节串——**不要把它当字节权威**。
+- `data_b64`：载荷字节的权威表示，RFC 4648 标准 base64 + `=` 填充（字符串；
+  未捕获到载荷时为 `null`）。P1 之前的旧抓包没有该字段。解码方必须断言
+  `decoded_len == buf_size`。
 - `data_len`：捕获的数据长度（uint32）
 - `truncated`：数据是否因大小限制被截断（布尔值）
+- `bytes_lost`：`truncated` 为真时未捕获的原始字节数（uint32）
 
 ### 进程追踪器 JSON 事件
 
@@ -388,7 +405,7 @@ make clean
 | `latency_ms` | float | SSL_read/SSL_write 进入到退出之间的时间，毫秒 |
 | `is_handshake` | bool | 如果是握手事件则为 `true` |
 | `data` | string\|null | 解密的明文内容（JSON 转义），无数据时为 `null` |
-| `truncated` | bool | 如果 `buf_size < len`（数据超过 512KB 缓冲区）则为 `true` |
+| `truncated` | bool | 如果 `buf_size < len`（数据超过 256 KiB 缓冲区）则为 `true` |
 | `bytes_lost` | int | 仅在 `truncated` 为 `true` 时出现：`len - buf_size` |
 
 **SSL 读写事件：**
@@ -424,7 +441,7 @@ make clean
 }
 ```
 
-**截断事件**（数据超过 512KB 缓冲区时）：
+**截断事件**（数据超过 256 KiB 缓冲区时）：
 ```json
 {
   "function": "WRITE/SEND",
@@ -434,10 +451,10 @@ make clean
   "tid": 959035,
   "uid": 1000,
   "len": 600000,
-  "buf_size": 524288,
+  "buf_size": 262144,
   "latency_ms": 0.100,
   "is_handshake": false,
-  "data": "POST /v1/messages ...(前 512KB)...",
+  "data": "POST /v1/messages ...(前 256 KiB)...",
   "truncated": true,
   "bytes_lost": 75712
 }
@@ -464,7 +481,7 @@ make clean
 **注意事项：**
 - `comm` 是 `bpf_get_current_comm()` 返回的**线程名**，而非进程名。例如，Claude Code 的 SSL 流量显示 `"HTTP Client"`，而非 `"claude"`。
 - `data` 包含解密的明文。控制字符会被 JSON 转义（`\n`、`\r`、`\t`、`\uXXXX`）。有效的 UTF-8 序列直接传递。
-- `len` 是 SSL_read/SSL_write 返回的值。`buf_size` 是实际复制的量（上限 512KB）。
+- `len` 是 SSL_read/SSL_write 返回的值。`buf_size` 是实际复制的量（上限 256 KiB）。
 
 ### 常见使用模式
 

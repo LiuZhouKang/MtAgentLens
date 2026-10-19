@@ -1,0 +1,39 @@
+{
+  "_purpose": "Measured volume baseline for the NETWORK_CONNECT / NETWORK_SEND producers. Reproduce with scripts/spikes/network-noise-measure.sh; the E2E contract is scripts/spikes/network-e2e.sh. dropped_events is parsed from the PROCESS_RINGBUF_STATS line on stderr; the script fails if that line is absent, so 0 is an observation, not a default.",
+  "measured_at": "2026-10-18",
+  "kernel": "7.0.0-38-generic",
+  "method": "process -m 2 -c python3, transient systemd unit issuing N TCP connects + N UDP sendto to 127.0.0.1",
+  "run": {
+    "requested_connects": 200,
+    "requested_sends": 200,
+    "observed_connects_to_target": 200,
+    "observed_sends_to_target": 200,
+    "network_events_total": 400,
+    "all_events_total": 403,
+    "elapsed_s": 0.049,
+    "network_events_per_s": 8117.5,
+    "dropped_events": 0,
+    "ringbuf_stats_observed": true,
+    "bad_json_lines": 0
+  },
+  "contract": {
+    "one_syscall_one_event": "an AF_INET connect(2) emits exactly one NETWORK_CONNECT; an AF_INET sendto(2) with a destination emits exactly one NETWORK_SEND",
+    "families_reported": [
+      "AF_INET",
+      "AF_INET6"
+    ],
+    "families_dropped_in_kernel": [
+      "AF_UNIX (local IPC, not egress)",
+      "everything else"
+    ],
+    "addrlen": "a sockaddr shorter than its family's struct (16 bytes for AF_INET, 24 for AF_INET6) is dropped rather than decoded; sendto(..., addr, 0) uses the connected peer and reports no destination",
+    "af_inet6": "decoded to host/port like AF_INET; the address is rendered canonically (e.g. ::1). No placeholder is ever emitted.",
+    "scope": "userspace PID tracking (same rule as file operations): mode 2 reports only tracked matching PIDs and their descendants"
+  },
+  "budget": {
+    "max_network_events_per_syscall": 1,
+    "max_dropped_events_fraction": 0.001,
+    "max_bad_json_lines": 0,
+    "note": "The 8117 events/s figure is the achieved rate for a tight 200-connect burst, not a limit. The gate is amplification (events per syscall) and ring-buffer loss, both of which are independent of workload size."
+  }
+}

@@ -2,10 +2,11 @@
 name = "mtagentlens"
 version = "0.1.0"
 edition = "2024"
+license = "Apache-2.0 OR MIT"
+rust-version = "1.85"
 
 [dependencies]
 async-stream = "0.3"
-anthropic = "0.0.8"
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5.41", features = ["derive"] }
@@ -42,14 +43,31 @@ sha2 = "0.11.0"
 sha1 = "0.10"
 hmac = "0.12"
 base64 = "0.22"
+zstd = "0.13"
+flate2 = "1"
+brotli = "7"
 
 [dev-dependencies]
 serde_yaml = "0.9"
 
 [lints.rust]
-# 二进制 crate 中仅测试使用或仍属 WIP 的内部项会被 dead_code 标记。
-# 保留以允许渐进清理，新提交不应新增死代码。
-dead_code = "allow"
+# Verified against `rustc -W help` on 1.97.1 (see docs/adr).
+#
+# `dead_code_pub_in_binary` detects public items in an *executable* crate that
+# are never used. It is the only compiler mechanism that catches the failure
+# mode this repo hit repeatedly: a dead `pub` item in a bin is invisible to
+# plain `dead_code`, so `ResponsibilityRuntime::run` (85 lines, zero callers)
+# survived until it was found by noticing its string constant had been dropped
+# from the release binary by LTO.
+dead_code_pub_in_binary = "warn"
+# `pub` items not reachable from the crate root. Existing violations are listed
+# below with reasons; new ones are errors.
+unreachable_pub = "deny"
+# NOT enabled: `unused_crate_dependencies`. It is structurally a false positive
+# in a lib+bin package — Cargo cannot express "bin-only dependency", so every
+# dependency used only by src/main.rs (clap, env_logger, ...) is reported as
+# unused by the lib target. Measured: 7 such reports, all false. The documented
+# workaround (`use dep as _;`) would assert a dependency the lib does not have.
 
 [lints.clippy]
 # 严格 clippy 门禁（CI 以 `-D warnings` 运行）前的遗留代码触发的 lint。

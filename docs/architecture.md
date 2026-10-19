@@ -33,10 +33,14 @@ MtAgentLens 是一个基于 eBPF 的零插桩 LLM Agent 可观测性系统。它
   |  | SSL_write     |   | fork / clone|   | stdin / stdout |       |
   |  | uprobe (L3)   |   | open / unlink|  | MCP plaintext  |       |
   |  +---------------+   +-------------+   +----------------+       |
-  |  fileaccess          browsertrace       system                  |
-  |  +---------------+   +-------------+   +----------------+       |
-  |  | file R/W ops  |   | browser SSL |   | CPU / memory   |       |
-  |  +---------------+   +-------------+   +----------------+       |
+  |  process (file mutations: unlinkat / truncate)                   |
+  |  +---------------+                                                |
+  |  | file R/W ops  |                                                |
+  |  | workspace bnd |                                                |
+  |  +---------------+                                                |
+  |                                                                 |
+  |  userspace: system  — CPU / memory sampled from /proc            |
+  |                                                                 |
   +---------------------------------+-------------------------------+
                                     | JSON event stream (stdout)
   ==================================+================================
@@ -63,7 +67,7 @@ MtAgentLens 是一个基于 eBPF 的零插桩 LLM Agent 可观测性系统。它
   |  |  |  Phase 1 (streaming, per-event)                   |     | |
   |  |  |  +---------------------------------------------+  |     | |
   |  |  |  | PhaseClassificationEngine                   |  |     | |
-  |  |  |  |   -> 2,595 rules, 6-dim combinatorial score  |  |     | |
+  |  |  |  |   -> 25 rules (5 safe + 20 unsafe), 6-dim score  |  |     | |
   |  |  |  |   -> Process Boundary Crossing (PBC) detect  |  |     | |
   |  |  |  +---------------------+-----------------------+  |     | |
   |  |  |                        v                          |     | |
@@ -87,7 +91,7 @@ MtAgentLens 是一个基于 eBPF 的零插桩 LLM Agent 可观测性系统。它
   |  |  |  +---------------------------------------------+  |     | |
   |  |  +---------------------------------------------------+     | |
   |  +-----------------------------+-----------------------------+ |
-  |  Dual-write: SQLite (responsibility.db) + JSONL (streaming)   |
+  |  SQLite single-writer (responsibility.db); raw events via FileLogger |
   +---------------------------------+-------------------------------+
                                     |
   ==================================+================================
@@ -104,7 +108,7 @@ MtAgentLens 是一个基于 eBPF 的零插桩 LLM Agent 可观测性系统。它
   |  /handoff    handoff / delegation observability                 |
   |  /investigations  claim, evidence and traceback workbench       |
   |  /api/events legacy log-backed event stream                     |
-  |  /api/runs/{id}/{alerts,correlation-evidence,events,diff,...}   |
+  |  /api/runs/{id}/{alerts,evidence,events,snapshots,db}            |
   +-----------------------------------------------------------------+
 ```
 
@@ -121,8 +125,7 @@ eBPF 程序是独立编译的 C 程序，通过 libbpf 加载到内核 hook 点�
 | `tls_capture` | `SSL_read`/`SSL_write` uprobe | SSL/TLS 解密后明文 HTTP 流量 | Agent-API 通信、间接注入检测 |
 | `process` | tracepoint + kprobe | `exec`/`exit`/`fork`/`open`/`bind`/`connect` | 进程血缘、PBC 检测、文件操作 |
 | `stdiocap` | `read`/`write` uprobe | 本地 MCP 进程的 stdin/stdout/stderr | MCP 协议明文捕获 |
-| `fileaccess` | 文件操作 kprobe | 文件读/写/删除/重命名 | 工作区边界违规检测 |
-| `browsertrace` | 浏览器 SSL uprobe | 浏览器中的 LLM 对话明文 | Web 版 Agent 监控 |
+| `process` | tracepoint（含文件） | 进程生命周期 + FILE_OPEN/DELETE/TRUNCATE | 进程与文件变更归因 |
 | `system` | `/proc` 轮询 | CPU 使用率、RSS 内存 | 性能监控、资源滥用检测 |
 
 ### `--binary-path` 与静态链接 SSL
@@ -186,10 +189,10 @@ Analyzer 采用**管道-过滤器模式**。每个 analyzer 接收一个 `EventS
 
 | Analyzer | 状态 | 阻塞问题 |
 |----------|------|---------|
-| `EventDedup` | 可直接激活 | 无技术阻塞 |
-| `SharedStateStore` | 可直接激活 | 无技术阻塞 |
-| `ContextPollutionAnalyzer` | 编译错误 ×6 | `get_or_create_scenario()` 双重可变借用 |
-| `CredentialLeakAnalyzer` | 编译错误 ×1 | `CredentialLeakRecord`/`CredentialType` 未定义 |
+| `EventDedup` | 已删除 | 能力被意图级内容去重覆盖；原文件从未参与编译 |
+| `SharedStateStore` | 已删除（仅 impl） | `MutexSharedStateStore` 零实现者/零调用者；trait 仍留在 `pipeline_contract.rs`，属独立的契约批次决策 |
+| `ContextPollutionAnalyzer` | 已删除 | 编译错误 ×6（`get_or_create_scenario()` 双重可变借用）；判定门写死 Benchmark 场景字面量，能力已由 `graph/taint.rs` + `graph_builder` 通用污点传播覆盖 |
+| `CredentialLeakAnalyzer` | 已删除 | 440 行是 `handoff_injection.rs` 的逐行克隆；闸门只认一个 fixture 路径 |
 
 ### 事件格式
 
@@ -214,7 +217,7 @@ ResponsibilityRuntime 是 MtAgentLens 的核心——它将原始事件流转化
 ### 两阶段架构
 
 **阶段 1（流式）**——每个事件到达时立即处理：
-1. **PhaseClassificationEngine**：2,595 条规则 + 6 维组合评分，检测进程边界跨越（PBC）
+1. **PhaseClassificationEngine**：25 条规则（5 safe + 20 unsafe）+ 6 维组合评分，检测进程边界跨越（PBC）
 2. **GraphBuilder**：事件 → 责任图节点和边
 3. **IdentityResolver**：并查集（UnionFind），三信号融合
 4. **TaintTracker**：跨进程污点传播
@@ -256,12 +259,24 @@ conversation_id ───┘
 - **L1 缓存**（精确匹配）：相同的事件指纹 → 直接复用历史仲裁结果
 - **L2 缓存**（语义相似）：相近的事件模式 → 参考历史结果降低 LLM 调用
 
-FuxiBench 86 场景中仅触发 34 次（39.5% 调用率），方向准确率 84.2%。
+FuxiBench 86 个 DB 中 63 个场景出现 `observer_*` 路由，其中 59 个为
+`observer_failed`（API 不可用）；只有 6 个场景得到非 failed 裁决。观察者的
+有效性尚无干净语料证据，不能引用为结论。
 
-#### 双写持久化
+#### 带外数据源（Out-of-band，当前仅 OpenClaw）
 
-- **SQLite**（`responsibility.db`）：结构化查询、回放审计、图遍历
-- **JSONL**（流式推送）：SSE → 前端实时更新
+`OpenClawRunner` 以只读方式轮询 agent 自己落盘的
+`trajectory_runtime_events.tool.call`，把结构化工具调用作为
+`OutOfBandAsserted` intent 注入同一相关器；eBPF 仍独立可用，带外缺失时降级。
+身份边界由 `MTAGENTLENS_AGENT_COMMS/_CGROUP/_EXE` 声明，显式 cgroup/exe
+边界为严格模式（TLS 不再单独判定 Agent）。
+
+#### 持久化
+
+- **SQLite**（`responsibility.db`）：唯一结构化真源；批次写入、schema 版本门、
+  丢弃/写失败计数，run 结束输出 `[diagnostics:json]`。
+- 原始事件流由 `FileLogger` 写入行式 JSONL 日志；前端实时更新走
+  `/api/live/events` 的 SSE 通道，不经过持久化层。
 
 ---
 
@@ -281,10 +296,10 @@ FuxiBench 86 场景中仅触发 34 次（39.5% 调用率），方向准确率 84
 | `/api/runs/active` | GET | 当前活动 run |
 | `/api/runs/{id}` | GET | 单个 run 摘要 |
 | `/api/runs/{id}/alerts` | GET | 安全告警列表 |
-| `/api/runs/{id}/correlation-evidence` | GET | 证据关联 |
+| `/api/runs/{id}/evidence` | GET | 意图/动作/证据关联 |
 | `/api/runs/{id}/events` | GET | run-scoped 原始事件 |
 | `/api/runs/{id}/diff` | GET | 回放差异对比 |
-| `/api/runs/{id}/graph-analysis` | GET | 责任图/因果链分析 |
+| `/api/runs/{id}/snapshots` | GET | 图演化快照（读 `graph_snapshots`） |
 | `/api/runs/{id}/snapshots` | GET | 图快照 |
 
 ### 前端
@@ -331,7 +346,7 @@ Next.js 16 + React 19 + TypeScript 5 + Tailwind CSS 4。
    SSE 重组 → HTTP 解析 → 时间戳标准化 → 认证头剥离
    → HandoffInjection 检测 → MultiAgentAnomaly 检测
    → ResponsibilityRuntime（分类 + 图构建 + 身份解析 + 污点追踪）
-6. 双写: SQLite + JSONL → SSE → 前端实时更新
+6. SQLite 单写 + SSE（原始事件另经 FileLogger 落 JSONL 行日志）
 7. SIGINT → 阶段 2 批量终结 → Traceback + Claims + Alerts
 8. 清理临时文件，输出指标
 ```
@@ -349,7 +364,7 @@ collector/src/
 ├── main.rs                    CLI 入口（clap derive）
 ├── framework/                 流式引擎
 │   ├── runners/               7 个 Runner
-│   ├── analyzers/             29 个 Analyzer
+│   ├── analyzers/             30+ 个 Analyzer
 │   └── binary_extractor.rs    编译期 BPF 内嵌
 ├── responsibility/            因果引擎（17 个子模块）
 │   ├── graph/                 ResponsibilityGraph
@@ -357,7 +372,7 @@ collector/src/
 │   ├── claims/                ClaimBuilder · TracebackBuilder · AlertBuilder
 │   ├── classification/        PhaseClassificationEngine
 │   ├── observer/              Observer LLM (CachePrior)
-│   ├── persistence/           SQLite + JSONL 双写
+│   ├── persistence/           SQLite（单一 schema + 版本门）
 │   ├── replay/                回放 + 差异引擎
 │   ├── judgment/              策略评估 · 委派追踪
 │   ├── runtime/               事件循环编排

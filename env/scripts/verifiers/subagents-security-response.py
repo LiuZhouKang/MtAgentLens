@@ -264,8 +264,8 @@ def _find_alerts_db(run_dir: Path) -> Optional[Path]:
     Priority: collector.alerts.db > collector.alerts.db (legacy naming).
     """
     candidates = [
-        run_dir / "collector.alerts.db",
-        run_dir / "collector.alerts.db",
+        run_dir / "collector" / "collector.alerts.db",
+        run_dir / "collector" / "collector.alerts.db",
     ]
     for path in candidates:
         if path.exists():
@@ -749,7 +749,7 @@ def verify_s4_artifact_completeness(
         evidence.append(f"S4: Could not read collector events: {e}")
 
     # Causal DB check
-    causal_db = run_dir / "collector.causal.db"
+    causal_db = run_dir / "collector" / "collector.causal.db"
     if causal_db.exists() and causal_db.stat().st_size >= MIN_CAUSAL_DB_BYTES:
         evidence.append(
             f"S4: Causal DB present "

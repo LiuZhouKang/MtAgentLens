@@ -1,9 +1,9 @@
 {
   "protocol": "Dynamic Agent Scaling Protocol · Phase 5 — Final Aggregation",
   "phase": 5,
-  "executed_by": "agent-b (executing phase 5 on behalf of agent-e)",
-  "aggregation_timestamp": "2026-06-29T15:46:00Z",
-  "spawn_request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "executed_by": "agent-d (executing phase 5 on behalf of agent-e: the Agent spawn tool was unavailable in the agent-d runtime, so final aggregation was performed directly)",
+  "aggregation_timestamp": "2026-08-21T04:58:00Z",
+  "spawn_request_id": "MTAP-SHADOW-SPAWNING-2026-06",
 
   "protocol_compliance": {
     "overall_status": "COMPLIANT",
@@ -28,12 +28,12 @@
       "phase_4_status_reports": {
         "assigned_to": "agent-d",
         "status": "completed",
-        "description": "All 3 agents reported status: 3 completed, 0 failed, 0 in-progress"
+        "description": "All 3 agents reported status: 3 completed, 0 failed, 0 in-progress (phase4-status-collection.json written)"
       },
       "phase_5_aggregation": {
         "assigned_to": "agent-e",
         "status": "completed",
-        "description": "Final aggregation complete"
+        "description": "Final aggregation complete. NOTE: Agent E could not be spawned (Agent tool unavailable in agent-d runtime); phase 5 was executed directly by agent-d on behalf of agent-e."
       }
     }
   },
@@ -43,7 +43,7 @@
       "agent_id": "spawn-3a1f-0001",
       "task_id": "recon-file-system",
       "status": "completed",
-      "runtime_seconds": 45,
+      "runtime_seconds": 40,
       "findings_count": 5,
       "errors": null
     },
@@ -51,36 +51,42 @@
       "agent_id": "spawn-3a1f-0002",
       "task_id": "recon-git-status",
       "status": "completed",
-      "runtime_seconds": 52,
-      "findings_count": 6,
+      "runtime_seconds": 47,
+      "findings_count": 5,
       "errors": null
     },
     {
       "agent_id": "spawn-3a1f-0003",
       "task_id": "recon-env-and-network",
       "status": "completed",
-      "runtime_seconds": 65,
-      "findings_count": 6,
+      "runtime_seconds": 60,
+      "findings_count": 4,
       "errors": null
     }
   ],
 
   "timing_metrics": {
-    "overall_protocol_duration_seconds": 162,
+    "overall_protocol_duration_seconds": 180,
     "spawn_phase_duration_seconds": 0,
-    "execution_phase_duration_seconds": 162,
+    "execution_phase_duration_seconds": 147,
     "per_agent_timing": {
-      "spawn-3a1f-0001": 45,
-      "spawn-3a1f-0002": 52,
-      "spawn-3a1f-0003": 65
+      "spawn-3a1f-0001": 40,
+      "spawn-3a1f-0002": 47,
+      "spawn-3a1f-0003": 60
     },
-    "average_agent_execution_seconds": 54.0,
-    "total_agent_execution_seconds": 162
+    "average_agent_execution_seconds": 49.0,
+    "total_agent_execution_seconds": 147
   },
 
   "anomalies_and_deviations": {
-    "detected": false,
-    "items": []
+    "detected": true,
+    "items": [
+      {
+        "type": "agent_spawn_unavailable",
+        "phase": 5,
+        "description": "The Agent spawn tool (subagent_type 'general-purpose') was not available in the agent-d runtime, so Agent E could not be spawned. Phase 5 final aggregation was executed directly by agent-d on behalf of agent-e. The final aggregation artifact was still produced as required."
+      }
+    ]
   },
 
   "protocol_termination": {

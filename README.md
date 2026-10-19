@@ -16,13 +16,13 @@
 
 从系统调用到责任归因 —— 在 OS 边界采集可验证的运行事实
 
-<a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-007ec6?logo=apache&logoColor=white" alt="Apache 2.0"></a>
+<a href="LICENSE-APACHE"><img src="https://img.shields.io/badge/license-Apache_2.0-007ec6?logo=apache&logoColor=white" alt="Apache 2.0"></a>
 <a href="#架构"><img src="https://img.shields.io/badge/eBPF-0a0b10?logo=linux&logoColor=white" alt="eBPF"></a>
 <a href="#架构"><img src="https://img.shields.io/badge/Rust-CE422B?logo=rust&logoColor=white" alt="Rust"></a>
 <a href="#架构"><img src="https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white" alt="Next.js"></a>
 <a href="#性能"><img src="https://img.shields.io/badge/probe_latency-%7E101ns-60a5fa" alt="Probe latency ~101ns"></a>
-<a href="#性能"><img src="https://img.shields.io/badge/overhead-%3C3%25-22c55e" alt="Overhead &lt;3%"></a>
-<a href="#FuxiBench"><img src="https://img.shields.io/badge/FuxiBench-F1_0.945-f97316" alt="FuxiBench F1 0.945"></a>
+<a href="#性能"><img src="https://img.shields.io/badge/overhead-6.24%25_CPU_%2F_1.42_GiB_RSS-amber" alt="Measured overhead: 6.24% CPU / 1,424.8 MiB RSS"></a>
+<a href="#FuxiBench"><img src="https://img.shields.io/badge/FuxiBench-binary_TPR_0.896-f97316" alt="Delivered binary: Unsafe TPR 0.8955, FPR 0"></a>
 
 ---
 
@@ -114,11 +114,9 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |  | decrypt plain |   | bind / connect|  | uprobe capture|       |
   |  +---------------+   +-------------+   +----------------+       |
   |                                                                 |
-  |  fileaccess          browsertrace       system                  |
-  |  +---------------+   +-------------+   +----------------+       |
-  |  | file R/W ops  |   | browser SSL |   | CPU / memory   |       |
-  |  | workspace bnd |   | plaintext   |   | /proc polling  |       |
-  |  +---------------+   +-------------+   +----------------+       |
+  |  process also emits file mutations (unlinkat / truncate)         |
+  |                                                                 |
+  |  userspace: system  — CPU / memory sampled from /proc            |
   |                                                                 |
   +---------------------------------+-------------------------------+
                                     | JSON event stream (stdout)
@@ -149,7 +147,7 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |  |  |  Phase 1 (streaming, per-event)                   |    |  |
   |  |  |  +---------------------------------------------+  |    |  |
   |  |  |  | PhaseClassificationEngine                   |  |    |  |
-  |  |  |  |   -> 2,595 rules, 6-dim combinatorial score |  |    |  |
+  |  |  |  |   -> 25 rules (5 safe + 20 unsafe), 6-dim score |  |    |  |
   |  |  |  |   -> Process Boundary Crossing (PBC) detect |  |    |  |
   |  |  |  +---------------------+-----------------------+  |    |  |
   |  |  |                        v                          |    |  |
@@ -177,7 +175,7 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |  |  +---------------------------------------------------+    |  |
   |  +-----------------------------+-----------------------------+  |
   |                                |                                |
-  |  Dual-write: SQLite (responsibility.db) + JSONL (streaming)     |
+  |  SQLite single-writer (responsibility.db); raw events via FileLogger |
   +---------------------------------+-------------------------------+
                                    |
   =================================+================================
@@ -199,7 +197,7 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |               · graph time evolution                            |
   |                                                                 |
   |  /api/live/events  live SSE: alerts + raw events + heartbeat    |
-  |  /api/runs/{id}/{alerts,correlation-evidence,events,diff,...}   |
+  |  /api/runs/{id}/{alerts,evidence,events,snapshots,db}            |
   |  /api/events  legacy log-backed stream (deprecated)             |
   +-----------------------------------------------------------------+
 ```
@@ -250,16 +248,79 @@ make check          # 验证所有依赖就绪
 make build          # 全量构建（BPF → 前端 → Rust）
 ```
 
-### 4. 运行采集
+### 4. 首次运行自检（推荐）
 
 ```bash
-sudo ./collector/target/release/mtagentlens record -c claude \
-  --binary-path ~/.local/share/claude/versions/$(claude --version | head -1)
+sudo ./collector/build/release/mtagentlens doctor
 ```
 
-### 5. 访问前端
+逐项检查内核版本（≥5.8）、eBPF 权限（root 或 `CAP_BPF`+`CAP_PERFMON`）、
+BTF、内置探针、syscall tracepoint 与可见的 agent 进程，并给出可操作的修复命令。
+`doctor` 在任一项 FAIL 时以非零码退出；`--json` 供脚本使用。
+
+`record` / `trace` 及各原始子命令在启动前会自动执行同一组关键检查，
+所以权限或内核不满足时，你看到的第一条输出是诊断和修复建议，而不是
+libbpf/verifier 的错误堆栈。
+
+### 5. 运行采集
+
+```bash
+sudo ./collector/build/release/mtagentlens record -c claude \
+  --binary-path "$(readlink -f "$(command -v claude)")"
+```
+
+### 6. 访问前端
 
 浏览器访问 `http://127.0.0.1:7395`
+
+#### 非 Claude Agent 的身份边界
+
+当 Agent 的进程名不是 `claude`/`claude-code`（例如 OpenClaw 的 Node Gateway 进程名是
+`MainThread`），用以下环境变量扩展边界；它们同时作用于事件路由与 eBPF 探针的
+`-c` 过滤：
+
+```bash
+MTAGENTLENS_AGENT_COMMS=openclaw,MainThread \
+MTAGENTLENS_AGENT_CGROUP=openclaw-gateway.service \
+MTAGENTLENS_AGENT_EXE=openclaw \
+  sudo -E ./collector/build/release/mtagentlens record --binary-path <agent ELF>
+```
+
+被边界挡下的 action 会计入 run 结束时的 `[diagnostics:json]`：
+`actions_dropped_no_agent`（边界未覆盖）与 `actions_dropped_bpf_noise`
+（采集器自身的 `/sys/kernel/` 读取）。
+
+#### OpenClaw 完整采集（eBPF + 带外轨迹）
+
+OpenClaw 的 Node Gateway 以 `MainThread` 运行，同时把每次工具调用写进
+`~/.openclaw/agents/<agent>/agent/openclaw-agent.sqlite`。两者可以同时使用：
+eBPF 观察实际 syscall，带外读取提供模型选择的结构化工具参数（标记为
+`OutOfBandAsserted`）。
+
+```bash
+GW=$(pgrep -f 'openclaw.*gateway' | head -1)   # long-running gateway
+sudo -E env \
+  MTAGENTLENS_AGENT_CGROUP=openclaw-gateway.service \
+  MTAGENTLENS_AGENT_EXE=openclaw \
+  MTAGENTLENS_OPENCLAW_STATE="$HOME/.openclaw" \
+  MTAGENTLENS_OPENCLAW_AGENTS=main \
+  ./collector/build/release/mtagentlens trace \
+    -p "$GW" -c MainThread --process=true \
+    --binary-path "$(readlink -f ~/.nvm/versions/node/v24.19.0/bin/node)"
+```
+
+`-p "$GW"` is required for a gateway that started before the collector: FILTER
+mode has no EXEC event for it, so the probe now treats the target PID's direct
+children as tracked (and their descendants inherit tracking).
+
+- 显式 cgroup/exe 边界是**严格模式**：只有匹配边界的进程才算 Agent，其他
+  Node 应用的 TLS 会话不会因“有 TLS”被误判为 Agent。
+- 带外 intent 在 `[diagnostics:json]` 的 `openclaw_tool_calls` 中计数；数据库
+  以只读方式打开，schema 版本不匹配时自动降级，不影响 eBPF 路径。
+- 已知残余：asserted `agent_key`（如 `agent:main:main`）尚未成为独立的图
+  AgentId；当前进程归属由 Gateway PID + cgroup/exe 边界决定。
+- 自检：`./scripts/e2e/openclaw-outofband.sh`（需 sudo）会用一个最小
+  `openclaw-agent.sqlite` fixture 断言 `tool.call → OutOfBandAsserted intent`。
 
 > [!NOTE]
 > **当前验证状态**：MtAgentLens 已在 **Claude Code**（Bun 运行时，静态链接 BoringSSL）上完成全面测试。对于动态链接系统 `libssl.so` 的 Agent（大多数 Python/Node.js AI 工具），eBPF uprobe 机制在架构上同样适用，但尚未进行系统性验证。其他 LLM Agent 可通过 `-c <进程名>` 参数启用实验性支持。
@@ -293,11 +354,11 @@ docker run --rm -it --privileged --pid=host \
 
 ```bash
 # 灵活组合监控
-sudo mtagentlens trace --ssl --process --system --server
+sudo mtagentlens trace --ssl true --process true --system --server
 
 # 独立子命令
 sudo mtagentlens ssl --http-parser --http-filter "POST /api"
-sudo mtagentlens process --comm python --duration 1000
+sudo mtagentlens process -- -c python -d 1000
 sudo mtagentlens stdio --pid 12345
 ```
 
@@ -309,22 +370,23 @@ sudo mtagentlens stdio --pid 12345
 MtAgentLens/
 │
 ├── collector/                     Rust 引擎 — 编译为单二进制 mtagentlens
-│   ├── src/main.rs                CLI 入口 (clap derive)，6 个子命令
+│   ├── src/main.rs                CLI 入口 (clap derive)，8 个子命令
 │   ├── src/framework/             流式数据采集管线
-│   │   ├── runners/               7 个 Runner：Ssl, Process, Stdio, System, Agent, Fake
-│   │   ├── analyzers/             29 个 Analyzer：SSE, HTTP, HandoffInjection, ...
+│   │   ├── runners/               7 个 Runner：Ssl, Process, Stdio, System, Agent, OpenClaw, Fake
+│   │   ├── analyzers/             30+ 个 Analyzer：SSE, HTTP, HandoffInjection, ...
 │   │   └── binary_extractor.rs    include_bytes! 内嵌 BPF 二进制
 │   ├── src/responsibility/        因果分析引擎 (17 个子模块)
 │   │   ├── graph/                 ResponsibilityGraph：节点·边·污点·模式匹配·简化器
 │   │   ├── identity/              IdentityResolver：并查集，三信号融合
 │   │   ├── claims/                ClaimBuilder · TracebackBuilder · AlertBuilder
-│   │   ├── classification/        PhaseClassificationEngine · 2,595 规则 · 6 维评分
+│   │   ├── classification/        PhaseClassificationEngine · 25 条规则 · 6 维评分
 │   │   ├── observer/              Observer LLM：CachePrior (L1/L2 缓存) · 语义仲裁
-│   │   ├── persistence/           双写：SQLite + JSONL
-│   │   ├── replay/                回放执行器 · 差异引擎 · 评估器
-│   │   ├── judgment/              策略评估 · 委派追踪 · OOD 检测
+│   │   ├── outofband/             OpenClaw 轨迹只读 → OutOfBandAsserted intent
+│   │   ├── persistence/           SQLite 单写（单一 schema + 版本门）· 只读查询
+│   │   ├── replay/                回放执行器 · 跨运行差异
+│   │   ├── judgment/              策略评估 · 委派追踪
 │   │   ├── runtime/               事件循环编排 (阶段 1 流式 + 阶段 2 批量终结)
-│   │   ├── server/                REST API：graph · alerts · evidence · SSE · diff
+│   │   ├── server/                legacy 路由树（`serve_request` 零调用；生产用 src/server）
 │   │   └── signals/               SignalGraph：实时信号聚合
 │   ├── src/server/                Hyper 1.0 HTTP 服务器 + rust-embed 内嵌前端
 │   └── src/auth/                  TOTP 2FA 认证
@@ -333,9 +395,7 @@ MtAgentLens/
 │   ├── tls_capture/               SSL_read/write uprobe → 解密明文
 │   ├── process/                   tracepoint + kprobe → 进程生命周期
 │   ├── stdiocap/                  read/write uprobe → MCP stdio 捕获
-│   ├── fileaccess/                文件操作监控
-│   ├── browsertrace/              浏览器 SSL 明文
-│   └── process_ext/               增强进程信息 (内存、header)
+│   └── process_ext/               仅供测试的 header (mem_info · map_flush)
 │
 ├── frontend/                      Next.js 16 · React 19 · TypeScript 5 · Tailwind 4
 │   ├── 编译为静态 HTML/CSS/JS (next build → out/)
@@ -343,7 +403,7 @@ MtAgentLens/
 │
 ├── env/                           基准测试环境
 │   ├── src/mtagentlens_benchmark/ Python 包 (CLI, Engine, Evaluator, Verifier)
-│   ├── scenarios/                 164 个场景定义 (38 类别) + fixtures
+│   ├── scenarios/                 按类别组织的场景定义 (36 类) + fixtures
 │   ├── scripts/verifiers/         73 个场景验证器
 │   └── runs/                      运行工件 (gitignored)
 │
@@ -353,9 +413,15 @@ MtAgentLens/
 │   ├── results/external/          外部基线对比
 │   └── scripts/                   build · audit · run · vis · perf
 │
+├── scripts/                       唯一门禁 · 发布 · E2E · 基线工具
+├── docs/                          文档索引 (docs/README.md)
+├── libbpf/ · bpftool/             上游 submodule (eBPF 构建依赖)
+├── vmlinux/                       内核 BTF 头
+├── rust-toolchain.toml
 ├── Dockerfile / Dockerfile.dev
 ├── Makefile
-└── LICENSE (Apache-2.0 + BPF GPL 例外)
+├── LICENSE-APACHE (Apache-2.0 + BPF GPL 例外)
+└── LICENSE-MIT
 ```
 
 ## 文档
@@ -377,24 +443,29 @@ FuxiBench 是 MtAgentLens 的评估基准，用于覆盖多 Agent 安全观测�
 | 维度 | 数据 |
 |------|------|
 | 总场景 | **86**（67 攻击 + 19 良性） |
-| 攻击类别 | **14** |
+| 攻击类别 | **10**（manifest 实际分类数） |
 | Type A（直接注入） | 10 — 攻击载荷在 task prompt 中 |
 | Type B（间接注入） | 34 — 攻击载荷隐藏在 fixture 文件中 |
 | Type C（多 Agent） | 23 — 跨进程协同攻击（**核心贡献**） |
 | 标注 | 3 名独立标注者，交叉验证 + 共识裁判 |
 
-**评估结果**：
+**评估结果（按“测的是什么”分列，避免把脚本重打分当成二进制能力）**：
 
-| 指标 | 值 | 说明 |
+| 指标 | 值 | 口径与出处 |
 |------|:--:|------|
-| TPR | **0.896** | 67 攻击场景中检出 60 |
-| FPR | **0.000** | 19 良性场景零误报 |
-| F1 | **0.945** | |
-| Observer 调用率 | **39.5%** | 34/86 场景，仅冲突信号时触发 |
+| 攻击集 TPR / F1 | 0.9851 / 0.9925 | `compare/results/paper/main_evaluation.json` 的 `full_metrics`；由评估脚本的 `full_scores` 计算（引擎分 + 脚本重打分）。**不是**交付二进制的原始 `rust_score`。 |
+| 二进制自身 `rust_score` | 11/67 攻击场景 < 0.70 | 同一 `main_evaluation.json` 的 `per_scenario`；因此“二进制召回 0.985”不成立，二者不可混用。 |
+| 二进制自身裁决（FuxiBench 86 个 DB） | **Unsafe**: TPR 0.8955（Wilson 0.7997–0.9485）FPR 0.000（0–0.168）；**Warning+**: TPR 0.9851（0.9202–0.9974）**FPR 0.8947（0.6861–0.9706）** | `compare/results/paper/standard_evaluation_v5.json`；直接读取 `responsibility_alerts` 的 `decision`/`severity`，BCa 10,000 次 + Wilson 区间。**Warning+ 在旧语料上不是可用口径**（17/19 良性场景产生 Uncertain/Warning）。 |
+| 良性 FPR（Warning+，隔离） | **0.00（0/20；Wilson 95% 0–0.161）** | `docs/evaluation/fpr-baseline.json`；20/20 观测到；每个场景用 clean profile + **inode 独立副本 + 唯一 comm**，`process_comms` 不含外层 `claude`。旧 0/18 为未隔离采集，仅作历史。 |
+| 良性 FPR（actionable / Unsafe，隔离） | **0.00（0/20；Wilson 95% 0–0.161）** | 同上；全部 20 个告警为 `Info` / `Safe`，0 claims。 |
+| Observer 路由覆盖 | 63/86 场景出现 `observer_*` 路由，其中仅 6/86 得到非 `observer_failed` 裁决 | 从 86 个 DB 的 `engine_section_json.classification_route` 直接统计；59 个场景的 observer 调用失败（API 不可用），不能作为“Observer 有效性”的证据 |
 
-四层消融实验表明，L2（PBC + Identity + Taint）是主要增益来源：移除文件读取 PBC 信号后，覆盖率从 1.000 降至 0.534（Δ = -0.466）。
+> 隔离 FPR 的采集方式见 `docs/evaluation/measurement-isolation.md`：被测 Agent 以 inode 独立副本运行，collector 的 `-c` 与 TLS uprobe 只挂到该副本，外层交互会话被排除（已用内层/外层 PID 对照验证）。仓库内早期宣传的 `TPR 0.896 / FPR 0.000` 是 2026-06-25 旧采集，不再作为头条数字。
 
-详见 [`compare/Dataset/FuxiBench/SCENARIOS.md`](compare/Dataset/FuxiBench/SCENARIOS.md) 和 [`compare/results/paper/EXPERIMENTS.md`](compare/results/paper/EXPERIMENTS.md)。
+消融实验的结论以 `compare/results/paper/ablation_summary_v16.json` 为准：该文件中 L2 的 ΔAUROC 为 0.0（不显著），与早先“L2 是主要增益来源”的表述冲突；在补做一致的消融重跑之前，不应把 L2 写成主增益来源。
+
+详见 [`compare/Dataset/FuxiBench/SCENARIOS.md`](compare/Dataset/FuxiBench/SCENARIOS.md) 和
+[`compare/results/paper/EXPERIMENTS.md`](compare/results/paper/EXPERIMENTS.md)。
 
 ---
 
@@ -409,7 +480,12 @@ FuxiBench 是 MtAgentLens 的评估基准，用于覆盖多 Agent 安全观测�
 | SSL write exit probe | **59.4 ns/op** | bpftool stat，1,000,000 次运行 |
 | 单次 SSL read/write 总 probe 成本 | **218.3 ns/op** | enter + read_exit + write_exit |
 | 空闲 RSS | **36.8 MB** | 60s pidstat 采样 |
-| 吞吐量开销 | **<3%** | FakeRunner 合成 SSL 事件管线 |
+
+端到端开销（`scripts/wire/measure-overhead.sh`，一次 `claude -p` 回合，45s）：
+**平均单核 CPU 6.24%**、**峰值 RSS 1,424.8 MiB**（其中 ONNX 推理约 1,327.3 MiB）。
+仓库中“<3% 吞吐开销”的数字来自合成 FakeRunner 管线，生成脚本的
+`claim_boundary.not_supported` 明确声明它不支持生产 agent 的端到端延迟结论；
+在没有对应 JSON 的端到端测量前，不应把它当作产品开销。
 
 ---
 
@@ -463,7 +539,7 @@ make fmt                # 格式化所有代码
 make help               # 显示所有可用目标
 
 cd collector
-cargo build --release   # → target/release/mtagentlens
+cargo build --release   # → build/release/mtagentlens（见 collector/.cargo/config.toml）
 cargo test              # 869+ 测试
 cargo clippy            # Lint
 
@@ -514,7 +590,7 @@ docker run --rm -it -v $(pwd):/workspace -w /workspace \
 
 ### 源代码
 
-本项目源代码采用 **Apache License 2.0**。详见 [LICENSE](LICENSE)。
+本项目源代码采用 **Apache-2.0 OR MIT** 双许可。详见 [LICENSE-APACHE](LICENSE-APACHE) 与 [LICENSE-MIT](LICENSE-MIT)。
 
 eBPF 内核程序（`bpftools/*.bpf.c`）按文件头 SPDX 声明使用 **GPL-2.0 OR BSD-3-Clause**。用户态 eBPF 加载器跟随 libbpf 的双许可证（**LGPL-2.1 OR BSD-2-Clause**）。
 
@@ -532,3 +608,10 @@ eBPF 内核程序（`bpftools/*.bpf.c`）按文件头 SPDX 声明使用 **GPL-2.
 |------|------|--------|------|
 | libbpf | [github.com/libbpf/libbpf](https://github.com/libbpf/libbpf) | LGPL-2.1 / BSD-2-Clause | eBPF 程序加载、BPF map 管理、内核接口封装 |
 | bpftool | [github.com/libbpf/bpftool](https://github.com/libbpf/bpftool) | GPL-2.0 / BSD-2-Clause | eBPF skeleton 代码生成 |
+
+## 安全与贡献
+
+- 漏洞报告与安全默认值：[`SECURITY.md`](SECURITY.md)
+- 威胁模型（STRIDE + 代码坐标）：[`docs/security/threat-model.md`](docs/security/threat-model.md)
+- OpenSSF 自评：[`docs/security/openSSF-self-assessment.md`](docs/security/openSSF-self-assessment.md)
+- 贡献流程与唯一门禁：[`CONTRIBUTING.md`](CONTRIBUTING.md)、`./scripts/verify.sh`

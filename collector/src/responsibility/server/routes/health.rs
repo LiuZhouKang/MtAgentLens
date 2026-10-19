@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Health-check endpoints: GET /health, GET /live, GET /ready.
 
 use hyper::{Request, Response, body::Bytes};

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // HTTP API handlers for two-factor authentication (2FA) endpoints.
 // These handlers implement the server-side logic for:

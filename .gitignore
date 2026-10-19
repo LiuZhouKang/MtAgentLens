@@ -1,5 +1,7 @@
 # Build artifacts
 /build
+frontend/out/*
+!frontend/out/.gitkeep
 collector/build/
 agentsight
 .next/
@@ -37,6 +39,10 @@ compare/results/*
 
 # Runtime data
 env/runs/
+env/fpr-runs/
+
+# Local-only assets moved out of the project tree (videos, references, old copies)
+local/
 
 # Dev tools (local only)
 .claude/
@@ -96,6 +102,12 @@ docs/决赛文档/assets/video/
 .env
 .envrc
 
+# Local API credentials: templates only (*.example). Never commit the real files.
+env/config/claude.env
+env/config/observer.toml
+env/config/vendors/*/claude.env
+env/config/vendors/*/observer.toml
+
 # Logs
 *.log
 record.log
@@ -117,6 +129,10 @@ debug-*.md
 *.db
 *.db-shm
 *.db-wal
+# ...except the schema fixture: the upgrade contract needs a real v1 file in
+# version control. A fixture that only exists locally cannot be falsified by a
+# third party (single-schema plan D1).
+!collector/tests/fixtures/schema/*.db
 
 # Compiled benchmark binaries
 compare/scripts/perf/bench_targets/exec_loop
@@ -130,5 +146,6 @@ compare/models/
 collector/models/
 web/
 
-# 答辩准备材料（本地专属，不上传远程 gitlab）
-docs/prepare/
+
+# Release artifacts (scripts/release.sh)
+/dist/

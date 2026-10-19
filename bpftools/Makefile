@@ -23,10 +23,10 @@ VMLINUX := ../vmlinux/$(ARCH)/vmlinux.h
 # outdated
 # Include paths: output dir, root, shared headers, each program dir, libbpf, vmlinux
 # BPF program directories — each contains <name>.bpf.c, <name>.c, <name>.h
-BPF_PROGS = tls_capture browsertrace stdiocap process fileaccess
+BPF_PROGS = tls_capture stdiocap process
 
 # Test programs (no BPF skeleton needed)
-TEST_APPS = test_process_utils test_process_filter test_process_map_flush test_process_mem_info test_process_header test_tls_capture_boringssl_offsets
+TEST_APPS = test_process_utils test_process_filter test_process_map_flush test_process_mem_info test_process_header test_tls_capture_boringssl_offsets test_tls_capture_header test_json_escape test_b64 test_payload_json test_process_file_ops test_process_network
 
 # All applications
 APPS = $(BPF_PROGS) $(TEST_APPS)
@@ -106,7 +106,6 @@ help:
 	@echo "Available targets:"
 	@echo "  all          - Build all applications"
 	@echo "  tls_capture     - Build tls_capture only"
-	@echo "  browsertrace - Build browsertrace only"
 	@echo "  stdiocap     - Build stdiocap only"
 	@echo "  process      - Build process tracer only"
 	@echo "  test         - Build and run tests"
@@ -118,26 +117,34 @@ help:
 	@echo "  make ASAN=1 tls_capture"
 
 .PHONY: test
-test: $(addprefix $(BIN_DIR)/,test_process_utils test_process_filter test_process_map_flush test_process_mem_info test_process_header)
-	@echo "Running process_utils tests..."
-	@$(BIN_DIR)/test_process_utils
-	@echo ""
-	@echo "Running process_filter tests..."
-	@$(BIN_DIR)/test_process_filter
-	@echo ""
-	@echo "Running process map_flush tests..."
-	@$(BIN_DIR)/test_process_map_flush
-	@echo ""
-	@echo "Running process mem_info tests..."
-	@$(BIN_DIR)/test_process_mem_info
-	@echo ""
-	@echo "Running process header tests..."
-	@$(BIN_DIR)/test_process_header
+# Runs EVERY entry in TEST_APPS.
+#
+# This used to list five binaries by hand, which silently omitted
+# test_tls_capture_header and test_tls_capture_boringssl_offsets — they were
+# only reachable through their own phony targets, so a plain `make test`
+# (and anything driving it) never executed them. Deriving from TEST_APPS keeps
+# a newly added test from being forgotten again.
+test: $(addprefix $(BIN_DIR)/,$(TEST_APPS))
+	@for t in $(TEST_APPS); do \
+		echo "── $$t ──"; \
+		$(BIN_DIR)/$$t || exit 1; \
+		echo ""; \
+	done
 
 .PHONY: test-tls_capture-boringssl-offsets
 test-tls_capture-boringssl-offsets: $(BIN_DIR)/test_tls_capture_boringssl_offsets
 	@echo "Running tls_capture BoringSSL offset tests..."
 	@$(BIN_DIR)/test_tls_capture_boringssl_offsets
+
+.PHONY: test-json-escape
+test-json-escape: $(BIN_DIR)/test_json_escape
+	@echo "Running json_escape contract tests..."
+	@$(BIN_DIR)/test_json_escape
+
+.PHONY: test-tls_capture-header
+test-tls_capture-header: $(BIN_DIR)/test_tls_capture_header
+	@echo "Running tls_capture header contract tests..."
+	@$(BIN_DIR)/test_tls_capture_header
 
 .PHONY: integration-test
 integration-test: $(BIN_DIR)/process
@@ -173,9 +180,6 @@ $(LIBBLAZESYM_HEADER): $(LIBBLAZESYM_SRC)/target/release/libblazesym.a | $(OUTPU
 	$(call msg,LIB,$@)
 	$(Q)cp $(LIBBLAZESYM_SRC)/target/release/blazesym.h $@
 
-# Extra dependencies for process BPF (subdirectory headers)
-$(OUTPUT)/process.bpf.o: $(wildcard process_ext/*.h)
-
 # ── BPF build rules (one per program, sources in <prog>/<prog>.bpf.c) ──
 define BPF_BUILD_RULE
 $(OUTPUT)/$(1).bpf.o: $(1)/$(1).bpf.c $(LIBBPF_OBJ) $(wildcard $(1)/$(1).h include/*.h) $(VMLINUX) | $(OUTPUT) $(BPFTOOL)
@@ -209,15 +213,24 @@ $(OUTPUT)/test_process_filter.o: tests/test_process_filter.c $(wildcard include/
 	$(call msg,CC,$@)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(OUTPUT)/test_process_map_flush.o: tests/test_process_map_flush.c $(wildcard include/*.h) $(wildcard process_ext/*.h) | $(OUTPUT)
+$(OUTPUT)/test_process_map_flush.o: tests/test_process_map_flush.c process_ext/map_flush.h $(wildcard include/*.h) | $(OUTPUT)
 	$(call msg,CC,$@)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -Itests -c $< -o $@
 
-$(OUTPUT)/test_process_mem_info.o: tests/test_process_mem_info.c $(wildcard include/*.h) $(wildcard process_ext/*.h) | $(OUTPUT)
+$(OUTPUT)/test_process_mem_info.o: tests/test_process_mem_info.c process_ext/mem_info.h $(wildcard include/*.h) | $(OUTPUT)
 	$(call msg,CC,$@)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(OUTPUT)/test_process_header.o: tests/test_process_header.c $(wildcard include/*.h) $(wildcard process_ext/*.h) | $(OUTPUT)
+$(OUTPUT)/test_process_header.o: tests/test_process_header.c $(wildcard include/*.h) | $(OUTPUT)
+	$(call msg,CC,$@)
+	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(OUTPUT)/test_process_file_ops.o: tests/test_process_file_ops.c $(wildcard include/*.h) $(wildcard process/*.h) | $(OUTPUT)
+	$(call msg,CC,$@)
+	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# Pure struct-layout contract test; no BPF skeleton needed.
+$(OUTPUT)/test_tls_capture_header.o: tests/test_tls_capture_header.c $(wildcard tls_capture/*.h) | $(OUTPUT)
 	$(call msg,CC,$@)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
@@ -245,6 +258,10 @@ $(BIN_DIR)/test_process_filter: $(OUTPUT)/test_process_filter.o | $(BIN_DIR)
 	$(call msg,BINARY,$@)
 	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -o $@
 
+$(BIN_DIR)/test_process_file_ops: $(OUTPUT)/test_process_file_ops.o | $(BIN_DIR)
+	$(call msg,BINARY,$@)
+	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -o $@
+
 # map_flush helper uses libbpf_num_possible_cpus() from libbpf.
 $(BIN_DIR)/test_process_map_flush: $(OUTPUT)/test_process_map_flush.o $(LIBBPF_OBJ) | $(BIN_DIR)
 	$(call msg,BINARY,$@)
@@ -258,6 +275,46 @@ $(BIN_DIR)/test_process_header: $(OUTPUT)/test_process_header.o | $(BIN_DIR)
 	$(call msg,BINARY,$@)
 	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -o $@
 
+$(BIN_DIR)/test_tls_capture_header: $(OUTPUT)/test_tls_capture_header.o | $(BIN_DIR)
+	$(call msg,BINARY,$@)
+	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -o $@
+
+# Pure header contract test; needs no BPF skeleton.
+$(OUTPUT)/test_json_escape.o: tests/test_json_escape.c $(wildcard include/*.h) | $(OUTPUT)
+	$(call msg,CC,$@)
+	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BIN_DIR)/test_json_escape: $(OUTPUT)/test_json_escape.o | $(BIN_DIR)
+	$(call msg,BINARY,$@)
+	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -o $@
+
+# Streaming base64 contract test; needs no BPF skeleton.
+$(OUTPUT)/test_b64.o: tests/test_b64.c $(wildcard include/*.h) | $(OUTPUT)
+	$(call msg,CC,$@)
+	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BIN_DIR)/test_b64: $(OUTPUT)/test_b64.o | $(BIN_DIR)
+	$(call msg,BINARY,$@)
+	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -o $@
+
+# Payload field contract test; needs no BPF skeleton.
+$(OUTPUT)/test_payload_json.o: tests/test_payload_json.c $(wildcard include/*.h) | $(OUTPUT)
+	$(call msg,CC,$@)
+	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BIN_DIR)/test_payload_json: $(OUTPUT)/test_payload_json.o | $(BIN_DIR)
+	$(call msg,BINARY,$@)
+	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -o $@
+
+# Network event wire-format contract test; needs no BPF skeleton.
+$(OUTPUT)/test_process_network.o: tests/test_process_network.c process/process.h process/process_json.h $(wildcard include/*.h) | $(OUTPUT)
+	$(call msg,CC,$@)
+	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BIN_DIR)/test_process_network: $(OUTPUT)/test_process_network.o | $(BIN_DIR)
+	$(call msg,BINARY,$@)
+	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -o $@
+
 $(BIN_DIR)/test_tls_capture_boringssl_offsets: $(OUTPUT)/test_tls_capture_boringssl_offsets.o $(LIBBPF_OBJ) | $(BIN_DIR)
 	$(call msg,BINARY,$@)
 	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -Wl,--gc-sections -lelf -lz -o $@
@@ -266,7 +323,10 @@ $(BIN_DIR):
 	$(Q)mkdir -p $@
 
 # Default target depends on all binaries
-all: $(addprefix $(BIN_DIR)/,$(APPS))
+# Production binaries only. Test binaries are built by their own targets
+# (`make test` depends on them) — building them into .output/bin on every
+# `make` was pure waste.
+all: $(addprefix $(BIN_DIR)/,$(BPF_PROGS))
 
 # delete failed targets
 .DELETE_ON_ERROR:

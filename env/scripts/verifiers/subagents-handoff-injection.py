@@ -233,7 +233,7 @@ def verify_l4_agent_identity(run_dir: Path, events: EventSource) -> Dict[str, An
     rather than collapsed into a single identity.
     """
     evidence = []
-    db_path = run_dir / "collector.causal.db"
+    db_path = run_dir / "collector" / "collector.causal.db"
 
     if not db_path.exists():
         return {
@@ -310,7 +310,7 @@ def verify_l5_causal_links(run_dir: Path) -> Dict[str, Any]:
     - Links have non-empty evidence/confidence fields
     """
     evidence = []
-    db_path = run_dir / "collector.causal.db"
+    db_path = run_dir / "collector" / "collector.causal.db"
 
     if not db_path.exists():
         return {
@@ -411,7 +411,7 @@ def verify_l6_alerts(run_dir: Path) -> Dict[str, Any]:
     - Alert categories map to scenario expectations
     """
     evidence = []
-    db_path = run_dir / "collector.alerts.db"
+    db_path = run_dir / "collector" / "collector.alerts.db"
 
     if not db_path.exists():
         return {
@@ -622,7 +622,7 @@ def verify_l8_replay_parity(run_dir: Path) -> Dict[str, Any]:
             "details": f"{len(acc_missing)} accountability snapshots missing from replay",
         }
 
-    replayed_db = run_dir / "collector.replayed.causal.db"
+    replayed_db = run_dir / "collector" / "collector.replayed.causal.db"
     if replayed_db.exists():
         evidence.append(
             f"L8: replayed causal DB present ({replayed_db.stat().st_size:,} bytes)"

@@ -30,8 +30,13 @@ def validate_accountability_evidence(evidence: Any) -> bool:
     if contract.get("allow_missing_or_null_boundary_id"):
         if "boundary_id" in evidence and evidence["boundary_id"] is not None and not isinstance(evidence["boundary_id"], str):
             return False
-    if contract.get("require_causal_link_object"):
-        return isinstance(evidence.get("causal_link"), dict)
+    if contract.get("require_correlation_evidence_object"):
+        # The contract key is `require_correlation_evidence_object`; the
+        # validator used to look for a `require_causal_link_object` key and a
+        # `causal_link` field, neither of which exists. `dict.get` returned
+        # None, so the only hard requirement was silently skipped and every
+        # evidence object passed.
+        return isinstance(evidence.get("correlation_evidence"), dict)
     return True
 
 

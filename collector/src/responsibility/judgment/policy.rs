@@ -1,6 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright (c) 2026 MtAgentLens Project
+
 use std::collections::HashSet;
 
-use crate::responsibility::judgment::delegation::DelegationRecord;
+use crate::responsibility::judgment::delegation::DelegationObservation;
 use crate::responsibility::types::ids::{BoundaryId, EvidenceId, PolicyId, ProcessId};
 use crate::responsibility::types::policy_types::{
     EvidenceRef, PolicyEvaluationResult, ResponsibilityClaimState,
@@ -22,7 +25,7 @@ pub const CONTEXT_PROPAGATION_WINDOW_NS: u64 = 30_000_000_000;
 pub fn evaluate_delegation_boundary(
     from_agent: &str,
     to_agent: &str,
-    delegation_records: &[DelegationRecord],
+    delegation_records: &[DelegationObservation],
 ) -> PolicyEvaluationResult {
     if delegation_records.is_empty() {
         return PolicyEvaluationResult {
@@ -290,7 +293,7 @@ pub fn evaluate_taint_boundary(
 pub fn evaluate_accountability_policy(
     agent_id: &str,
     resource: &ResourceId,
-    delegation_records: &[DelegationRecord],
+    delegation_records: &[DelegationObservation],
     known_tainted_paths: &HashSet<String>,
 ) -> PolicyEvaluationResult {
     evaluate_boundary_policy_with_resource(
@@ -309,7 +312,7 @@ pub fn evaluate_accountability_policy(
 pub fn evaluate_boundary_policy_with_resource(
     agent_id: &str,
     resource: &ResourceId,
-    delegation_records: &[DelegationRecord],
+    delegation_records: &[DelegationObservation],
     known_tainted_paths: &HashSet<String>,
 ) -> PolicyEvaluationResult {
     // Always check capability boundary (applies to all resource types)
@@ -509,8 +512,15 @@ fn is_sensitive_path(path: &str) -> bool {
         "/id_rsa",
         // Credential patterns (1)
         "credentials",
-        // Exfiltration configuration (2)
-        "endpoint",
+        // Cloud / container credential stores (5)
+        "/.aws/",
+        "/.config/gcloud/",
+        "/.docker/config.json",
+        "/.kube/config",
+        "/.netrc",
+        // Exfiltration configuration (1). "endpoint" used to be here, but it
+        // matches ordinary deployment files (e.g. deploy-endpoints.json,
+        // {"endpoints":[]}) and produced PolicyViolation claims on benign runs.
         "exfil",
     ];
     SENSITIVE.iter().any(|s| path.contains(s))
@@ -630,12 +640,14 @@ mod tests {
 
     #[test]
     fn test_delegation_boundary_found() {
-        let records = vec![DelegationRecord {
+        let records = vec![DelegationObservation {
             delegation_id: "deleg-1".to_string(),
             from_agent_id: "agent-a".to_string(),
             to_agent_id: "agent-b".to_string(),
             parent_pid: 100,
+            parent_start_time_ns: 11,
             child_pid: 200,
+            child_start_time_ns: 22,
             timestamp_ns: 1000,
             child_comm: "claude".to_string(),
             confidence: 0.85,
@@ -648,12 +660,14 @@ mod tests {
 
     #[test]
     fn test_delegation_boundary_not_found() {
-        let records = vec![DelegationRecord {
+        let records = vec![DelegationObservation {
             delegation_id: "deleg-1".to_string(),
             from_agent_id: "agent-a".to_string(),
             to_agent_id: "agent-b".to_string(),
             parent_pid: 100,
+            parent_start_time_ns: 11,
             child_pid: 200,
+            child_start_time_ns: 22,
             timestamp_ns: 1000,
             child_comm: "claude".to_string(),
             confidence: 0.85,
@@ -682,6 +696,33 @@ mod tests {
         assert!(result.matched);
         assert_eq!(result.claim_state, ResponsibilityClaimState::Observed);
         assert_eq!(result.boundary_id.unwrap().0, "boundary.file_read");
+    }
+
+    #[test]
+    fn test_deployment_endpoints_file_is_not_sensitive() {
+        // Regression: the bare substring "endpoint" matched this benign
+        // fixture and produced a PolicyViolation claim on 2 of 20 benign runs.
+        assert!(!is_sensitive_path(
+            "env/scenarios/fixtures/benign/benign-code-refactor/deploy-endpoints.json"
+        ));
+        let resource = ResourceId::File {
+            canonical_path: "/tmp/deploy-endpoints.json".to_string(),
+        };
+        let result = evaluate_capability_boundary("agent-1", &resource);
+        assert_ne!(
+            result.claim_state,
+            ResponsibilityClaimState::Observed,
+            "a deployment endpoint list must not be an observed boundary crossing"
+        );
+    }
+
+    #[test]
+    fn test_cloud_credential_paths_are_sensitive() {
+        assert!(is_sensitive_path("/home/u/.aws/credentials"));
+        assert!(is_sensitive_path("/home/u/.kube/config"));
+        assert!(is_sensitive_path("/home/u/.docker/config.json"));
+        assert!(is_sensitive_path("/home/u/.netrc"));
+        assert!(is_sensitive_path("/tmp/exfil-plan.json"));
     }
 
     #[test]

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright (c) 2026 MtAgentLens Project
+
 use super::ids::*;
 use serde::{Deserialize, Serialize};
 
@@ -70,50 +73,6 @@ pub enum PolicyJudgmentResult {
 }
 
 // ═══ Policy Rule ═══
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PolicyRule {
-    pub rule_id: String,
-    pub priority: u32,
-    pub boundary: PolicyBoundary,
-    pub resource: ResourceSelector,
-    pub action: ActionSelector,
-    pub judgment: PolicyJudgmentResult,
-    pub description: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ResourceSelector {
-    Any,
-    Exact(String),
-    Prefix(String),
-    Glob(String),
-    Host(String),
-    Port(u16),
-    PortRange(u16, u16),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ActionSelector {
-    Any,
-    Read,
-    Write,
-    Execute,
-    Delete,
-    Operation(OperationCategory),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub enum OperationCategory {
-    FileRead,
-    FileWrite,
-    FileExec,
-    NetworkConnect,
-    NetworkSend,
-    ProcessEnum,
-    CredentialAccess,
-    ResourceHog,
-}
 
 // ═══ Delegation ═══
 

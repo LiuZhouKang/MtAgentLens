@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // cross_layer_bus.rs — Unified cross-layer event bus (§17).
 //

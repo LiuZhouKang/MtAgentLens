@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 MtAgentLens Project
 
 //! Analyzer Pipeline Composition Contract
@@ -277,7 +277,13 @@ pub fn canonical_pipeline_contracts() -> Vec<StageContract> {
             },
             produces: maplit::hashset! {
                 "multi_agent_anomaly".into(), "security_signoff".into(),
-                "context_pollution".into(),  // CPDP-001: ContextPollutionAnalyzer (undeployed)
+                // Declared, but nothing emits it: the CPDP-001 analyzer never
+                // compiled and has been deleted. The entry is kept because the
+                // ContextPollution stage's `consumes` set requires an upstream
+                // producer — see `test_canonical_contracts_are_satisfied`.
+                // Whether that stage survives is part of the separate decision
+                // about the unwired pipeline contract as a whole.
+                "context_pollution".into(),
             },
             pass_through: true,
             stateless: false, // maintains command history, cpu/mem streaks, sign-off lifecycle

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // runtime.rs — ResponsibilityRuntime: event loop orchestrator.
 //
@@ -7,13 +7,12 @@
 // triggers Phase 2 (batch) at session end.
 //
 // Key methods:
-//   run()         — main event loop (tokio::select! over event_rx + end_rx)
+//   process()     — the live event loop, driven as an `Analyzer`
 //   route_event() — stringly-typed dispatch to signals/identity/evidence
 //   trigger()     — debounced classification pipeline
 //   finalize()    — Phase 2 authoritative batch refinement
 
-use tokio::sync::{broadcast, mpsc, watch};
-use tokio::time::{Duration, interval};
+use tokio::sync::broadcast;
 
 use crate::framework::Event;
 use crate::framework::analyzers::Analyzer;
@@ -29,19 +28,23 @@ use crate::responsibility::cross_layer_bus::{
     ClaimSignal, ClassificationSignal, CrossLayerBus, ScoringSignal,
 };
 use crate::responsibility::evidence::correlator::EvidenceCorrelator;
-use crate::responsibility::evidence::intent_extractor::IntentExtractor;
 use crate::responsibility::graph::graph_builder::GraphBuilder;
 use crate::responsibility::graph::simplifier::GraphSimplifier;
 use crate::responsibility::identity::resolver::IdentityResolver;
+use crate::responsibility::judgment::delegation::DelegationTracker;
 use crate::responsibility::observer::ObserverProvider;
 use crate::responsibility::observer::cache::ObserverCache;
 use crate::responsibility::observer::types::{CacheKey, CacheTTL};
 use crate::responsibility::output::{EvaluationSummary, OutputFormat, OutputWriter};
 use crate::responsibility::persistence::{
-    BindingType, PersistRecord, PersistenceWriter, ProcessMetadata, TlsSession,
+    BindingType, IdentityBeliefLevel, PersistRecord, PersistenceWriter, ProcessMetadata, TlsSession,
 };
 use crate::responsibility::runtime::buffer::GraphDeltaBuffer;
-use crate::responsibility::runtime::routing::{DIAG_EVIDENCE_INTENTS, dispatch_event};
+use crate::responsibility::runtime::routing::{
+    DIAG_ACTIONS_DROPPED_BPF_NOISE, DIAG_ACTIONS_DROPPED_NO_AGENT, DIAG_ACTIONS_PRODUCED,
+    DIAG_EVIDENCE_ATTEMPTED, DIAG_EVIDENCE_INTENTS, DIAG_INTENTS_DEDUPED, DIAG_OPENCLAW_TOOL_CALLS,
+    dispatch_event,
+};
 use crate::responsibility::scoring::progressive::DimIndex;
 use crate::responsibility::signals::SignalGraph;
 use crate::responsibility::types::alert_types::{
@@ -52,34 +55,16 @@ use crate::responsibility::types::graph_types::{
     GraphSnapshot, ResponsibilityEdgeType as NewEdgeType, ResponsibilityNodeType as NewNodeType,
 };
 use crate::responsibility::types::ids::{
-    AlertId, ClaimId, EdgeId, MessageId, ProcessId, TlsSessionId,
+    ActionId, AgentId, AlertId, ClaimId, EdgeId, IntentId, MessageId, ProcessId, TlsSessionId,
 };
 use crate::responsibility::types::refinement::{GraphRefinement, GraphRefinementType};
 use futures::StreamExt;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Global shutdown signal. Set by the SIGINT handler in main.rs.
 /// The runtime polls this in its event loop to trigger Phase 2 finalization.
 pub static RUNTIME_SHUTDOWN: AtomicBool = AtomicBool::new(false);
-
-// ─── Session End Signal ───────────────────────────────────────────────
-
-/// Session end signal types per spec §3.3.
-///
-/// When received, the runtime stops accepting new events and triggers
-/// Phase 2 authoritative refinement.
-#[derive(Debug, Clone)]
-pub enum SessionEndSignal {
-    /// SIGINT received.
-    Sigint,
-    /// Monitored child process exited.
-    Sigchld(u32),
-    /// POST /api/sessions/{id}/end was called.
-    ApiCall,
-    /// Session timeout.
-    Timeout(u64),
-}
 
 // ─── Runtime Configuration ────────────────────────────────────────────
 
@@ -140,6 +125,10 @@ pub struct ResponsibilityRuntime {
     evidence_correlator: EvidenceCorrelator,
     /// Incremental graph builder (handles correlations one at a time).
     graph_builder: GraphBuilder,
+    /// Process-spawn delegation tracker (agent A spawns a process that
+    /// resolves to agent B). Complements the graph builder's observed
+    /// cross-agent orchestration signal.
+    delegation_tracker: DelegationTracker,
     /// Graph simplifier — removes low-confidence edges and merges duplicate
     /// resource nodes after each trigger cycle (§10.4 in architecture spec).
     graph_simplifier: GraphSimplifier,
@@ -151,6 +140,13 @@ pub struct ResponsibilityRuntime {
     observer_cache: ObserverCache,
     /// Fire-and-forget persistence writer (bounded mpsc channel).
     persistence: PersistenceWriter,
+    /// Optional live-forward channel for raw framework events.
+    ///
+    /// The runtime is the last analyzer, so the runner's output stream is not
+    /// a live path: buffering events there starved `/api/live/events` until
+    /// the run ended and lost the buffer on shutdown. Forwarding from here
+    /// keeps the live view real-time without retaining events.
+    raw_event_tx: Option<tokio::sync::broadcast::Sender<crate::framework::Event>>,
     /// Unified cross-layer bus (scoring / classification / claims / alerts).
     bus: CrossLayerBus,
     /// Running count of events processed.
@@ -178,38 +174,24 @@ pub struct ResponsibilityRuntime {
     claimed_edge_ids: HashSet<EdgeId>,
     /// Behavior timeline (accumulated across triggers).
     timeline: Vec<BehaviorTimelineEntry>,
+    /// Intent IDs that were successfully queued for persistence. Evidence
+    /// referencing any other intent (dropped due to backpressure, or never
+    /// persisted) is skipped rather than failing a FOREIGN KEY constraint.
+    persisted_intent_ids: HashSet<IntentId>,
+    /// Action IDs that were successfully queued for persistence.
+    persisted_action_ids: HashSet<ActionId>,
+    /// Provisional `(agent, pid, start, belief)` mappings already queued.
+    /// Without this set the dispatch path re-wrote every mapping on every
+    /// event — O(processes x events) records that saturated the writer
+    /// channel and turned into tens of thousands of dropped rows.
+    persisted_identity_mappings: HashSet<(AgentId, u32, u64, IdentityBeliefLevel)>,
+    /// Last persisted process set per provisional agent. The identity row is
+    /// rewritten only when the set changes instead of once per event.
+    persisted_provisional_sets: HashMap<AgentId, Vec<(u32, u64)>>,
     /// Whether new data has arrived since the last trigger.
     dirty: bool,
     /// Diagnostic: TLS event count.
     diag_tls_count: u64,
-    /// Per-connection accumulated SSL data buffers.
-    /// Keyed by connection identifier (pid:tid or connection_id).
-    /// Accumulates small chunks into complete messages for intent extraction.
-    conn_buffers: std::collections::HashMap<String, ConnBuffer>,
-    /// Maps PID → most recent TLS session. Used to create message_bindings
-    /// when flushing connection buffers, regardless of rw-direction key
-    /// mismatches between TLS events and data events.
-    pid_tls_session: std::collections::HashMap<u32, TlsSessionId>,
-}
-
-/// Accumulated raw data for a single TLS connection.
-struct ConnBuffer {
-    data: String,
-    last_update_ns: u64,
-    rw: u64, // 0=read(incoming/response), 1=write(outgoing/request)
-    tls_session_id: Option<TlsSessionId>,
-}
-
-impl ConnBuffer {
-    const MAX_SIZE: usize = 512 * 1024; // 512KB max per connection
-    const TTL_NS: u64 = 60_000_000_000; // 60s TTL
-
-    fn append(&mut self, chunk: &str, ts: u64) {
-        if self.data.len() + chunk.len() <= Self::MAX_SIZE {
-            self.data.push_str(chunk);
-        }
-        self.last_update_ns = ts;
-    }
 }
 
 impl ResponsibilityRuntime {
@@ -235,11 +217,13 @@ impl ResponsibilityRuntime {
             identity_resolver: IdentityResolver::new(),
             evidence_correlator: EvidenceCorrelator::new(),
             graph_builder: GraphBuilder::with_default_config(),
+            delegation_tracker: DelegationTracker::new(),
             graph_simplifier: GraphSimplifier::with_default_config(),
             classification_engine: PhaseClassificationEngine::new(),
             observer,
             observer_cache: ObserverCache::new(),
             persistence,
+            raw_event_tx: None,
             bus,
             event_count: 0,
             observer_calls: 0,
@@ -255,11 +239,22 @@ impl ResponsibilityRuntime {
             baseline_tracker: crate::responsibility::scoring::baseline::BaselineTracker::new(),
             calibration_monitor:
                 crate::responsibility::scoring::calibration::CalibrationMonitor::default(),
+            persisted_intent_ids: HashSet::new(),
+            persisted_action_ids: HashSet::new(),
+            persisted_identity_mappings: HashSet::new(),
+            persisted_provisional_sets: HashMap::new(),
             dirty: false,
             diag_tls_count: 0,
-            conn_buffers: std::collections::HashMap::new(),
-            pid_tls_session: std::collections::HashMap::new(),
         }
+    }
+
+    /// Forward every routed event to `tx` as it arrives (live SSE).
+    pub fn with_raw_event_sender(
+        mut self,
+        tx: tokio::sync::broadcast::Sender<crate::framework::Event>,
+    ) -> Self {
+        self.raw_event_tx = Some(tx);
+        self
     }
 
     // ── Session Initialization (shared by run() and process()) ──────
@@ -280,76 +275,6 @@ impl ResponsibilityRuntime {
         run_id
     }
 
-    // ── Main Event Loop ──────────────────────────────────────────────
-
-    /// Run the main event loop.
-    ///
-    /// Consumes events from `event_rx` and watches for session end on
-    /// `end_rx`. Routes each event through `route_event()`, triggers
-    /// classification on debounce or every N events, and calls
-    /// `finalize()` when the session ends.
-    ///
-    /// # Channels
-    ///
-    /// - `event_rx` — unbounded receiver of framework events
-    /// - `end_rx` — watch receiver for SessionEndSignal
-    pub async fn run(
-        &mut self,
-        mut event_rx: mpsc::UnboundedReceiver<Event>,
-        mut end_rx: watch::Receiver<Option<SessionEndSignal>>,
-    ) {
-        let run_id = self.init_session();
-
-        let debounce = Duration::from_millis(self.config.debounce_ms);
-        let mut tick = interval(debounce);
-
-        loop {
-            tokio::select! {
-                // ── Event received ──────────────────────────────────
-                Some(event) = event_rx.recv() => {
-                    self.event_count += 1;
-                    self.dirty = true;
-
-                    // Route event to subsystems (raw events persisted inside)
-                    let _output = self.route_event(event);
-
-                    // Trigger on count threshold
-                    if self.event_count.is_multiple_of(self.config.trigger_every_n) {
-                        self.trigger().await;
-                    }
-                }
-
-                // ── Debounce timer fired ────────────────────────────
-                _ = tick.tick() => {
-                    if self.dirty {
-                        self.trigger().await;
-                    }
-                }
-
-                // ── Session end signal ──────────────────────────────
-                Ok(()) = end_rx.changed() => {
-                    // Complete any pending trigger, then finalize
-                    if self.dirty {
-                        self.trigger().await;
-                    }
-                    self.finalize().await;
-
-                    // Write run end marker
-                    let _ = self.persistence.write(PersistRecord::RunEnd {
-                        run_id: run_id.clone(),
-                        timestamp_ns: current_time_ns(),
-                    });
-
-                    // Flush persistence before exit
-                    let _ = self.persistence.flush().await;
-                    break;
-                }
-
-                else => break,
-            }
-        }
-    }
-
     // ── Event Routing ────────────────────────────────────────────────
 
     /// Route a single framework event to the appropriate subsystems.
@@ -363,49 +288,188 @@ impl ResponsibilityRuntime {
     ///
     /// Returns a `Vec<Event>` of output events for downstream framework
     /// analyzers (e.g., signal events, alert events).
-    pub fn route_event(&mut self, event: Event) -> Vec<Event> {
+    /// Route one event through the responsibility subsystems.
+    ///
+    /// Takes `&Event` so callers can forward the original event downstream
+    /// unchanged: the runtime is an Analyzer in a global chain, and the
+    /// analyzers after it must still see every event.
+    pub fn route_event(&mut self, event: &Event) -> Vec<Event> {
+        // stdio capture is raw process I/O (file/pipe bytes), not an LLM
+        // response. Feeding it to IntentExtractor turns file content into
+        // phantom tool intents; keep it terminal until a dedicated content
+        // observation path is enabled (P3-b).
+        if crate::responsibility::runtime::routing::is_terminal_runtime_source(&event.source) {
+            return Vec::new();
+        }
+
         let intents_before = self.graph_buffer.intents.len();
         let actions_before = self.graph_buffer.actions.len();
 
         self.persist_raw_event(&event);
 
-        let output = dispatch_event(
+        let dispatch = dispatch_event(
             &event,
             &mut self.signal_graph,
             &mut self.identity_resolver,
             &mut self.evidence_correlator,
             &mut self.graph_buffer,
-        )
-        .output_events;
+        );
+        let output = dispatch.output_events;
+
+        // Message→TLS bindings surfaced during intent extraction. Routing has
+        // no writer handle, so it hands them back here. This replaces the
+        // binding that `flush_conn_buffers` produced as a by-product of
+        // re-extracting the same payload — which duplicated every intent,
+        // since `MessageId` is generated fresh per run and the correlator's
+        // (intent_id, action_id) dedup key could therefore never match.
+        for binding in dispatch.message_bindings {
+            let _ = self.persistence.write(PersistRecord::MessageBinding {
+                message_id: binding.message_id,
+                pid: binding.pid,
+                start_time_ns: binding.start_time_ns,
+                tls_session_id: binding.tls_session_id,
+                binding_type: BindingType::TlsShared,
+                timestamp_ns: binding.timestamp_ns,
+            });
+        }
 
         // Persist new intents and actions for replay support.
         // Phase 2 replay reads these from SQLite to re-run batch correlation.
         for intent in &self.graph_buffer.intents[intents_before..] {
-            let _ = self
+            if self
                 .persistence
-                .write(PersistRecord::Intent(intent.clone()));
+                .write(PersistRecord::Intent(intent.clone()))
+            {
+                self.persisted_intent_ids.insert(intent.intent_id.clone());
+            }
         }
         for action in &self.graph_buffer.actions[actions_before..] {
-            let _ = self
+            if self
                 .persistence
-                .write(PersistRecord::Action(action.clone()));
+                .write(PersistRecord::Action(action.clone()))
+            {
+                self.persisted_action_ids.insert(action.action_id.clone());
+            }
         }
 
         // Persist provisional identities and process→agent mappings
         for pi in self.identity_resolver.provisional_identities() {
-            let _ = self
-                .persistence
-                .write(PersistRecord::ProvisionalIdentity(pi.clone()));
+            let mut process_set: Vec<(u32, u64)> = pi
+                .process_ids
+                .iter()
+                .map(|p| (p.pid, p.start_time_ns))
+                .collect();
+            process_set.sort_unstable();
+            if self.persisted_provisional_sets.get(&pi.agent_id) != Some(&process_set) {
+                self.persisted_provisional_sets
+                    .insert(pi.agent_id.clone(), process_set);
+                let _ = self
+                    .persistence
+                    .write(PersistRecord::ProvisionalIdentity(pi.clone()));
+            }
             for pid in &pi.process_ids {
+                let key = (
+                    pi.agent_id.clone(),
+                    pid.pid,
+                    pid.start_time_ns,
+                    IdentityBeliefLevel::Provisional,
+                );
+                if !self.persisted_identity_mappings.insert(key) {
+                    continue;
+                }
                 let _ = self.persistence.write(PersistRecord::IdentityMapping {
                     agent_id: pi.agent_id.clone(),
                     pid: pid.pid,
                     start_time_ns: pid.start_time_ns,
+                    belief_level: IdentityBeliefLevel::Provisional,
+                    observed_at_ns: current_time_ns(),
+                    source: "provisional_identity",
                 });
             }
         }
 
+        self.detect_delegations(&event);
+
         output
+    }
+
+    /// Detect process-spawn delegations for this event.
+    ///
+    /// An orchestration tool call is only one way agents hand work to each
+    /// other; the other is a process spawn that later resolves to a different
+    /// agent. Recording the spawn here lets the graph builder's policy gate
+    /// distinguish a verified delegation (Observed) from an unverified
+    /// cross-agent orchestration (Ambiguous).
+    fn detect_delegations(&mut self, event: &Event) {
+        let is_exec = event.data.get("event").and_then(|v| v.as_str()) == Some("EXEC");
+        if !is_exec && self.delegation_tracker.pending_count() == 0 {
+            return;
+        }
+
+        // pid → agent from the current provisional identities. Built only when
+        // there is something to resolve (EXEC or pending spawns).
+        let mut pid_agent: HashMap<u32, String> = HashMap::new();
+        for identity in self.identity_resolver.provisional_identities() {
+            for process_id in &identity.process_ids {
+                pid_agent.insert(process_id.pid, identity.agent_id.to_string());
+            }
+        }
+
+        if is_exec
+            && let Some(ppid) = event
+                .data
+                .get("ppid")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as u32)
+            && let Some(parent_agent) = pid_agent.get(&ppid)
+        {
+            let parent_start_time_ns = event
+                .data
+                .get("parent_start_time_ns")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let child_start_time_ns = event
+                .data
+                .get("start_time_ns")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            self.delegation_tracker.record_spawn(
+                crate::responsibility::judgment::delegation::SpawnObservation {
+                    parent_pid: ppid,
+                    parent_start_time_ns,
+                    child_pid: event.pid,
+                    child_start_time_ns,
+                    parent_agent_id: parent_agent.as_str(),
+                    timestamp_ns: event.timestamp,
+                    child_comm: &event.comm,
+                },
+            );
+        }
+
+        for record in self.delegation_tracker.drain_delegations(&pid_agent) {
+            self.graph_builder.record_delegation(record.clone());
+            // The tracker observation and the persisted record carry the same
+            // facts in different shapes; convert here so the delegation table
+            // keeps typed process IDs (pid + start time, immune to pid reuse).
+            let persisted = crate::responsibility::types::policy_types::DelegationRecord {
+                delegation_id: record.delegation_id.clone(),
+                from_agent: crate::responsibility::types::AgentId::from(
+                    record.from_agent_id.clone(),
+                ),
+                to_agent: crate::responsibility::types::AgentId::from(record.to_agent_id.clone()),
+                parent_process: crate::responsibility::types::ProcessId::new(
+                    record.parent_pid,
+                    record.parent_start_time_ns,
+                ),
+                child_process: crate::responsibility::types::ProcessId::new(
+                    record.child_pid,
+                    record.child_start_time_ns,
+                ),
+                timestamp_ns: record.timestamp_ns,
+                confidence: record.confidence,
+            };
+            let _ = self.persistence.write(PersistRecord::Delegation(persisted));
+        }
     }
 
     /// Persist raw eBPF events (EXEC, TLS) and accumulate SSL data.
@@ -481,13 +545,8 @@ impl ResponsibilityRuntime {
                 ProcessId::new(pid, start_time_ns),
                 &self.signal_graph.snapshot(),
             );
-            let tls_session_id = event
-                .data
-                .get("connection_id")
-                .or_else(|| event.data.get("tls_session"))
-                .and_then(|v| v.as_str())
-                .map(TlsSessionId::from)
-                .unwrap_or_else(TlsSessionId::new);
+            let tls_session_id =
+                crate::responsibility::runtime::routing::resolve_tls_session_id(&event);
 
             let _ = self.persistence.write(PersistRecord::Tls(TlsSession {
                 tls_session_id: tls_session_id.clone(),
@@ -495,123 +554,6 @@ impl ResponsibilityRuntime {
                 start_time_ns: resolved_id.start_time_ns,
                 timestamp_ns: event.timestamp,
             }));
-
-            // Store PID→TLS mapping so flush_conn_buffers can create
-            // message_bindings regardless of rw-direction key mismatches.
-            self.pid_tls_session.insert(resolved_id.pid, tls_session_id);
-        }
-
-        // ── Cross-event payload accumulation (all sources) ────────
-        let chunk: Option<&str> = event
-            .data
-            .get("data")
-            .and_then(|v| v.as_str())
-            .or_else(|| event.data.get("body").and_then(|v| v.as_str()));
-        if let Some(chunk) = chunk
-            && !chunk.is_empty()
-        {
-            let pid = event
-                .data
-                .get("pid")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(event.pid as u64) as u32;
-            let rw = event
-                .data
-                .get("function")
-                .and_then(|v| v.as_str())
-                .map(|f| {
-                    if f.to_lowercase().contains("read") {
-                        0u64
-                    } else {
-                        1u64
-                    }
-                })
-                .unwrap_or(1);
-            // Separate buffers per PID and direction (read=response, write=request)
-            let conn_key = format!("{}:rw{}", pid, rw);
-            self.conn_buffers
-                .entry(conn_key)
-                .or_insert_with(|| ConnBuffer {
-                    data: String::new(),
-                    last_update_ns: 0,
-                    rw,
-                    tls_session_id: None,
-                })
-                .append(chunk, event.timestamp);
-        }
-    }
-
-    /// Flush accumulated connection buffers through intent extraction.
-    ///
-    /// Called periodically from trigger() to process accumulated SSL data
-    /// into intents. Drains each buffer and resets it.
-    fn flush_conn_buffers(&mut self) {
-        let snapshot = self.signal_graph.snapshot();
-        let now = current_time_ns();
-
-        // Expire old buffers first
-        self.conn_buffers
-            .retain(|_, buf| now.saturating_sub(buf.last_update_ns) < ConnBuffer::TTL_NS);
-
-        for (conn_key, buf) in &mut self.conn_buffers {
-            if buf.data.is_empty() || buf.data.len() < 64 {
-                continue;
-            }
-
-            // Parse connection key: "pid:rwX"
-            let pid: u32 = match conn_key.split(':').next().and_then(|s| s.parse().ok()) {
-                Some(p) => p,
-                None => continue,
-            };
-            let process_id = crate::responsibility::runtime::routing::resolve_process_id(
-                ProcessId::new(pid, 0),
-                &snapshot,
-            );
-
-            let source = if buf.rw == 1 {
-                IntentAuthoritySource::SseResponseToolUse // outgoing — has request context
-            } else {
-                IntentAuthoritySource::HttpResponseToolUse
-            };
-            let msg_id = MessageId::new();
-
-            let intents = IntentExtractor::extract(
-                &buf.data,
-                source,
-                process_id,
-                msg_id.clone(),
-                buf.last_update_ns,
-            );
-
-            if !intents.is_empty() {
-                // Persist message binding — links TLS session to parsed message.
-                // This enables end-to-end traceability: TLS connection → HTTP
-                // message → intent → action. Uses the PID→TLS map populated
-                // when TLS events arrive (separately from data chunks).
-                if let Some(tls_sid) = self.pid_tls_session.get(&process_id.pid) {
-                    let _ = self.persistence.write(PersistRecord::MessageBinding {
-                        message_id: msg_id.clone(),
-                        pid: process_id.pid,
-                        start_time_ns: process_id.start_time_ns,
-                        tls_session_id: Some(tls_sid.clone()),
-                        binding_type: BindingType::TlsShared,
-                        timestamp_ns: buf.last_update_ns,
-                    });
-                }
-
-                DIAG_EVIDENCE_INTENTS.fetch_add(intents.len() as u64, Ordering::Relaxed);
-                for intent in intents {
-                    let intent_clone = intent.clone();
-                    self.graph_buffer.push_intent(intent_clone);
-                    let evidence_list = self.evidence_correlator.on_intent(intent, &snapshot);
-                    for ev in evidence_list {
-                        self.graph_buffer.push_evidence(ev);
-                    }
-                }
-                // Only clear if extraction succeeded; otherwise accumulate more data
-                buf.data.clear();
-            }
-            // Note: if no intents found, data stays for next trigger
         }
     }
 
@@ -628,15 +570,15 @@ impl ResponsibilityRuntime {
     /// 6. Build claims, alerts, tracebacks
     /// 7. Persist and broadcast
     pub async fn trigger(&mut self) {
-        // ── 0. Flush accumulated connection buffers → intents ──────
-        self.flush_conn_buffers();
-
         // ── 1. Signal snapshot ─────────────────────────────────────
         let _snapshot = self.signal_graph.snapshot();
 
         // ── 2. Drain and persist evidence correlator diagnostics ──
         for diag in self.evidence_correlator.drain_diagnostics() {
-            let _ = self.persistence.write(PersistRecord::NonLink(diag));
+            let _ = self
+                .persistence
+                .write_blocking(PersistRecord::NonLink(diag))
+                .await;
         }
 
         // ── 3a. Process standalone intents (UserPrompt etc.) through
@@ -681,8 +623,18 @@ impl ResponsibilityRuntime {
         // Process each accumulated evidence item
         let evidence_snapshot: Vec<_> = self.graph_buffer.evidence.drain(..).collect();
         for ev in &evidence_snapshot {
-            // Persist the evidence link to DB
-            let _ = self.persistence.write(PersistRecord::Evidence(ev.clone()));
+            // Persist the evidence link to DB only when both parents reached
+            // the writer. A dropped parent is already counted as lost data;
+            // inserting the child anyway would only produce a FOREIGN KEY
+            // failure that looks like a second, unrelated defect.
+            if self.persisted_intent_ids.contains(&ev.intent_id)
+                && self.persisted_action_ids.contains(&ev.action_id)
+            {
+                let _ = self
+                    .persistence
+                    .write_blocking(PersistRecord::Evidence(ev.clone()))
+                    .await;
+            }
 
             // Look up the intent and action that produced this evidence
             let intent = self.graph_buffer.find_intent_by_id(&ev.intent_id).cloned();
@@ -716,7 +668,7 @@ impl ResponsibilityRuntime {
         if !simplify_delta.removed_edges.is_empty() || !simplify_delta.removed_nodes.is_empty() {
             let _ = self
                 .persistence
-                .write(PersistRecord::GraphRefinement(GraphRefinement {
+                .write_blocking(PersistRecord::GraphRefinement(GraphRefinement {
                     refinement_type: GraphRefinementType::EdgeRemoved,
                     affected_nodes: simplify_delta.removed_nodes.clone(),
                     affected_edges: simplify_delta.removed_edges.clone(),
@@ -726,7 +678,8 @@ impl ResponsibilityRuntime {
                         simplify_delta.removed_edges.len(),
                         simplify_delta.diagnostics.join("; ")
                     ),
-                }));
+                }))
+                .await;
         }
 
         // ── 4. Pattern match the graph ─────────────────────────────
@@ -1250,18 +1203,27 @@ impl ResponsibilityRuntime {
             // Persist claims FIRST (traceback has FOREIGN KEY to claim)
             for claim in &new_claims {
                 self.phase1_claim_ids.insert(claim.claim_id.clone());
-                let _ = self.persistence.write(PersistRecord::Claim(claim.clone()));
+                let _ = self
+                    .persistence
+                    .write_blocking(PersistRecord::Claim(claim.clone()))
+                    .await;
             }
 
             // Build and persist tracebacks AFTER claims
             for claim in &new_claims {
                 if let Some(traceback) = TracebackBuilder::build(claim, graph) {
-                    let _ = self.persistence.write(PersistRecord::Traceback(traceback));
+                    let _ = self
+                        .persistence
+                        .write_blocking(PersistRecord::Traceback(traceback))
+                        .await;
                 }
             }
 
             self.phase1_alert_ids.push(alert.alert_id.clone());
-            let _ = self.persistence.write(PersistRecord::Alert(alert.clone()));
+            let _ = self
+                .persistence
+                .write_blocking(PersistRecord::Alert(alert.clone()))
+                .await;
 
             // Broadcast alert to frontend SSE consumers
             self.bus.emit_alert(alert);
@@ -1271,12 +1233,14 @@ impl ResponsibilityRuntime {
         for node in &self.graph_buffer.nodes {
             let _ = self
                 .persistence
-                .write(PersistRecord::GraphNode(node.clone()));
+                .write_blocking(PersistRecord::GraphNode(node.clone()))
+                .await;
         }
         for edge in &self.graph_buffer.edges {
             let _ = self
                 .persistence
-                .write(PersistRecord::GraphEdge(edge.clone()));
+                .write_blocking(PersistRecord::GraphEdge(edge.clone()))
+                .await;
         }
 
         // Persist a graph snapshot for replay and Phase 2 diff.
@@ -1292,13 +1256,14 @@ impl ResponsibilityRuntime {
         };
         let _ = self
             .persistence
-            .write(PersistRecord::GraphSnapshot(snapshot));
+            .write_blocking(PersistRecord::GraphSnapshot(snapshot))
+            .await;
 
         // ── Persist policy/judgment data ────────────────────────────
         // Policy evaluations: one per PolicyBoundaryCrossing edge
         for edge in &self.graph_buffer.edges {
             if edge.edge_type == crate::responsibility::types::graph_types::ResponsibilityEdgeType::PolicyBoundaryCrossing {
-                let _ = self.persistence.write(PersistRecord::PolicyEvaluation(
+                let _ = self.persistence.write_blocking(PersistRecord::PolicyEvaluation(
                     crate::responsibility::types::policy_types::PolicyEvaluation {
                         policy_id: crate::responsibility::types::ids::PolicyId::new(),
                         boundary: crate::responsibility::types::policy_types::PolicyBoundary::Capability,
@@ -1318,20 +1283,23 @@ impl ResponsibilityRuntime {
                         evidence: edge.evidence_refs.clone(),
                         confidence: edge.confidence,
                         reason: "PolicyBoundaryCrossing edge created".to_string(),
-                    }));
+                    })).await;
             }
         }
         // Context pollution from taint tracker
         let taint = self.graph_builder.taint_tracker();
         for (path, record) in taint.contaminated_artifacts() {
-            let _ = self.persistence.write(PersistRecord::ContextPollution(
-                crate::responsibility::types::policy_types::ContextPollution {
-                    source_agent: record.source_agent.clone(),
-                    contaminated_artifact: path.clone(),
-                    propagation_path: vec![],
-                    detected_at_ns: record.timestamp_ns,
-                },
-            ));
+            let _ = self
+                .persistence
+                .write_blocking(PersistRecord::ContextPollution(
+                    crate::responsibility::types::policy_types::ContextPollution {
+                        source_agent: record.source_agent.clone(),
+                        contaminated_artifact: path.clone(),
+                        propagation_path: vec![],
+                        detected_at_ns: record.timestamp_ns,
+                    },
+                ))
+                .await;
         }
 
         // ── Cleanup ────────────────────────────────────────────────
@@ -1378,24 +1346,41 @@ impl ResponsibilityRuntime {
         for agent in &authoritative_identity.agents {
             let _ = self
                 .persistence
-                .write(PersistRecord::AuthoritativeIdentity(agent.clone()));
+                .write_blocking(PersistRecord::AuthoritativeIdentity(agent.clone()))
+                .await;
             for pid in &agent.process_ids {
-                let _ = self.persistence.write(PersistRecord::IdentityMapping {
-                    agent_id: agent.agent_id.clone(),
-                    pid: pid.pid,
-                    start_time_ns: pid.start_time_ns,
-                });
+                let belief_level = match agent.confidence {
+                    crate::responsibility::types::identity_types::AgentConfidence::Authoritative => {
+                        IdentityBeliefLevel::Authoritative
+                    }
+                    crate::responsibility::types::identity_types::AgentConfidence::Inferred => {
+                        IdentityBeliefLevel::Inferred
+                    }
+                };
+                let _ = self
+                    .persistence
+                    .write_blocking(PersistRecord::IdentityMapping {
+                        agent_id: agent.agent_id.clone(),
+                        pid: pid.pid,
+                        start_time_ns: pid.start_time_ns,
+                        belief_level,
+                        observed_at_ns: current_time_ns(),
+                        source: "authoritative_identity_resolution",
+                    })
+                    .await;
             }
         }
         for refinement in &authoritative_identity.refinements {
             let _ = self
                 .persistence
-                .write(PersistRecord::IdentityRefinement(refinement.clone()));
+                .write_blocking(PersistRecord::IdentityRefinement(refinement.clone()))
+                .await;
         }
         for boundary in &authoritative_identity.subagent_boundaries {
             let _ = self
                 .persistence
-                .write(PersistRecord::SubagentBoundary(boundary.clone()));
+                .write_blocking(PersistRecord::SubagentBoundary(boundary.clone()))
+                .await;
         }
 
         // ── 3. Batch evidence correlation ──────────────────────────
@@ -1408,12 +1393,20 @@ impl ResponsibilityRuntime {
 
         // Persist batch evidence and refinements
         for ev in &batch_evidence.evidence {
-            let _ = self.persistence.write(PersistRecord::Evidence(ev.clone()));
+            if self.persisted_intent_ids.contains(&ev.intent_id)
+                && self.persisted_action_ids.contains(&ev.action_id)
+            {
+                let _ = self
+                    .persistence
+                    .write_blocking(PersistRecord::Evidence(ev.clone()))
+                    .await;
+            }
         }
         for refinement in &batch_evidence.refinements {
             let _ = self
                 .persistence
-                .write(PersistRecord::EvidenceRefinement(refinement.clone()));
+                .write_blocking(PersistRecord::EvidenceRefinement(refinement.clone()))
+                .await;
         }
 
         // ── 4. Finalize graph ──────────────────────────────────────
@@ -1430,7 +1423,8 @@ impl ResponsibilityRuntime {
         };
         let _ = self
             .persistence
-            .write(PersistRecord::GraphSnapshot(graph_snapshot.clone()));
+            .write_blocking(PersistRecord::GraphSnapshot(graph_snapshot.clone()))
+            .await;
 
         let _frozen =
             self.graph_builder
@@ -1440,7 +1434,8 @@ impl ResponsibilityRuntime {
         for refinement in &_frozen.refinements {
             let _ = self
                 .persistence
-                .write(PersistRecord::GraphRefinement(refinement.clone()));
+                .write_blocking(PersistRecord::GraphRefinement(refinement.clone()))
+                .await;
         }
 
         // ── 5. Authoritative classification ────────────────────────
@@ -1493,16 +1488,25 @@ impl ResponsibilityRuntime {
 
             // Persist claims FIRST (traceback has FOREIGN KEY to claim)
             for claim in &claims {
-                let _ = self.persistence.write(PersistRecord::Claim(claim.clone()));
+                let _ = self
+                    .persistence
+                    .write_blocking(PersistRecord::Claim(claim.clone()))
+                    .await;
             }
 
             // Build and persist tracebacks AFTER claims
             for claim in &claims {
                 if let Some(traceback) = TracebackBuilder::build(claim, graph) {
-                    let _ = self.persistence.write(PersistRecord::Traceback(traceback));
+                    let _ = self
+                        .persistence
+                        .write_blocking(PersistRecord::Traceback(traceback))
+                        .await;
                 }
             }
-            let _ = self.persistence.write(PersistRecord::Alert(alert.clone()));
+            let _ = self
+                .persistence
+                .write_blocking(PersistRecord::Alert(alert.clone()))
+                .await;
 
             // Broadcast final authoritative alert
             let phase2_alert_id = alert.alert_id.clone();
@@ -1510,23 +1514,23 @@ impl ResponsibilityRuntime {
 
             // ── Persist Phase1→Phase2 refinements ──────────────────────
             for p1_id in self.phase1_alert_ids.drain(..) {
-                let _ = self.persistence.write(PersistRecord::ClassificationRefinement(
+                let _ = self.persistence.write_blocking(PersistRecord::ClassificationRefinement(
                     crate::responsibility::types::refinement::ClassificationRefinement {
                         phase1_alert_id: p1_id,
                         phase2_alert_id: phase2_alert_id.clone(),
                         refinement_type: crate::responsibility::types::refinement::ClassificationRefinementType::Dismissed,
                         reason: "Phase 2 authoritative re-evaluation".into(),
                         score_delta: 0.0,
-                    }));
+                    })).await;
             }
             for c1_id in self.phase1_claim_ids.drain() {
-                let _ = self.persistence.write(PersistRecord::ClaimRefinement(
+                let _ = self.persistence.write_blocking(PersistRecord::ClaimRefinement(
                     crate::responsibility::types::refinement::ClaimRefinement {
                         phase1_claim_id: c1_id,
                         phase2_claim_id: ClaimId::from("phase2-authoritative"),
                         refinement_type: crate::responsibility::types::refinement::ClaimRefinementType::Dismissed,
                         reason: "Phase 2 authoritative re-evaluation".into(),
-                    }));
+                    })).await;
             }
         } // can_identify_agent
 
@@ -1587,8 +1591,62 @@ impl ResponsibilityRuntime {
         let json_writer = OutputWriter::new(OutputFormat::Json);
         eprintln!("[evaluation:json] {}", json_writer.format_summary(&summary));
 
+        // Routing diagnostics. These are the counters that explain "the run
+        // observed traffic but produced no intents/actions": an empty result
+        // must be distinguishable from an unobserved one.
+        eprintln!(
+            "[diagnostics:json] {}",
+            serde_json::json!({
+                "evidence_attempted": DIAG_EVIDENCE_ATTEMPTED.load(std::sync::atomic::Ordering::Relaxed),
+                "evidence_intents": DIAG_EVIDENCE_INTENTS.load(std::sync::atomic::Ordering::Relaxed),
+                "intents_deduped": DIAG_INTENTS_DEDUPED.load(std::sync::atomic::Ordering::Relaxed),
+                "openclaw_tool_calls": DIAG_OPENCLAW_TOOL_CALLS.load(std::sync::atomic::Ordering::Relaxed),
+                "actions_produced": DIAG_ACTIONS_PRODUCED.load(std::sync::atomic::Ordering::Relaxed),
+                "actions_dropped_no_agent": DIAG_ACTIONS_DROPPED_NO_AGENT.load(std::sync::atomic::Ordering::Relaxed),
+                "actions_dropped_bpf_noise": DIAG_ACTIONS_DROPPED_BPF_NOISE.load(std::sync::atomic::Ordering::Relaxed),
+                "bodies_too_large": crate::responsibility::evidence::intent_extractor::DIAG_BODY_TOO_LARGE
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            })
+        );
+
         // Flush all pending persistence writes
         let _ = self.persistence.flush().await;
+    }
+
+    /// Finalize the run and make the persistence outcome visible.
+    ///
+    /// Both shutdown branches of the live event loop need this. Duplicating it
+    /// is how the two copies drifted: the flush result was discarded with
+    /// `let _ =`, and the drop / write-failure counters were never printed, so a
+    /// run could lose persisted rows while looking perfectly healthy.
+    async fn finalize_session(&mut self, run_id: &str) {
+        if self.dirty {
+            self.trigger().await;
+        }
+        self.finalize().await;
+
+        let _ = self.persistence.write(PersistRecord::RunEnd {
+            run_id: run_id.to_string(),
+            timestamp_ns: current_time_ns(),
+        });
+
+        if let Err(e) = self.persistence.flush().await {
+            eprintln!("persistence: final flush failed: {e}");
+        }
+        let lost = self.persistence.lost_persist_count();
+        let failed = self.persistence.write_failure_count();
+        let closed = self.persistence.channel_closed_count();
+        if lost > 0 || failed > 0 || closed > 0 {
+            eprintln!(
+                "persistence: DEGRADED — {lost} record(s) dropped before the writer, \
+                 {failed} write-path failure(s), {closed} record(s) rejected after the \
+                 writer task exited; persisted run data is incomplete"
+            );
+        } else {
+            eprintln!(
+                "persistence: flushed cleanly (0 dropped, 0 write failures, 0 closed-channel)"
+            );
+        }
     }
 }
 
@@ -1632,7 +1690,6 @@ impl Analyzer for ResponsibilityRuntime {
 
     async fn process(&mut self, input: EventStream) -> Result<EventStream, AnalyzerError> {
         let run_id = self.init_session();
-        let mut output = Vec::new();
         let mut input = Box::pin(input);
         let mut tick =
             tokio::time::interval(std::time::Duration::from_millis(self.config.debounce_ms));
@@ -1646,8 +1703,16 @@ impl Analyzer for ResponsibilityRuntime {
                 event_opt = input.next() => {
                     match event_opt {
                         Some(event) => {
-                            let emitted = self.route_event(event);
-                            output.extend(emitted);
+                            // The runtime is the terminal analyzer: it
+                            // consumes the stream and forwards raw events
+                            // live instead of accumulating them. Buffering
+                            // here made `/api/live/events` silent for the
+                            // whole run and left the buffer unread on the
+                            // shutdown path.
+                            if let Some(tx) = &self.raw_event_tx {
+                                let _ = tx.send(event.clone());
+                            }
+                            let _ = self.route_event(&event);
                             self.event_count += 1;
                             self.dirty = true;
                             if self.event_count.is_multiple_of(self.config.trigger_every_n) {
@@ -1655,15 +1720,7 @@ impl Analyzer for ResponsibilityRuntime {
                             }
                         }
                         None => {
-                            if self.dirty {
-                                self.trigger().await;
-                            }
-                            self.finalize().await;
-                            let _ = self.persistence.write(PersistRecord::RunEnd {
-                                run_id: run_id.clone(),
-                                timestamp_ns: current_time_ns(),
-                            });
-                            let _ = self.persistence.flush().await;
+                            self.finalize_session(&run_id).await;
                             break;
                         }
                     }
@@ -1675,21 +1732,15 @@ impl Analyzer for ResponsibilityRuntime {
                 }
                 _ = shutdown_poll.tick() => {
                     if RUNTIME_SHUTDOWN.load(Ordering::Relaxed) {
-                        if self.dirty {
-                            self.trigger().await;
-                        }
-                        self.finalize().await;
-                        let _ = self.persistence.write(PersistRecord::RunEnd {
-                            run_id: run_id.clone(),
-                            timestamp_ns: current_time_ns(),
-                        });
-                        let _ = self.persistence.flush().await;
+                        self.finalize_session(&run_id).await;
                         break;
                     }
                 }
             }
         }
 
-        Ok(Box::pin(futures::stream::iter(output)))
+        // Terminal analyzer: no downstream consumer. The runner's stream ends
+        // when the input ends, which is what main.rs waits for.
+        Ok(Box::pin(futures::stream::empty()))
     }
 }

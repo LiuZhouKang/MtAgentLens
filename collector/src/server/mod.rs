@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 eunomia-bpf org.
 
 //! Web server module for serving embedded frontend assets
@@ -11,11 +11,11 @@ pub mod assets;
 pub mod live_sse;
 pub mod web;
 
+pub use web::WebServer;
+
 // #[cfg(test)]
 // mod test_assets;
 // #[cfg(test)]
 // mod test_web;
 // #[cfg(test)]
 // mod test_integration;
-
-pub use web::WebServer;

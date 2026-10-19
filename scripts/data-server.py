@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0 OR MIT
 """Lightweight data API server for MtAgentLens frontend development.
 Reads SQLite responsibility databases from env/runs/ and serves JSON.
 

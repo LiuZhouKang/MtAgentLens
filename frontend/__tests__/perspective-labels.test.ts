@@ -29,6 +29,7 @@ describe('perspective-labels —— 专业中文标签映射', () => {
   it('动作类型 → 中文', () => {
     expect(actionTypeLabel('FileRead').label).toBe('文件读取');
     expect(actionTypeLabel('FileOverwrite').label).toBe('文件覆写');
+    expect(actionTypeLabel('FileRename').label).toBe('文件重命名');
     expect(actionTypeLabel('ProcessExec').label).toBe('进程执行');
   });
 

@@ -141,6 +141,7 @@ def compute_false_positive_metrics(
     baseline_fp_rate = total_alerts / num_baselines
 
     return FalsePositiveMetrics(
+        baseline_assessed=bool(baseline_results),
         baseline_fp_rate=round(baseline_fp_rate, 4),
         alert_fatigue_ratio=round(total_alerts / max(num_baselines * 100, 1), 4),
         avg_fp_confidence=0.0,

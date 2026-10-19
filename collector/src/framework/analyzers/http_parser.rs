@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 eunomia-bpf org.
 
 use super::event::HTTPEvent;
@@ -256,6 +256,12 @@ impl Analyzer for HTTPParser {
                 // Only process SSL events. SSE-processed events (source="sse_processor")
                 // are passed through for CausalTraceAnalyzer to extract tool_use intents.
                 if event.source == "ssl" {
+                    // A raw fragment that PayloadNormalizer is buffering must
+                    // not be parsed as a complete message; the decoded
+                    // replacement arrives once the response is complete.
+                    if event.data.get("partial").and_then(|value| value.as_bool()) == Some(true) {
+                        return Some(event);
+                    }
                     Self::handle_ssl_event(event, include_raw_data)
                 } else {
                     Some(event) // Pass through other events

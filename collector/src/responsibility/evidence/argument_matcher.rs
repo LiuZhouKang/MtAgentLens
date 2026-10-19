@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // argument_matcher.rs — L1-L5 argument matching between Intent and Action args.
 //
@@ -152,6 +152,12 @@ fn compare_paths(intent_path: &str, action_path: &str) -> Option<(MatchLevel, f3
 // ─── Command comparison (symmetric) ───────────────────────────────────
 
 fn compare_commands(intent_cmd: &str, action_cmd: &str) -> Option<(MatchLevel, f32)> {
+    // An empty command is contained in every string, so the L3 rule below
+    // would link a malformed tool input to every ProcessExec action. Empty is
+    // not evidence.
+    if intent_cmd.trim().is_empty() || action_cmd.trim().is_empty() {
+        return None;
+    }
     // L1: exact match
     if intent_cmd == action_cmd {
         return Some((MatchLevel::L1Exact, 0.90));
@@ -187,6 +193,9 @@ fn compare_commands(intent_cmd: &str, action_cmd: &str) -> Option<(MatchLevel, f
 /// Compare a command to a path (e.g., intent says "python3", action has "/usr/bin/python3").
 /// This handles the Command↔Path cross-match.
 fn compare_command_to_path(cmd: &str, path: &str) -> Option<(MatchLevel, f32)> {
+    if cmd.trim().is_empty() || path.trim().is_empty() {
+        return None;
+    }
     let cmd_lower = cmd.to_lowercase();
     let path_lower = path.to_lowercase();
 
@@ -397,6 +406,18 @@ fn longest_common_substring(a: &str, b: &str, min_len: usize) -> Option<(usize, 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An empty (or whitespace-only) command is a substring of every string.
+    /// It must never produce a correlation.
+    #[test]
+    fn empty_commands_never_match() {
+        assert_eq!(compare_commands("", "python3"), None);
+        assert_eq!(compare_commands("python3", ""), None);
+        assert_eq!(compare_commands("   ", "python3"), None);
+        assert_eq!(compare_commands("   ", "   "), None);
+        assert_eq!(compare_command_to_path("", "/usr/bin/python3"), None);
+        assert_eq!(compare_command_to_path("python3", "   "), None);
+    }
 
     // ── Path matching ────────────────────────────────────────────────
 

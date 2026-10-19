@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright (c) 2026 MtAgentLens Project
+
 // ── Legacy modules (backward compat) ───────────────────────────────────────
-pub mod action_candidate;
-pub mod correlator_legacy;
-pub mod evidence_record;
-pub mod root_cause;
+// The legacy correlator, its duplicate MatchLevel / CorrelationEvidence /
+// ActionCandidateType definitions, the unused EvidenceRecordNew type and the
+// dead Innovation-7/17 graph modules were deleted on 2026-10-18. The audit and
+// the semantic mapping table are in docs/adr/0011-one-match-level.md.
 
 // ── Authoritative modules ──────────────────────────────────────────────────
 pub mod action_classifier;
@@ -15,27 +18,13 @@ pub mod intent_extractor;
 pub mod non_link_diagnostic;
 pub mod quality;
 
-// ── Legacy re-exports (backward compat — old consumers) ────────────────────
-pub use action_candidate::{
-    ActionCandidate, ActionCandidateType, CandidateDerivationMode, Lossiness, SignalClass,
-};
-// Legacy types from correlator_legacy — re-exported for backward compat.
-pub use correlator_legacy::{
-    CorrelationEvidence, EvidenceCorrelator, MatchLevel, PendingArbitration,
-};
-pub use evidence_record::{
-    EvidenceDiagnostic, EvidenceDirectnessNew, EvidenceReconstruction, EvidenceRecordNew,
-    EvidenceType, MatchedField,
-};
-pub use root_cause::rank_legacy_correlation_evidence;
-
 // ── Authoritative re-exports ───────────────────────────────────────────────
 pub use action_classifier::ActionClassifier;
 pub use args::{extract_action_args, extract_intent_args};
 pub use argument_matcher::{match_args, match_level_base_score};
 pub use buffer::{ActionBuffer, IntentBuffer};
 pub use confidence::compute_confidence;
-pub use correlator::{CorrelationResult, EvidenceCorrelator as NewEvidenceCorrelator};
+pub use correlator::{CorrelationResult, EvidenceCorrelator};
 pub use intent_extractor::IntentExtractor;
 pub use non_link_diagnostic::{
     ambiguous_competition, below_confidence_cutoff, candidate_not_available,
@@ -44,4 +33,3 @@ pub use non_link_diagnostic::{
 pub use quality::passes_quality_gate;
 // Re-export types that moved to types/ for backward compat
 pub use crate::responsibility::types::{NonLinkDiagnostic, NonLinkReason};
-pub mod normalizer;

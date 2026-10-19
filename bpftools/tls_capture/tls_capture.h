@@ -22,6 +22,7 @@ struct probe_SSL_data_t {
     int rw;
     char comm[TASK_COMM_LEN];
     __u8 buf[MAX_BUF_SIZE];
+    __u64 ssl_ptr;          // SSL* connection object; stable within one TLS session
     int is_handshake;
 };
 

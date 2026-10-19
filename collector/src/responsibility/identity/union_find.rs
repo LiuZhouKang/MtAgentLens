@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // union_find/ — Three-signal union-find algorithm for Phase 2 authoritative identity resolution.
 //
@@ -12,9 +12,11 @@
 //        * comm ∈ {"claude", "claude-code"} → subagent boundary, DON'T merge
 //        * otherwise → tool process, join parent's agent
 //   4. S1 upward propagation (max depth 5): for unassigned processes, walk up parents
-//   5. AgentId derivation: sort all ProcessIds in component → concat → SHA256 → "agent-{8hex}"
+//   5. AgentId derivation: sort all ProcessIds in component → concat → SHA256 → "agent-{16hex}"
 
 use crate::responsibility::signals::SignalSnapshot;
+#[cfg(test)]
+use crate::responsibility::signals::signal_snapshot::ProcessExecInfo;
 use crate::responsibility::types::{
     AgentConfidence, AgentId, AuthoritativeIdentity, IdentityRefinement, IdentityRefinementType,
     MessageId, ProcessId, ProvisionalIdentity, SubagentBoundary, SubagentBoundaryReason,
@@ -22,12 +24,109 @@ use crate::responsibility::types::{
 };
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
-/// Process names that indicate an agent process (not a tool process).
+/// Default process names that indicate an agent process (not a tool process).
 /// See spec §6.2: is_agent_process checks comm ∈ AGENT_COMMS.
+///
+/// An installation whose agent does not run under one of these names (for
+/// example OpenClaw, whose Node gateway runs as `MainThread` with no reliable
+/// `comm`) can extend the boundary at startup:
+///
+/// ```text
+/// MTAGENTLENS_AGENT_COMMS=openclaw,MainThread ./mtagentlens record ...
+/// ```
+///
+/// Processes outside the boundary are counted in
+/// `DIAG_ACTIONS_DROPPED_NO_AGENT` rather than dropped invisibly.
 pub const AGENT_COMMS: &[&str] = &["claude", "claude-code"];
+
+/// Optional override set by [`configure_agent_comms_from_env`].
+static AGENT_COMM_OVERRIDE: OnceLock<HashSet<String>> = OnceLock::new();
+/// cgroup unit names treated as agent processes (`MTAGENTLENS_AGENT_CGROUP`).
+static AGENT_CGROUP_OVERRIDE: OnceLock<HashSet<String>> = OnceLock::new();
+/// Executable-path substrings treated as agent processes
+/// (`MTAGENTLENS_AGENT_EXE`).
+static AGENT_EXE_OVERRIDE: OnceLock<Vec<String>> = OnceLock::new();
+
+/// Extend the agent `comm` boundary from `MTAGENTLENS_AGENT_COMMS`
+/// (comma-separated). Unset or empty keeps the built-in default.
+pub fn configure_agent_comms_from_env() {
+    if let Ok(raw) = std::env::var("MTAGENTLENS_AGENT_COMMS") {
+        let comms = parse_agent_comm_list(&raw);
+        if !comms.is_empty() {
+            let _ = AGENT_COMM_OVERRIDE.set(comms);
+        }
+    }
+    if let Ok(raw) = std::env::var("MTAGENTLENS_AGENT_CGROUP") {
+        let units = parse_agent_comm_list(&raw);
+        if !units.is_empty() {
+            let _ = AGENT_CGROUP_OVERRIDE.set(units);
+        }
+    }
+    if let Ok(raw) = std::env::var("MTAGENTLENS_AGENT_EXE") {
+        let paths: Vec<String> = raw
+            .split(',')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .collect();
+        if !paths.is_empty() {
+            let _ = AGENT_EXE_OVERRIDE.set(paths);
+        }
+    }
+}
+
+/// Whether an explicit identity boundary (cgroup or executable path) is
+/// configured. In that mode TLS sessions alone must not qualify a process:
+/// every Node app shares the `MainThread` comm and can open TLS.
+pub fn has_identity_boundary() -> bool {
+    AGENT_CGROUP_OVERRIDE
+        .get()
+        .is_some_and(|units| !units.is_empty())
+        || AGENT_EXE_OVERRIDE
+            .get()
+            .is_some_and(|paths| !paths.is_empty())
+}
+
+/// Whether a cgroup unit name was configured as an agent boundary.
+pub fn is_agent_cgroup(unit: &str) -> bool {
+    AGENT_CGROUP_OVERRIDE
+        .get()
+        .is_some_and(|units| units.contains(unit))
+}
+
+/// Whether an executable path (or full command line) contains a configured
+/// agent-path substring. This is the signal that survives Node's shared
+/// `MainThread` comm: the argv/path still names the agent.
+pub fn is_agent_exe(path: &str) -> bool {
+    AGENT_EXE_OVERRIDE
+        .get()
+        .is_some_and(|paths| paths.iter().any(|p| path.contains(p)))
+}
+
+/// Parse a comma-separated agent comm list, trimming blanks.
+pub fn parse_agent_comm_list(raw: &str) -> HashSet<String> {
+    raw.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+/// Whether `comm` identifies an agent process under the configured boundary.
+pub fn is_agent_comm(comm: &str) -> bool {
+    // Apply MTAGENTLENS_AGENT_* once, even when the caller (a library user)
+    // did not run the CLI startup hook.
+    static ENV_INIT: std::sync::Once = std::sync::Once::new();
+    ENV_INIT.call_once(configure_agent_comms_from_env);
+    match AGENT_COMM_OVERRIDE.get() {
+        Some(over) => over.contains(comm) || AGENT_COMMS.contains(&comm),
+        None => AGENT_COMMS.contains(&comm),
+    }
+}
 
 /// Maximum depth for upward propagation (S1 up-phase).
 const UPWARD_MAX_DEPTH: usize = 5;
@@ -92,7 +191,7 @@ pub fn is_agent_process(process_id: ProcessId, snapshot: &SignalSnapshot) -> boo
         Some(m) => m,
         None => return false,
     };
-    AGENT_COMMS.contains(&meta.comm.as_str())
+    is_agent_comm(&meta.comm)
 }
 
 /// Check whether there is a subagent boundary between parent and child.
@@ -147,8 +246,11 @@ pub fn has_children_in_multiple_components(
 
 /// Derive a deterministic AgentId from a set of ProcessIds.
 ///
-/// Sorts all ProcessIds in the component, concatenates them as a string,
-/// and takes the first 8 hex chars of SHA256.
+/// Sorts all ProcessIds in the component, concatenates them as a string, and
+/// hex-encodes the first 8 bytes of the SHA256 digest — i.e. 16 hex characters,
+/// giving `agent-{16hex}`. This is the only place an `agent-*` identifier is
+/// derived; the framework detection layer deliberately emits `root_pid` instead
+/// of inventing one, because it cannot see the full ProcessId set.
 fn derive_agent_id(process_ids: &[ProcessId]) -> AgentId {
     let mut sorted: Vec<_> = process_ids.to_vec();
     sorted.sort_by_key(|p| (p.pid, p.start_time_ns));
@@ -519,13 +621,31 @@ mod tests {
     fn test_is_agent_process_identifies_agent_comms() {
         let mut g = SignalGraph::new();
         let p = pid(100, 1);
-        g.observe_exec(p, pid(1, 0), "claude", None, 1);
+        g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         let snap = g.snapshot();
         assert!(is_agent_process(p, &snap));
 
         let mut g2 = SignalGraph::new();
         let p2 = pid(200, 2);
-        g2.observe_exec(p2, pid(1, 0), "curl", None, 2);
+        g2.observe_exec(
+            p2,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "curl".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
         let snap2 = g2.snapshot();
         assert!(!is_agent_process(p2, &snap2));
     }
@@ -542,8 +662,26 @@ mod tests {
         let parent = pid(100, 1);
         let child = pid(200, 2);
 
-        g.observe_exec(child, parent, "claude", None, 2);
-        g.observe_exec(parent, pid(1, 0), "claude", None, 1);
+        g.observe_exec(
+            child,
+            parent,
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
+        g.observe_exec(
+            parent,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         // Parent and child have different, non-overlapping TLS sessions
         g.observe_tls(parent, tls("sess-parent"), 10);
         g.observe_tls(child, tls("sess-child"), 20);
@@ -562,8 +700,26 @@ mod tests {
         // Shared TLS between parent and child is tracked via tls_collisions, not as
         // dual ownership. This test validates that when parent and child have
         // NO TLS overlap (each has its own session), the boundary IS detected.
-        g.observe_exec(child, parent, "claude", None, 2);
-        g.observe_exec(parent, pid(50, 0), "claude", None, 1);
+        g.observe_exec(
+            child,
+            parent,
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
+        g.observe_exec(
+            parent,
+            pid(50, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         // Parent and child have DIFFERENT TLS sessions → boundary expected
         g.observe_tls(parent, tls("sess-parent"), 10);
         g.observe_tls(child, tls("sess-child"), 20);
@@ -578,8 +734,26 @@ mod tests {
         let parent = pid(100, 1);
         let child = pid(200, 2);
 
-        g.observe_exec(child, parent, "curl", None, 2);
-        g.observe_exec(parent, pid(1, 0), "claude", None, 1);
+        g.observe_exec(
+            child,
+            parent,
+            ProcessExecInfo {
+                comm: "curl".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
+        g.observe_exec(
+            parent,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         g.observe_tls(parent, tls("sess-parent"), 10);
         g.observe_tls(child, tls("sess-child"), 20);
 
@@ -594,8 +768,26 @@ mod tests {
         let parent = pid(100, 1);
         let child = pid(200, 2);
 
-        g.observe_exec(child, parent, "claude", None, 2);
-        g.observe_exec(parent, pid(1, 0), "claude", None, 1);
+        g.observe_exec(
+            child,
+            parent,
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
+        g.observe_exec(
+            parent,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
 
         let snap = g.snapshot();
         assert!(!is_subagent_boundary(parent, child, &snap));
@@ -608,8 +800,26 @@ mod tests {
         let a = pid(100, 1);
         let b = pid(200, 2);
 
-        g.observe_exec(a, shell, "claude", None, 1);
-        g.observe_exec(b, shell, "claude", None, 2);
+        g.observe_exec(
+            a,
+            shell,
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        g.observe_exec(
+            b,
+            shell,
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
 
         let snap = g.snapshot();
         let mut assignments = HashMap::new();
@@ -630,8 +840,26 @@ mod tests {
         let a = pid(200, 2);
         let b = pid(300, 3);
 
-        g.observe_exec(a, parent, "cat", None, 2);
-        g.observe_exec(b, parent, "head", None, 3);
+        g.observe_exec(
+            a,
+            parent,
+            ProcessExecInfo {
+                comm: "cat".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
+        g.observe_exec(
+            b,
+            parent,
+            ProcessExecInfo {
+                comm: "head".into(),
+                ..Default::default()
+            },
+            None,
+            3,
+        );
 
         let snap = g.snapshot();
         let mut assignments = HashMap::new();
@@ -664,11 +892,29 @@ mod tests {
         let tool = pid(200, 2);
 
         // Claude process with TLS → seed
-        g.observe_exec(claude, shell, "claude", None, 1);
+        g.observe_exec(
+            claude,
+            shell,
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         g.observe_tls(claude, tls("sess-1"), 10);
 
         // Tool child without TLS → should be assigned to same agent
-        g.observe_exec(tool, claude, "cat", None, 2);
+        g.observe_exec(
+            tool,
+            claude,
+            ProcessExecInfo {
+                comm: "cat".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
 
         let snap = g.snapshot();
         let result = run_authoritative_resolution(&snap, &HashMap::new());
@@ -690,15 +936,42 @@ mod tests {
         let sub = pid(200, 2);
         let sub_tool = pid(300, 3);
 
-        g.observe_exec(main, shell, "claude", None, 1);
+        g.observe_exec(
+            main,
+            shell,
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         g.observe_tls(main, tls("sess-main"), 10);
 
         // Subagent with independent TLS → separate agent
-        g.observe_exec(sub, main, "claude", None, 2);
+        g.observe_exec(
+            sub,
+            main,
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
         g.observe_tls(sub, tls("sess-sub"), 20);
 
         // Tool child of sub → assigned to sub
-        g.observe_exec(sub_tool, sub, "python3", None, 3);
+        g.observe_exec(
+            sub_tool,
+            sub,
+            ProcessExecInfo {
+                comm: "python3".into(),
+                ..Default::default()
+            },
+            None,
+            3,
+        );
 
         let snap = g.snapshot();
         let result = run_authoritative_resolution(&snap, &HashMap::new());
@@ -731,10 +1004,28 @@ mod tests {
         let tool = pid(200, 2);
 
         // Agent process with TLS → seed
-        g.observe_exec(agent, pid(50, 0), "claude", None, 1);
+        g.observe_exec(
+            agent,
+            pid(50, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         g.observe_tls(agent, tls("sess-1"), 10);
         // Tool child without TLS → merged into agent
-        g.observe_exec(tool, agent, "cat", None, 2);
+        g.observe_exec(
+            tool,
+            agent,
+            ProcessExecInfo {
+                comm: "cat".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
 
         let snap = g.snapshot();
         let result = run_authoritative_resolution(&snap, &HashMap::new());
@@ -752,7 +1043,16 @@ mod tests {
         let mut g = SignalGraph::new();
         let shell = pid(50, 0);
         let noise = pid(999, 1);
-        g.observe_exec(noise, shell, "bun", None, 1);
+        g.observe_exec(
+            noise,
+            shell,
+            ProcessExecInfo {
+                comm: "bun".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
 
         let snap = g.snapshot();
         let result = run_authoritative_resolution(&snap, &HashMap::new());
@@ -775,10 +1075,28 @@ mod tests {
         let claude_b = pid(200, 2);
 
         // Both Claude processes under same shell, independent TLS
-        g.observe_exec(claude_a, shell, "claude", None, 1);
+        g.observe_exec(
+            claude_a,
+            shell,
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         g.observe_tls(claude_a, tls("sess-a"), 10);
 
-        g.observe_exec(claude_b, shell, "claude", None, 2);
+        g.observe_exec(
+            claude_b,
+            shell,
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
         g.observe_tls(claude_b, tls("sess-b"), 20);
 
         let snap = g.snapshot();
@@ -796,17 +1114,72 @@ mod tests {
         let kernel_thread = pid(10, 0);
 
         // Claude has TLS
-        g.observe_exec(claude, shell, "claude", None, 1);
+        g.observe_exec(
+            claude,
+            shell,
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         g.observe_tls(claude, tls("sess-1"), 10);
 
         // Shell and kernel_thread are ancestors without TLS
-        g.observe_exec(shell, kernel_thread, "bash", None, 0);
-        g.observe_exec(kernel_thread, pid(1, 0), "kthreadd", None, 0);
+        g.observe_exec(
+            shell,
+            kernel_thread,
+            ProcessExecInfo {
+                comm: "bash".into(),
+                ..Default::default()
+            },
+            None,
+            0,
+        );
+        g.observe_exec(
+            kernel_thread,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "kthreadd".into(),
+                ..Default::default()
+            },
+            None,
+            0,
+        );
 
         let snap = g.snapshot();
         let result = run_authoritative_resolution(&snap, &HashMap::new());
 
         // Should resolve at least the claude process
         assert_eq!(result.agents.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod agent_comm_tests {
+    use super::*;
+
+    #[test]
+    fn default_boundary_covers_builtin_agents() {
+        assert!(is_agent_comm("claude"));
+        assert!(is_agent_comm("claude-code"));
+        assert!(!is_agent_comm("MainThread"));
+        assert!(!is_agent_comm("curl"));
+    }
+
+    #[test]
+    fn cgroup_and_exe_boundaries_are_off_by_default() {
+        assert!(!is_agent_cgroup("some.service"));
+        assert!(!is_agent_exe("/usr/bin/some-agent"));
+    }
+
+    #[test]
+    fn comm_list_parsing_trims_and_drops_blanks() {
+        let parsed = parse_agent_comm_list(" openclaw , MainThread ,, ");
+        assert!(parsed.contains("openclaw"));
+        assert!(parsed.contains("MainThread"));
+        assert_eq!(parsed.len(), 2);
+        assert!(parse_agent_comm_list("   ").is_empty());
     }
 }

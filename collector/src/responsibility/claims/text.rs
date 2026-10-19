@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // text.rs — AlertBuilderText: generates human-readable title, summary, and
 // action_hint strings from ResponsibilityClaims and display profiles.

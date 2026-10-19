@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Uniform API response and error formats for all server endpoints.
 
 use serde::Serialize;

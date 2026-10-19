@@ -22,6 +22,23 @@
 
 #include "tls_capture.skel.h"
 #include "tls_capture.h"
+#include "json_escape.h"
+#include "payload_json.h"
+
+/*
+ * Report a fatal error, set a non-zero exit code, and jump to cleanup.
+ *
+ * A bare `warn(...); goto cleanup;` left `err` at 0, so the process exited
+ * with status 0 after a fatal failure. The Rust side then saw a clean exit
+ * with zero events — an indistinguishable "successful but empty" run.
+ */
+#define FAIL(...)                                                                 \
+	do {                                                                          \
+		warn(__VA_ARGS__);                                                        \
+		err = -1;                                                                 \
+		goto cleanup;                                                             \
+	} while (0)
+
 
 #define INVALID_UID -1
 #define INVALID_PID -1
@@ -54,6 +71,31 @@
 	__ATTACH_UPROBE_CHECKED(skel, binary_path, sym_name, prog_name, false)
 #define ATTACH_URETPROBE_CHECKED(skel, binary_path, sym_name, prog_name)  \
 	__ATTACH_UPROBE_CHECKED(skel, binary_path, sym_name, prog_name, true)
+
+/*
+ * Best-effort attachment.
+ *
+ * A missing symbol must not abort the whole attach sequence: with the
+ * _CHECKED variants, the first absent symbol (e.g. SSL_write_ex2, which only
+ * exists on newer OpenSSL) returns early and silently leaves every later
+ * symbol — including SSL_do_handshake — unattached. Failures are counted and
+ * reported instead.
+ */
+static int attach_failures = 0;
+
+#define __ATTACH_UPROBE_SOFT(skel, binary_path, sym_name, prog_name, is_retprobe) \
+	do {                                                                          \
+	  __ATTACH_UPROBE(skel, binary_path, sym_name, prog_name, is_retprobe);       \
+	  if (!skel->links.prog_name) {                                               \
+		fprintf(stderr, "Warning: symbol %s could not be attached; continuing with the remaining symbols\n", #sym_name); \
+		attach_failures++;                                                        \
+	  }                                                                           \
+	} while (false)
+
+#define ATTACH_UPROBE_SOFT(skel, binary_path, sym_name, prog_name)     \
+	__ATTACH_UPROBE_SOFT(skel, binary_path, sym_name, prog_name, false)
+#define ATTACH_URETPROBE_SOFT(skel, binary_path, sym_name, prog_name)  \
+	__ATTACH_UPROBE_SOFT(skel, binary_path, sym_name, prog_name, true)
 
 #define __ATTACH_UPROBE_OFFSET(skel, binary_path, offset, prog_name, is_retprobe) \
 	do {                                                                          \
@@ -239,11 +281,15 @@ static struct boringssl_offsets find_boringssl_offsets(const char *binary_path) 
 		/* Fallback: search independently */
 		size_t hs_off = find_pattern(data, st.st_size, handshake_pat, sizeof(handshake_pat));
 		if (hs_off == (size_t)-1) {
+			/* Newer Bun builds (>= v1.4.x) changed the SSL_do_handshake
+			 * prologue, so it may not match. It is optional — data capture
+			 * only needs SSL_read/SSL_write. Degrade gracefully instead of
+			 * failing the whole BoringSSL detection. */
 			if (verbose)
-				fprintf(stderr, "BoringSSL: SSL_do_handshake pattern not found\n");
-			goto out;
+				fprintf(stderr, "BoringSSL: SSL_do_handshake pattern not found; handshake events unavailable\n");
+		} else {
+			result.ssl_do_handshake = hs_off;
 		}
-		result.ssl_do_handshake = hs_off;
 	}
 
 	result.ssl_read = read_off;
@@ -346,21 +392,44 @@ static void sig_int(int signo) {
 	exiting = 1;
 }
 
+/*
+ * Attach the OpenSSL family. Best-effort per symbol: an older/newer OpenSSL
+ * may lack SSL_write_ex/SSL_read_ex, and that must not stop SSL_read or
+ * SSL_write from being attached.
+ *
+ * NOTE on SSL_write_ex2 (OpenSSL 3.2+): deliberately NOT attached here. Its
+ * signature is (SSL*, buf, num, flags, written) — the 4th argument is a flags
+ * word, not the `size_t *written` that probe_SSL_write_ex_enter expects, so
+ * reusing that program would read a bogus user pointer. Covering it needs a
+ * dedicated pair of probes. Measured OpenClaw traffic on Node v24 is already
+ * captured in full by the symbols below, so this is a known gap rather than a
+ * current loss.
+ */
 int attach_openssl(struct tls_capture_bpf *skel, const char *lib) {
-	ATTACH_UPROBE_CHECKED(skel, lib, SSL_write, probe_SSL_rw_enter);
-	ATTACH_URETPROBE_CHECKED(skel, lib, SSL_write, probe_SSL_write_exit);
-	ATTACH_UPROBE_CHECKED(skel, lib, SSL_read, probe_SSL_rw_enter);
-	ATTACH_URETPROBE_CHECKED(skel, lib, SSL_read, probe_SSL_read_exit);
+	int before = attach_failures;
 
-	ATTACH_UPROBE_CHECKED(skel, lib, SSL_write_ex, probe_SSL_write_ex_enter);
-	ATTACH_URETPROBE_CHECKED(skel, lib, SSL_write_ex, probe_SSL_write_ex_exit);
-	ATTACH_UPROBE_CHECKED(skel, lib, SSL_read_ex, probe_SSL_read_ex_enter);
-	ATTACH_URETPROBE_CHECKED(skel, lib, SSL_read_ex, probe_SSL_read_ex_exit);
+	ATTACH_UPROBE_SOFT(skel, lib, SSL_write, probe_SSL_rw_enter);
+	ATTACH_URETPROBE_SOFT(skel, lib, SSL_write, probe_SSL_write_exit);
+	ATTACH_UPROBE_SOFT(skel, lib, SSL_read, probe_SSL_rw_enter);
+	ATTACH_URETPROBE_SOFT(skel, lib, SSL_read, probe_SSL_read_exit);
 
-	ATTACH_UPROBE_CHECKED(skel, lib, SSL_do_handshake,
-							probe_SSL_do_handshake_enter);
-	ATTACH_URETPROBE_CHECKED(skel, lib, SSL_do_handshake,
-								probe_SSL_do_handshake_exit);
+	ATTACH_UPROBE_SOFT(skel, lib, SSL_write_ex, probe_SSL_write_ex_enter);
+	ATTACH_URETPROBE_SOFT(skel, lib, SSL_write_ex, probe_SSL_write_ex_exit);
+	ATTACH_UPROBE_SOFT(skel, lib, SSL_read_ex, probe_SSL_read_ex_enter);
+	ATTACH_URETPROBE_SOFT(skel, lib, SSL_read_ex, probe_SSL_read_ex_exit);
+
+	ATTACH_UPROBE_SOFT(skel, lib, SSL_do_handshake,
+					   probe_SSL_do_handshake_enter);
+	ATTACH_URETPROBE_SOFT(skel, lib, SSL_do_handshake,
+						  probe_SSL_do_handshake_exit);
+
+	if (attach_failures == before) {
+		fprintf(stderr, "tls_capture: all OpenSSL symbols attached\n");
+	} else {
+		fprintf(stderr,
+				"Warning: tls_capture could not attach %d OpenSSL symbol(s); the remaining symbols are active\n",
+				attach_failures - before);
+	}
 
 	return 0;
 }
@@ -446,61 +515,6 @@ char *find_library_path(const char *libname) {
 // Global buffer allocated once and reused
 static char *event_buf = NULL;
 
-// Function to validate UTF-8 sequence and return its length
-// Returns 0 if invalid, otherwise returns the number of bytes in the sequence
-int validate_utf8_char(const unsigned char *str, size_t remaining) {
-	if (!str || remaining == 0) return 0;
-	
-	unsigned char c = str[0];
-	
-	// ASCII character (0-127)
-	if (c < 0x80) return 1;
-	
-	// Determine the expected length of UTF-8 sequence
-	int expected_len = 0;
-	if ((c & 0xE0) == 0xC0) expected_len = 2;      // 110xxxxx
-	else if ((c & 0xF0) == 0xE0) expected_len = 3; // 1110xxxx
-	else if ((c & 0xF8) == 0xF0) expected_len = 4; // 11110xxx
-	else return 0; // Invalid start byte
-	
-	// Check if we have enough bytes
-	if (remaining < expected_len) return 0;
-	
-	// Create a buffer for mbstowcs
-	char temp[5] = {0};
-	for (int i = 0; i < expected_len && i < 4; i++) {
-		temp[i] = str[i];
-	}
-	
-	// Set locale for UTF-8 (done once in main)
-	wchar_t wc;
-	mbstate_t state;
-	memset(&state, 0, sizeof(state));
-	
-	// Try to convert the sequence
-	size_t result = mbrtowc(&wc, temp, expected_len, &state);
-	
-	// Check for conversion errors
-	if (result == (size_t)-1 || result == (size_t)-2 || result == 0) {
-		return 0; // Invalid sequence
-	}
-	
-	// Additional validation for overlong sequences and valid code points
-	if (expected_len == 2) {
-		unsigned int codepoint = ((c & 0x1F) << 6) | (str[1] & 0x3F);
-		if (codepoint < 0x80) return 0; // Overlong
-	} else if (expected_len == 3) {
-		unsigned int codepoint = ((c & 0x0F) << 12) | ((str[1] & 0x3F) << 6) | (str[2] & 0x3F);
-		if (codepoint < 0x800) return 0; // Overlong
-		if (codepoint >= 0xD800 && codepoint <= 0xDFFF) return 0; // Surrogate
-	} else if (expected_len == 4) {
-		unsigned int codepoint = ((c & 0x07) << 18) | ((str[1] & 0x3F) << 12) | 
-		                        ((str[2] & 0x3F) << 6) | (str[3] & 0x3F);
-		if (codepoint < 0x10000 || codepoint > 0x10FFFF) return 0; // Invalid range
-	}
-	
-	return expected_len;
-}
 
 // Function to print the event from the perf buffer in JSON format
 void print_event(struct probe_SSL_data_t *event, const char *evt) {
@@ -548,14 +562,17 @@ void print_event(struct probe_SSL_data_t *event, const char *evt) {
 	// Basic fields - always include all fields
 	printf("\"function\":\"%s\",", rw_event[event->rw]);
 	printf("\"timestamp_ns\":%llu,", event->timestamp_ns);
-	printf("\"comm\":\"%s\",", event->comm);
+	printf("\"comm\":"); json_print_str(event->comm); printf(",");
 	printf("\"pid\":%d,", event->pid);
-	printf("\"len\":%d,", event->len);
-	printf("\"buf_size\":%u,", event->buf_size);
+	printf("\"len\":%u,", event->len);
+	printf("\"buf_size\":%u,", buf_size);
 
 	// Always include extra fields (UID, TID)
 	printf("\"uid\":%d,", event->uid);
 	printf("\"tid\":%d,", event->tid);
+	/* Connection identity: same SSL* within a session, distinct across
+	 * concurrent sessions multiplexed onto one tid. */
+	printf("\"ssl_ptr\":%llu,", (unsigned long long)event->ssl_ptr);
 
 	// Always include latency field
 	if (event->delta_ns) {
@@ -567,58 +584,12 @@ void print_event(struct probe_SSL_data_t *event, const char *evt) {
 	// Always include handshake field
 	printf("\"is_handshake\":%s,", event->is_handshake ? "true" : "false");
 
-	// Data field - always include both text and hex
-	if (buf_size > 0) {
-		// Text data
-		printf("\"data\":\"");
-		for (unsigned int i = 0; i < buf_size; i++) {
-			unsigned char c = event_buf[i];
-			if (c == '"' || c == '\\') {
-				printf("\\%c", c);
-			} else if (c == '\n') {
-				printf("\\n");
-			} else if (c == '\r') {
-				printf("\\r");
-			} else if (c == '\t') {
-				printf("\\t");
-			} else if (c == '\b') {
-				printf("\\b");
-			} else if (c == '\f') {
-				printf("\\f");
-			} else if (c >= 32 && c <= 126) {
-				// ASCII printable characters
-				printf("%c", c);
-			} else if (c >= 128) {
-				// Use our new UTF-8 validation function
-				int utf8_len = validate_utf8_char((unsigned char *)&event_buf[i], buf_size - i);
-				
-				if (utf8_len > 0) {
-					// Output the valid UTF-8 sequence
-					for (int j = 0; j < utf8_len; j++) {
-						printf("%c", event_buf[i + j]);
-					}
-					i += utf8_len - 1; // Skip the continuation bytes
-				} else {
-					// Invalid UTF-8 byte - escape it
-					printf("\\u%04x", c);
-				}
-			} else {
-				// Control characters (0-31, 127)
-				printf("\\u%04x", c);
-			}
-		}
-		printf("\",");
-		
-		
-		// Add truncated info if data was truncated
-		if (buf_size < event->len) {
-			printf("\"truncated\":true,\"bytes_lost\":%d", event->len - buf_size);
-		} else {
-			printf("\"truncated\":false");
-		}
-	} else {
-		printf("\"data\":null,\"truncated\":false");
-	}
+	/* Payload fields. `data` remains the legacy display field; `data_b64`
+	 * is the authoritative byte representation (include/payload_json.h).
+	 * Both fields are emitted here so `truncated`/`bytes_lost` are counted
+	 * once, in raw bytes (base64 padding is never part of the payload). */
+	json_print_payload_fields(stdout, (const unsigned char *)event_buf, buf_size,
+				  event->len);
 
 	// Close JSON object
 	printf("}\n");
@@ -654,8 +625,7 @@ int main(int argc, char **argv) {
 
 	obj = tls_capture_bpf__open_opts(&open_opts);
 	if (!obj) {
-		warn("failed to open BPF object\n");
-		goto cleanup;
+		FAIL("failed to open BPF object\n");
 	}
 
 	obj->rodata->targ_uid = env.uid;
@@ -663,8 +633,7 @@ int main(int argc, char **argv) {
 
 	err = tls_capture_bpf__load(obj);
 	if (err) {
-		warn("failed to load BPF object: %d\n", err);
-		goto cleanup;
+		FAIL("failed to load BPF object: %d\n", err);
 	}
 
 	// Allocate global buffer once
@@ -743,8 +712,7 @@ int main(int argc, char **argv) {
 	rb = ring_buffer__new(bpf_map__fd(obj->maps.rb), handle_event, NULL, NULL);
 	if (!rb) {
 		err = -errno;
-		warn("failed to open ring buffer: %d\n", err);
-		goto cleanup;
+		FAIL("failed to open ring buffer: %d\n", err);
 	}
 
 	if (signal(SIGINT, sig_int) == SIG_ERR) {
@@ -756,8 +724,7 @@ int main(int argc, char **argv) {
 	while (!exiting) {
 		err = ring_buffer__poll(rb, PERF_POLL_TIMEOUT_MS);
 		if (err < 0 && err != -EINTR) {
-			warn("error polling ring buffer: %s\n", strerror(-err));
-			goto cleanup;
+			FAIL("error polling ring buffer: %s\n", strerror(-err));
 		}
 
 		/* Periodically check dropped event counter (every ~10s since timeout=100ms) */

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // TOTP (Time-based One-Time Password) implementation per RFC 6238.
 // Uses HMAC-SHA1 as the underlying hash function and a 30-second time step.
@@ -63,8 +63,19 @@ pub fn validate_totp(secret: &str, code: &str) -> bool {
         let check_counter = counter.wrapping_add(offset);
         let expected = compute_totp(&decoded, check_counter, TOTP_DIGITS);
         result |= constant_time_compare(code, &expected);
+        #[cfg(test)]
+        TOTP_WINDOWS_CHECKED.with(|checks| checks.set(checks.get() + 1));
     }
     result
+}
+
+/// Test-only counter: proves both the valid and invalid paths execute all
+/// three windows. Thread-local so a concurrently running test cannot perturb
+/// the count (libtest runs each test on its own thread). The previous test
+/// measured wall-clock ratios, which is inherently flaky under load.
+#[cfg(test)]
+thread_local! {
+    pub(crate) static TOTP_WINDOWS_CHECKED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 /// Compute a TOTP value for a given secret and counter.
@@ -403,13 +414,10 @@ mod tests {
 
     #[test]
     fn ut21_constant_time_behavior() {
-        // Verify constant-time comparison doesn't leak timing differences.
-        // Since the loop now always checks all 3 windows (no early return),
-        // valid and invalid paths should take comparable time.
+        // Constant-time, deterministically: both a valid and an invalid code
+        // must execute the same three window checks. Wall-clock ratios were
+        // flaky under load and did not prove the property any better.
         let secret = generate_totp_secret();
-        let iterations = 2000;
-
-        // Precompute a valid code
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
@@ -418,32 +426,21 @@ mod tests {
         let decoded = base32_decode(&secret).unwrap();
         let valid_code = compute_totp(&decoded, counter, TOTP_DIGITS);
 
-        let start_valid = std::time::Instant::now();
-        for _ in 0..iterations {
-            let _ = validate_totp(&secret, &valid_code);
-        }
-        let valid_duration = start_valid.elapsed();
+        TOTP_WINDOWS_CHECKED.with(|checks| checks.set(0));
+        let _ = validate_totp(&secret, &valid_code);
+        let valid_checks = TOTP_WINDOWS_CHECKED.with(std::cell::Cell::get);
 
-        // Measure invalid code timing (same kind of code, different digits)
-        let start_invalid = std::time::Instant::now();
-        for _ in 0..iterations {
-            let _ = validate_totp(&secret, "000000");
-        }
-        let invalid_duration = start_invalid.elapsed();
+        // Same digit shape, different value: exercises the comparison-failure
+        // path. (A rare coincidence with the valid code still executes the
+        // same three checks, so the assertion is about work, not outcome.)
+        TOTP_WINDOWS_CHECKED.with(|checks| checks.set(0));
+        let _ = validate_totp(&secret, "000000");
+        let invalid_checks = TOTP_WINDOWS_CHECKED.with(std::cell::Cell::get);
 
-        let max_dur = valid_duration.max(invalid_duration);
-        let min_dur = valid_duration.min(invalid_duration);
-        let ratio = max_dur.as_nanos() as f64 / min_dur.as_nanos() as f64;
-
-        // Ratio should be close to 1.0 because the loop body is identical
-        // regardless of whether the code matches. Allow 2× as a safety margin
-        // for runtime scheduling noise on a loaded system.
-        assert!(
-            ratio < 2.0,
-            "Timing ratio too high: {:.4} (valid={:?}, invalid={:?})",
-            ratio,
-            valid_duration,
-            invalid_duration
+        assert_eq!(valid_checks, 3, "valid path must check all three windows");
+        assert_eq!(
+            invalid_checks, 3,
+            "invalid path must check all three windows"
         );
     }
 

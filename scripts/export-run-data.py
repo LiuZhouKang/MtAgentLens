@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0 OR MIT
 """Export the latest graph snapshot + alerts from a MtAgentLens run to JSON.
 
 Usage: python3 scripts/export-run-data.py <run_dir> <output.json>

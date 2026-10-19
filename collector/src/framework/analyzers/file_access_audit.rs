@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 MtAgentLens Project
 
 //! File Access Audit Analyzer
@@ -252,6 +252,42 @@ impl FileAccessAuditAnalyzer {
         ("low", None)
     }
 
+    /// Risk ordering used by `min_risk_level`.
+    fn risk_rank(level: &str) -> u8 {
+        match level {
+            "high" => 2,
+            "medium" => 1,
+            _ => 0,
+        }
+    }
+
+    /// Apply the configured path and risk filters to one access.
+    ///
+    /// Returns `false` when the event should pass through without an audit
+    /// record. Every field here is a real control: an option that silently
+    /// does nothing is worse than no option.
+    fn should_audit(filepath: &str, risk_level: &str, config: &FileAccessAuditConfig) -> bool {
+        if !config.enabled {
+            return false;
+        }
+        if config
+            .excluded_paths
+            .iter()
+            .any(|prefix| filepath.starts_with(prefix))
+        {
+            return false;
+        }
+        if !config.monitored_paths.is_empty()
+            && !config
+                .monitored_paths
+                .iter()
+                .any(|prefix| filepath.starts_with(prefix))
+        {
+            return false;
+        }
+        Self::risk_rank(risk_level) >= Self::risk_rank(&config.min_risk_level)
+    }
+
     /// Process a single FILE_OPEN event from the process source.
     fn process_file_open(
         event: &Event,
@@ -280,6 +316,10 @@ impl FileAccessAuditAnalyzer {
         } else {
             "info"
         };
+
+        if !Self::should_audit(filepath, risk_level, config) {
+            return vec![event.clone()];
+        }
 
         // Build the file_context from available eBPF fields
         let file_context = KernelFileContext {
@@ -659,6 +699,72 @@ mod tests {
         assert_eq!(
             ev.data.get("access_type").and_then(Value::as_str),
             Some("Stat")
+        );
+    }
+
+    async fn audit_events_for(config: FileAccessAuditConfig, filepath: &str) -> Vec<Event> {
+        let roots = vec![PathBuf::from("/home")];
+        let mut analyzer = FileAccessAuditAnalyzer::new(config, roots);
+        let input = vec![mk_event(
+            1_000,
+            "process",
+            700,
+            "claude",
+            json!({ "event": "FILE_OPEN", "count": 1, "filepath": filepath, "flags": 1 }),
+        )];
+        let stream = analyzer
+            .process(Box::pin(futures::stream::iter(input)))
+            .await
+            .expect("analyzer should run");
+        stream
+            .collect::<Vec<Event>>()
+            .await
+            .into_iter()
+            .filter(|e| e.source == "file_access")
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn disabled_config_emits_no_audit_events() {
+        let config = FileAccessAuditConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        assert!(audit_events_for(config, "/etc/passwd").await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn excluded_paths_suppress_audit_events() {
+        let config = FileAccessAuditConfig {
+            excluded_paths: vec!["/etc".to_string()],
+            ..Default::default()
+        };
+        assert!(audit_events_for(config, "/etc/passwd").await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn monitored_paths_restrict_audit_events() {
+        let config = FileAccessAuditConfig {
+            monitored_paths: vec!["/var/log".to_string()],
+            excluded_paths: vec![],
+            ..Default::default()
+        };
+        assert!(audit_events_for(config, "/etc/passwd").await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn min_risk_level_filters_low_risk_access() {
+        let config = FileAccessAuditConfig {
+            min_risk_level: "high".to_string(),
+            excluded_paths: vec![],
+            monitored_paths: vec![],
+            ..Default::default()
+        };
+        // A read inside the workspace is low risk and must be filtered.
+        assert!(
+            audit_events_for(config, "/home/user/project/main.rs")
+                .await
+                .is_empty()
         );
     }
 }

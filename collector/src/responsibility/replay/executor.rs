@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // executor.rs — ReplayExecutor: drives the full Phase 2 authoritative replay
 // pipeline from a persisted run.
@@ -27,6 +27,7 @@ use crate::responsibility::identity::union_find::run_authoritative_resolution;
 use crate::responsibility::persistence::PersistenceReader;
 use crate::responsibility::signals::SignalSnapshot;
 use crate::responsibility::signals::signal_graph::SignalGraph;
+use crate::responsibility::signals::signal_snapshot::ProcessExecInfo;
 use crate::responsibility::types::{
     Action, AgentId, AlertId, AuthoritativeIdentity, BehaviorTimeline, ClaimId, ClaimRefinement,
     ClaimRefinementType, ClassificationRefinement, ClassificationRefinementType,
@@ -113,7 +114,10 @@ impl ReplayExecutor {
             .ok_or_else(|| anyhow::anyhow!("run not found: {}", run_id))?;
 
         // ── Step 1: Load signal data and build SignalGraph ─────────────
-        let snapshot = Self::load_signal_snapshot(run_id)?;
+        let db_path = reader
+            .db_path()
+            .ok_or_else(|| anyhow::anyhow!("replay requires a file-backed database"))?;
+        let snapshot = Self::load_signal_snapshot(db_path, run_id)?;
 
         // ── Step 1b: Load provisional identities for refinement tracking ──
         let (provisional_identities, _) = reader.get_identities(run_id)?;
@@ -177,18 +181,20 @@ impl ReplayExecutor {
 
         // ── Step 5: Classification — classify_authoritative ───────────
         let classification_engine = PhaseClassificationEngine::new();
-        // Pattern matching uses the legacy graph representation; for replay
-        // we pass an empty set and let classification proceed on rule/evidence
-        // scoring alone, since the full graph is available.
-        let patterns: Vec<crate::responsibility::graph::pattern_matcher::GraphPatternMatch> =
-            Vec::new();
+        // Pattern matching runs on the same ResponsibilityGraph the live path
+        // uses. This used to pass an empty set ("legacy graph"), which made a
+        // replayed run score differently from the live run that recorded it.
+        let patterns = crate::responsibility::graph::pattern_matcher::GraphPatternMatcher::new(
+            crate::responsibility::graph::pattern_matcher::default_templates(),
+        )
+        .match_graph(graph_builder.graph());
 
         let (classification_result, _route) = classification_engine.classify_authoritative(
             graph_builder.graph(),
             &patterns,
             &correlation_result.evidence,
-            0, // repetition_count — 0 for batch replay
-            0, // intent_count — 0 for batch replay
+            intents.len() as u32, // same inputs as the live Phase 2 path
+            intents.len() as u32, // (0 here made the replayed score differ)
         );
 
         // ── Step 6: Claims, Alerts, Tracebacks ────────────────────────
@@ -232,7 +238,9 @@ impl ReplayExecutor {
         refinements.graph = frozen_graph.refinements.clone();
 
         // Classification refinements — compare phase1 vs phase2 alerts
-        let phase1_alerts = reader.get_alerts(run_id).unwrap_or_default();
+        // A corrupt alert row must fail the replay: treating it as "Phase 1
+        // had no alerts" would mark every Phase-2 alert as Discovered.
+        let phase1_alerts = reader.get_alerts(run_id).context("load phase-1 alerts")?;
         refinements.classification =
             Self::build_classification_refinements(&phase1_alerts, &alerts);
 
@@ -324,13 +332,15 @@ impl ReplayExecutor {
     // ── Internal helpers ────────────────────────────────────────────────
 
     /// Load raw signal data from the DB and build a SignalGraph + snapshot.
-    fn load_signal_snapshot(run_id: &str) -> Result<Arc<SignalSnapshot>> {
+    fn load_signal_snapshot(
+        db_path: &std::path::Path,
+        run_id: &str,
+    ) -> Result<Arc<SignalSnapshot>> {
         // We need a direct read-only connection for signal-layer data
         // since PersistenceReader does not yet expose process_events, tls_sessions,
         // or message_bindings queries directly.
-        let db_path = Self::find_db_path(run_id)?;
         let conn = Connection::open_with_flags(
-            &db_path,
+            db_path,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )
         .context("open signal db for replay")?;
@@ -374,7 +384,18 @@ impl ReplayExecutor {
                     _ => ProcessId::new(0, 0),
                 };
 
-                graph.observe_exec(child, parent, &comm, None, ts);
+                // Replay only persists comm; the richer identity signals are
+                // not recoverable from the replay log.
+                graph.observe_exec(
+                    child,
+                    parent,
+                    ProcessExecInfo {
+                        comm: comm.clone(),
+                        ..Default::default()
+                    },
+                    None,
+                    ts,
+                );
             }
         }
 
@@ -452,38 +473,6 @@ impl ReplayExecutor {
 
     /// Find the database path for a given run. Uses the standard location
     /// inferred from the reader's backing store, falling back to a default.
-    fn find_db_path(_run_id: &str) -> Result<String> {
-        // Try common responsibility DB paths.
-        // The PersistenceReader stores the path internally; we try the likely locations.
-        let candidates = &[
-            "trace.log.responsibility.db",
-            "responsibility.db",
-            "/tmp/mtagentlens/responsibility.db",
-            "/var/lib/mtagentlens/responsibility.db",
-        ];
-
-        for candidate in candidates {
-            if std::path::Path::new(candidate).exists() {
-                return Ok(candidate.to_string());
-            }
-        }
-
-        // Also try globbing for *.responsibility.db in CWD
-        if let Ok(entries) = std::fs::read_dir(".") {
-            for entry in entries.flatten() {
-                let name = entry.file_name();
-                if let Some(n) = name.to_str()
-                    && n.ends_with(".responsibility.db")
-                    && entry.path().is_file()
-                {
-                    return Ok(n.to_string());
-                }
-            }
-        }
-
-        // Default fallback
-        Ok("trace.log.responsibility.db".to_string())
-    }
 
     /// Build classification refinements by comparing Phase 1 and Phase 2 alerts.
     fn build_classification_refinements(
@@ -808,55 +797,4 @@ mod tests {
     }
 }
 
-pub struct ReplayConfig {
-    pub skip_identity_resolution: bool,
-    pub skip_attribution: bool,
-    pub skip_ai_pipeline: bool,
-    pub skip_content_boundary_signals: bool,
-    pub enabled_match_levels:
-        Option<HashSet<crate::responsibility::types::evidence_types::MatchLevel>>,
-    pub enabled_action_types:
-        Option<HashSet<crate::responsibility::types::evidence_types::ActionCandidateType>>,
-}
-impl ReplayConfig {
-    pub fn all_enabled() -> Self {
-        Self {
-            skip_identity_resolution: false,
-            skip_attribution: false,
-            skip_ai_pipeline: false,
-            skip_content_boundary_signals: false,
-            enabled_match_levels: None,
-            enabled_action_types: None,
-        }
-    }
-}
-pub fn all_action_candidate_types()
--> Vec<crate::responsibility::types::evidence_types::ActionCandidateType> {
-    use crate::responsibility::types::evidence_types::ActionCandidateType::*;
-    vec![
-        FileRead,
-        FileWrite,
-        FileOverwrite,
-        FileDelete,
-        NetworkConnect,
-        NetworkSend,
-        ProcessExec,
-        ProcessSpawn,
-    ]
-}
-impl ReplayExecutor {
-    pub fn reauthoritative_with_config(
-        r: &PersistenceReader,
-        id: &str,
-        _: &ReplayConfig,
-    ) -> Result<ReplayResult> {
-        Self::reauthoritative(r, id)
-    }
-    pub fn reauthoritative_from_persisted_graph_with_config(
-        r: &PersistenceReader,
-        id: &str,
-        _: &ReplayConfig,
-    ) -> Result<ReplayResult> {
-        Self::reauthoritative(r, id)
-    }
-}
+impl ReplayExecutor {}

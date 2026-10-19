@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // graph.rs — ResponsibilityGraph: the central in-memory graph data structure.
 //
@@ -811,7 +811,6 @@ mod tests {
             evidence_refs: Vec::new(),
             confidence: 0.8,
             phase: PhaseIndicator::Provisional { timestamp_ns: 1000 },
-            signal: None,
         }
     }
 

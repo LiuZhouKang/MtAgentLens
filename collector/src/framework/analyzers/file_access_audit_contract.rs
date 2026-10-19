@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 MtAgentLens Project
 
 //! File Access Audit Analyzer Contract
@@ -76,27 +76,88 @@ pub struct FileAccessAuditRecord {
 pub struct FileAccessAuditConfig {
     /// Enable audit logging
     pub enabled: bool,
-    /// Paths to monitor (glob patterns)
+    /// Path prefixes to audit. Empty means every path is audited.
     pub monitored_paths: Vec<String>,
-    /// Paths to exclude (glob patterns)
+    /// Path prefixes to exclude from auditing.
     pub excluded_paths: Vec<String>,
     /// Flag suspicious writes to system directories
     pub flag_system_writes: bool,
-    /// Flag cross-user access attempts
-    pub flag_cross_user_access: bool,
-    /// Minimum risk level to emit (low/medium/high)
+    /// Minimum risk level to emit: `low`, `medium` or `high`.
     pub min_risk_level: String,
+}
+
+impl FileAccessAuditConfig {
+    /// Load configuration overrides from `MTAGENTLENS_FILE_AUDIT_*`.
+    ///
+    /// Defaults preserve the pre-wiring behaviour (audit everything, report
+    /// from `low`). Without this constructor the wired fields would be
+    /// unreachable from production, which is the same no-op in a new costume.
+    pub fn from_env() -> Self {
+        let mut config = Self::default();
+        if let Ok(raw) = std::env::var("MTAGENTLENS_FILE_AUDIT_ENABLED") {
+            config.enabled = matches!(raw.trim(), "1" | "true" | "yes");
+        }
+        if let Ok(raw) = std::env::var("MTAGENTLENS_FILE_AUDIT_MONITORED") {
+            config.monitored_paths = parse_path_list(&raw);
+        }
+        if let Ok(raw) = std::env::var("MTAGENTLENS_FILE_AUDIT_EXCLUDED") {
+            config.excluded_paths = parse_path_list(&raw);
+        }
+        if let Ok(raw) = std::env::var("MTAGENTLENS_FILE_AUDIT_MIN_RISK") {
+            let level = raw.trim().to_ascii_lowercase();
+            if matches!(level.as_str(), "low" | "medium" | "high") {
+                config.min_risk_level = level;
+            }
+        }
+        config
+    }
+}
+
+fn parse_path_list(raw: &str) -> Vec<String> {
+    raw.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 impl Default for FileAccessAuditConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            monitored_paths: vec!["/etc".to_string(), "/root".to_string(), "/home".to_string()],
-            excluded_paths: vec!["/proc".to_string(), "/sys".to_string()],
+            // Defaults preserve the pre-wiring behaviour: audit every path and
+            // emit every risk level. Narrowing the scope is opt-in.
+            monitored_paths: vec![],
+            excluded_paths: vec![],
             flag_system_writes: true,
-            flag_cross_user_access: true,
-            min_risk_level: "medium".to_string(),
+            min_risk_level: "low".to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod env_config_tests {
+    use super::*;
+
+    #[test]
+    fn path_list_trims_and_drops_blanks() {
+        assert_eq!(
+            parse_path_list(" /etc , /root ,, /home/user "),
+            vec![
+                "/etc".to_string(),
+                "/root".to_string(),
+                "/home/user".to_string()
+            ]
+        );
+        assert!(parse_path_list("  ").is_empty());
+    }
+
+    #[test]
+    fn defaults_preserve_pre_wiring_behaviour() {
+        let config = FileAccessAuditConfig::default();
+        assert!(config.enabled);
+        assert!(config.monitored_paths.is_empty());
+        assert!(config.excluded_paths.is_empty());
+        assert_eq!(config.min_risk_level, "low");
     }
 }

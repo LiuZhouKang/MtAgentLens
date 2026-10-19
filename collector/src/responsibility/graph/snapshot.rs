@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // snapshot.rs — GraphSnapshot creation, FrozenGraph (Phase 2), and snapshot helpers.
 //

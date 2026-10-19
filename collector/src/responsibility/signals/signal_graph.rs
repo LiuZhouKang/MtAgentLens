@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // SignalGraph — eBPF signal acquisition and live process/tls/message binding.
 // Maintains the process tree, TLS-to-message two-hop bindings, thread tracking,
@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use super::signal_snapshot::{
-    OrphanMessage, OrphanTls, ProcessMetadata, SignalSnapshot, TlsCollision,
+    OrphanMessage, OrphanTls, ProcessExecInfo, ProcessMetadata, SignalSnapshot, TlsCollision,
 };
 
 // ─── Capacity constants ───────────────────────────────────────────────
@@ -19,8 +19,6 @@ pub const MAX_PROCESSES: usize = 100_000;
 pub const PROCESS_TTL_NS: u64 = 600_000_000_000;
 /// 30 seconds in nanoseconds
 pub const ORPHAN_TTL_NS: u64 = 30_000_000_000;
-/// Maximum depth for descendant traversal
-pub const MAX_DESCENDANT_DEPTH: usize = 256;
 
 // ─── SignalGraph ──────────────────────────────────────────────────────
 
@@ -163,6 +161,11 @@ impl SignalGraph {
                 exit_time_ns: None,
                 exit_code: None,
                 is_alive: true,
+                // This path scans /proc/<pid>/stat for liveness only; the
+                // identity signals come from EXEC events (observe_exec).
+                cmdline: None,
+                exe_path: None,
+                cgroup_unit: None,
             };
 
             self.processes.insert(process_id, meta);
@@ -187,7 +190,7 @@ impl SignalGraph {
         &mut self,
         child: ProcessId,
         parent: ProcessId,
-        comm: &str,
+        info: ProcessExecInfo,
         pgid: Option<u32>,
         ts: u64,
     ) {
@@ -200,26 +203,43 @@ impl SignalGraph {
             }
         }
 
-        // Upsert child metadata
+        // Upsert child metadata.
+        // Both closures below are FnOnce, so each needs its own copy.
+        let info_update = info.clone();
+        let info_insert = info;
         self.processes
             .entry(child)
-            .and_modify(|m| {
-                m.comm = comm.to_string();
+            .and_modify(move |m| {
+                m.comm = info_update.comm.clone();
                 m.last_seen_ns = ts;
                 m.is_alive = true;
                 if pgid.is_some() {
                     m.pgid = pgid;
                 }
+                // Only overwrite identity signals we actually observed —
+                // an EXEC without a cmdline must not erase a known one.
+                if info_update.cmdline.is_some() {
+                    m.cmdline = info_update.cmdline.clone();
+                }
+                if info_update.exe_path.is_some() {
+                    m.exe_path = info_update.exe_path.clone();
+                }
+                if info_update.cgroup_unit.is_some() {
+                    m.cgroup_unit = info_update.cgroup_unit.clone();
+                }
             })
-            .or_insert_with(|| ProcessMetadata {
+            .or_insert_with(move || ProcessMetadata {
                 process_id: child,
-                comm: comm.to_string(),
+                comm: info_insert.comm,
                 pgid,
                 first_seen_ns: ts,
                 last_seen_ns: ts,
                 exit_time_ns: None,
                 exit_code: None,
                 is_alive: true,
+                cmdline: info_insert.cmdline,
+                exe_path: info_insert.exe_path,
+                cgroup_unit: info_insert.cgroup_unit,
             });
 
         // Upsert parent metadata (lazily discovered)
@@ -235,6 +255,9 @@ impl SignalGraph {
                     exit_time_ns: None,
                     exit_code: None,
                     is_alive: true,
+                    cmdline: None,
+                    exe_path: None,
+                    cgroup_unit: None,
                 });
         }
 
@@ -568,12 +591,53 @@ mod tests {
     }
 
     #[test]
+    fn exec_records_cmdline_and_cgroup() {
+        let mut g = SignalGraph::new();
+        let child = pid(100, 1);
+
+        g.observe_exec(
+            child,
+            pid(50, 0),
+            ProcessExecInfo {
+                comm: "node".to_string(),
+                cmdline: Some("node /opt/openclaw/dist/index.js gateway".to_string()),
+                exe_path: Some("/usr/bin/node".to_string()),
+                cgroup_unit: Some("openclaw-gateway.service".to_string()),
+            },
+            None,
+            1,
+        );
+
+        let snap = g.snapshot();
+        let meta = snap.get_process(100, 1).expect("process should exist");
+        assert_eq!(meta.comm, "node");
+        assert_eq!(
+            meta.cmdline.as_deref(),
+            Some("node /opt/openclaw/dist/index.js gateway")
+        );
+        assert_eq!(meta.exe_path.as_deref(), Some("/usr/bin/node"));
+        assert_eq!(
+            meta.cgroup_unit.as_deref(),
+            Some("openclaw-gateway.service")
+        );
+    }
+
+    #[test]
     fn test_exec_builds_parent_child_tree() {
         let mut g = SignalGraph::new();
         let parent = pid(100, 1000);
         let child = pid(200, 2000);
 
-        g.observe_exec(child, parent, "myapp", None, 2000);
+        g.observe_exec(
+            child,
+            parent,
+            ProcessExecInfo {
+                comm: "myapp".into(),
+                ..Default::default()
+            },
+            None,
+            2000,
+        );
 
         let snap = g.snapshot();
         assert_eq!(snap.get_parent(child), Some(parent));
@@ -592,7 +656,16 @@ mod tests {
         let init = pid(1, 0);
         let child = pid(200, 2000);
 
-        g.observe_exec(child, init, "daemon", None, 2000);
+        g.observe_exec(
+            child,
+            init,
+            ProcessExecInfo {
+                comm: "daemon".into(),
+                ..Default::default()
+            },
+            None,
+            2000,
+        );
 
         let snap = g.snapshot();
         assert_eq!(snap.get_parent(child), None);
@@ -661,7 +734,16 @@ mod tests {
         let mut g = SignalGraph::new();
         let proc = pid(100, 1000);
 
-        g.observe_exec(proc, pid(1, 0), "test", None, 1000);
+        g.observe_exec(
+            proc,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "test".into(),
+                ..Default::default()
+            },
+            None,
+            1000,
+        );
         g.observe_exit(proc, 0, 5000);
 
         let snap = g.snapshot();
@@ -678,7 +760,16 @@ mod tests {
         let b = pid(20, 1);
 
         // a is parent of b
-        g.observe_exec(b, a, "child", None, 1000);
+        g.observe_exec(
+            b,
+            a,
+            ProcessExecInfo {
+                comm: "child".into(),
+                ..Default::default()
+            },
+            None,
+            1000,
+        );
 
         let snap = g.snapshot();
         assert!(snap.is_descendant_or_same(b, a));
@@ -695,7 +786,16 @@ mod tests {
 
         for i in 0..10 {
             let child = pid(100 + i as u32, i as u64);
-            g.observe_exec(child, prev, "node", None, i as u64);
+            g.observe_exec(
+                child,
+                prev,
+                ProcessExecInfo {
+                    comm: "node".into(),
+                    ..Default::default()
+                },
+                None,
+                i as u64,
+            );
             children.push(child);
             prev = child;
         }
@@ -716,10 +816,37 @@ mod tests {
         let c = pid(30, 3);
 
         // Create a cycle: a → b → c → a
-        g.observe_exec(b, a, "b", None, 1);
-        g.observe_exec(c, b, "c", None, 2);
+        g.observe_exec(
+            b,
+            a,
+            ProcessExecInfo {
+                comm: "b".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        g.observe_exec(
+            c,
+            b,
+            ProcessExecInfo {
+                comm: "c".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
         // Manually create cycle (override parent): a's parent is now c
-        g.observe_exec(a, c, "a-cycle", None, 3);
+        g.observe_exec(
+            a,
+            c,
+            ProcessExecInfo {
+                comm: "a-cycle".into(),
+                ..Default::default()
+            },
+            None,
+            3,
+        );
 
         let snap = g.snapshot();
         // b IS reachable from a via a→c→b (2 steps), so is_descendant_or_same
@@ -746,7 +873,16 @@ mod tests {
         // Create a very deep chain (> MAX_DESCENDANT_DEPTH)
         for i in 0..300u64 {
             let child = pid(1000 + i as u32, i);
-            g.observe_exec(child, prev, "deep", None, i);
+            g.observe_exec(
+                child,
+                prev,
+                ProcessExecInfo {
+                    comm: "deep".into(),
+                    ..Default::default()
+                },
+                None,
+                i,
+            );
             prev = child;
         }
 
@@ -762,7 +898,16 @@ mod tests {
         let intent = pid(100, 0);
         let action = pid(200, 1);
 
-        g.observe_exec(action, intent, "action", None, 1000);
+        g.observe_exec(
+            action,
+            intent,
+            ProcessExecInfo {
+                comm: "action".into(),
+                ..Default::default()
+            },
+            None,
+            1000,
+        );
 
         let snap = g.snapshot();
         assert!(snap.can_correlate(intent, action));
@@ -772,7 +917,16 @@ mod tests {
     #[test]
     fn test_metrics() {
         let mut g = SignalGraph::new();
-        g.observe_exec(pid(100, 1), pid(50, 0), "test", None, 1);
+        g.observe_exec(
+            pid(100, 1),
+            pid(50, 0),
+            ProcessExecInfo {
+                comm: "test".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         g.observe_tls(pid(100, 1), tls("tls-1"), 2);
         g.observe_message_via_tls(tls("tls-1"), msg("m1"));
         g.lost_event_count = 5;
@@ -792,7 +946,16 @@ mod tests {
         let mut g = SignalGraph::new();
         let proc = pid(100, 1);
 
-        g.observe_exec(proc, pid(1, 0), "short_lived", None, 0);
+        g.observe_exec(
+            proc,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "short_lived".into(),
+                ..Default::default()
+            },
+            None,
+            0,
+        );
         g.observe_exit(proc, 0, 1000);
 
         // Evict with time well past TTL
@@ -807,7 +970,16 @@ mod tests {
         let mut g = SignalGraph::new();
         let proc = pid(100, 1);
 
-        g.observe_exec(proc, pid(1, 0), "alive", None, 0);
+        g.observe_exec(
+            proc,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "alive".into(),
+                ..Default::default()
+            },
+            None,
+            0,
+        );
 
         g.evict_expired(PROCESS_TTL_NS + 1);
 
@@ -862,7 +1034,16 @@ mod tests {
         let mut g = SignalGraph::new();
         let proc = pid(100, 1);
 
-        g.observe_exec(proc, pid(1, 0), "shell", Some(42), 1000);
+        g.observe_exec(
+            proc,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "shell".into(),
+                ..Default::default()
+            },
+            Some(42),
+            1000,
+        );
 
         let snap = g.snapshot();
         assert_eq!(snap.get_process(100, 1).unwrap().pgid, Some(42));

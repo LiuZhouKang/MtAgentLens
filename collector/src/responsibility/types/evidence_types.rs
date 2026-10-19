@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright (c) 2026 MtAgentLens Project
+
 use super::ids::*;
 use super::phase::PhaseIndicator;
 use serde::{Deserialize, Serialize};
@@ -19,15 +22,6 @@ pub struct Intent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IntentArgs {
-    pub path: Option<String>,
-    pub command: Option<String>,
-    pub url: Option<String>,
-    pub host: Option<String>,
-    pub port: Option<u16>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Action {
     pub action_id: ActionId,
     pub process_id: ProcessId,
@@ -38,7 +32,8 @@ pub struct Action {
     pub timestamp_ns: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct NormalizedArgs {
     pub canonical_path: Option<String>,
     pub host: Option<String>,
@@ -47,7 +42,7 @@ pub struct NormalizedArgs {
     pub raw_args: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum NormalizedArg {
     Path(String),
     Command(String),
@@ -102,6 +97,9 @@ pub enum IntentAuthoritySource {
     SseResponseToolUse,
     HttpResponseToolUse,
     TextFallback,
+    /// Read from the agent's own on-disk trajectory (out-of-band). This is an
+    /// *asserted* source: the agent wrote it, we did not observe it.
+    OutOfBandAsserted,
 }
 
 impl std::fmt::Display for IntentAuthoritySource {
@@ -111,6 +109,7 @@ impl std::fmt::Display for IntentAuthoritySource {
             Self::SseResponseToolUse => "sse_response_tool_use",
             Self::HttpResponseToolUse => "http_response_tool_use",
             Self::TextFallback => "text_fallback",
+            Self::OutOfBandAsserted => "out_of_band_asserted",
         };
         write!(f, "{}", value)
     }
@@ -124,6 +123,10 @@ pub enum ActionCandidateType {
     FileWrite,
     FileOverwrite,
     FileDelete,
+    /// A rename moves a directory entry: the source disappears and the
+    /// destination appears. It is not an overwrite of either path, and the
+    /// destination is the fact an accountability trail needs.
+    FileRename,
     NetworkConnect,
     NetworkSend,
     ProcessExec,

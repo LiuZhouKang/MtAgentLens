@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 eunomia-bpf org.
 
 use super::common::{AnalyzerProcessor, BinaryExecutor};
-use super::{EventStream, ProcessConfig, Runner, RunnerError};
+use super::{EventStream, Runner, RunnerError};
 use crate::framework::analyzers::Analyzer;
 use crate::framework::core::Event;
 use async_trait::async_trait;
@@ -12,7 +12,6 @@ use std::path::Path;
 
 /// Runner for collecting process/system events
 pub struct ProcessRunner {
-    config: ProcessConfig,
     analyzers: Vec<Box<dyn Analyzer>>,
     executor: BinaryExecutor,
     additional_args: Vec<String>,
@@ -23,7 +22,6 @@ impl ProcessRunner {
     pub fn from_binary_extractor(binary_path: impl AsRef<Path>) -> Self {
         let path_str = binary_path.as_ref().to_string_lossy().to_string();
         Self {
-            config: ProcessConfig::default(),
             analyzers: Vec::new(),
             executor: BinaryExecutor::new(path_str).with_runner_name("Process".to_string()),
             additional_args: Vec::new(),
@@ -42,20 +40,6 @@ impl ProcessRunner {
             .executor
             .with_args(&self.additional_args)
             .with_runner_name("Process".to_string());
-        self
-    }
-
-    /// Set the PID to monitor
-    #[allow(dead_code)]
-    pub fn pid(mut self, pid: u32) -> Self {
-        self.config.pid = Some(pid);
-        self
-    }
-
-    /// Set the memory threshold for filtering
-    #[allow(dead_code)]
-    pub fn memory_threshold(mut self, threshold: u64) -> Self {
-        self.config.memory_threshold = Some(threshold);
         self
     }
 
@@ -149,15 +133,6 @@ mod tests {
         let runner = ProcessRunner::from_binary_extractor("/fake/path/process");
         assert_eq!(runner.name(), "process");
         assert_eq!(runner.id(), "process");
-        assert_eq!(runner.config.pid, None);
-    }
-
-    #[test]
-    fn test_process_runner_with_custom_config() {
-        let runner = ProcessRunner::from_binary_extractor("/fake/path/process").pid(1234);
-
-        assert_eq!(runner.id(), "process");
-        assert_eq!(runner.config.pid, Some(1234));
     }
 
     #[test]

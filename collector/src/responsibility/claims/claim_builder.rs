@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // claim_builder.rs — reads PolicyBoundaryCrossing edges from the
 // ResponsibilityGraph and builds ResponsibilityClaims (new types/ system).
@@ -197,13 +197,25 @@ fn classify_claim_type(
     graph: &ResponsibilityGraph,
     edge: &ResponsibilityEdge,
 ) -> ResponsibilityClaimType {
-    // Check: does a TaintPropagatesTo edge touch either the source or target?
-    let has_taint = any_edge_touching(
-        graph,
-        &ResponsibilityEdgeType::TaintPropagatesTo,
-        &edge.source,
-        &edge.target,
-    );
+    // A taint label is only valid when the taint edge is incident to this
+    // boundary AND shares the observation that produced the crossing. Without
+    // the shared evidence, one taint edge relabels every unrelated boundary
+    // crossing of the same two agents (the P1 claim amplification).
+    let has_taint = graph
+        .edges_of_type(&ResponsibilityEdgeType::TaintPropagatesTo)
+        .iter()
+        .filter_map(|edge_id| graph.get_edge(edge_id))
+        .any(|taint| {
+            let incident = taint.source == edge.source
+                || taint.target == edge.target
+                || taint.source == edge.target
+                || taint.target == edge.source;
+            incident
+                && taint
+                    .evidence_refs
+                    .iter()
+                    .any(|evidence| edge.evidence_refs.contains(evidence))
+        });
 
     if has_taint {
         return ResponsibilityClaimType::TaintedContextUse;
@@ -241,21 +253,6 @@ fn classify_claim_type(
 
     // Default: generic policy violation.
     ResponsibilityClaimType::PolicyViolation
-}
-
-/// Returns true if any edge of `edge_type` has `source == a` or `target == b`.
-fn any_edge_touching(
-    graph: &ResponsibilityGraph,
-    edge_type: &ResponsibilityEdgeType,
-    node_a: &crate::responsibility::types::NodeId,
-    node_b: &crate::responsibility::types::NodeId,
-) -> bool {
-    graph.edges_of_type(edge_type).iter().any(|eid| {
-        graph.get_edge(eid).is_some_and(|e| {
-            (e.source == *node_a || e.target == *node_a)
-                || (e.source == *node_b || e.target == *node_b)
-        })
-    })
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -464,7 +461,7 @@ fn resource_summary(
 mod tests {
     use super::*;
     use crate::responsibility::graph::ResponsibilityGraph;
-    use crate::responsibility::types::PhaseIndicator;
+    use crate::responsibility::types::{EvidenceId, PhaseIndicator};
 
     fn make_agent_node(
         id: &str,
@@ -508,7 +505,6 @@ mod tests {
             evidence_refs: vec![],
             confidence,
             phase: PhaseIndicator::Provisional { timestamp_ns: 1000 },
-            signal: None,
         }
     }
 
@@ -572,20 +568,25 @@ mod tests {
         let mut g = ResponsibilityGraph::default();
         g.add_node(make_agent_node("agent1", "agent-a"));
         g.add_node(make_boundary_node("boundary1"));
-        g.add_edge(make_edge(
+        let evidence = EvidenceId::from("ev-shared");
+        let mut pb = make_edge(
             "edge_pb",
             ResponsibilityEdgeType::PolicyBoundaryCrossing,
             "agent1",
             "boundary1",
             0.80,
-        ));
-        g.add_edge(make_edge(
+        );
+        pb.evidence_refs = vec![evidence.clone()];
+        g.add_edge(pb);
+        let mut taint = make_edge(
             "edge_taint",
             ResponsibilityEdgeType::TaintPropagatesTo,
             "agent1",
             "boundary1",
             0.70,
-        ));
+        );
+        taint.evidence_refs = vec![evidence];
+        g.add_edge(taint);
 
         let claims = ClaimBuilder::build_claims(&g, &HashSet::new());
         assert_eq!(claims.len(), 1);
@@ -593,6 +594,51 @@ mod tests {
             claims[0].claim_type,
             ResponsibilityClaimType::TaintedContextUse
         ));
+    }
+
+    #[test]
+    fn test_taint_claim_requires_shared_evidence() {
+        let mut g = ResponsibilityGraph::default();
+        g.add_node(make_agent_node("agent1", "agent-a"));
+        g.add_node(make_boundary_node("boundary1"));
+        g.add_node(make_boundary_node("boundary2"));
+
+        let mut pb1 = make_edge(
+            "edge_pb1",
+            ResponsibilityEdgeType::PolicyBoundaryCrossing,
+            "agent1",
+            "boundary1",
+            0.80,
+        );
+        pb1.evidence_refs = vec![EvidenceId::from("ev-1")];
+        g.add_edge(pb1);
+        let mut pb2 = make_edge(
+            "edge_pb2",
+            ResponsibilityEdgeType::PolicyBoundaryCrossing,
+            "agent1",
+            "boundary2",
+            0.80,
+        );
+        pb2.evidence_refs = vec![EvidenceId::from("ev-2")];
+        g.add_edge(pb2);
+        // The taint edge shares no evidence with either crossing.
+        let mut taint = make_edge(
+            "edge_taint",
+            ResponsibilityEdgeType::TaintPropagatesTo,
+            "agent1",
+            "boundary1",
+            0.70,
+        );
+        taint.evidence_refs = vec![EvidenceId::from("ev-3")];
+        g.add_edge(taint);
+
+        let claims = ClaimBuilder::build_claims(&g, &HashSet::new());
+        assert_eq!(claims.len(), 2);
+        assert!(
+            claims
+                .iter()
+                .all(|claim| matches!(claim.claim_type, ResponsibilityClaimType::PolicyViolation))
+        );
     }
 
     #[test]

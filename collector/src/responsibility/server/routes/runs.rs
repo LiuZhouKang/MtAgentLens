@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Route handlers for run endpoints: GET /api/runs, /api/runs/active, /api/runs/{id}.
 
 use crate::responsibility::persistence::reader::PersistenceReader;

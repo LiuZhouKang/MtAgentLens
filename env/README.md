@@ -151,15 +151,14 @@ env/
 │
 ├── scripts/                    ← 工具脚本
 │   ├── task_wrapper.sh         ← tmux agent 生命周期管理
-│   ├── evaluate_frozen_v2.py   ← 评估入口
+│   ├── legacy/                 ← 一次性迁移/旧评估脚本（历史，保留复现）
 │   ├── verifiers/              ← 场景验证器（73 个）
 │   └── ...                     ← 数据库检查、数据集冻结等
 │
-├── scenarios/                  ← 场景定义（38 个类别目录，164 个场景）
+├── scenarios/                  ← 按类别组织的场景定义（以 make env-list-scenarios 为准）
 │   └── fixtures/               ← 攻击触发 fixture 文件
-├── tests/                      ← 测试（21 个）
-├── config/                     ← 配置文件
-├── docs/                       ← 文档
+├── tests/                      ← 测试（23 个文件）
+├── config/                     ← 本地配置（真实凭据 gitignored）
 └── runs/                       ← 运行工件（gitignored）
 ```
 

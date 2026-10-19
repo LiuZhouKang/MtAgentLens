@@ -244,6 +244,8 @@ void test_should_track_process_target_pid() {
                 "target PID should be tracked");
     test_assert(!should_track_process(&tracker, "bash", 5678, 1000),
                 "non-target PID should not be tracked");
+    test_assert(should_track_process(&tracker, "bash", 5678, 1234),
+                "direct child of the target PID should be tracked");
 }
 
 void test_should_report_file_ops() {

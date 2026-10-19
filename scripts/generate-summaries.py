@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0 OR MIT
 """Generate summary.json files for historical runs so the API can serve them."""
 import json, sqlite3
 from pathlib import Path
 
-RUNS_DIR = Path("/home/lzk/MtAgentLens/env/runs")
+RUNS_DIR = Path(__file__).resolve().parents[1] / "env" / "runs"
 
 for run_dir in sorted(RUNS_DIR.iterdir()):
     if not run_dir.is_dir():

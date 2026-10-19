@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // buffer.rs — Thin GraphDeltaBuffer (Vec accumulator).
 //
@@ -35,6 +35,14 @@ pub struct GraphDeltaBuffer {
     pub evidence: Vec<CorrelationEvidence>,
     /// Behavior timeline entries (ordered by time).
     pub timeline: Vec<BehaviorTimelineEntry>,
+    /// Content signatures of intents already accepted.
+    ///
+    /// An LLM request carries the whole conversation history, so every turn
+    /// re-yields the tool calls and prompts of all earlier turns. Without
+    /// this, the same logical intent is extracted once per subsequent
+    /// request, and every downstream artifact (evidence, claims, alerts)
+    /// is multiplied along with it.
+    seen_intent_signatures: std::collections::HashSet<u64>,
 }
 
 impl GraphDeltaBuffer {
@@ -54,8 +62,24 @@ impl GraphDeltaBuffer {
     }
 
     /// Push an intent into the buffer.
+    ///
+    /// Unconditional: the runtime re-pushes intents after draining them, so
+    /// this must not filter. Use [`Self::accept_intent_once`] at the point of
+    /// extraction to suppress re-observations of the same content.
     pub fn push_intent(&mut self, intent: Intent) {
         self.intents.push(intent);
+    }
+
+    /// Record an intent's content signature.
+    ///
+    /// Returns `true` the first time a given (tool name, arguments) pair is
+    /// seen, `false` for an exact re-observation. Callers should skip the
+    /// intent when this returns `false`. The signature deliberately excludes
+    /// timestamp and message id: those differ on every re-extraction, which is
+    /// exactly why the existing id-based dedup never fired.
+    pub fn accept_intent_once(&mut self, intent: &Intent) -> bool {
+        self.seen_intent_signatures
+            .insert(intent_content_signature(intent))
     }
 
     /// Push an action into the buffer.
@@ -114,5 +138,78 @@ impl GraphDeltaBuffer {
         self.actions.clear();
         self.evidence.clear();
         self.timeline.clear();
+    }
+}
+
+/// Stable content signature of an intent.
+///
+/// Uses the owning process plus the tool name and normalised arguments — the
+/// parts that identify *which agent intended to do what*. Timestamps and
+/// freshly generated ids are excluded on purpose, but the process identity is
+/// not: two agents that run the same `Bash {command:"ls"}` are two distinct
+/// intents, and dropping the second would erase one agent's attribution.
+fn intent_content_signature(intent: &Intent) -> u64 {
+    use std::hash::{Hash, Hasher};
+
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    intent.process_id.pid.hash(&mut hasher);
+    intent.process_id.start_time_ns.hash(&mut hasher);
+    intent.tool_name.hash(&mut hasher);
+    match serde_json::to_string(&intent.tool_args) {
+        Ok(serialised) => serialised.hash(&mut hasher),
+        Err(_) => intent.tool_args.len().hash(&mut hasher),
+    }
+    hasher.finish()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::responsibility::types::evidence_types::IntentAuthoritySource;
+    use crate::responsibility::types::evidence_types::{Intent, IntentClass, IntentParseState};
+    use crate::responsibility::types::ids::{IntentId, MessageId, ProcessId};
+
+    fn make_intent(tool: &str, ts: u64) -> Intent {
+        Intent {
+            intent_id: IntentId::new(),
+            process_id: ProcessId::new(1, 0),
+            message_id: MessageId::new(),
+            tool_name: tool.to_string(),
+            tool_args: Vec::new(),
+            intent_class: IntentClass::SideEffect,
+            parse_state: IntentParseState::Complete,
+            primary_matching_eligible: true,
+            authority_source: IntentAuthoritySource::SseResponseToolUse,
+            timestamp_ns: ts,
+        }
+    }
+
+    #[test]
+    fn accept_intent_once_rejects_repeat_of_same_content() {
+        let mut buf = GraphDeltaBuffer::new();
+        // Same tool name, different ids and timestamps — exactly what
+        // re-extracting the request history produces.
+        assert!(
+            buf.accept_intent_once(&make_intent("exec", 100)),
+            "first sight accepted"
+        );
+        assert!(
+            !buf.accept_intent_once(&make_intent("exec", 200)),
+            "later sight rejected"
+        );
+        assert!(
+            !buf.accept_intent_once(&make_intent("exec", 300)),
+            "still rejected"
+        );
+    }
+
+    #[test]
+    fn accept_intent_once_allows_distinct_content() {
+        let mut buf = GraphDeltaBuffer::new();
+        assert!(buf.accept_intent_once(&make_intent("exec", 1)));
+        assert!(
+            buf.accept_intent_once(&make_intent("ls", 1)),
+            "different tool is distinct"
+        );
     }
 }

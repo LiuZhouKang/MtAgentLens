@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // risk_factors.rs — Splunk RBA-style entity risk factor aggregation.
 //

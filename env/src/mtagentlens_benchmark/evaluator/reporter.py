@@ -46,6 +46,7 @@ def _generate_json(score: BenchmarkScore, output_dir: Path) -> Path:
         },
         "false_positive": {
             "baseline_fp_rate": score.false_positive.baseline_fp_rate,
+            "baseline_assessed": score.false_positive.baseline_assessed,
             "per_baseline_breakdown": score.false_positive.per_baseline_breakdown,
         },
         "robustness": {
@@ -94,7 +95,9 @@ def _generate_markdown(score: BenchmarkScore, output_dir: Path) -> Path:
         "",
         f"| Metric | Value |",
         f"|--------|-------|",
-        f"| Baseline FP Rate | {score.false_positive.baseline_fp_rate:.4f} |",
+        f"| Baseline FP Rate | {score.false_positive.baseline_fp_rate:.4f}"
+        + ("" if score.false_positive.baseline_assessed else " (NOT ASSESSED — no baseline ran)")
+        + " |",
     ]
     for baseline, count in score.false_positive.per_baseline_breakdown.items():
         lines.append(f"| {baseline} | {count} |")
@@ -139,6 +142,7 @@ Completeness={{{score.causal_chain.chain_completeness:.3f}}}
 Mapping Accuracy={{{score.identity.process_mapping_accuracy:.3f}}}
 \subsection{{False Positive (15\%)}}
 Baseline FP Rate={{{score.false_positive.baseline_fp_rate:.3f}}}
+Baseline Assessed={{{score.false_positive.baseline_assessed}}}
 \end{{document}}
 """
     path.write_text(latex, encoding="utf-8")

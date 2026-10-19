@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // taint.rs — TaintTracker: cross-agent contamination propagation tracking.
 //
@@ -8,6 +8,7 @@
 // reads a contaminated file, it becomes contaminated itself).
 
 use crate::responsibility::types::AgentId;
+use crate::responsibility::types::ids::ProcessId;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -18,6 +19,14 @@ use std::collections::{HashMap, HashSet};
 pub struct TaintRecord {
     /// The agent that contaminated this artifact.
     pub source_agent: AgentId,
+    /// The OS process that performed the observed write, when known.
+    ///
+    /// Phase 1 mints one provisional AgentId per process when TLS/ancestor
+    /// evidence is missing. Without the process, two IDs of the same process
+    /// look like two agents and a read of one's own file becomes a false
+    /// cross-agent taint.
+    #[serde(default)]
+    pub source_process: Option<ProcessId>,
     /// Canonical path of the contaminated artifact.
     pub artifact: String,
     /// When the contamination was first detected.
@@ -92,6 +101,27 @@ impl TaintTracker {
     /// If the artifact is already tracked, the record is updated with the
     /// new timestamp only if it is earlier (first contamination wins).
     pub fn mark_contaminated(&mut self, source: AgentId, artifact: &str, ts: u64) {
+        self.mark_contaminated_inner(source, None, artifact, ts);
+    }
+
+    /// Mark contamination and remember which OS process performed the write.
+    pub fn mark_contaminated_with_process(
+        &mut self,
+        source: AgentId,
+        source_process: ProcessId,
+        artifact: &str,
+        ts: u64,
+    ) {
+        self.mark_contaminated_inner(source, Some(source_process), artifact, ts);
+    }
+
+    fn mark_contaminated_inner(
+        &mut self,
+        source: AgentId,
+        source_process: Option<ProcessId>,
+        artifact: &str,
+        ts: u64,
+    ) {
         let key = artifact.to_string();
 
         if let Some(existing) = self.contaminated_artifacts.get_mut(&key) {
@@ -99,6 +129,7 @@ impl TaintTracker {
             if ts < existing.timestamp_ns {
                 existing.timestamp_ns = ts;
                 existing.source_agent = source.clone();
+                existing.source_process = source_process;
             }
             existing.access_count += 1;
         } else {
@@ -107,6 +138,7 @@ impl TaintTracker {
 
             let record = TaintRecord {
                 source_agent: source.clone(),
+                source_process,
                 artifact: key.clone(),
                 timestamp_ns: ts,
                 evidence_refs: Vec::new(),
@@ -133,10 +165,42 @@ impl TaintTracker {
         artifact: &str,
         access_ts_ns: u64,
     ) -> Option<TaintAccess> {
+        self.check_access_inner(agent, None, artifact, access_ts_ns)
+    }
+
+    /// Check an access while supplying the reader's OS process.
+    ///
+    /// A writer and reader that are the same process cannot be distinguished
+    /// as two logical agents in Phase 1, so no cross-agent taint is claimed.
+    pub fn check_access_from(
+        &self,
+        agent: &AgentId,
+        accessor_process: ProcessId,
+        artifact: &str,
+        access_ts_ns: u64,
+    ) -> Option<TaintAccess> {
+        self.check_access_inner(agent, Some(accessor_process), artifact, access_ts_ns)
+    }
+
+    fn check_access_inner(
+        &self,
+        agent: &AgentId,
+        accessor_process: Option<ProcessId>,
+        artifact: &str,
+        access_ts_ns: u64,
+    ) -> Option<TaintAccess> {
         let record = self.contaminated_artifacts.get(artifact)?;
 
         // Same agent accessing its own contaminated artifact: not a cross-agent taint.
         if record.source_agent == *agent {
+            return None;
+        }
+
+        // Same OS process: the identity split cannot separate two logical
+        // agents inside one process, so a cross-agent claim would be unfounded.
+        if let (Some(writer), Some(reader)) = (record.source_process, accessor_process)
+            && writer == reader
+        {
             return None;
         }
 
@@ -381,5 +445,27 @@ mod tests {
         // Earliest timestamp (1000) should win.
         assert_eq!(record.timestamp_ns, 1000);
         assert_eq!(record.source_agent, b);
+    }
+    #[test]
+    fn test_same_process_access_is_not_cross_agent_taint() {
+        let mut tracker = TaintTracker::new();
+        let writer = agent("agent-writer");
+        let reader = agent("agent-reader");
+        let pid = ProcessId::new(100, 1);
+
+        tracker.mark_contaminated_with_process(writer, pid, "/tmp/handoff.txt", 1_000);
+
+        // Same process under two provisional IDs: no cross-agent claim.
+        assert!(
+            tracker
+                .check_access_from(&reader, pid, "/tmp/handoff.txt", 2_000)
+                .is_none()
+        );
+        // A genuinely different process still propagates.
+        assert!(
+            tracker
+                .check_access_from(&reader, ProcessId::new(200, 2), "/tmp/handoff.txt", 2_000)
+                .is_some()
+        );
     }
 }

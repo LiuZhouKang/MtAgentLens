@@ -32,3 +32,9 @@
 *.pdf     binary
 *.pptx    binary
 *.mp4     binary
+
+# Captured transport fixtures are byte-exact test oracles; line-ending
+# normalisation would change their sizes and SHA-256 (caught by the fresh-clone
+# gate: a clean clone must reproduce the manifest hashes).
+collector/tests/fixtures/wire/** -text
+collector/tests/fixtures/schema/*.db binary

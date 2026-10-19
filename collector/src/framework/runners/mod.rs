@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 eunomia-bpf org.
 
 use crate::framework::core::Event;
@@ -32,22 +32,6 @@ pub trait Runner: Send + Sync {
     fn id(&self) -> String;
 }
 
-/// Configuration for SSL/TLS monitoring
-#[derive(Debug, Clone, Default)]
-pub struct SslConfig {
-    #[allow(dead_code)]
-    pub tls_version: Option<String>,
-}
-
-/// Configuration for process monitoring
-#[derive(Debug, Clone, Default)]
-pub struct ProcessConfig {
-    #[allow(dead_code)]
-    pub pid: Option<u32>,
-    #[allow(dead_code)]
-    pub memory_threshold: Option<u64>,
-}
-
 /// Configuration for stdio payload monitoring
 #[derive(Debug, Clone, Default)]
 pub struct StdioConfig {
@@ -64,6 +48,7 @@ pub struct StdioConfig {
 pub mod agent; // Add agent runner for flexible composition
 pub mod common;
 pub mod fake; // Add fake runner for testing
+pub mod outofband;
 pub mod process;
 pub mod ssl;
 pub mod stdio;
@@ -71,6 +56,7 @@ pub mod system; // Add system runner for CPU and memory monitoring
 
 pub use agent::AgentRunner; // Export AgentRunner
 pub use fake::FakeRunner; // Export FakeRunner
+pub use outofband::OpenClawRunner;
 pub use process::ProcessRunner;
 pub use ssl::SslRunner;
 pub use stdio::StdioRunner;

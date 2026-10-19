@@ -12,7 +12,7 @@
 #   docker run --rm -it --cap-add=CAP_BPF --cap-add=CAP_SYS_ADMIN --pid=host \
 #       -v /sys:/sys:ro -v /usr:/usr:ro -v /lib:/lib:ro \
 #       -p 7395:7395 \
-#       mtagentlens trace --ssl --process --system
+#       mtagentlens trace --ssl true --process true --system
 
 # ============ Stage 1: Builder ============
 FROM ubuntu:24.04 AS builder
@@ -68,7 +68,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libelf1 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /build/collector/target/release/mtagentlens /usr/local/bin/mtagentlens
+# `.cargo/config.toml` sets `target-dir = "build"`; the binary is NOT under
+# `collector/target/` (a stale path here made the image build fail).
+COPY --from=builder /build/collector/build/release/mtagentlens /usr/local/bin/mtagentlens
 
 EXPOSE 7395
 

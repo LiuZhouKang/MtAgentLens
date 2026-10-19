@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Decrypt and visualize Claude Code API traffic from a scenario run.
 #
 # Usage:
@@ -21,7 +24,7 @@ RUN_DIR=""
 
 for arg in "$@"; do
     case "$arg" in
-        --latest) RUN_DIR=$(find /home/lzk/MtAgentLens/env/runs -maxdepth 1 -type d -name "202*" 2>/dev/null | sort | tail -1) ;;
+        --latest) RUN_DIR=$(find "$ROOT/env/runs" -maxdepth 1 -type d -name "202*" 2>/dev/null | sort | tail -1) ;;
         *) RUN_DIR="$arg" ;;
     esac
 done

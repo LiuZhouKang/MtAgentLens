@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 MtAgentLens Project
 
 //! Core data types for Causal Trace (Subproject 1)
@@ -135,6 +135,16 @@ pub struct CausalEdge {
     pub causality_type: CausalityType,
     pub confidence: f32,
     pub evidence: Vec<EvidenceRef>,
+}
+
+/// An edge must carry non-temporal evidence: temporal proximity alone is not
+/// a causal claim. This predicate lives on the type it describes (it used to
+/// sit in a legacy correlator module that no production code called).
+pub fn edge_has_non_temporal_support(edge: &CausalEdge) -> anyhow::Result<()> {
+    if edge.evidence.is_empty() {
+        anyhow::bail!("responsibility edge missing evidence");
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -534,15 +544,15 @@ impl IntentEvent {
     }
 }
 
+/// Classify a tool name into an `IntentClass`.
+///
+/// Delegates to the single canonical table in
+/// [`tool_vocabulary`](crate::responsibility::types::tool_vocabulary). This
+/// function used to carry its own table, which disagreed with the live
+/// extractor's on `Bash` (and several other names) — so the same tool had
+/// different `primary_matching_eligible` depending on which path built it.
 pub fn classify_intent_class(tool_name: &str) -> IntentClass {
-    match tool_name {
-        "TaskCreate" | "TaskUpdate" | "Skill" | "AskUserQuestion" | "Agent" | "SendMessage" => {
-            IntentClass::Orchestration
-        }
-        "Read" | "Write" | "Edit" | "Bash" | "WebFetch" | "WebSearch" | "Glob"
-        | "text_response" => IntentClass::SideEffect,
-        _ => IntentClass::Unknown,
-    }
+    crate::responsibility::types::tool_vocabulary::classify_intent_class(tool_name)
 }
 
 pub fn is_primary_matching_tool(tool_name: &str) -> bool {

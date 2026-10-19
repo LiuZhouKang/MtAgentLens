@@ -1,4 +1,6 @@
-use super::alert_types::AlertSeverity;
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright (c) 2026 MtAgentLens Project
+
 use super::ids::*;
 use super::phase::PhaseIndicator;
 use super::resource::NormalizedResource;
@@ -13,6 +15,42 @@ pub enum ResponsibilityNodeType {
     ToolCall,
     Credential,
     Context,
+}
+
+/// The observable kind of a node's resource.
+///
+/// The graph stores almost everything as a `Resource` node and puts the real
+/// distinction in `node.resource`. Templates that only compare node types
+/// cannot tell a file write from a network send; this is the discriminator
+/// they need.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum ResourceKind {
+    File,
+    Network,
+    Process,
+    Conversation,
+    ToolCall,
+    Credential,
+    Context,
+}
+
+impl ResourceKind {
+    pub fn matches(self, resource: &NormalizedResource) -> bool {
+        matches!(
+            (self, resource),
+            (Self::File, NormalizedResource::File { .. })
+                | (Self::Network, NormalizedResource::Network { .. })
+                | (Self::Process, NormalizedResource::Process { .. })
+                | (
+                    Self::Conversation,
+                    NormalizedResource::LlmConversation { .. }
+                )
+                | (Self::ToolCall, NormalizedResource::ToolCall { .. })
+                | (Self::Credential, NormalizedResource::Credential { .. })
+                | (Self::Context, NormalizedResource::Context { .. })
+        )
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -51,12 +89,12 @@ pub struct ResponsibilityEdge {
     pub evidence_refs: Vec<EvidenceId>,
     pub confidence: f32,
     pub phase: PhaseIndicator,
-    pub signal: Option<super::signal_types::DetectedSignal>,
 }
 
 // ═══ Graph snapshot and metrics ═══
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct GraphSnapshot {
     pub snapshot_id: String,
     pub timestamp_ns: u64,
@@ -84,27 +122,4 @@ pub struct GraphDiff {
     pub removed_edges: Vec<EdgeId>,
     pub node_count_change: i32,
     pub edge_count_change: i32,
-}
-
-// ═══ Pattern matching ═══
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GraphPatternTemplate {
-    pub template_id: String,
-    pub description: String,
-    pub severity: AlertSeverity,
-    pub required_node_types: Vec<ResponsibilityNodeType>,
-    pub required_edge_types: Vec<ResponsibilityEdgeType>,
-    pub min_matches: usize,
-    pub min_distinct_agents: usize,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GraphPatternMatch {
-    pub template_id: String,
-    pub confidence: f32,
-    pub severity: AlertSeverity,
-    pub description: String,
-    pub matched_node_ids: Vec<NodeId>,
-    pub matched_edge_ids: Vec<EdgeId>,
 }

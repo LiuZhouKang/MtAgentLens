@@ -1,12 +1,16 @@
 # MtAgentLens 实验设计 v5 — RQ驱动 · 标准指标 · 正式设计文档
 **状态**: 正式设计文档 · **日期**: 2026-06-14 · **目标会议**: USENIX Security / CCS / NDSS
 
-> **当前实现口径（2026-06-27）**：本文件保留 v5 实验设计思路。最终主评估已扩展为
-> FuxiBench 86 场景（67 attack + 19 benign），攻击类型分布为 Type A=10、
-> Type B=34、Type C=23。最终指标以
-> `compare/results/paper/main_evaluation.json` 和
-> `compare/results/paper/EXPERIMENTS.md` 为准：MtAgentLens TPR=0.896、
-> FPR=0.000、F1=0.945、MCC=0.809；Type C TPR=1.000。
+> **当前实现口径（2026-10-19）**：本文件保留 v5 实验设计思路。FuxiBench 86 场景
+> （67 attack + 19 benign；Type A=10、B=34、C=23）。指标必须分口径：
+>
+> - **交付二进制裁决**（`responsibility_alerts`，`compare/results/paper/standard_evaluation_v5.json`）：
+>   `decision=Unsafe` TPR=0.8955（Wilson 0.7997–0.9485）、FPR=0.000（0–0.168）、
+>   F1=0.9449、MCC=0.809；Warning+ TPR=0.9851 但 FPR=0.8947（不可作为产品口径）。
+> - **评估脚本复合分**（`main_evaluation.json` 的 `full_scores`）：
+>   TPR=0.9851、F1=0.9925；这是脚本对 DB 信号的重打分，**不是**二进制自身裁决。
+>
+> 旧文中的 TPR=0.896 / F1=0.945 是历史采集，不再作为头条数字。
 
 > v5 取代 v4。核心变更：
 > 1. 定义 4 个 Research Questions，每个实验严格对齐 RQ
@@ -105,7 +109,7 @@
 | 方法 | 用途 | 标准来源 |
 |------|------|---------|
 | **McNemar's test** (Yates correction) | 配对二元结果比较 | Dietterich (1998), "Approximate Statistical Tests for Comparing Supervised Classification Learning Algorithms" |
-| **Bootstrap 95% CI** (10,000 resamples, BCa) | 所有关键指标的不确定性量化 | Efron & Tibshirani (1994) |
+| **Bootstrap 95% CI** (10,000 resamples, BCa) | 交付二进制的 TPR/FPR 不确定性量化（当前仅两种裁决口径；见 §Bootstrap 95% CI 的范围说明） | Efron & Tibshirani (1994) |
 | **Cohen's κ** | 标注者间一致性 | 盲标注质量保证 |
 | **Fisher's exact test** | 小样本 2×2 列联表 | 替代 χ²（小 n 时更准确） |
 
@@ -201,7 +205,7 @@
 
 | Tool | TPR | FPR | Precision | F1 | MCC | Detected/Total |
 |------|-----|-----|-----------|----|-----|----------------|
-| **MtAgentLens (eBPF ON)** | 0.896 | 0.000 | 1.000 | 0.945 | 0.809 | 60/67 |
+| **MtAgentLens (delivered binary, decision=Unsafe)** | 0.8955 | 0.000 | 1.000 | 0.9449 | 0.8090 | 60/67 |
 | LLM Guard | 详见 `compare/results/paper/EXPERIMENTS.md` | — | — | — | — | — |
 | Agent Sentinel | 详见 `compare/results/paper/EXPERIMENTS.md` | — | — | — | — | — |
 | Meta Prompt Guard | 详见 `compare/results/paper/EXPERIMENTS.md` | — | — | — | — | — |
@@ -230,7 +234,16 @@
 
 ### Bootstrap 95% CI
 
-所有 TPR/FPR/F1/MCC 报告 Bootstrap 95% CI (BCa, 10,000 resamples)。
+交付二进制的检测指标报告 Bootstrap 95% CI（BCa，10,000 resamples，固定种子
+20261019）：`compare/results/paper/standard_evaluation_v5.json` 的
+`rq1_detection.strict` / `rq1_detection.actionable`。当每次重采样结果完全一致
+（例如 FPR 0/19）时 BCa 区间退化为 [0, 0]，该文件同时报告 Wilson 95% 区间。
+
+**范围说明（原承诺为“所有 TPR/FPR/F1/MCC”）**：本仓库目前只对从
+`responsibility_alerts` 直接读取的二进制裁决（`decision=Unsafe` 与
+`severity∈{Warning,Critical}` 两种口径）计算了 CI。评估脚本的 `full_scores`
+复合分、以及与其他工具的 McNemar 对比尚未产出 CI 产物；在补产之前，正文
+不得声称这些指标已有区间估计。
 
 ---
 

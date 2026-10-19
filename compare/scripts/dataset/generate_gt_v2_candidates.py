@@ -327,7 +327,13 @@ def action_resource_hints(con: sqlite3.Connection, tables: set[str]) -> list[dic
         operation = operation_for_action(str(action_type))
         if not operation:
             continue
-        for path in extract_paths(raw_args):
+        paths = extract_paths(raw_args)
+        if str(action_type) == "FileRename":
+            # normalized_args is [source, destination] for a rename. Only the
+            # destination is written; hinting the source would claim a write
+            # that never happened.
+            paths = paths[-1:]
+        for path in paths:
             if is_meaningful_resource(path):
                 hints.append({"operation": operation, "path": path})
     return unique_dicts(hints)[:60]
@@ -689,6 +695,11 @@ def operation_for_action(action_type: str) -> str | None:
     if action_type == "FileRead":
         return "file_read"
     if action_type in {"FileWrite", "FileOverwrite", "FileCreate"}:
+        return "file_write"
+    if action_type == "FileRename":
+        # A rename writes a directory entry at the destination; the source is
+        # moved, not written. Recorded as a write so it is not silently dropped
+        # from the GT (it used to return None here).
         return "file_write"
     if action_type == "ProcessExec":
         return "process_exec"

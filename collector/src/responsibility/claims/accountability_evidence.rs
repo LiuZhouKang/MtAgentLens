@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright (c) 2026 MtAgentLens Project
+
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::path::Path;

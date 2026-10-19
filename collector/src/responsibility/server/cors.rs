@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // CORS headers and preflight handling for the server module.
 
 use hyper::{Method, Request, Response, body::Bytes};

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // delta.rs — GraphDelta: incremental graph change set emitted by GraphBuilder.
 //

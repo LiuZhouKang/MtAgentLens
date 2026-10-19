@@ -1,0 +1,193 @@
+{
+  "schema": "mtagentlens.standard_evaluation.v5",
+  "generated_at": "2026-10-19",
+  "provenance": {
+    "corpus": "compare/Dataset/FuxiBench/traces/*/responsibility.db (86 scenario databases)",
+    "ground_truth": "compare/Dataset/FuxiBench/prompt_inputs/manifest.json",
+    "detector": "delivered binary verdict, read directly from responsibility_alerts (decision/severity)",
+    "method": "BCa bootstrap, 10000 resamples, seed 20261019; statistic = per-class detection rate",
+    "note": "Fills the Bootstrap-CI commitment for RQ1 detection. BCa intervals are degenerate when every resample is identical (FPR 0/19); Wilson is reported alongside.",
+    "reproduce_with": "python3 scripts/evaluation/binary_verdict_bootstrap.py"
+  },
+  "dataset_stats": {
+    "total_scenarios": 86,
+    "attack_scenarios": 67,
+    "benign_scenarios": 19,
+    "type_a": 10,
+    "type_b": 34,
+    "type_c": 23
+  },
+  "rq1_detection": {
+    "definitions": {
+      "strict": "any alert with decision=Unsafe",
+      "actionable": "any alert with severity in {Warning,Critical} (product \"Warning+\")"
+    },
+    "strict": {
+      "TP": 60,
+      "FN": 7,
+      "FP": 0,
+      "TN": 19,
+      "TPR": 0.8955223880597015,
+      "TPR_CI95": [
+        0.7761194029850746,
+        0.9402985074626866
+      ],
+      "TPR_wilson95": [
+        0.7996871695126198,
+        0.9484623023121713
+      ],
+      "FPR": 0.0,
+      "FPR_CI95": [
+        0.0,
+        0.0
+      ],
+      "FPR_wilson95": [
+        0.0,
+        0.16817922405261626
+      ],
+      "Precision": 1.0,
+      "F1": 0.9448818897637795,
+      "MCC": 0.8089624259871484
+    },
+    "actionable": {
+      "TP": 66,
+      "FN": 1,
+      "FP": 17,
+      "TN": 2,
+      "TPR": 0.9850746268656716,
+      "TPR_CI95": [
+        0.9104477611940298,
+        1.0
+      ],
+      "TPR_wilson95": [
+        0.9201813768022188,
+        0.997360428265921
+      ],
+      "FPR": 0.8947368421052632,
+      "FPR_CI95": [
+        0.5789473684210527,
+        0.9473684210526315
+      ],
+      "FPR_wilson95": [
+        0.6860591728889099,
+        0.9706414397011299
+      ],
+      "Precision": 0.7951807228915663,
+      "F1": 0.88,
+      "MCC": 0.2042602997894309
+    },
+    "by_attack_type": {
+      "A": {
+        "n": 10,
+        "strict_detected": 8,
+        "actionable_detected": 10
+      },
+      "B": {
+        "n": 34,
+        "strict_detected": 31,
+        "actionable_detected": 33
+      },
+      "C": {
+        "n": 23,
+        "strict_detected": 21,
+        "actionable_detected": 23
+      }
+    },
+    "composite_rust_score_below_0_70": {
+      "count": 11,
+      "scenarios": [
+        "credential-keylogger",
+        "credential-memory-scrape",
+        "handoff-injection",
+        "network-anomaly",
+        "privsec-docker-escape",
+        "prompt-injection-classical",
+        "resource-direct",
+        "shadow-agent",
+        "supplychain-malicious-build",
+        "supplychain-poison-config",
+        "supplychain-typosquatting"
+      ]
+    }
+  },
+  "rq3_attribution": {
+    "corpus_caveat": "The 86 databases were collected 2026-07-16, before the graph-pattern producer was restored (2026-10-19) and before the credential resource producer. Pattern verdicts and Credential nodes are 0 in every scenario: absence here is 'not produced by that build', not 'correctly not detected'.",
+    "classification_fpr": {
+      "TaintedContextUse": {
+        "benign": "15/19",
+        "fpr": 0.7894736842105263,
+        "wilson95": [
+          0.567,
+          0.915
+        ],
+        "attack": "59/67",
+        "recall": 0.8805970149253731
+      },
+      "PolicyViolation": {
+        "benign": "2/19",
+        "fpr": 0.10526315789473684,
+        "wilson95": [
+          0.029,
+          0.314
+        ],
+        "attack": "40/67",
+        "recall": 0.5970149253731343
+      },
+      "SuspiciousDelegation": {
+        "benign": "0/19",
+        "fpr": 0.0,
+        "wilson95": [
+          0.0,
+          0.168
+        ],
+        "attack": "0/67",
+        "recall": 0.0,
+        "note": "enum variant exists but no producer emitted it in this corpus; 0/19 and 0/67 are empty-set observations, not tested negatives"
+      },
+      "UnauthorizedCapabilityUse": {
+        "benign": "0/19",
+        "fpr": 0.0,
+        "wilson95": [
+          0.0,
+          0.168
+        ],
+        "attack": "0/67",
+        "recall": 0.0,
+        "note": "enum variant exists but no producer emitted it in this corpus; 0/19 and 0/67 are empty-set observations, not tested negatives"
+      },
+      "BlockedAttempt": {
+        "benign": "0/19",
+        "fpr": 0.0,
+        "wilson95": [
+          0.0,
+          0.168
+        ],
+        "attack": "0/67",
+        "recall": 0.0,
+        "note": "enum variant exists but no producer emitted it in this corpus; 0/19 and 0/67 are empty-set observations, not tested negatives"
+      },
+      "ResponsibilityAnomaly": {
+        "benign": "0/19",
+        "fpr": 0.0,
+        "wilson95": [
+          0.0,
+          0.168
+        ],
+        "attack": "0/67",
+        "recall": 0.0,
+        "note": "enum variant exists but no producer emitted it in this corpus; 0/19 and 0/67 are empty-set observations, not tested negatives"
+      }
+    },
+    "graph_pattern_producer": {
+      "measured": false,
+      "reason": "producer restored 2026-10-19; corpus predates it"
+    },
+    "credential_resource_producer": {
+      "measured": false,
+      "reason": "corpus has zero Credential nodes in all 86 scenarios"
+    },
+    "cross_check": {
+      "note": "The 2026-10-19 benign FPR rerun (docs/evaluation/fpr-baseline-2026-10-19.json) recorded 0 claims across 18 observed scenarios, while this July corpus records TaintedContextUse in 15/19 benign scenarios. Different binaries/corpora; neither is the current clean-host number."
+    }
+  }
+}

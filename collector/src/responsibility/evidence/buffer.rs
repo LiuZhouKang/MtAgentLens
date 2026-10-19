@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // buffer.rs — TTL-based buffers for streaming intent-to-action correlation.
 //

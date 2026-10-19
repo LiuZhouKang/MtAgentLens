@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0 OR MIT
 """Export graph snapshot for a single run. Called by API route."""
 import json, sqlite3, sys, re
 from pathlib import Path

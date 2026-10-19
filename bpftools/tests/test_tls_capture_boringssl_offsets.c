@@ -27,11 +27,13 @@ int main(void)
 {
     const char *binary_path = getenv("MTAGENTLENS_CLAUDE_BINARY");
     if (!binary_path || binary_path[0] == '\0') {
-        binary_path = "/home/lzk/.npm-global/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe";
+        fprintf(stderr,
+                "SKIP: set MTAGENTLENS_CLAUDE_BINARY to a readable Claude ELF\n");
+        return 0;
     }
     if (access(binary_path, R_OK) != 0) {
         fprintf(stderr,
-                "SKIP: set MTAGENTLENS_CLAUDE_BINARY to a readable Claude ELF (current: %s)\n",
+                "SKIP: MTAGENTLENS_CLAUDE_BINARY is not readable: %s\n",
                 binary_path);
         return 0;
     }
@@ -48,12 +50,17 @@ int main(void)
 
     assert_true(offsets.found,
                 "expected current Claude ELF BoringSSL offset detection to succeed");
-    assert_true(offsets.ssl_do_handshake > 0,
-                "expected SSL_do_handshake offset to be non-zero");
     assert_true(offsets.ssl_read > 0,
                 "expected SSL_read offset to be non-zero");
     assert_true(offsets.ssl_write > 0,
                 "expected SSL_write offset to be non-zero");
+    /* SSL_do_handshake is optional: Bun >= v1.4.x changed its prologue, so
+     * detection may legitimately return 0 here (handshake events degrade,
+     * data capture via SSL_read/SSL_write is unaffected). */
+    if (offsets.ssl_do_handshake == 0) {
+        fprintf(stderr,
+                "note: SSL_do_handshake offset is 0 (Bun >= v1.4 degraded); data capture unaffected\n");
+    }
 
     if (tests_failed != 0) {
         fprintf(stderr, "Test failed with %d assertion failure(s).\n", tests_failed);

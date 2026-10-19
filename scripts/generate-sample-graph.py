@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0 OR MIT
 """Generate TypeScript module from exported sample-run.json."""
 import json
 from pathlib import Path

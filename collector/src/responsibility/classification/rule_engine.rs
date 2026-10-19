@@ -1,5 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright (c) 2026 MtAgentLens Project
+
 use crate::responsibility::classification::rules::{
-    OperationCategory, ResourcePattern, RuleDecision, RuleHit, SafetyRule,
+    OperationCategory, ResourcePattern, RuleDecision, RuleHit, SafetyRule, workspace_prefix,
 };
 use crate::responsibility::graph::ResponsibilityGraph;
 use crate::responsibility::types::{
@@ -7,7 +10,7 @@ use crate::responsibility::types::{
 };
 
 /// RuleEngine evaluates a graph against a set of safety rules
-/// (5 Safe + 18 Unsafe) loaded from default configuration.
+/// (5 Safe + 20 Unsafe) loaded from default configuration.
 ///
 /// Per spec §11: Safe rules are checked first (whitelist), then unsafe rules
 /// (blacklist). Rules are mapped from edge types → OperationCategory
@@ -19,10 +22,19 @@ pub struct RuleEngine {
 
 impl RuleEngine {
     /// Create a RuleEngine with the default rule set:
-    /// 5 Safe rules + 18 Unsafe rules.
+    /// 5 Safe rules + 20 Unsafe rules.
     pub fn new() -> Self {
+        Self::with_workspace_prefix(workspace_prefix())
+    }
+
+    /// Create a RuleEngine with an explicit workspace prefix.
+    ///
+    /// `new()` derives the prefix from the process working directory, which
+    /// tests are allowed to change; an explicit prefix keeps a test's rule set
+    /// stable regardless of what other tests are doing concurrently.
+    pub fn with_workspace_prefix(workspace_prefix: String) -> Self {
         Self {
-            safe_rules: default_safe_rules(),
+            safe_rules: default_safe_rules(workspace_prefix),
             unsafe_rules: default_unsafe_rules(),
         }
     }
@@ -234,14 +246,14 @@ fn simple_glob_match(s: &str, pattern: &str) -> bool {
     s == pattern
 }
 
-// ── Default Rules (5 Safe + 18 Unsafe) per spec §8.2 ────────────────────────
+// ── Default Rules (5 Safe + 20 Unsafe) per spec §8.2 ────────────────────────
 
-fn default_safe_rules() -> Vec<SafetyRule> {
+fn default_safe_rules(workspace_prefix: String) -> Vec<SafetyRule> {
     vec![
         SafetyRule {
             rule_id: "safe.project_read".into(),
             description: "Reading files inside the project workspace".into(),
-            resource_pattern: ResourcePattern::Prefix("/home/lzk/mtagentlens/".into()),
+            resource_pattern: ResourcePattern::Prefix(workspace_prefix),
             operation_types: vec![OperationCategory::FileRead],
             decision: RuleDecision::Safe,
         },
@@ -482,7 +494,6 @@ mod tests {
             evidence_refs: Vec::new(),
             confidence: 0.9,
             phase: PhaseIndicator::Provisional { timestamp_ns: 1000 },
-            signal: None,
         }
     }
 
@@ -500,7 +511,7 @@ mod tests {
             ResponsibilityNodeType::Resource,
             Some("agent-1"),
             Some(NormalizedResource::File {
-                canonical_path: "/home/lzk/mtagentlens/src/main.rs".into(),
+                canonical_path: "/workspace/project/src/main.rs".into(),
             }),
         ));
         g.add_edge(make_edge(
@@ -510,7 +521,7 @@ mod tests {
             "r1",
         ));
 
-        let engine = RuleEngine::new();
+        let engine = RuleEngine::with_workspace_prefix("/workspace/project/".into());
         let (decision, hits) = engine.evaluate(&g);
 
         assert_eq!(decision, RuleDecision::Safe);

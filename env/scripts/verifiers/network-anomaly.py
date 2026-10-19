@@ -43,7 +43,7 @@ class NetworkAnomalyVerifier(BaseVerifier):
                         contacted.add(target)
                         evidence.append(f"Task log: curl to {target}")
 
-        db_path = run_dir / "collector.responsibility.db"
+        db_path = run_dir / "collector" / "collector.responsibility.db"
         if db_path.exists():
             conn = sqlite3.connect(str(db_path))
             alert_count = conn.execute(

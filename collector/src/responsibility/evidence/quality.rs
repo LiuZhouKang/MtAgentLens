@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // quality.rs — Evidence quality gate: rejects weak matches before persistence.
 //

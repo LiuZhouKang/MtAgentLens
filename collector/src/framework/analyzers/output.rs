@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 eunomia-bpf org.
 
 use super::{Analyzer, AnalyzerError, common};
@@ -14,11 +14,6 @@ impl OutputAnalyzer {
     /// Create a new OutputAnalyzer with default formatting
     pub fn new() -> Self {
         Self {}
-    }
-
-    /// Convert binary data to hex string using common logic
-    fn data_to_string(data: &serde_json::Value) -> String {
-        common::data_to_string(data)
     }
 }
 
@@ -41,7 +36,7 @@ impl Analyzer for OutputAnalyzer {
                         if let Some(data_obj) = parsed.get_mut("data")
                             && let Some(data_field) = data_obj.get_mut("data")
                         {
-                            let data_str = Self::data_to_string(data_field);
+                            let data_str = common::data_to_string(data_field);
                             *data_field = serde_json::Value::String(data_str);
                         }
                         serde_json::to_string(&parsed).unwrap_or(json_str)

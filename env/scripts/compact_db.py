@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Compact a responsibility DB by keeping only essential tables."""
+"""Compact a responsibility DB by keeping only essential tables.
+
+Views are part of the contract, not decoration: since schema v2 the collector
+stores identity as `identity_process_beliefs` and exposes the historical
+`identity_process_map` as a view over it. A compactor that enumerates only
+`type='table'` silently drops that contract, so views are recreated here and a
+view that cannot be recreated fails the run instead of vanishing.
+"""
 
 import sqlite3, sys, os
 
@@ -22,6 +29,10 @@ ESSENTIAL_TABLES = {
     'evidence_refinements',
     'graph_refinements',
     'identity_refinements',
+    # v2 identity beliefs; v1 databases carry the same data in the
+    # identity_process_map *table*, which is copied when it exists.
+    'identity_process_beliefs',
+    'identity_process_map',
 }
 
 def compact_db(src_path: str, dst_path: str):
@@ -60,6 +71,28 @@ def compact_db(src_path: str, dst_path: str):
             rows
         )
         print(f'  COPY: {table} ({len(rows)} rows)')
+
+    # Recreate views after their base tables exist. A view that cannot be
+    # created means the compacted database would silently break a documented
+    # query contract, so it is an error, not a skip.
+    views = src.execute(
+        "SELECT name, sql FROM sqlite_master WHERE type='view' ORDER BY name"
+    ).fetchall()
+    for name, create_sql in views:
+        try:
+            dst.execute(create_sql)
+            print(f'  VIEW: {name}')
+        except sqlite3.Error as exc:
+            raise SystemExit(
+                f"compact_db: cannot recreate view {name}: {exc}"
+            ) from exc
+
+    # Preserve the schema identity, not just the rows: a compacted database
+    # stamped user_version=0 would be re-adopted and re-migrated later.
+    user_version = src.execute('PRAGMA user_version').fetchone()[0]
+    application_id = src.execute('PRAGMA application_id').fetchone()[0]
+    dst.execute(f'PRAGMA user_version = {int(user_version)}')
+    dst.execute(f'PRAGMA application_id = {int(application_id)}')
 
     dst.commit()
     src.close()

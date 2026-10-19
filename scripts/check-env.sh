@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0 OR MIT
 # ─── MtAgentLens 环境预检脚本 ───────────────────────────────────────────
 # 用法:
 #   ./scripts/check-env.sh        # 完整检查

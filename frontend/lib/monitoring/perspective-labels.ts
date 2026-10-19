@@ -48,6 +48,7 @@ const ACTION_TYPE_LABELS: Record<string, LabelEntry> = {
   FileOverwrite: { label: '文件覆写', desc: '覆盖已有文件' },
   ProcessExec: { label: '进程执行', desc: '启动 / 执行进程' },
   FileDelete: { label: '文件删除', desc: '删除文件' },
+  FileRename: { label: '文件重命名', desc: '移动 / 重命名文件' },
   NetworkConnect: { label: '网络连接', desc: '建立网络连接' },
   NetworkSend: { label: '网络发送', desc: '发送网络数据' },
 };

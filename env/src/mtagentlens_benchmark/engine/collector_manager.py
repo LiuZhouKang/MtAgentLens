@@ -117,6 +117,17 @@ def _find_claude_binary_with_diagnostics() -> tuple[str | None, dict]:
         "final_path": None,
     }
 
+    override = os.environ.get("MTAGENTLENS_AGENT_BINARY", "").strip()
+    if override:
+        diagnostics["searched_paths"].append(f"MTAGENTLENS_AGENT_BINARY -> {override}")
+        candidate = Path(override)
+        if candidate.exists() and _is_elf_binary(candidate):
+            diagnostics["final_path"] = str(candidate)
+            return str(candidate), diagnostics
+        diagnostics["rejected_reasons"].append(
+            f"MTAGENTLENS_AGENT_BINARY is not an ELF binary: {override}"
+        )
+
     claude_path = shutil.which("claude")
     if claude_path:
         resolved = Path(claude_path).resolve()
@@ -248,7 +259,14 @@ def _verify_uprobes_attached(binary_path: str, timeout: float = 5.0) -> dict:
 
         if result is None or not result.stdout.strip():
             diag["uprobe_count"] = 0
-            diag["errors"].append("uprobe_events file is empty; no eBPF uprobes active")
+            # tls_capture attaches with bpf_program__attach_uprobe
+            # (perf_event_open), which does not create tracefs entries.
+            # An empty file is therefore not evidence of failure; the runtime
+            # TLS-session count is the authoritative check.
+            diag["note"] = (
+                "uprobe_events is empty; perf_event-based uprobes do not register "
+                "tracefs entries. Runtime TLS sessions decide capture health."
+            )
             return diag
 
         lines = [l.strip() for l in result.stdout.strip().split("\n") if l.strip()]
@@ -279,11 +297,33 @@ def _verify_uprobes_attached(binary_path: str, timeout: float = 5.0) -> dict:
 CANARY_URL = "https://httpbin.org/get?mtagentlens-canary=verify"
 
 
-def _tls_canary_test(output_dir: Path, timeout: float = 10.0) -> dict:
+def _canary_captured(output_dir: Path, log_file: str = "collector") -> bool:
+    """True if the collector log shows the canary request was actually seen.
+
+    The canary URL carries the unique marker ``mtagentlens-canary``, so a
+    substring hit is unambiguous evidence that this TLS request was captured.
+    """
+    log_path = output_dir / f"{log_file}.log"
+    if not log_path.exists():
+        return False
+    try:
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return "mtagentlens-canary" in text
+
+
+def _tls_canary_test(output_dir: Path, timeout: float = 10.0,
+                     log_file: str = "collector",
+                     comm_filter: str | None = None) -> dict:
     """Send a known TLS request and verify the collector captured it.
 
     Uses curl to make a marked HTTPS request. After a short wait, checks
     the collector's output for evidence of TLS capture.
+
+    A comm filter that does not include ``curl`` makes the canary
+    inapplicable: the request is deliberately outside the capture boundary,
+    so its absence is expected and must not be reported as a failure.
     """
     diag: dict = {
         "canary_url": CANARY_URL,
@@ -292,6 +332,13 @@ def _tls_canary_test(output_dir: Path, timeout: float = 10.0) -> dict:
         "captured_in_log": False,
         "errors": [],
     }
+    if comm_filter and comm_filter not in ("", "curl"):
+        diag["skipped"] = True
+        diag["skipped_reason"] = (
+            f"collector comm filter '{comm_filter}' excludes the curl canary; "
+            "capture health is decided by runtime TLS sessions"
+        )
+        return diag
 
     try:
         result = subprocess.run(
@@ -305,8 +352,17 @@ def _tls_canary_test(output_dir: Path, timeout: float = 10.0) -> dict:
         diag["errors"].append(f"Canary curl failed: {e}")
         return diag
 
-    # Wait for collector to process and log the event
+    # Wait for the collector to process and log the event, then actually
+    # LOOK for it. This used to sleep and return with `captured_in_log` still
+    # at its initialised False — a check that could never fire, while the
+    # docstring claimed it verified capture.
     time.sleep(2.0)
+
+    diag["captured_in_log"] = _canary_captured(output_dir, log_file)
+    if not diag["captured_in_log"]:
+        diag["errors"].append(
+            "canary request not found in collector output; TLS capture may be inactive"
+        )
 
     return diag
 
@@ -620,9 +676,18 @@ class CollectorManager(CollectorInterface):
         # ── 2. Start MtAgentLens collector ──
         binary_path = str(self._workspace.project_root / self.binary)
         log_path = output_dir / self.log_file
+        # The comm filter is the capture-surface boundary. When the benchmark
+        # launched the agent through a unique symlink, that basename (not the
+        # interactive session's "claude") is what may be captured.
+        effective_comm = (
+            os.environ.get("MTAGENTLENS_AGENT_COMM", "").strip()
+            or self.comm
+            or (Path(claude_bin).name if claude_bin else "claude")
+        )
+        self._health_snapshot["comm_filter"] = effective_comm
         collector_cmd = [
             binary_path, self.subcommand,
-            "--comm", self.comm,
+            "--comm", effective_comm,
             "-o", str(log_path),
         ] + self.trace_args
         if self.disable_responsibility_observer:
@@ -642,8 +707,16 @@ class CollectorManager(CollectorInterface):
         try:
             if self.sudo and sudo_pass:
                 cmd = ["sudo", "-S"]
+                preserve = [
+                    "MTAGENTLENS_AGENT_COMMS",
+                    "MTAGENTLENS_AGENT_CGROUP",
+                    "MTAGENTLENS_AGENT_EXE",
+                ]
                 if os.environ.get("MTAGENTLENS_PRESERVE_OBSERVER_ENV") == "1":
-                    cmd.append("--preserve-env=ANTHROPIC_BASE_URL,ANTHROPIC_AUTH_TOKEN,MODEL")
+                    preserve.extend(
+                        ["ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "MODEL"]
+                    )
+                cmd.append("--preserve-env=" + ",".join(preserve))
                 cmd += collector_cmd
                 self._process = subprocess.Popen(
                     cmd, stdin=subprocess.PIPE,
@@ -674,7 +747,7 @@ class CollectorManager(CollectorInterface):
         if self.verify_uprobes and ssl_enabled and claude_bin:
             uprobe_diag = _verify_uprobes_attached(claude_bin, self.uprobe_verify_timeout)
             self._health_snapshot["uprobe_verification"] = uprobe_diag
-            if not uprobe_diag.get("attached"):
+            if not uprobe_diag.get("attached") and uprobe_diag.get("errors"):
                 self._health_snapshot["uprobe_verification"]["warning"] = (
                     f"startup check did not observe an active uprobe for {claude_bin}; "
                     "final TLS capture health is determined from runtime metrics"
@@ -682,7 +755,12 @@ class CollectorManager(CollectorInterface):
 
         # ── 4. TLS canary test ──
         if self.canary_test and ssl_enabled and claude_bin:
-            canary_diag = _tls_canary_test(output_dir, self.canary_timeout)
+            canary_diag = _tls_canary_test(
+                output_dir,
+                self.canary_timeout,
+                self.log_file,
+                comm_filter=effective_comm,
+            )
             self._health_snapshot["canary_test"] = canary_diag
 
         # Write health snapshot for diagnostics
@@ -768,12 +846,28 @@ class CollectorManager(CollectorInterface):
             or metrics.get("max_has_signal", 0) > 0
             or metrics.get("max_clusters", 0) > 0
         )
+        # Startup checks must count. Previously overall_healthy was derived
+        # purely from runtime DB metrics, so a collector whose uprobes never
+        # attached still reported healthy as soon as any events showed up.
+        #
+        # "Not run" and "ran and failed" are distinguished: an absent check is
+        # not penalised, but a check that executed and failed is.
+        startup_ok = True
+        uprobe = self._health_snapshot.get("uprobe_verification") or {}
+        if uprobe:
+            startup_ok = startup_ok and bool(uprobe.get("attached"))
+        canary = self._health_snapshot.get("canary_test") or {}
+        if canary.get("sent") and canary.get("curl_ok"):
+            startup_ok = startup_ok and bool(canary.get("captured_in_log"))
+        metrics["startup_capture_verified"] = startup_ok
+
         metrics["overall_healthy"] = all([
             metrics["tls_capture_active"],
             metrics["process_monitor_active"],
             metrics["responsibility_runtime_active"],
             metrics["pbc_detection_healthy"],
             metrics["scoring_healthy"],
+            startup_ok,
         ])
         self._health_snapshot["runtime_metrics"] = metrics
 

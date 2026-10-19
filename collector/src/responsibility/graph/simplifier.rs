@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // simplifier.rs — GraphSimplifier: simplifies/filters/windows the graph.
 //
@@ -263,7 +263,6 @@ mod tests {
             evidence_refs: Vec::new(),
             confidence,
             phase: PhaseIndicator::Provisional { timestamp_ns: 1000 },
-            signal: None,
         }
     }
 

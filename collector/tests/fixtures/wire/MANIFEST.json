@@ -1,0 +1,177 @@
+{
+  "schema": "mtagentlens.wire-fixture/1",
+  "created_at": "2026-10-17",
+  "kernel": "7.0.0-38-generic",
+  "why": "These are the first-hand bytes the SSL uprobe saw, not our hex dump or Event JSON. They are the anti-regression corpus for the P1 byte-lossless work and the oracle for framework/normalize.",
+  "extraction": "scripts/wire/extract_wire.py maps the C program's \\u00XX escapes back to single bytes and asserts len(recovered)==buf_size; serde_json must never be used for this (it is not injective).",
+  "golden_recipe": "scripts/wire/extract_wire.py golden <fixture-dir>  (de-chunk + system zstd -d)",
+  "fixtures": {
+    "openclaw-deepseek-zstd-chunked": {
+      "client": {
+        "name": "OpenClaw",
+        "version": "2026.10.1",
+        "runtime": "node v24.19.0",
+        "provider": "deepseek",
+        "api": "openai-completions",
+        "endpoint": "https://api.deepseek.com/chat/completions",
+        "session_key": "agent:main:p05-wire-corpus"
+      },
+      "capture": {
+        "raw_file": "/tmp/p05/openclaw-fresh-20261017-225825.jsonl",
+        "ssl_ptr": 610977632,
+        "pid": 1488,
+        "comm": "MainThread",
+        "tool": "bpftools/.output/bin/tls_capture -p 1488 --binary-path /home/lzk/.nvm/versions/node/v24.19.0/bin/node",
+        "captured_at": "2026-10-17T22:58:25+08:00"
+      },
+      "response": {
+        "status": 200,
+        "content_encoding": "zstd",
+        "transfer_encoding": "chunked",
+        "content_type": "text/event-stream",
+        "chunked_payload_bytes": 597,
+        "golden_decoded_bytes": 5288,
+        "zstd_cli": "v1.5.5"
+      },
+      "sanitization": [
+        "authorization header value -> Bearer REDACTED (1)",
+        "'lzk' -> 'usr' equal-length replacement (9)"
+      ],
+      "files": {
+        "request.http": {
+          "bytes": 51108,
+          "sha256": "56e28b89decbdb187a6522159422a3c3a5118671db5395848c57055a8a6d3d61"
+        },
+        "response.http": {
+          "bytes": 1233,
+          "sha256": "2590a9d91e030136c5b108aea906dafbd4f407323332042bba59b6f55201ad9d"
+        },
+        "golden.sse": {
+          "bytes": 5288,
+          "sha256": "d9f9eae175ab63a3c9ee370f7c17b0945c72c05b5b4b7a710bae965ef50a9627"
+        }
+      }
+    },
+    "claude-code-deepseek-zstd-chunked": {
+      "client": {
+        "name": "claude-code",
+        "version": "2.1.302",
+        "user_agent": "claude-cli/2.1.302 (external, sdk-cli)",
+        "provider": "deepseek (anthropic-compatible)",
+        "api": "anthropic-messages",
+        "endpoint": "https://api.deepseek.com/anthropic/v1/messages?beta=true"
+      },
+      "capture": {
+        "raw_file": "/tmp/p05/claude-20261017-230009.jsonl",
+        "ssl_ptr": 6246606048064,
+        "comm": "HTTP Client",
+        "tool": "bpftools/.output/bin/tls_capture --binary-path <claude.exe> (BoringSSL by offset)",
+        "captured_at": "2026-10-17T23:00:09+08:00",
+        "note": "request arrived in two SSL_write calls (16384 + 70703 bytes)"
+      },
+      "response": {
+        "status": 200,
+        "content_encoding": "zstd",
+        "transfer_encoding": "chunked",
+        "content_type": "text/event-stream",
+        "chunked_payload_bytes": 1275,
+        "golden_decoded_bytes": 10722,
+        "zstd_cli": "v1.5.5"
+      },
+      "sanitization": [
+        "authorization header value -> Bearer REDACTED (1)",
+        "x-claude-code-session-id -> zero uuid (1)",
+        "'lzk' -> 'usr' equal-length replacement (2)"
+      ],
+      "files": {
+        "request.http": {
+          "bytes": 87061,
+          "sha256": "297c34668dab6c9ec0ffea1afa2ce4f88663f35cd9885f74f0e5098eec4aa1da"
+        },
+        "response.http": {
+          "bytes": 2031,
+          "sha256": "58cf3c1a8b5634192ceabe25e807eeaf109fa397c322b6013feeaf553c3505c8"
+        },
+        "golden.sse": {
+          "bytes": 10722,
+          "sha256": "1167bbcd51f4f346a350aff04095318ec75272b85d60c96b1314ccbe2d90967c"
+        }
+      }
+    },
+    "openclaw-intent-crosscheck": {
+      "client": {
+        "name": "OpenClaw",
+        "version": "2026.10.1",
+        "runtime": "node v24.19.0",
+        "provider": "deepseek",
+        "api": "openai-completions",
+        "endpoint": "https://api.deepseek.com/chat/completions",
+        "session_key": "agent:main:p05-crosscheck-20261017-230843"
+      },
+      "capture": {
+        "raw_file": "/tmp/p05/crosscheck-20261017-230843.jsonl",
+        "ssl_ptr": 592283728,
+        "pid": 1488,
+        "comm": "MainThread",
+        "pair": 0,
+        "tool": "bpftools/.output/bin/tls_capture -p 1488 --binary-path <node>",
+        "captured_at": "2026-10-17T23:08:43+08:00",
+        "note": "keep-alive session with two request/response pairs; pair 0 contains the tool call"
+      },
+      "response": {
+        "status": 200,
+        "content_encoding": "zstd",
+        "transfer_encoding": "chunked",
+        "content_type": "text/event-stream",
+        "chunked_payload_bytes": 4637,
+        "golden_decoded_bytes": 171282,
+        "zstd_cli": "v1.5.5"
+      },
+      "sanitization": [
+        "authorization header value -> Bearer REDACTED (1)",
+        "'lzk' -> 'usr' equal-length replacement (9)"
+      ],
+      "asserted_ground_truth": {
+        "source": "openclaw-agent.sqlite:transcript_events (full args); trajectory_runtime_events ellipsizes args",
+        "export_command": "python3 scripts/wire/crosscheck_openclaw.py --sqlite ~/.openclaw/agents/main/agent/openclaw-agent.sqlite --session-key p05-crosscheck-20261017-230843 --since 2026-10-17T23:08:40 --until 2026-10-17T23:09:10 --out collector/tests/fixtures/wire/openclaw-intent-crosscheck/asserted-tools.json",
+        "tool_call_id": "call_00_BEeJQHspHn8me7IYOESg9530"
+      },
+      "files": {
+        "request.http": {
+          "bytes": 51161,
+          "sha256": "e598ea7df6b1413d11042d97b4ce9fce25e306d665dbbe6de6fd6636934a994b"
+        },
+        "response.http": {
+          "bytes": 6204,
+          "sha256": "be5f737e624a1ffb9ff8f8d57576fc7ddc967a04e9c4b5a129d59c1b0e42bff7"
+        },
+        "golden.sse": {
+          "bytes": 171282,
+          "sha256": "02d521231041624424c05e86713c139ec92dd0277896caaf48ef16ff4f9f2373"
+        },
+        "asserted-tools.json": {
+          "bytes": 471,
+          "sha256": "e0c024dee739101281cde3ab181ecd4e36d67578642bb62ad4ae51e88971c42b"
+        }
+      }
+    },
+    "transport": {
+      "derived_from": "claude-code-deepseek-zstd-chunked/response.http",
+      "why": "Proves the legacy backslash-u escaping and the additive data_b64 field decode to identical bytes, and that decoded_len == buf_size. Derived, not a live capture; the source bytes are first-hand.",
+      "files": {
+        "payload.bin": {
+          "bytes": 2031,
+          "sha256": "58cf3c1a8b5634192ceabe25e807eeaf109fa397c322b6013feeaf553c3505c8"
+        },
+        "capture-escaped.jsonl": {
+          "bytes": 5036,
+          "sha256": "75d7d138accb4dd1495429465b63e763a64b6b6cbe077f288878e0c299f9f4eb"
+        },
+        "capture-base64.jsonl": {
+          "bytes": 7758,
+          "sha256": "d9733b42209607b2c44cb00fd79bc681de4decb0f1e5f77d407f9f77afb72f9f"
+        }
+      }
+    }
+  }
+}

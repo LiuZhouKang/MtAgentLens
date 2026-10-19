@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // observer/types.rs — CANONICAL Observer type system (§16).
 //
@@ -8,6 +8,10 @@
 
 use crate::responsibility::claims::ClaimSeverity;
 pub use crate::responsibility::types::refinement::ScoreBreakdown;
+// Alert-facing types live in types/alert_types.rs (single source of truth).
+pub use crate::responsibility::types::alert_types::{
+    AlertAuthority, DisplayProfile, PatternVerdict, RuleVerdict,
+};
 use serde::{Deserialize, Serialize};
 
 // ── Observer Decision ───────────────────────────────────────────────────
@@ -38,26 +42,6 @@ pub enum CacheTTL {
     Once,
     Task,
     All,
-}
-
-// ── Alert Authority ─────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AlertAuthority {
-    Authoritative,
-    Supporting,
-    Unavailable,
-}
-
-impl AlertAuthority {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Authoritative => "authoritative",
-            Self::Supporting => "supporting",
-            Self::Unavailable => "unavailable",
-        }
-    }
 }
 
 // ── Observer Error ──────────────────────────────────────────────────────
@@ -232,27 +216,6 @@ pub struct ObserverInput {
     pub prior: CachePrior,
 }
 
-// ── Rule / Pattern Verdicts ─────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RuleVerdict {
-    pub rule_id: String,
-    pub description: String,
-    pub matched_resource: String,
-    pub llm_agreed: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub llm_comment: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PatternVerdict {
-    pub template_id: String,
-    pub match_confidence: f32,
-    pub llm_agreed: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub llm_comment: Option<String>,
-}
-
 // ── Observer Output ─────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -268,27 +231,6 @@ pub struct ObserverOutput {
     pub evidence_cited: Vec<String>,
     pub rule_verdicts: Vec<RuleVerdict>,
     pub pattern_verdicts: Vec<PatternVerdict>,
-}
-
-// ── Display Profile ─────────────────────────────────────────────────────
-
-/// Controls which layers the frontend renders for an alert.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DisplayProfile {
-    SafeBaseline,
-    UnsafeByEngine,
-    ObserverJudged,
-}
-
-impl DisplayProfile {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::SafeBaseline => "safe_baseline",
-            Self::UnsafeByEngine => "unsafe_by_engine",
-            Self::ObserverJudged => "observer_judged",
-        }
-    }
 }
 
 // ── Cache Key ───────────────────────────────────────────────────────────

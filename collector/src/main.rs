@@ -1,44 +1,46 @@
-#![allow(dead_code, unused_imports, unused_variables, unused_mut)]
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 eunomia-bpf org.
 
 use clap::{Parser, Subcommand};
 use futures::stream::StreamExt;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::signal;
 use tokio::sync::broadcast;
 
-mod framework;
-mod responsibility;
-mod server;
-
+// `framework`, `responsibility` and `server` are declared in lib.rs ONLY.
+//
+// Re-declaring them here (as `mod framework;` etc.) compiled the whole crate
+// twice and produced two mutually incompatible type universes — `crate::X` and
+// `mtagentlens::X` were different types, and every global `static` existed in
+// two copies. It was also the reason `dead_code` had to be allowed crate-wide.
 #[allow(unused_imports)]
-use framework::analyzers::file_access_audit::FileAccessAuditAnalyzer;
+use mtagentlens::framework::analyzers::file_access_audit::FileAccessAuditAnalyzer;
 #[allow(unused_imports)]
-use framework::analyzers::file_access_audit_contract::FileAccessAuditConfig;
+use mtagentlens::framework::analyzers::file_access_audit_contract::FileAccessAuditConfig;
 
-use framework::{
+use mtagentlens::framework::{
     analyzers::{
         AuthHeaderRemover, ConnectionBuffer, FileLogger, HTTPFilter, HTTPParser,
-        HandoffInjectionAnalyzer, MultiAgentAnomalyAnalyzer, OutputAnalyzer, SSEProcessor,
-        SSLFilter, SecuritySignoffAnalyzer, SecuritySignoffConfig, TimestampNormalizer,
-        print_global_http_filter_metrics, print_global_ssl_filter_metrics,
+        HandoffInjectionAnalyzer, MultiAgentAnomalyAnalyzer, OutputAnalyzer, RawSecretRedactor,
+        SSEProcessor, SSLFilter, SecuritySignoffAnalyzer, SecuritySignoffConfig,
+        StdioSecretRedactor, TimestampNormalizer, print_global_http_filter_metrics,
+        print_global_ssl_filter_metrics,
     },
     binary_extractor::BinaryExtractor,
     runners::{
-        AgentRunner, ProcessRunner, Runner, RunnerError, SslRunner, StdioRunner, SystemRunner,
+        AgentRunner, OpenClawRunner, ProcessRunner, Runner, RunnerError, SslRunner, StdioRunner,
+        SystemRunner,
     },
 };
 
-use crate::responsibility::persistence::PersistenceWriter;
-use crate::responsibility::runtime::runtime::{ResponsibilityRuntime, RuntimeConfig};
-use crate::responsibility::types::alert_types::ResponsibilityAlert;
+use mtagentlens::responsibility::persistence::PersistenceWriter;
+use mtagentlens::responsibility::runtime::runtime::{ResponsibilityRuntime, RuntimeConfig};
+use mtagentlens::responsibility::types::alert_types::ResponsibilityAlert;
 
-use server::WebServer;
+use mtagentlens::server::WebServer;
 
 static SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(false);
 
@@ -55,7 +57,8 @@ async fn setup_signal_handler() {
         println!("\n\nReceived SIGINT, shutting down...");
 
         // Signal the ResponsibilityRuntime to trigger Phase 2 finalization
-        crate::responsibility::runtime::runtime::RUNTIME_SHUTDOWN.store(true, Ordering::Relaxed);
+        mtagentlens::responsibility::runtime::runtime::RUNTIME_SHUTDOWN
+            .store(true, Ordering::Relaxed);
 
         // Print HTTP filter metrics using the global function
         print_global_http_filter_metrics();
@@ -291,10 +294,10 @@ enum Commands {
         server_port: u16,
     },
     /// Record agent activity with optimized filters and settings
-    /// Equivalent to: trace -c claude --http-filter "request.path_prefix=/v1/rgstr | response.status_code=202 | request.method=HEAD | response.body=" --ssl-filter "data=0\\r\\n\\r\\n|data.type=binary" -q --server-port 7395 --server -o record.log
+    /// Equivalent to: trace -c claude --http-filter "request.path_prefix=/v1/rgstr | response.status_code=202 | request.method=HEAD" --ssl-filter "data=0\\r\\n\\r\\n" -q --server-port 7395 --server -o record.log
     Record {
-        /// Process command filter (defaults to "claude")
-        #[arg(short = 'c', long)]
+        /// Process command filter
+        #[arg(short = 'c', long, default_value = "claude")]
         comm: String,
         /// Path to the ELF binary executable to monitor (e.g., ~/.nvm/versions/node/v20.0.0/bin/node)
         #[arg(long)]
@@ -351,6 +354,58 @@ enum Commands {
         #[arg(long, default_value = "7395")]
         server_port: u16,
     },
+    /// Export a run's responsibility alerts as content-free GenAI spans (JSONL)
+    ExportGenai {
+        /// Live responsibility database (collector.responsibility.db)
+        #[arg(long)]
+        db: String,
+        /// Output JSONL path
+        #[arg(long)]
+        out: String,
+        /// Include free-form text, redacted (off by default)
+        #[arg(long)]
+        include_content: bool,
+    },
+    /// Check that this host can run MtAgentLens (kernel, privileges, probes, agents)
+    Doctor {
+        /// Emit JSON instead of human-readable lines
+        #[arg(long)]
+        json: bool,
+        /// Also check this ELF binary for SSL instrumentation
+        #[arg(long)]
+        binary_path: Option<String>,
+    },
+}
+
+/// Extend a process-probe `comm` filter with `MTAGENTLENS_AGENT_COMMS`.
+///
+/// The eBPF FILTER mode only emits processes whose `comm` matches (or that
+/// descend from a match), so the in-process boundary is not enough for an
+/// agent such as OpenClaw's `MainThread` gateway: without this union the probe
+/// never emits its events and the no-agent counter never fires.
+fn agent_comm_filter(base: &str) -> String {
+    merge_comm_filter(
+        base,
+        std::env::var("MTAGENTLENS_AGENT_COMMS").ok().as_deref(),
+    )
+}
+
+/// Union two comma-separated comm lists, preserving order and dropping blanks.
+fn merge_comm_filter(base: &str, extra: Option<&str>) -> String {
+    let mut comms: Vec<String> = base
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect();
+    if let Some(extra) = extra {
+        for comm in extra.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            if !comms.iter().any(|existing| existing == comm) {
+                comms.push(comm.to_string());
+            }
+        }
+    }
+    comms.join(",")
 }
 
 #[tokio::main]
@@ -362,8 +417,106 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let cli = Cli::parse();
 
+    // Extend the agent `comm` boundary before any event is routed.
+    // Defaults are `claude`/`claude-code`; a custom agent (e.g. OpenClaw's
+    // `MainThread` gateway) opts in via MTAGENTLENS_AGENT_COMMS.
+    mtagentlens::responsibility::identity::union_find::configure_agent_comms_from_env();
+
+    // Load the scenario vocabulary once, before any analyzer is constructed.
+    // A configured-but-unreadable file stops the process: silently running
+    // with defaults the operator did not ask for would be a policy change.
+    if let Err(err) = mtagentlens::framework::analyzers::scenario_vocabulary::load_and_install() {
+        eprintln!("scenario vocabulary: {err}");
+        std::process::exit(1);
+    }
+
     // Setup signal handler for graceful shutdown
     setup_signal_handler().await;
+
+    // `doctor` runs before the extractor is created: it performs its own quiet
+    // extraction (as one of its checks) and must work even when the rest of
+    // the host is not ready.
+    if let Commands::Doctor { json, binary_path } = &cli.command {
+        let checks = mtagentlens::doctor::run(binary_path.as_deref()).await;
+        if *json {
+            println!("{}", serde_json::to_string_pretty(&checks)?);
+        } else {
+            print!("{}", mtagentlens::doctor::render(&checks));
+        }
+        std::process::exit(if mtagentlens::doctor::has_failure(&checks) {
+            1
+        } else {
+            0
+        });
+    }
+
+    // Commands with no eBPF component run before the extractor exists: they
+    // must not fail because a temp directory is unavailable, and `system`
+    // polls /proc rather than attaching a probe. A trace with only `--system`
+    // is in the same category.
+    if let Commands::ExportGenai {
+        db,
+        out,
+        include_content,
+    } = &cli.command
+    {
+        run_export_genai(db, out, *include_content)?;
+        return Ok(());
+    }
+    if let Commands::System {
+        interval,
+        pid,
+        comm,
+        no_children,
+        cpu_threshold,
+        memory_threshold,
+        log_file,
+        quiet,
+        rotate_logs,
+        max_log_size,
+        server,
+        server_port,
+    } = &cli.command
+    {
+        run_system(
+            *interval,
+            *pid,
+            comm.as_deref(),
+            !*no_children,
+            *cpu_threshold,
+            *memory_threshold,
+            log_file,
+            *quiet,
+            *rotate_logs,
+            *max_log_size,
+            *server,
+            *server_port,
+        )
+        .await
+        .map_err(convert_runner_error)?;
+        return Ok(());
+    }
+
+    let needs_ebpf = match &cli.command {
+        Commands::Ssl { .. }
+        | Commands::Process { .. }
+        | Commands::Stdio { .. }
+        | Commands::Record { .. } => true,
+        Commands::Trace {
+            ssl,
+            process,
+            stdio,
+            ..
+        } => *ssl || *process || *stdio,
+        _ => false,
+    };
+
+    // Fail before extracting/starting anything if the host cannot run eBPF.
+    // Running it here (not inside each runner) keeps the first output the
+    // actionable diagnosis rather than extractor progress lines.
+    if needs_ebpf {
+        ensure_runtime_ready().await.map_err(convert_runner_error)?;
+    }
 
     // Create BinaryExtractor with embedded binaries
     let binary_extractor = BinaryExtractor::new().await?;
@@ -481,40 +634,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             max_log_size,
             server,
             server_port,
-        } => run_trace(
-            &binary_extractor,
-            *ssl,
-            *pid,
-            pid_set,
-            *ssl_uid,
-            comm.as_deref(),
-            ssl_filter,
-            *ssl_handshake,
-            *ssl_http,
-            *ssl_raw_data,
-            *process,
-            *stdio,
-            *stdio_uid,
-            stdio_comm.as_deref(),
-            *stdio_all_fds,
-            *stdio_max_bytes,
-            *duration,
-            *mode,
-            *system,
-            *system_interval,
-            http_filter,
-            *disable_auth_removal,
-            *disable_responsibility_observer,
-            binary_path.as_deref(),
-            log_file,
-            *quiet,
-            *rotate_logs,
-            *max_log_size,
-            *server,
-            *server_port,
-        )
-        .await
-        .map_err(convert_runner_error)?,
+        } => {
+            let effective_comm = comm.as_deref().map(agent_comm_filter);
+            run_trace(
+                &binary_extractor,
+                *ssl,
+                *pid,
+                pid_set,
+                *ssl_uid,
+                effective_comm.as_deref(),
+                ssl_filter,
+                *ssl_handshake,
+                *ssl_http,
+                *ssl_raw_data,
+                *process,
+                *stdio,
+                *stdio_uid,
+                stdio_comm.as_deref(),
+                *stdio_all_fds,
+                *stdio_max_bytes,
+                *duration,
+                *mode,
+                *system,
+                *system_interval,
+                http_filter,
+                *disable_auth_removal,
+                *disable_responsibility_observer,
+                binary_path.as_deref(),
+                log_file,
+                *quiet,
+                *rotate_logs,
+                *max_log_size,
+                *server,
+                *server_port,
+            )
+            .await
+            .map_err(convert_runner_error)?;
+        }
         Commands::Record {
             comm,
             binary_path,
@@ -523,20 +679,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             max_log_size,
             server_port,
         } => {
-            // Predefined filter patterns optimized for agent monitoring
-            let http_filter_patterns = vec![
-                "request.path_prefix=/v1/rgstr | response.status_code=202 | request.method=HEAD | response.body=".to_string(),
-            ];
-            let ssl_filter_patterns = vec!["data=0\\r\\n\\r\\n | data.type=binary".to_string()];
+            // Predefined filter patterns optimized for agent monitoring.
+            // Kept in the library (analyzers::presets) so tests can assert
+            // what they do to real event shapes.
+            let http_filter_patterns =
+                mtagentlens::framework::analyzers::presets::record_http_filter_patterns();
+            let ssl_filter_patterns =
+                mtagentlens::framework::analyzers::presets::record_ssl_filter_patterns();
 
             // Enable system monitoring by default for record command
+            let effective_comm = agent_comm_filter(comm);
             run_trace(
                 &binary_extractor,
                 true,
                 None,
                 &[],
                 None,
-                Some(comm),
+                Some(&effective_comm),
                 &ssl_filter_patterns,
                 false,
                 true,
@@ -565,37 +724,70 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             .await
             .map_err(convert_runner_error)?
         }
-        Commands::System {
-            interval,
-            pid,
-            comm,
-            no_children,
-            cpu_threshold,
-            memory_threshold,
-            log_file,
-            quiet,
-            rotate_logs,
-            max_log_size,
-            server,
-            server_port,
-        } => run_system(
-            *interval,
-            *pid,
-            comm.as_deref(),
-            !*no_children,
-            *cpu_threshold,
-            *memory_threshold,
-            log_file,
-            *quiet,
-            *rotate_logs,
-            *max_log_size,
-            *server,
-            *server_port,
-        )
-        .await
-        .map_err(convert_runner_error)?,
+        // `system` and `export-genai` are handled before the extractor is
+        // created; they have no eBPF component.
+        Commands::System { .. } => {
+            unreachable!("system is handled before the extractor is created")
+        }
+        Commands::ExportGenai { .. } => {
+            unreachable!("export-genai is handled before the extractor is created")
+        }
+        // Handled before the extractor is created.
+        Commands::Doctor { .. } => unreachable!("doctor is handled before dispatch"),
     }
 
+    Ok(())
+}
+
+/// Refuse to start an eBPF runner on a host that cannot run one.
+///
+/// Without this the first error a user sees is a libbpf/verifier message.
+/// The check is intentionally small (kernel, privileges, BTF); the full
+/// report — including probe and agent checks — is `mtagentlens doctor`.
+async fn ensure_runtime_ready() -> Result<(), RunnerError> {
+    use mtagentlens::doctor::{CheckStatus, has_failure, preflight, render};
+
+    let checks = preflight().await;
+    if !has_failure(&checks) {
+        return Ok(());
+    }
+    eprintln!("MtAgentLens preflight failed:");
+    for check in checks
+        .iter()
+        .filter(|check| check.status == CheckStatus::Fail)
+    {
+        eprintln!("  ✗ {}: {}", check.name, check.detail);
+        if let Some(remedy) = &check.remedy {
+            eprintln!("    → {remedy}");
+        }
+    }
+    eprintln!("\nFull report:\n{}", render(&checks));
+    Err(RunnerError::from(
+        "preflight failed; run `mtagentlens doctor` for the complete report",
+    ))
+}
+
+/// Export alerts from a live responsibility database as content-free spans.
+///
+/// Nothing here reads transport bytes: the export surface is identifiers,
+/// enums, counts and timestamps. `include_content` is opt-in and redacted.
+fn run_export_genai(
+    db: &str,
+    out: &str,
+    include_content: bool,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use mtagentlens::export::genai::{ExportPolicy, alert_span, write_jsonl};
+    use mtagentlens::responsibility::persistence::PersistenceReader;
+
+    let reader = PersistenceReader::open(db)?;
+    let alerts = reader.get_alerts_all()?;
+    let policy = ExportPolicy { include_content };
+    let spans: Vec<_> = alerts
+        .iter()
+        .map(|alert| alert_span(alert, policy))
+        .collect();
+    let written = write_jsonl(std::path::Path::new(out), spans.iter())?;
+    println!("exported {written} content-free spans to {out}");
     Ok(())
 }
 
@@ -739,6 +931,12 @@ async fn run_raw_ssl(
     // Add TimestampNormalizer first to convert nanoseconds since boot to milliseconds since epoch
     ssl_runner = ssl_runner.add_analyzer(Box::new(TimestampNormalizer::new()));
 
+    // Decode complete HTTPS responses before any filter sees them. The chunked
+    // terminator is its own `0\r\n\r\n` event and the ssl filter can drop it.
+    ssl_runner = ssl_runner.add_analyzer(Box::new(
+        mtagentlens::framework::analyzers::payload_normalizer::PayloadNormalizer::new(),
+    ));
+
     // Add SSL filter if patterns are provided
     if !ssl_filter_patterns.is_empty() {
         ssl_runner = ssl_runner.add_analyzer(Box::new(SSLFilter::with_patterns(
@@ -748,6 +946,11 @@ async fn run_raw_ssl(
 
     // ConnectionBuffer: assemble SSL_write fragments before downstream parsing
     ssl_runner = ssl_runner.add_analyzer(Box::new(ConnectionBuffer::new()));
+
+    // Privacy: redact Authorization/Cookie values before any output sees the
+    // bytes. The capture itself stays byte-exact; only data_b64 is rewritten
+    // and the event carries a `redaction` marker.
+    ssl_runner = ssl_runner.add_analyzer(Box::new(RawSecretRedactor::new()));
 
     // Add analyzers based on flags - when HTTP parser is enabled, always enable SSE merge first
     if enable_http_parser {
@@ -960,6 +1163,36 @@ fn build_stdio_args(
     args
 }
 
+/// Build the argument list for the `process` eBPF binary.
+///
+/// The binary starts in PROC mode (1) when no filter is given, and switches to
+/// FILTER mode (2) as soon as it parses `-c` or `-p` (`process.c::parse_arg`).
+/// The collector passes `-m 2` explicitly anyway: which processes are captured
+/// is a product decision, and it should not depend on that parsing side
+/// effect. An explicit `--mode` still wins.
+fn build_process_args(
+    comm: Option<&str>,
+    pid: Option<u32>,
+    duration: Option<u32>,
+    mode: Option<u32>,
+) -> Vec<String> {
+    let mut args = Vec::new();
+    if let Some(comm_filter) = comm {
+        args.extend(["-c".to_string(), comm_filter.to_string()]);
+    }
+    if let Some(pid_filter) = pid {
+        args.extend(["-p".to_string(), pid_filter.to_string()]);
+    }
+    if let Some(duration_filter) = duration {
+        args.extend(["-d".to_string(), duration_filter.to_string()]);
+    }
+    let effective_mode = mode.or_else(|| (comm.is_some() || pid.is_some()).then_some(2));
+    if let Some(mode_filter) = effective_mode {
+        args.extend(["-m".to_string(), mode_filter.to_string()]);
+    }
+    args
+}
+
 /// Show raw stdio events as JSON
 async fn run_raw_stdio(
     binary_extractor: &BinaryExtractor,
@@ -989,6 +1222,11 @@ async fn run_raw_stdio(
 
     // Add TimestampNormalizer first to convert nanoseconds since boot to milliseconds since epoch
     stdio_runner = stdio_runner.add_analyzer(Box::new(TimestampNormalizer::new()));
+
+    // Privacy: MCP tool arguments routinely carry API keys and tokens. Redact
+    // credential-shaped text before the console, log file or SSE sees it. The
+    // captured payload itself is not modified; the event records what changed.
+    stdio_runner = stdio_runner.add_analyzer(Box::new(StdioSecretRedactor::new()));
 
     if !quiet {
         stdio_runner = stdio_runner.add_analyzer(Box::new(OutputAnalyzer::new()));
@@ -1116,6 +1354,16 @@ async fn run_trace(
 
             ssl_runner = ssl_runner.add_analyzer(Box::new(TimestampNormalizer::new()));
 
+            // Must run before SSLFilter: the chunked terminator is its own
+            // `0\r\n\r\n` event, and the record SSL preset matches exactly
+            // that event. A later assembler would never finish a chunked body.
+            ssl_runner = ssl_runner.add_analyzer(Box::new(
+                mtagentlens::framework::analyzers::payload_normalizer::PayloadNormalizer::new(),
+            ));
+
+            // Privacy: redact sensitive header values before filters/output.
+            ssl_runner = ssl_runner.add_analyzer(Box::new(RawSecretRedactor::new()));
+
             if !ssl_filter.is_empty() {
                 ssl_runner = ssl_runner
                     .add_analyzer(Box::new(SSLFilter::with_patterns(ssl_filter.to_vec())));
@@ -1168,6 +1416,8 @@ async fn run_trace(
 
         stdio_runner = stdio_runner.with_args(&stdio_args);
         stdio_runner = stdio_runner.add_analyzer(Box::new(TimestampNormalizer::new()));
+        // Privacy: see run_raw_stdio. Redaction must precede every output.
+        stdio_runner = stdio_runner.add_analyzer(Box::new(StdioSecretRedactor::new()));
 
         agent = agent.add_runner(Box::new(stdio_runner));
         println!("✓ Stdio monitoring enabled for PID {}", pid_filter);
@@ -1184,20 +1434,7 @@ async fn run_trace(
         for pid_target in process_targets {
             let mut process_runner =
                 ProcessRunner::from_binary_extractor(binary_extractor.get_process_path());
-            let mut process_args = Vec::new();
-            if let Some(comm_filter) = comm {
-                process_args.extend(["-c".to_string(), comm_filter.to_string()]);
-            }
-            if let Some(pid_filter) = pid_target {
-                process_args.extend(["-p".to_string(), pid_filter.to_string()]);
-            }
-            if let Some(duration_filter) = duration {
-                process_args.extend(["-d".to_string(), duration_filter.to_string()]);
-            }
-            if let Some(mode_filter) = mode {
-                process_args.extend(["-m".to_string(), mode_filter.to_string()]);
-            }
-
+            let process_args = build_process_args(comm, pid_target, duration, mode);
             if !process_args.is_empty() {
                 process_runner = process_runner.with_args(&process_args);
             }
@@ -1236,6 +1473,30 @@ async fn run_trace(
         );
     }
 
+    // Out-of-band agent trajectory (OpenClaw): opt-in via environment.
+    // The eBPF path remains authoritative; this only adds the structured
+    // tool calls the agent recorded for itself.
+    if let Ok(state_dir) = std::env::var("MTAGENTLENS_OPENCLAW_STATE") {
+        let agents: Vec<String> = std::env::var("MTAGENTLENS_OPENCLAW_AGENTS")
+            .unwrap_or_else(|_| "main".to_string())
+            .split(',')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .collect();
+        let mut outofband = OpenClawRunner::new(std::path::PathBuf::from(&state_dir), agents);
+        if let Ok(ms) = std::env::var("MTAGENTLENS_OPENCLAW_POLL_MS")
+            && let Ok(millis) = ms.parse::<u64>()
+        {
+            outofband = outofband.with_poll_interval_ms(millis);
+        }
+        agent = agent.add_runner(Box::new(outofband));
+        println!("✓ OpenClaw out-of-band reader enabled ({state_dir})");
+        if !process_enabled {
+            println!("! OpenClaw out-of-band needs --process=true to correlate with actions");
+        }
+    }
+
     // Ensure at least one runner is enabled
     if !ssl_enabled && !process_enabled && !stdio_enabled && !system_enabled {
         return Err(
@@ -1248,7 +1509,7 @@ async fn run_trace(
 
     // Create ResponsibilityRuntime with persistence and alert broadcasting
     let responsibility_db_path = format!("{}.responsibility.db", log_file);
-    let persistence_config = crate::responsibility::persistence::WriterConfig {
+    let persistence_config = mtagentlens::responsibility::persistence::WriterConfig {
         db_path: responsibility_db_path.clone(),
         ..Default::default()
     };
@@ -1267,31 +1528,35 @@ async fn run_trace(
     // 1. Environment variables (works on ANY machine, no config file needed).
     // 2. Config file paths (relative to cwd).
     // 3. Mock provider (zero-token dev/testing fallback).
-    let observer: Box<dyn crate::responsibility::observer::provider::ObserverProvider> =
-        match crate::responsibility::observer::provider::ObserverLLMProvider::from_env() {
+    let observer: Box<dyn mtagentlens::responsibility::observer::provider::ObserverProvider> =
+        match mtagentlens::responsibility::observer::provider::ObserverLLMProvider::from_env() {
             Ok(provider) => {
                 println!("✓ Observer: LLM provider loaded from environment variables");
                 Box::new(provider)
             }
             Err(_) => {
                 let config_paths = ["env/config/observer.toml", "observer_llm.toml"];
-                let mut loaded = None;
-                for path in &config_paths {
-                    if let Ok(provider) = crate::responsibility::observer::provider::ObserverLLMProvider::from_config_file(path) {
-                        println!("✓ Observer: LLM provider loaded from {path}");
-                        loaded = Some(Box::new(provider)
-                            as Box<dyn crate::responsibility::observer::provider::ObserverProvider>);
-                        break;
+                match mtagentlens::responsibility::observer::provider::ObserverLLMProvider::load_from_paths(&config_paths) {
+                    Ok(Some(provider)) => {
+                        println!("✓ Observer: LLM provider loaded from a config file");
+                        Box::new(provider)
+                    }
+                    // A file that exists but does not parse is a configuration
+                    // error, not "not found". Falling back to Mock here would
+                    // silently disable the LLM arbitration the operator asked
+                    // for, so the process stops instead.
+                    Err(err) => {
+                        return Err(format!("observer config exists but is unusable: {err:?}").into());
+                    }
+                    Ok(None) => {
+                        println!("! Observer: no config file or ANTHROPIC_AUTH_TOKEN, using Mock (zero-token dev mode)");
+                        Box::new(
+                            mtagentlens::responsibility::observer::mock::MockObserverProvider::with_responses(
+                                vec![],
+                            ),
+                        )
                     }
                 }
-                loaded.unwrap_or_else(|| {
-                    println!("! Observer: config not found, using Mock (zero-token dev mode)");
-                    Box::new(
-                        crate::responsibility::observer::mock::MockObserverProvider::with_responses(
-                            vec![],
-                        ),
-                    )
-                })
             }
         };
     // Load ONNX DeBERTa classifier for Content Boundary Layer 3.
@@ -1311,29 +1576,24 @@ async fn run_trace(
                 .find(|p| p.join("model.onnx").exists())
                 .unwrap_or_else(|| std::path::PathBuf::from("collector/models/deberta"))
         });
-    let classifier = match crate::responsibility::judgment::classifier::OnnxClassifier::try_new(
-        &classifier_model_dir,
-    ) {
-        Ok(Some(c)) => {
-            println!("✓ DeBERTa classifier: Layer 3 prompt injection detection enabled");
-            Some(std::sync::Arc::new(c))
-        }
-        Ok(None) => {
-            println!("! DeBERTa classifier: model.onnx not found, Layer 3 disabled");
-            None
-        }
-        Err(e) => {
-            println!("! DeBERTa classifier: failed to start ({e}), Layer 3 disabled");
-            None
-        }
-    };
+    let classifier =
+        match mtagentlens::responsibility::judgment::classifier::OnnxClassifier::try_new(
+            &classifier_model_dir,
+        ) {
+            Ok(Some(c)) => {
+                println!("✓ DeBERTa classifier: Layer 3 prompt injection detection enabled");
+                Some(std::sync::Arc::new(c))
+            }
+            Ok(None) => {
+                println!("! DeBERTa classifier: model.onnx not found, Layer 3 disabled");
+                None
+            }
+            Err(e) => {
+                println!("! DeBERTa classifier: failed to start ({e}), Layer 3 disabled");
+                None
+            }
+        };
     runtime_config.classifier = classifier;
-
-    // 克隆给 runtime（广播发送端）；原 alert_tx 供实时 SSE 服务器使用。
-    let runtime =
-        ResponsibilityRuntime::new(runtime_config, persistence_writer, alert_tx.clone(), observer);
-    agent = agent.add_global_analyzer(Box::new(runtime));
-    println!("✓ Responsibility runtime enabled (Phase 1 streaming + Phase 2 batch)");
 
     agent = agent.add_global_analyzer(Box::new(MultiAgentAnomalyAnalyzer::new()));
     println!("✓ Multi-agent anomaly detection enabled");
@@ -1345,9 +1605,10 @@ async fn run_trace(
     // Monitors file access patterns with workspace boundary awareness.
     // Detects suspicious access to system dirs and files outside workspace.
     agent = agent.add_global_analyzer(Box::new(FileAccessAuditAnalyzer::new(
-        FileAccessAuditConfig::default(),
+        FileAccessAuditConfig::from_env(),
         vec![
-            std::path::PathBuf::from("/home/lzk/MtAgentLens"),
+            // Workspace root is the process CWD, not a developer's home path.
+            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
             std::path::PathBuf::from("/tmp"),
         ],
     )));
@@ -1378,6 +1639,30 @@ async fn run_trace(
         agent = agent.add_global_analyzer(Box::new(OutputAnalyzer::new()));
         println!("✓ Console output enabled");
     }
+
+    // The responsibility runtime goes LAST.
+    //
+    // Its `process()` runs a select! loop that drains the whole input stream
+    // and only then returns the events it produced. Registered first (as it
+    // used to be) it consumed the stream and emitted nothing until shutdown,
+    // so every analyzer behind it — the four detectors, FileLogger and
+    // OutputAnalyzer — received zero events for the entire run. That is why
+    // trace.log was always 0 bytes.
+    //
+    // It is a consumer, not a pass-through: it writes the graph/DB directly
+    // and does not need anyone downstream, so ending the chain is its correct
+    // place.
+    let mut runtime = ResponsibilityRuntime::new(
+        runtime_config,
+        persistence_writer,
+        alert_tx.clone(),
+        observer,
+    );
+    if enable_server {
+        runtime = runtime.with_raw_event_sender(event_sender.clone());
+    }
+    agent = agent.add_global_analyzer(Box::new(runtime));
+    println!("✓ Responsibility runtime enabled (Phase 1 streaming + Phase 2 batch)");
 
     println!("{}", "=".repeat(60));
     println!(
@@ -1531,14 +1816,26 @@ async fn start_web_server_if_enabled(
     enable_server: bool,
     port: u16,
     log_file: Option<&str>,
-    event_sender: broadcast::Sender<crate::framework::core::Event>,
-    alert_tx: Option<broadcast::Sender<crate::responsibility::types::alert_types::ResponsibilityAlert>>,
+    event_sender: broadcast::Sender<mtagentlens::framework::core::Event>,
+    alert_tx: Option<
+        broadcast::Sender<mtagentlens::responsibility::types::alert_types::ResponsibilityAlert>,
+    >,
 ) -> Result<Option<tokio::task::JoinHandle<()>>, Box<dyn std::error::Error>> {
     if !enable_server {
         return Ok(None);
     }
 
-    let addr = format!("0.0.0.0:{}", port)
+    // Loopback by default: the server exposes captured agent traffic, run
+    // databases and alerts. A tool that listens on every interface by default
+    // turns a local observability install into a network service nobody asked
+    // for. Operators who need remote access set MTAGENTLENS_BIND explicitly.
+    let host = std::env::var("MTAGENTLENS_BIND").unwrap_or_else(|_| "127.0.0.1".to_string());
+    if host != "127.0.0.1" && host != "::1" && host != "localhost" {
+        eprintln!(
+            "! Web server binding to {host} (set MTAGENTLENS_BIND=127.0.0.1 to keep it local)"
+        );
+    }
+    let addr = format!("{host}:{port}")
         .parse()
         .map_err(|e| format!("Invalid server address: {}", e))?;
 
@@ -1559,4 +1856,99 @@ async fn start_web_server_if_enabled(
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     Ok(Some(server_handle))
+}
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+    use clap::Parser;
+
+    /// The probe filter must include the configured agent comms; otherwise a
+    /// non-`claude` agent never reaches the in-process boundary.
+    #[test]
+    fn agent_comm_filter_unions_without_duplicates() {
+        assert_eq!(merge_comm_filter("claude", None), "claude");
+        assert_eq!(
+            merge_comm_filter("claude", Some("openclaw, MainThread")),
+            "claude,openclaw,MainThread"
+        );
+        assert_eq!(
+            merge_comm_filter("claude,openclaw", Some("openclaw,, claude ")),
+            "claude,openclaw"
+        );
+        assert_eq!(merge_comm_filter("", Some("a")), "a");
+    }
+
+    /// `record` must be usable without an explicit `-c`; historically the
+    /// doc comment claimed a "claude" default while clap saw a required arg.
+    #[test]
+    fn record_comm_defaults_to_claude() {
+        let cli =
+            Cli::try_parse_from(["mtagentlens", "record"]).expect("record should parse without -c");
+        match cli.command {
+            Commands::Record { comm, .. } => assert_eq!(comm, "claude"),
+            _ => panic!("expected the Record subcommand"),
+        }
+    }
+
+    #[test]
+    fn doctor_parses_json_and_binary_path() {
+        let cli = Cli::try_parse_from([
+            "mtagentlens",
+            "doctor",
+            "--json",
+            "--binary-path",
+            "/bin/true",
+        ])
+        .expect("doctor should parse");
+        match cli.command {
+            Commands::Doctor { json, binary_path } => {
+                assert!(json);
+                assert_eq!(binary_path.as_deref(), Some("/bin/true"));
+            }
+            _ => panic!("expected the Doctor subcommand"),
+        }
+    }
+
+    /// An explicit `-c` must still win over the default.
+    #[test]
+    fn record_comm_accepts_explicit_value() {
+        let cli = Cli::try_parse_from(["mtagentlens", "record", "-c", "openclaw"])
+            .expect("record -c openclaw should parse");
+        match cli.command {
+            Commands::Record { comm, .. } => assert_eq!(comm, "openclaw"),
+            _ => panic!("expected the Record subcommand"),
+        }
+    }
+
+    /// A filtered collector run must select FILTER mode explicitly. The
+    /// binary happens to switch to FILTER when it parses `-c`/`-p`, but the
+    /// capture scope is a product decision and the collector should not rely
+    /// on that side effect.
+    #[test]
+    fn a_process_filter_without_a_mode_selects_filter_mode() {
+        let with_comm = build_process_args(Some("claude"), None, None, None);
+        assert!(
+            with_comm.windows(2).any(|w| w == ["-m", "2"]),
+            "{with_comm:?}"
+        );
+
+        let with_pid = build_process_args(None, Some(1234), None, None);
+        assert!(
+            with_pid.windows(2).any(|w| w == ["-m", "2"]),
+            "{with_pid:?}"
+        );
+
+        // No filter: keep the binary's all-process default (it is a debugging
+        // tool at that point), and never invent a mode.
+        let unfiltered = build_process_args(None, None, None, None);
+        assert!(!unfiltered.iter().any(|arg| arg == "-m"), "{unfiltered:?}");
+
+        // An explicit mode always wins.
+        let explicit = build_process_args(Some("claude"), None, None, Some(0));
+        assert!(
+            explicit.windows(2).any(|w| w == ["-m", "0"]),
+            "{explicit:?}"
+        );
+    }
 }

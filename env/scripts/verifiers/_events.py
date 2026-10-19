@@ -19,7 +19,7 @@ class EventSource:
     def __init__(self, run_dir: Path):
         self.run_dir = run_dir
         self.collector_dir = run_dir / "collector"
-        self.trace_log = run_dir / "collector.log"
+        self.trace_log = run_dir / "collector" / "collector.log"
         self._experiment_pid_set: Optional[set] = None
         self._load_experiment_pids()
 

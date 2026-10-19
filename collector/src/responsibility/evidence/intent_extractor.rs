@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // intent_extractor.rs — Intent extraction from LLM API responses.
 //
@@ -15,9 +15,17 @@ use crate::responsibility::types::{
     NormalizedArg, ProcessId,
 };
 use regex_lite::Regex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Maximum body length to attempt structured JSON parsing (2 MB).
-const MAX_JSON_PARSE_BYTES: usize = 2 * 1024 * 1024;
+pub const MAX_JSON_PARSE_BYTES: usize = 2 * 1024 * 1024;
+
+/// Bodies skipped because they exceeded [`MAX_JSON_PARSE_BYTES`].
+///
+/// A large system prompt (for example OpenClaw's 47 KB request is fine, but
+/// agent runtimes that inline whole files are not) silently produced zero
+/// intents before this counter existed. It is surfaced at run finalization.
+pub static DIAG_BODY_TOO_LARGE: AtomicU64 = AtomicU64::new(0);
 
 // ─── HTTP body extraction ─────────────────────────────────────────────
 
@@ -122,29 +130,10 @@ fn looks_like_sse(s: &str) -> bool {
 }
 
 // ─── IntentClass helpers ──────────────────────────────────────────────
-
-/// Tools that orchestrate work (agent coordination, task planning).
-const ORCHESTRATION_TOOLS: &[&str] = &[
-    "Bash",
-    "Task",
-    "TodoWrite",
-    "TaskOutput",
-    "ExitPlanMode",
-    "EnterPlanMode",
-];
-
-/// Tools that produce observable side effects.
-const SIDE_EFFECT_TOOLS: &[&str] = &[
-    "Write",
-    "Edit",
-    "Read",
-    "Glob",
-    "Grep",
-    "WebFetch",
-    "WebSearch",
-    "NotebookEdit",
-    "LS",
-];
+//
+// The class table lives in `types::tool_vocabulary` so that every intent path
+// shares one answer. It used to be duplicated here, and the copy disagreed
+// with `types::support_types` on `Bash` and several other names.
 
 /// Required input fields per tool name. Missing fields → Partial parse state.
 const REQUIRED_FIELDS: &[(&str, &[&str])] = &[
@@ -163,13 +152,7 @@ const REQUIRED_FIELDS: &[(&str, &[&str])] = &[
 ];
 
 fn classify_intent_class(tool_name: &str) -> IntentClass {
-    if ORCHESTRATION_TOOLS.contains(&tool_name) {
-        IntentClass::Orchestration
-    } else if SIDE_EFFECT_TOOLS.contains(&tool_name) {
-        IntentClass::SideEffect
-    } else {
-        IntentClass::Unknown
-    }
+    crate::responsibility::types::tool_vocabulary::classify_intent_class(tool_name)
 }
 
 fn classify_parse_state(tool_name: &str, input: &serde_json::Value) -> IntentParseState {
@@ -239,6 +222,9 @@ impl IntentExtractor {
         message_id: MessageId,
         timestamp_ns: u64,
     ) -> Vec<Intent> {
+        if body.len() > MAX_JSON_PARSE_BYTES {
+            DIAG_BODY_TOO_LARGE.fetch_add(1, Ordering::Relaxed);
+        }
         // Step 0: SSE fast-path — route SSE streams directly to the SSE
         // parser BEFORE the raw buffer scan (step 1).
         //
@@ -1254,7 +1240,10 @@ mod tests {
 
         assert_eq!(intents.len(), 1);
         assert_eq!(intents[0].tool_name, "Bash");
-        assert_eq!(intents[0].intent_class, IntentClass::Orchestration);
+        // `Bash` is a side effect: it performs an action rather than
+        // coordinating agents, and the correlator must be able to link it to
+        // the shell action it produces. See `types::tool_vocabulary`.
+        assert_eq!(intents[0].intent_class, IntentClass::SideEffect);
         assert_eq!(intents[0].parse_state, IntentParseState::Complete);
         assert!(intents[0].primary_matching_eligible);
         assert!(!intents[0].tool_args.is_empty());
@@ -1478,17 +1467,37 @@ data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_
         );
     }
 
+    /// A body above the structured-parse limit is observable, not silently
+    /// ignored. The counter is what lets an operator tell "the runtime sent a
+    /// 3 MB prompt, so we skipped JSON parsing" from "no LLM traffic".
+    #[test]
+    fn oversized_body_increments_diagnostic_counter() {
+        let before = DIAG_BODY_TOO_LARGE.load(Ordering::Relaxed);
+        let body = " ".repeat(MAX_JSON_PARSE_BYTES + 1);
+        let _ = IntentExtractor::extract(
+            &body,
+            IntentAuthoritySource::HttpResponseToolUse,
+            ProcessId {
+                pid: 1,
+                start_time_ns: 0,
+            },
+            MessageId::new(),
+            0,
+        );
+        assert!(
+            DIAG_BODY_TOO_LARGE.load(Ordering::Relaxed) > before,
+            "oversized body must be counted"
+        );
+    }
+
+    /// The table itself is covered by `types::tool_vocabulary`'s tests; this
+    /// only pins that the wrapper used by the extraction path reaches it.
     #[test]
     fn test_intent_class_classification() {
-        // Orchestration
-        assert_eq!(classify_intent_class("Bash"), IntentClass::Orchestration);
+        assert_eq!(classify_intent_class("Bash"), IntentClass::SideEffect);
         assert_eq!(classify_intent_class("Task"), IntentClass::Orchestration);
-
-        // Side effect
         assert_eq!(classify_intent_class("Write"), IntentClass::SideEffect);
         assert_eq!(classify_intent_class("Read"), IntentClass::SideEffect);
-
-        // Unknown
         assert_eq!(
             classify_intent_class("SomeRandomTool"),
             IntentClass::Unknown

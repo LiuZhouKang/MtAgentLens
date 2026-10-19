@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Route handler: GET /api/runs/{id}/graph — return the full ResponsibilityGraph
 // for a run (nodes + edges) as a single JSON payload.
 

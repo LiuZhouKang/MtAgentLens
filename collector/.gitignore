@@ -7,3 +7,8 @@ ssl.log
 agent.log
 trace.log
 record.log
+
+# User-provided observer LLM config (contains an API key); copy from
+# observer_llm.toml.example. Previously committed as a symlink into a
+# different project tree, so a fresh clone got a broken link.
+/observer_llm.toml

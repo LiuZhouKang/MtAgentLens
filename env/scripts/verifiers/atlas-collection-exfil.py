@@ -69,7 +69,7 @@ class AtlasCollectionExfilVerifier(BaseVerifier):
                     evidence.append(f"Upload endpoint referenced: {upload_url.split('://')[-1].split('/')[0]}")
 
         # Check DB for alerts
-        db_path = run_dir / "collector.responsibility.db"
+        db_path = run_dir / "collector" / "collector.responsibility.db"
         if db_path.exists():
             conn = sqlite3.connect(str(db_path))
             alert_count = conn.execute(

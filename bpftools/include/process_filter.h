@@ -145,8 +145,16 @@ static inline bool should_track_process(struct pid_tracker *tracker,
 
 	/* Mode 2 (FILTER): selective tracking */
 	if (tracker->filter_mode == FILTER_MODE_FILTER) {
-		/* Check if specific PID was requested */
-		if (tracker->target_pid > 0 && pid == tracker->target_pid) {
+		/* Check if specific PID was requested.
+		 *
+		 * A long-running agent (e.g. the OpenClaw gateway) started before
+		 * the collector has no EXEC event, so it is never inserted into the
+		 * tracker. Its direct children must still be tracked: once a child
+		 * is inserted, the parent-tracking check covers the rest of the
+		 * tree. Without `ppid == target_pid`, `-p <gateway>` observes the
+		 * gateway itself but none of the work it spawns. */
+		if (tracker->target_pid > 0 &&
+		    (pid == tracker->target_pid || ppid == tracker->target_pid)) {
 			return true;
 		}
 
@@ -175,6 +183,13 @@ static inline bool should_report_file_ops(struct pid_tracker *tracker, pid_t pid
 
 	/* Mode 1 (PROC) and Mode 2 (FILTER): only report for tracked PIDs */
 	return pid_tracker_is_tracked(tracker, pid);
+}
+
+/* Network egress follows the same PID-scoping rule as file operations: an
+ * untracked process's connections are not this agent's traffic. */
+static inline bool should_report_network(struct pid_tracker *tracker, pid_t pid)
+{
+	return should_report_file_ops(tracker, pid);
 }
 
 /* Iterate over all active tracked PIDs */

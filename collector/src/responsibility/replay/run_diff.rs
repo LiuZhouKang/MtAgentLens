@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright (c) 2026 MtAgentLens Project
+
 /// Innovation 8: Cross-run causal graph diff analysis.
 ///
 /// Compares two sets of causal links (from different runs) and produces a diff

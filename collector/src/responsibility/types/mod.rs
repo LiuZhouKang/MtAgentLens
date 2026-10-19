@@ -1,16 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright (c) 2026 MtAgentLens Project
+
 pub mod alert_types;
 pub mod error;
 pub mod evidence_types;
 pub mod graph_types;
 pub mod identity_types;
 pub mod ids;
-pub mod observation_types;
 pub mod phase;
 pub mod policy_types;
 pub mod refinement;
 pub mod replay_types;
 pub mod resource;
-pub mod signal_types;
 
 pub use alert_types::*;
 pub use error::*;
@@ -24,3 +25,4 @@ pub use refinement::*;
 pub use replay_types::*;
 pub use resource::*;
 pub mod support_types;
+pub mod tool_vocabulary;

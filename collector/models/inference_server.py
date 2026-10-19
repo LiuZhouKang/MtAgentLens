@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ONNX DeBERTa inference server for AgentSight ContentBoundary Layer 3.
+"""ONNX DeBERTa inference server for MtAgentLens ContentBoundary Layer 3.
 
 Loads ProtectAI DeBERTa-prompt-injection-v2 ONNX model at startup,
 serves inference requests via JSON-line protocol over stdin/stdout.

@@ -13,7 +13,7 @@ import json, os, statistics, subprocess, sys, time
 from pathlib import Path
 
 PROJECT = Path(__file__).resolve().parents[3]
-COLLECTOR = PROJECT / "collector/target/release/mtagentlens"
+COLLECTOR = PROJECT / "collector/build/release/mtagentlens"  # target-dir is "build" (.cargo/config.toml)
 BENCH_DIR = Path(__file__).resolve().parent / "bench_targets"
 RESULTS = PROJECT / "compare/results/perf"
 RESULTS.mkdir(parents=True, exist_ok=True)

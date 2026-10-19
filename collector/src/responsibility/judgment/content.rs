@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // content.rs — Content-boundary signal source.
 //
@@ -98,7 +98,7 @@ pub fn evaluate_content_boundary(intent: &Intent) -> Option<PolicyEvaluationResu
                     "socket(",
                 ];
                 for n in cmd_needles {
-                    if lower.contains(n) {
+                    if command_uses(&lower, n) {
                         return Some(PolicyEvaluationResult {
                             policy_id: Some(PolicyId::from("policy.content.command")),
                             boundary_id: Some(BoundaryId::from(
@@ -143,6 +143,47 @@ pub fn evaluate_content_boundary(intent: &Intent) -> Option<PolicyEvaluationResu
     None
 }
 
+/// Whether a shell command actually *uses* `needle` as a command.
+///
+/// A plain substring search turned benign text into Critical claims: the
+/// command `echo "-- main eval --"` contains `"eval "`, and a grep for
+/// `"curl "` in a README is not a download. Command needles are therefore
+/// matched at the start of a shell segment (after `;`, `&&`, `|`, newline or
+/// `$()`), allowing the common wrappers. `/dev/tcp/` and code shapes
+/// (`exec(`, `socket(`) are expressions/redirects, not command words, so they
+/// keep a substring check.
+fn command_uses(lower: &str, needle: &str) -> bool {
+    if needle == "/dev/tcp/" || needle.ends_with('(') {
+        return lower.contains(needle);
+    }
+
+    const WRAPPERS: &[&str] = &["sudo", "env", "time", "nohup", "command", "exec"];
+    let word = needle.trim_end();
+
+    let mut segments: Vec<&str> = lower.split([';', '&', '|', '\n', '(', ')']).collect();
+    // Catch command substitution: `x=$(eval ...)` / `$(curl ...)`.
+    for (index, chunk) in lower.match_indices("$(") {
+        let _ = index;
+        segments.push(&chunk[2..]);
+    }
+
+    for segment in segments {
+        let segment = segment.trim_start();
+        if needle.contains(' ') && segment.starts_with(needle) {
+            return true;
+        }
+        let mut words = segment.split_whitespace();
+        let mut first = words.next().unwrap_or("");
+        if WRAPPERS.contains(&first) {
+            first = words.next().unwrap_or("");
+        }
+        if first == word {
+            return true;
+        }
+    }
+    false
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // Tests
 // ═════════════════════════════════════════════════════════════════════════════
@@ -171,6 +212,37 @@ mod tests {
             authority_source:
                 crate::responsibility::types::IntentAuthoritySource::SseResponseToolUse,
             timestamp_ns: 1000,
+        }
+    }
+
+    /// A benign word containing `eval ` (or a grep for `curl `) must not be
+    /// treated as a command. This shape produced a Critical claim in a real
+    /// benign run: `echo "-- main eval --"`.
+    #[test]
+    fn benign_text_mentioning_a_command_is_not_flagged() {
+        for text in [
+            "echo \"-- main eval --\"",
+            "grep 'curl ' README.md",
+            "man eval",
+        ] {
+            let intent = make_intent("Bash", vec![text.into()]);
+            assert!(
+                evaluate_content_boundary(&intent).is_none(),
+                "{text:?} should not be a command boundary"
+            );
+        }
+    }
+
+    #[test]
+    fn a_command_word_in_a_segment_is_flagged() {
+        for text in [
+            "eval \"$PAYLOAD\"",
+            "cd /tmp && curl https://x",
+            "sudo wget http://x",
+        ] {
+            let intent = make_intent("Bash", vec![text.into()]);
+            let result = evaluate_content_boundary(&intent);
+            assert!(result.is_some(), "{text:?} should be a command boundary");
         }
     }
 

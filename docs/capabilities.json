@@ -1,0 +1,126 @@
+{
+  "_generated_by": "hand-seeded 2026-10-17; P2 replaces this with `cargo xtask gen` output",
+  "_purpose": "Machine-readable capability manifest. Guards in scripts/verify.sh and collector/tests assert this file and reality agree in BOTH directions: a capability may not be declared without a real producer, and a real producer may not be undeclared. This is the mechanism that would have caught the 13 never-compiled files, the 6 never-constructed analyzers, and the `CapabilityUse` edge type that 11 detector templates require but nothing constructs.",
+  "license": {
+    "spdx": "Apache-2.0 OR MIT",
+    "note": "Files derived from eunomia-bpf carry SPDX MIT with their upstream copyright and are left untouched. eBPF C programs are GPL-2.0 OR BSD-3-Clause (BPF helpers require a GPL-compatible license)."
+  },
+  "kernel_requirement": {
+    "minimum": "5.8",
+    "reason": "all three eBPF programs (tls_capture, process, stdiocap) use BPF_MAP_TYPE_RINGBUF; tls_capture additionally uses bpf_probe_read_user (>=5.5)",
+    "note": "README.md / bpftools/README.md / CLAUDE.md previously claimed 4.1+ in three places; the loader must fail with a readable error below 5.8"
+  },
+  "analyzers": {
+    "registered": [
+      "RawSecretRedactor",
+      "StdioSecretRedactor",
+      "MultiAgentAnomalyAnalyzer",
+      "HandoffInjectionAnalyzer",
+      "FileAccessAuditAnalyzer",
+      "SecuritySignoffAnalyzer",
+      "FileLogger",
+      "OutputAnalyzer",
+      "ResponsibilityRuntime"
+    ],
+    "implemented_but_not_registered": []
+  },
+  "scenarios": {
+    "categories": [
+      "behavioral_attacks",
+      "benign",
+      "c2_backdoor",
+      "collection",
+      "context_loss",
+      "context_pollution",
+      "coordination_deadlock",
+      "covert_channel",
+      "credential_access",
+      "credential_theft",
+      "data_exfiltration",
+      "defense_evasion",
+      "handoff_injection",
+      "hidden_proxy_chain",
+      "identity_confusion",
+      "infinite_recursion",
+      "multi_agent_attack",
+      "multi_anomaly",
+      "network_anomaly",
+      "persistence",
+      "policy_bypass",
+      "privilege_escalation",
+      "privilege_leak",
+      "prompt_injection",
+      "race_conflict",
+      "real_attack",
+      "reasoning_loop",
+      "reconnaissance",
+      "resource_abuse",
+      "resource_starvation",
+      "role_hijack",
+      "supply_chain",
+      "time_bomb",
+      "tool_poisoning"
+    ],
+    "active_scenario_files": 139,
+    "excluded_dirs": [
+      "archive",
+      "_drafts",
+      "fixtures",
+      "grey_zone"
+    ]
+  },
+  "known_limitations": [
+    "1 event type is still matched by Rust but never emitted: FILE_WRITE (file writes are inferred from open flags). PROCESS_EXEC is emitted under the legacy name EXEC, which routing accepts. NETWORK_CONNECT and NETWORK_SEND are produced by `process` from sys_enter_connect / sys_enter_sendto: AF_INET and AF_INET6 are both decoded to host/port (IPv6 rendered as a canonical address), a sockaddr shorter than its family's struct is dropped rather than decoded, and other families (AF_UNIX et al.) are dropped in the kernel. FILE_DELETE is produced from unlinkat, unlink and rmdir; FILE_RENAME from rename, renameat and renameat2. Volume baseline: docs/evaluation/network-noise-budget.json.",
+    "HTTP/2 is not parsed (only HTTP/1.1 plaintext). HTTP/3/QUIC is structurally unreachable via SSL_read/SSL_write.",
+    "Connection-close-delimited responses (no Transfer-Encoding and no Content-Length) are not synthesized: their completion is unknowable, so they pass through raw. Compressed/chunked responses are decoded by PayloadNormalizer (P1); malformed or incomplete messages emit an explicit decode_status diagnostic instead of being silently dropped.",
+    "As of schema v2 (docs/adr/0005) the collector owns exactly one schema: `bin/replay` reads only the live `collector.responsibility.db`, and the 22 causal-era tests were retired with their routes. The replay report compares correlation evidence and alerts (semantic keys); it no longer produces a `snapshot_comparison` section because the retired accountability snapshots have no live equivalent. Replay's ablation flags (`--disable-signal`, `--persisted-graph-replay`) were removed rather than kept as no-ops: the executor never honoured them.",
+    "`intent_class` is persisted in lower case and the benchmark scripts count `intent_class='side_effect'`; this spelling is a load-bearing measurement contract and must not be changed.",
+    "The `observed`-vs-`asserted` identity split cannot separate N logical agents inside one OS process; the product promises a candidate set with grades, not a unique answer.",
+    "Raw SSL events (and their `data_b64`) are captured verbatim. Before any output, `RawSecretRedactor` rewrites the values of Authorization / Proxy-Authorization / Cookie / Set-Cookie / X-Api-Key inside HTTP heads and marks the event with a `redaction` object; the capture itself stays byte-exact. Residual: request/response bodies and arbitrary free text are not redacted, and a header value split across two TLS records evades redaction by design (half-redacting would keep the visible prefix).",
+    "stdio payloads are captured verbatim. Before any output, `StdioSecretRedactor` applies the shape-based `export::genai::redact` patterns to the event's `data` string and records a `redaction` object (`captured_data_bytes` / `redacted_data_bytes`); the capture itself is not modified. JSON input is redacted in a JSON-aware mode that replaces values only (object members, JSON embedded as an escaped string, array/numeric values under a sensitive key, header/label text inside a string) so the payload stays valid JSON; non-JSON input uses the header and `key=value` rules. Residual: an opaque credential with no recognizable prefix or key label; a key written with JSON unicode escapes (`\\u0070assword`); a credential split across two read(2)/write(2) events (each event is redacted independently, like a header split across TLS records); fd_target / comm / argv are not redacted. Process `full_command` captures argv verbatim and is not redacted.",
+    "External-content taint seed: read(2) coverage is proven by spike (3/3 runs, copy_failed=0, dropped_events=0), but no sound directive gate exists yet; the seed is not implemented or enabled. A naive verb+target gate lets the detector's own source/text through, and stdio raw bytes are written by FileLogger when stdio capture is enabled. SSL header redaction is implemented (RawSecretRedactor) and stdio payloads are shape-redacted (StdioSecretRedactor); neither makes the seed sound, which is why the seed stays disabled.",
+    "Dependency audit scope: `cargo audit` covers every Rust dependency and `npm audit` covers *production* npm dependencies (`--omit=dev`). Dev-only tooling (storybook, vitest, eslint and their transitive tree) still reports advisories; it never reaches the embedded artifact, and is treated as a build-tool trust-boundary risk rather than budgeted. `scripts/audit-budget.json` currently accepts no advisories (both lists empty).",
+    "FileRename is now a first-class action type (classifier, graph resource, persistence round-trip, replay action-type classification), so new rename actions record both the source and the destination path. Historical rows are approximations and are not rewritten: runs recorded with the last committed collector map a rename to FileWrite (FILE_RENAME was routed through the `write` arm), runs recorded with the uncommitted P4 working tree map it to FileOverwrite. Frontend gap (frontend is frozen this round): lib/monitoring/perspective-labels.ts and the two actionTone helpers do not list FileRename yet, so it renders with the neutral 'other' tone and its raw name until the frontend work is unfrozen.",
+    "Agent ownership is decided by `comm ∈ AGENT_COMMS` (default `claude`, `claude-code`) or by agent ancestry in the signal graph. An agent that runs under a different `comm` (e.g. OpenClaw's Node gateway runs as `MainThread`) must extend the boundary with `MTAGENTLENS_AGENT_COMMS=name1,name2`; actions outside the boundary are counted as `actions_dropped_no_agent` in the run's `[diagnostics:json]` line instead of being dropped invisibly.",
+    "`responsibility/server/**` (14 files) is a legacy route tree: `serve_request` has zero callers and the production server is `src/server/web.rs`. The frontend helpers `api.getGraph`/`api.getEvidence` still target `/api/runs/:id/graph` and `/api/runs/:id/evidence`, which only the legacy tree implements; the live server returns 404 and the frontend falls back to DB import. Removing or wiring this tree requires a frontend decision and is tracked as an open gap.",
+    "Path normalization is deliberately not one function: `evidence::args` normalizes intent/action keys (strip `./`, collapse `//`), `evidence::argument_matcher` resolves `.`/`..` for argument matching, and `graph_builder` normalizes policy keys (strip `~/` and `./`). Each has a different contract and its own tests; unifying them would change matching semantics.",
+    "Two `FilterExpression`/`FilterNode` grammars (SSL: binary And/Or over `data|function|latency_ms`; HTTP: n-ary And/Or over `request|response` targets) and two `json_to_event` timestamp preferences (process emits `timestamp`, tls_capture emits `timestamp_ns`) are intentional per-producer behaviours, not duplicate implementations.",
+    "Replay's ablation switches (`skip_identity_resolution`, `skip_attribution`, `skip_ai_pipeline`, `skip_content_boundary_signals`, `enabled_match_levels`, `enabled_action_types`) were never read by the executor; the inert `ReplayConfig` API was removed rather than kept as a no-op, matching the earlier removal of `--disable-signal` and `--persisted-graph-replay`.",
+    "TaintedContextUse is an investigative signal, not an actionable verdict: in the July 2026 FuxiBench corpus it fired in 15/19 benign scenarios (FPR 0.789, Wilson 0.567-0.915; 9/9 agent_teams, 6/10 single_agent) and 59/67 attacks. The intended authorization gate (`judgment/context_trust.rs`) existed but had zero callers and was deleted in ADR-0013; no authorization check is wired today. See compare/results/paper/standard_evaluation_v5.json (`rq3_attribution`).",
+    "Persistence backpressure: the live per-event path uses a bounded channel and drops rows under sustained overload (counted as `lost_persist_count`, reported as DEGRADED at finalize; the first 20 drops log their record kind). `trigger()`/`finalize()` batch paths use a blocking send. An evidence row is written only when its intent and action were successfully queued, so a dropped parent never turns into a FOREIGN KEY cascade.",
+    "Agent identity beyond `comm`: `MTAGENTLENS_AGENT_CGROUP` (exact cgroup unit names read from /proc/<pid>/cgroup on EXEC) and `MTAGENTLENS_AGENT_EXE` (substring of the executable path or full command line) extend the boundary when `comm` is uninformative (Node sets it to `MainThread`). `MTAGENTLENS_AGENT_COMMS` is also unioned into the process probe's `-c` filter; without that union the eBPF FILTER mode never emits the agent's events.",
+    "Measurement isolation is opt-in and applies to the benchmark path: `mtagentlens-benchmark run --clean-profile` isolates settings/MCP/hooks/skills/memory/environment, and `--agent-binary`/`--agent-comm` (or `scripts/wire/run-benign-fpr.sh`) exec a copy of the agent ELF with a distinct inode and a <=15-byte comm so TLS uprobes and the process filter exclude the interactive session. Direct `mtagentlens record -c claude` runs still capture any same-comm process by design; do not use them for FPR/overhead evidence. See docs/evaluation/measurement-isolation.md.",
+    "OpenClaw structured tool calls are available out-of-band: `MTAGENTLENS_OPENCLAW_STATE=~/.openclaw MTAGENTLENS_OPENCLAW_AGENTS=main` enables `OpenClawRunner`, which polls `trajectory_runtime_events.tool.call` read-only and emits `OutOfBandAsserted` intents correlated with the gateway's observed actions. The asserted `agent_key` (e.g. `agent:main:main`) is preserved in the event but is not yet a distinct graph AgentId; process attribution uses the gateway PID + cgroup/exe boundary.",
+    "No CI/CD is configured. The repository deliberately ships no `.gitlab-ci.yml`, no runner scripts and no hosted pipeline (ADR-0014): the competition GitLab instance restricts project runner registration. The gates are `./scripts/verify.sh` (offline, 14 gates) and `python3 scripts/audit_deps.py all` (network, run before release).",
+    "Historical commits tracked real observer API keys under `env/config/vendors/*` (sk-... values). They are now untracked and gitignored, with only `*.example` templates committed; the values remain in git history and must be rotated at the provider. History rewriting is optional; rotation is mandatory."
+  ],
+  "unbacked_event_types": [
+    "FILE_WRITE"
+  ],
+  "unbacked_graph_types": {
+    "node": [
+      "Process",
+      "ToolCall",
+      "Credential",
+      "Context"
+    ],
+    "edge": [
+      "Delegation",
+      "AuthorityTransfer",
+      "CapabilityUse",
+      "ContextInheritance",
+      "TaintPropagation",
+      "ViolationProvenance",
+      "CompetingExplanation"
+    ],
+    "resource_kinds": [
+      "Conversation",
+      "Context"
+    ],
+    "reason": "The runtime graph builder constructs only Agent/Resource/PolicyBoundary node types; its resource kinds are File/Network/Process/ToolCall/Credential. AgentDelegatesTo and ContextFlowsFrom are now produced for observed cross-agent orchestration. The remaining edge/node types are synonyms or concepts with no builder path; templates do not use them. A contract test (collector/tests/graph_pattern_contract.rs) forbids a template from requiring an undeclared type or kind and forces this list to shrink when a producer lands."
+  },
+  "inert_graph_templates": [],
+  "event_type_aliases": {
+    "PROCESS_EXEC": "EXEC"
+  }
+}

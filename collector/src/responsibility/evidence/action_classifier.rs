@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // action_classifier.rs — Single entry point for classifying syscalls into Action types.
 //
@@ -83,6 +83,13 @@ impl ActionClassifier {
             // ── File deletion ──
             "unlink" | "unlinkat" | "rmdir" => Some(ActionCandidateType::FileDelete),
 
+            // ── File rename ──
+            // Both paths are the action's resources: the source (what moved)
+            // and the destination (where it went). Keeping the destination
+            // only in the raw event meant every downstream claim could answer
+            // "what was moved" but never "to where".
+            "rename" | "renameat" | "renameat2" => Some(ActionCandidateType::FileRename),
+
             // ── Network ──
             "connect" => Some(ActionCandidateType::NetworkConnect),
             "sendto" | "sendmsg" | "sendmmsg" => Some(ActionCandidateType::NetworkSend),
@@ -140,6 +147,7 @@ impl ActionClassifier {
             | ActionCandidateType::FileWrite
             | ActionCandidateType::FileOverwrite
             | ActionCandidateType::FileDelete
+            | ActionCandidateType::FileRename
             | ActionCandidateType::NetworkConnect
             | ActionCandidateType::NetworkSend
             | ActionCandidateType::ProcessExec => SignalClass::HighSignal,
@@ -205,6 +213,32 @@ mod tests {
         let action = ActionClassifier::classify("read", &["3".to_string()], pid(), 1000);
         assert!(action.is_some());
         assert_eq!(action.unwrap().action_type, ActionCandidateType::FileRead);
+    }
+
+    /// A rename is not an overwrite: the source disappears and the destination
+    /// appears. Recording it as FileOverwrite loses the destination entirely,
+    /// which is the one fact an accountability trail most needs ("where did
+    /// this file go?"). Both paths stay in the action's normalized args.
+    #[test]
+    fn test_rename_is_its_own_type_with_both_paths() {
+        use crate::responsibility::types::NormalizedArg;
+
+        let action = ActionClassifier::classify(
+            "rename",
+            &["/tmp/src.txt".to_string(), "/tmp/dst.txt".to_string()],
+            pid(),
+            1000,
+        )
+        .expect("rename is actionable");
+
+        assert_eq!(action.action_type, ActionCandidateType::FileRename);
+        assert_eq!(
+            action.normalized_args,
+            vec![
+                NormalizedArg::Path("/tmp/src.txt".to_string()),
+                NormalizedArg::Path("/tmp/dst.txt".to_string()),
+            ]
+        );
     }
 
     #[test]

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright (c) 2026 MtAgentLens Project
+
 use crate::responsibility::claims::ClaimSeverity;
 use crate::responsibility::classification::pattern_matcher::GraphPatternMatch;
 use crate::responsibility::classification::rule_engine::RuleEngine;
@@ -496,7 +499,6 @@ mod tests {
             evidence_refs: Vec::new(),
             confidence: 0.9,
             phase: PhaseIndicator::Provisional { timestamp_ns: 1000 },
-            signal: None,
         }
     }
 
@@ -533,7 +535,7 @@ mod tests {
             ResponsibilityNodeType::Resource,
             Some("agent-1"),
             Some(NormalizedResource::File {
-                canonical_path: "/home/lzk/mtagentlens/src/main.rs".into(),
+                canonical_path: "/workspace/project/src/main.rs".into(),
             }),
         ));
         g.add_edge(make_edge(

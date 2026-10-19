@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Handoff observability REST API route handlers.
 //
 // All endpoints are read-only queries against the shared in-memory

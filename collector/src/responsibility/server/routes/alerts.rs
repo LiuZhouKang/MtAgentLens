@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Route handler: GET /api/runs/{id}/alerts — list all responsibility alerts for a run.
 
 use crate::responsibility::persistence::reader::PersistenceReader;

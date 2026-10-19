@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // Backup code generation for two-factor authentication.
 // Each backup code is a cryptographically random 8-digit number.

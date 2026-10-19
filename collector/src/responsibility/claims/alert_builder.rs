@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // alert_builder.rs — AlertBuilder: composes a ResponsibilityAlert from
 // claims, classification results, observer output, and graph context.
@@ -6,7 +6,7 @@
 use std::collections::HashSet;
 
 use crate::responsibility::classification::types::{
-    AlertAuthority as ClassAlertAuthority, ClassificationResult, ObserverDecision, ObserverOutput,
+    ClassificationResult, ObserverDecision, ObserverOutput,
 };
 use crate::responsibility::graph::ResponsibilityGraph;
 use crate::responsibility::types::{
@@ -198,32 +198,9 @@ fn resolve_alert_judgment(
                 }
             };
             let dec = convert_observer_decision(&out.decision);
-            let auth = convert_classification_authority(&out.authority);
-
-            // Map classification RuleVerdict → types RuleVerdict.
-            // Fields are structurally identical but types differ.
-            let rvs: Vec<RuleVerdict> = out
-                .rule_verdicts
-                .iter()
-                .map(|rv| RuleVerdict {
-                    rule_id: rv.rule_id.clone(),
-                    description: rv.description.clone(),
-                    matched_resource: rv.matched_resource.clone(),
-                    llm_agreed: rv.llm_agreed,
-                    llm_comment: rv.llm_comment.clone(),
-                })
-                .collect();
-
-            let pvs: Vec<PatternVerdict> = out
-                .pattern_verdicts
-                .iter()
-                .map(|pv| PatternVerdict {
-                    template_id: pv.template_id.clone(),
-                    match_confidence: pv.match_confidence,
-                    llm_agreed: pv.llm_agreed,
-                    llm_comment: pv.llm_comment.clone(),
-                })
-                .collect();
+            let auth = out.authority.clone();
+            let rvs = out.rule_verdicts.clone();
+            let pvs = out.pattern_verdicts.clone();
 
             (
                 dp,
@@ -429,14 +406,6 @@ fn convert_observer_decision(dec: &ObserverDecision) -> AlertDecision {
         ObserverDecision::Safe => AlertDecision::Safe,
         ObserverDecision::Unsafe => AlertDecision::Unsafe,
         ObserverDecision::Uncertain => AlertDecision::Uncertain,
-    }
-}
-
-fn convert_classification_authority(aa: &ClassAlertAuthority) -> AlertAuthority {
-    match aa {
-        ClassAlertAuthority::Authoritative => AlertAuthority::Authoritative,
-        ClassAlertAuthority::Supporting => AlertAuthority::Supporting,
-        ClassAlertAuthority::Unavailable => AlertAuthority::Unavailable,
     }
 }
 

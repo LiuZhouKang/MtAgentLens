@@ -784,7 +784,7 @@ def verify_c5_artifact_completeness(run_dir: Path, events: EventSource) -> Dict[
         evidence.append(f"C5: Could not read collector events: {e}")
 
     # ── Causal DB cross-check ──
-    causal_db = run_dir / "collector.causal.db"
+    causal_db = run_dir / "collector" / "collector.causal.db"
     if causal_db.exists() and causal_db.stat().st_size >= MIN_CAUSAL_DB_BYTES:
         evidence.append(f"C5: Causal DB present ({causal_db.stat().st_size:,} bytes, ≥{MIN_CAUSAL_DB_BYTES:,})")
     elif causal_db.exists():
@@ -1302,7 +1302,7 @@ def verify_sequential(run_dir: Path, scenario_dir: Path,
         overall = "degraded"
 
     # G5: Artifact completeness
-    trace_log = run_dir / "collector.log"
+    trace_log = run_dir / "collector" / "collector.log"
     if trace_log.exists() and trace_log.stat().st_size > 0:
         gate_decisions["G5"] = "pass — collector.log exists with data"
     elif trace_log.exists():

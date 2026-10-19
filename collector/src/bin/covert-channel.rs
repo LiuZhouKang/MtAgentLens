@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright (c) 2026 MtAgentLens Project
+
 // 基于文件元数据的隐蔽信道 — 发送方/接收方
 //
 // 协议: comm-protocol.md

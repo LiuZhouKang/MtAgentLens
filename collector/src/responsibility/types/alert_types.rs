@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright (c) 2026 MtAgentLens Project
+
 use super::ids::*;
 use super::phase::PhaseIndicator;
 use serde::{Deserialize, Serialize};
@@ -25,11 +28,31 @@ pub enum AlertAuthority {
     Unavailable,
 }
 
+impl AlertAuthority {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Authoritative => "authoritative",
+            Self::Supporting => "supporting",
+            Self::Unavailable => "unavailable",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DisplayProfile {
     SafeBaseline,
     UnsafeByEngine,
     ObserverJudged,
+}
+
+impl DisplayProfile {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::SafeBaseline => "safe_baseline",
+            Self::UnsafeByEngine => "unsafe_by_engine",
+            Self::ObserverJudged => "observer_judged",
+        }
+    }
 }
 
 // ═══ ResponsibilityAlert ═══
@@ -63,6 +86,7 @@ pub struct AgentRef {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct EngineSection {
     pub rule_verdicts: Vec<RuleVerdict>,
     pub pattern_verdicts: Vec<PatternVerdict>,
@@ -101,7 +125,8 @@ pub struct PatternVerdict {
     pub llm_comment: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct BehaviorTimeline {
     pub steps: Vec<BehaviorTimelineEntry>,
     pub total_duration_ms: u64,
@@ -186,4 +211,65 @@ pub struct ResponsibilityTraceback {
     pub root_cause_node_id: NodeId,
     pub explanation_summary: String,
     pub confidence: f32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Guard the wire name of `deberta_score`.
+    ///
+    /// Migrated from the never-compiled `types/alert_types_serde_test.rs`,
+    /// which held the only assertion on this key. The frontend reads it
+    /// (`frontend/lib/trace-workbench.ts`), so a rename or a dropped field
+    /// would silently degrade that surface, and nothing else covers it.
+    #[test]
+    fn deberta_score_keeps_its_wire_name() {
+        let es = EngineSection {
+            rule_verdicts: vec![],
+            pattern_verdicts: vec![],
+            classification_score: 0.5,
+            classification_route: "direct_safe".into(),
+            score_breakdown: Default::default(),
+            cusum_triggered: false,
+            cusum_dimensions: vec![],
+            progressive_fused: 0.0,
+            observer_trigger_reason: String::new(),
+            deberta_score: 0.85,
+        };
+        let json = serde_json::to_string(&es).expect("EngineSection must serialize");
+        assert!(json.contains("deberta_score"), "wire name changed: {json}");
+        assert!(json.contains("0.85"), "value missing: {json}");
+    }
+
+    /// Persisted/HTTP wire contract: these enums are written with
+    /// `format!("{:?}")` and read by the frontend as PascalCase strings; the
+    /// canonical types must not gain a `rename_all`.
+    #[test]
+    fn alert_authority_and_display_profile_stay_pascal_case() {
+        assert_eq!(
+            serde_json::to_string(&AlertAuthority::Authoritative).unwrap(),
+            "\"Authoritative\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DisplayProfile::UnsafeByEngine).unwrap(),
+            "\"UnsafeByEngine\""
+        );
+    }
+
+    /// `engine_section_json` has always carried `llm_comment: null` when the
+    /// observer did not comment; `skip_serializing_if` would silently change
+    /// the persisted shape.
+    #[test]
+    fn rule_verdict_keeps_null_llm_comment() {
+        let verdict = RuleVerdict {
+            rule_id: "r".into(),
+            description: "d".into(),
+            matched_resource: "m".into(),
+            llm_agreed: None,
+            llm_comment: None,
+        };
+        let json = serde_json::to_string(&verdict).unwrap();
+        assert!(json.contains("\"llm_comment\":null"), "{json}");
+    }
 }

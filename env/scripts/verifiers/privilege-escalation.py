@@ -50,7 +50,7 @@ def verify(run_dir: Path, scenario_dir: Path, events: EventSource) -> dict:
 
     # Check DB for alerts
     import sqlite3
-    db_path = run_dir / "collector.alerts.db"
+    db_path = run_dir / "collector" / "collector.alerts.db"
     if db_path.exists():
         conn = sqlite3.connect(str(db_path))
         cursor = conn.execute("SELECT count(*) FROM responsibility_alerts WHERE decision = 'unsafe'")

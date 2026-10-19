@@ -2,7 +2,6 @@ import type {
   ResponsibilityAlert,
   GraphData,
   GraphSnapshot,
-  GraphDiff,
   CorrelationEvidence,
   Intent,
   Action,
@@ -96,9 +95,6 @@ export const api = {
     }>(`/api/runs/${id}/evidence`),
 
   getSnapshots: (id: string) => fetchJson<GraphSnapshot[]>(`/api/runs/${id}/snapshots`),
-
-  getDiff: (id: string, against: string) =>
-    fetchJson<GraphDiff>(`/api/runs/${id}/diff?against=${against}`),
 
   getEvents: (id: string, beforeTs?: number): Promise<RunEvent[]> => {
     const params = beforeTs ? `?before_ts=${beforeTs}` : '';

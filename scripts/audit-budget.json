@@ -1,0 +1,5 @@
+{
+  "_purpose": "Accepted dependency advisories. Every entry needs a `reason`. The list may only shrink: an entry that no longer matches a live advisory fails the gate so it is removed the same day. `cargo` entries are keyed by advisory id; `npm` entries are keyed by (package, advisory) and cover *production* dependencies only (`npm audit --omit=dev`) — a package-level npm entry would pre-accept every future advisory for that package, so it is rejected. Validated offline by scripts/verify.sh (scripts/audit_deps.py --check-budget) and enforced online by the CI `audit` stage.",
+  "cargo": [],
+  "npm": []
+}

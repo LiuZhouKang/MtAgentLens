@@ -48,6 +48,16 @@ struct {
     __type(value, __u64);
 } bufs SEC(".maps");
 
+/* tid -> SSL* connection object. Stashed on entry, read back on return.
+ * Needed because a single tid (Node's event loop) multiplexes several
+ * concurrent TLS connections, so tid alone cannot identify a connection. */
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, MAX_ENTRIES);
+    __type(key, __u32);
+    __type(value, __u64);
+} ssls SEC(".maps");
+
 struct {
     __uint(type, BPF_MAP_TYPE_ARRAY);
     __uint(max_entries, 1);
@@ -93,6 +103,7 @@ int BPF_UPROBE(probe_SSL_rw_enter, void *ssl, void *buf, int num) {
     /* store arg info for later lookup */
     bpf_map_update_elem(&bufs, &tid, &buf, BPF_ANY);
     bpf_map_update_elem(&start_ns, &tid, &ts, BPF_ANY);
+    bpf_map_update_elem(&ssls, &tid, &ssl, BPF_ANY);
     return 0;
 }
 
@@ -118,6 +129,10 @@ static int SSL_exit(struct pt_regs *ctx, int rw) {
         return 0;
     u64 delta_ns = ts - *tsp;
 
+    /* Connection identity: stable across a TLS session, distinct across
+     * concurrent sessions that share this tid (Node multiplexes sockets). */
+    u64 *sslp = bpf_map_lookup_elem(&ssls, &tid);
+
     int len = PT_REGS_RC(ctx);
     if (len <= 0)  // no data
         return 0;
@@ -140,6 +155,7 @@ static int SSL_exit(struct pt_regs *ctx, int rw) {
     data->buf_size = 0;
     data->rw = rw;
     data->is_handshake = false;
+    data->ssl_ptr = sslp ? *sslp : 0;
 
     bpf_get_current_comm(&data->comm, sizeof(data->comm));
 
@@ -148,6 +164,7 @@ static int SSL_exit(struct pt_regs *ctx, int rw) {
 
     bpf_map_delete_elem(&bufs, &tid);
     bpf_map_delete_elem(&start_ns, &tid);
+    bpf_map_delete_elem(&ssls, &tid);
 
     if (!ret) {
         data->buf_filled = 1;
@@ -188,6 +205,7 @@ int BPF_UPROBE(probe_SSL_write_ex_enter, void *ssl, void *buf, size_t num, size_
     bpf_map_update_elem(&start_ns, &tid, &ts, BPF_ANY); 
     
     bpf_map_update_elem(&readbytes_ptrs, &tid, &readbytes, BPF_ANY);
+    bpf_map_update_elem(&ssls, &tid, &ssl, BPF_ANY);
 
     return 0;
 }
@@ -208,6 +226,7 @@ int BPF_UPROBE(probe_SSL_read_ex_enter, void *ssl, void *buf, size_t num, size_t
     bpf_map_update_elem(&start_ns, &tid, &ts, BPF_ANY); 
 
     bpf_map_update_elem(&readbytes_ptrs, &tid, &readbytes, BPF_ANY);
+    bpf_map_update_elem(&ssls, &tid, &ssl, BPF_ANY);
 
     return 0;
 }
@@ -234,6 +253,9 @@ static int ex_SSL_exit(struct pt_regs *ctx, int rw, int len) {
         return 0;
     u64 delta_ns = ts - *tsp;
 
+    /* Connection identity for the _ex variants (same tid multiplexing). */
+    u64 *sslp = bpf_map_lookup_elem(&ssls, &tid);
+
     if (len <= 0)  // no data
         return 0;
 
@@ -259,6 +281,7 @@ static int ex_SSL_exit(struct pt_regs *ctx, int rw, int len) {
     data->buf_size = 0;
     data->rw = rw;
     data->is_handshake = false;
+    data->ssl_ptr = sslp ? *sslp : 0;
 
     bpf_get_current_comm(&data->comm, sizeof(data->comm));
 
@@ -267,6 +290,7 @@ static int ex_SSL_exit(struct pt_regs *ctx, int rw, int len) {
 
     bpf_map_delete_elem(&bufs, &tid);
     bpf_map_delete_elem(&start_ns, &tid);
+    bpf_map_delete_elem(&ssls, &tid);
 
     if (!ret) {
         data->buf_filled = 1;
@@ -332,6 +356,7 @@ int BPF_UPROBE(probe_SSL_do_handshake_enter, void *ssl) {
 
     /* store arg info for later lookup */
     bpf_map_update_elem(&start_ns, &tid, &ts, BPF_ANY);
+    bpf_map_update_elem(&ssls, &tid, &ssl, BPF_ANY);
     return 0;
 }
 
@@ -344,17 +369,20 @@ int BPF_URETPROBE(probe_SSL_do_handshake_exit) {
     u64 ts = bpf_ktime_get_ns();
     int ret = 0;
 
-    /* use kernel terminology here for tgid/pid: */
-    u32 tgid = pid_tgid >> 32;
-
-    /* store arg info for later lookup */
-    if (!trace_allowed(tgid, pid)) {
+    /* trace_allowed(uid, pid) — pass the UID read above, not the tgid.
+     * Passing tgid made the UID filter compare targ_uid against a process id,
+     * so every handshake was dropped with no warning and no dropped-event
+     * counter increment whenever a uid filter was configured. */
+    if (!trace_allowed(uid, pid)) {
         return 0;
     }
 
     u64 *tsp = bpf_map_lookup_elem(&start_ns, &tid);
     if (tsp == 0)
         return 0;
+
+    /* Connection identity (handshake events share the same ssls stash). */
+    u64 *sslp = bpf_map_lookup_elem(&ssls, &tid);
 
     ret = PT_REGS_RC(ctx);
     if (ret <= 0)  // handshake failed
@@ -377,8 +405,10 @@ int BPF_URETPROBE(probe_SSL_do_handshake_exit) {
     data->buf_size = 0;
     data->rw = 2;
     data->is_handshake = true;
+    data->ssl_ptr = sslp ? *sslp : 0;
     bpf_get_current_comm(&data->comm, sizeof(data->comm));
     bpf_map_delete_elem(&start_ns, &tid);
+    bpf_map_delete_elem(&ssls, &tid);
 
     /* submit to ring buffer */
     bpf_ringbuf_submit(data, 0);

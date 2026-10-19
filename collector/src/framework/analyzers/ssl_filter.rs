@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 eunomia-bpf org.
 
 use super::{Analyzer, AnalyzerError, common};
@@ -129,8 +129,9 @@ impl FilterExpression {
     fn parse_condition(expr: &str) -> FilterNode {
         let expr = expr.trim();
 
-        // Handle parentheses
-        if expr.starts_with('(') && expr.ends_with(')') {
+        // Handle parentheses. A single `(` satisfies both checks and would
+        // slice `1..0`, so require a pair.
+        if expr.len() >= 2 && expr.starts_with('(') && expr.ends_with(')') {
             return Self::parse_expression(&expr[1..expr.len() - 1]);
         }
 
@@ -430,6 +431,14 @@ impl Drop for SSLFilter {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// A lone `(` satisfies starts_with and ends_with and used to slice 1..0.
+    #[test]
+    fn single_parenthesis_filter_does_not_panic() {
+        let _ = FilterExpression::parse("(");
+        let _ = FilterExpression::parse(")");
+        let _ = FilterExpression::parse("()");
+    }
 
     #[test]
     fn test_ssl_filter_expression_parsing() {

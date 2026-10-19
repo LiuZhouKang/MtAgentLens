@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Handoff Observability — in-memory data store for delegation tree, events,
 // metrics, and dependency edges.
 //

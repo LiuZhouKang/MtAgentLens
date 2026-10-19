@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Route handler: GET /api/runs/{id}/diff?against={other_run_id} — compute an
 // operation-level diff between two runs.
 

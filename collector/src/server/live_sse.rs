@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // 统一实时 SSE 事件帧：GET /api/live/events 的载荷单元。
 //
 // 直播（record/trace）中，后端把 ResponsibilityAlert（含图快照）与原始框架
@@ -8,8 +8,8 @@
 use crate::framework::core::Event;
 use crate::responsibility::types::alert_types::ResponsibilityAlert;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::broadcast;
 use tokio_stream::Stream;
 use tokio_stream::wrappers::BroadcastStream;
@@ -107,7 +107,10 @@ pub fn live_event_stream(
     // BoxBody 要求 Send + Sync（http-body 1.0 的 BoxBody = dyn Body + Send + Sync）。
     let alerts: Pin<Box<dyn Stream<Item = LiveSseEvent> + Send + Sync>> = match alert_rx {
         Some(rx) => Box::pin(BroadcastStream::new(rx).map(move |res| {
-            let id = Some(format!("{}", alert_shared.fetch_add(1, Ordering::SeqCst) + 1));
+            let id = Some(format!(
+                "{}",
+                alert_shared.fetch_add(1, Ordering::SeqCst) + 1
+            ));
             match res {
                 Ok(alert) => LiveSseEvent::alert(&alert, id),
                 Err(tokio_stream::wrappers::errors::BroadcastStreamRecvError::Lagged(n)) => {
@@ -118,9 +121,9 @@ pub fn live_event_stream(
         None => Box::pin(futures::stream::empty()),
     };
 
-    let heartbeat = tokio_stream::wrappers::IntervalStream::new(
-        tokio::time::interval(std::time::Duration::from_secs(30)),
-    )
+    let heartbeat = tokio_stream::wrappers::IntervalStream::new(tokio::time::interval(
+        std::time::Duration::from_secs(30),
+    ))
     .map(|_| LiveSseEvent::heartbeat());
 
     futures::stream::select(heartbeat, futures::stream::select(raw, alerts))
@@ -254,8 +257,14 @@ mod tests {
         let stream = live_event_stream(event_rx, Some(alert_rx));
         let events: Vec<LiveSseEvent> = stream.take(2).collect().await;
         let types: Vec<String> = events.iter().map(|e| e.event_type.clone()).collect();
-        assert!(types.contains(&"alert".to_string()), "缺少 alert：{types:?}");
-        assert!(types.contains(&"event".to_string()), "缺少 event：{types:?}");
+        assert!(
+            types.contains(&"alert".to_string()),
+            "缺少 alert：{types:?}"
+        );
+        assert!(
+            types.contains(&"event".to_string()),
+            "缺少 event：{types:?}"
+        );
         // 共享 AtomicU64 保证 id 全局单调、互不重复
         let ids: Vec<String> = events.iter().filter_map(|e| e.id.clone()).collect();
         assert_eq!(ids.len(), 2, "两路事件都应带 id：{events:?}");

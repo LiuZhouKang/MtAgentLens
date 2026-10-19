@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 eunomia-bpf org.
 
 use super::common::{AnalyzerProcessor, BinaryExecutor};
@@ -156,6 +156,20 @@ impl Runner for StdioRunner {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_stats_event_as_stdio_event() {
+        let json = serde_json::json!({
+            "direction": "STATS",
+            "timestamp_ns": 1u64,
+            "comm": "stdiocap",
+            "pid": 0u32,
+            "dropped_events": 0u64,
+        });
+        let event = StdioRunner::parse_stdio_event(json).expect("STATS must parse");
+        assert_eq!(event.source, "stdio");
+        assert_eq!(event.data["direction"], "STATS");
+    }
 
     #[test]
     fn test_stdio_runner_creation() {

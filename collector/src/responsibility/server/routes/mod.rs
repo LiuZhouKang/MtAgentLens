@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Route sub-modules for the server API.
 //
 // Each module handles a single URL subtree:

@@ -1,6 +1,7 @@
 node_modules/
 .next/
-out/
+out/*
+!out/.gitkeep
 storybook-static/
 test-results/
 playwright-report/

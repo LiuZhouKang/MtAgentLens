@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // Integration tests for the 2FA feature HTTP API handlers.
 // Tests are organized into five groups:

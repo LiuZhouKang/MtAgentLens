@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 eunomia-bpf org.
 
 use super::common::{AnalyzerProcessor, BinaryExecutor};
-use super::{EventStream, Runner, RunnerError, SslConfig};
+use super::{EventStream, Runner, RunnerError};
 use crate::framework::analyzers::Analyzer;
 use crate::framework::core::Event;
 use async_trait::async_trait;
@@ -12,7 +12,6 @@ use std::path::Path;
 
 /// Runner for collecting SSL/TLS events
 pub struct SslRunner {
-    config: SslConfig,
     analyzers: Vec<Box<dyn Analyzer>>,
     executor: BinaryExecutor,
     additional_args: Vec<String>,
@@ -23,7 +22,6 @@ impl SslRunner {
     pub fn from_binary_extractor(binary_path: impl AsRef<Path>) -> Self {
         let path_str = binary_path.as_ref().to_string_lossy().to_string();
         Self {
-            config: SslConfig::default(),
             analyzers: Vec::new(),
             executor: BinaryExecutor::new(path_str).with_runner_name("SSL".to_string()),
             additional_args: Vec::new(),
@@ -42,13 +40,6 @@ impl SslRunner {
             .executor
             .with_args(&self.additional_args)
             .with_runner_name("SSL".to_string());
-        self
-    }
-
-    /// Set the TLS version filter
-    #[allow(dead_code)]
-    pub fn tls_version(mut self, version: String) -> Self {
-        self.config.tls_version = Some(version);
         self
     }
 
@@ -141,14 +132,6 @@ mod tests {
     fn test_ssl_runner_creation() {
         let runner = SslRunner::from_binary_extractor("/fake/path/tls_capture");
         assert_eq!(runner.name(), "ssl");
-        assert_eq!(runner.id(), "ssl");
-    }
-
-    #[test]
-    fn test_ssl_runner_with_custom_config() {
-        let runner = SslRunner::from_binary_extractor("/fake/path/tls_capture")
-            .tls_version("1.2".to_string());
-
         assert_eq!(runner.id(), "ssl");
     }
 

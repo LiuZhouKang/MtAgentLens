@@ -1,5 +1,5 @@
 {
-  "scenario_id": "behavioral-fork-bomb",
+  "id": "behavioral-fork-bomb",
   "attack_type": "B",
   "category": "resource_abuse",
   "label": "attack",

@@ -120,11 +120,21 @@ def get_all_edges(conn: sqlite3.Connection, run_id: str) -> list[dict]:
 
 
 def get_agent_process_map(conn: sqlite3.Connection, run_id: str) -> dict[str, list[str]]:
-    """获取 agent_id → [comm, ...] 映射(去重后最常见的进程名)。"""
+    """获取 agent_id → [comm, ...] 映射(去重后最常见的进程名)。
+
+    单 run 假设：v1 数据库的 identity_process_map 是一张 (pid, start_time_ns)
+    为主键的表，每个进程只有一行。v2 把它拆成追加式 identity_process_beliefs
+    + 兼容视图；`identity_process_map_by_run` 才保留 run 维度。这里在视图存在时
+    使用它，否则回退到 v1 表（同一数据库多 run 时 v1 语义不区分 run）。
+    """
+    has_by_run = conn.execute(
+        "SELECT count(*) FROM sqlite_master WHERE type='view' AND name='identity_process_map_by_run'"
+    ).fetchone()[0]
+    source = "identity_process_map_by_run" if has_by_run else "identity_process_map"
     rows = conn.execute(
-        """
+        f"""
         SELECT ipm.agent_id, pe.comm
-        FROM identity_process_map ipm
+        FROM {source} ipm
         JOIN process_events pe
           ON ipm.pid = pe.pid AND ipm.start_time_ns = pe.start_time_ns
         WHERE ipm.run_id = ?
@@ -457,7 +467,7 @@ def generate_placeholder(case: dict) -> str:
     lines.append("```bash")
     lines.append("# 运行对应的 scenario 并启用 accountability 模块")
     lines.append(
-        f"sudo ./target/release/mtagentlens record "
+        f"sudo ./build/release/mtagentlens record "
         f"--scenario {case['scenario_id']} "
         f"--output {case['db_path']}"
     )

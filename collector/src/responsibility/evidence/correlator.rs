@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //
 // correlator.rs — EvidenceCorrelator (Phase 1 streaming + Phase 2 batch).
 //
@@ -29,6 +29,8 @@ use crate::responsibility::evidence::confidence::compute_confidence;
 use crate::responsibility::evidence::non_link_diagnostic;
 use crate::responsibility::evidence::quality::passes_quality_gate;
 use crate::responsibility::signals::SignalSnapshot;
+#[cfg(test)]
+use crate::responsibility::signals::signal_snapshot::ProcessExecInfo;
 use crate::responsibility::types::{
     Action, CandidateDerivationMode, CorrelationEvidence, EvidenceId, EvidenceRefinement,
     EvidenceRefinementType, Intent, IntentId, MatchLevel, NonLinkDiagnostic, PhaseIndicator,
@@ -708,10 +710,28 @@ mod tests {
         // Add init process
         let init = pid(1, 0);
         for (child, parent) in parent_child_pairs {
-            g.observe_exec(*child, *parent, "test", None, child.start_time_ns);
+            g.observe_exec(
+                *child,
+                *parent,
+                ProcessExecInfo {
+                    comm: "test".into(),
+                    ..Default::default()
+                },
+                None,
+                child.start_time_ns,
+            );
         }
         // Also ensure root is connected
-        g.observe_exec(init, pid(0, 0), "init", None, 0);
+        g.observe_exec(
+            init,
+            pid(0, 0),
+            ProcessExecInfo {
+                comm: "init".into(),
+                ..Default::default()
+            },
+            None,
+            0,
+        );
         let snap = g.snapshot();
         (g, snap)
     }
@@ -720,7 +740,16 @@ mod tests {
     fn test_correlate_same_process_exact_match() {
         let p = pid(100, 1);
         let mut snap_g = SignalGraph::new();
-        snap_g.observe_exec(p, pid(1, 0), "claude", None, 1);
+        snap_g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         let snap = snap_g.snapshot();
 
         let mut corr = EvidenceCorrelator::new();
@@ -754,7 +783,16 @@ mod tests {
     fn test_correlate_action_first_then_intent() {
         let p = pid(100, 1);
         let mut snap_g = SignalGraph::new();
-        snap_g.observe_exec(p, pid(1, 0), "claude", None, 1);
+        snap_g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         let snap = snap_g.snapshot();
 
         let mut corr = EvidenceCorrelator::new();
@@ -782,7 +820,16 @@ mod tests {
     fn test_no_correlation_different_files() {
         let p = pid(100, 1);
         let mut snap_g = SignalGraph::new();
-        snap_g.observe_exec(p, pid(1, 0), "claude", None, 1);
+        snap_g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         let snap = snap_g.snapshot();
 
         let mut corr = EvidenceCorrelator::new();
@@ -812,9 +859,36 @@ mod tests {
         let child_b = pid(300, 3);
 
         let mut snap_g = SignalGraph::new();
-        snap_g.observe_exec(parent, pid(1, 0), "claude", None, 1);
-        snap_g.observe_exec(child_a, parent, "cat", None, 2);
-        snap_g.observe_exec(child_b, parent, "cat", None, 3);
+        snap_g.observe_exec(
+            parent,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        snap_g.observe_exec(
+            child_a,
+            parent,
+            ProcessExecInfo {
+                comm: "cat".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
+        snap_g.observe_exec(
+            child_b,
+            parent,
+            ProcessExecInfo {
+                comm: "cat".into(),
+                ..Default::default()
+            },
+            None,
+            3,
+        );
         let snap = snap_g.snapshot();
 
         // Verify tree structure: child_a and child_b are siblings
@@ -847,7 +921,16 @@ mod tests {
     fn test_dedup_prevents_double_link() {
         let p = pid(100, 1);
         let mut snap_g = SignalGraph::new();
-        snap_g.observe_exec(p, pid(1, 0), "claude", None, 1);
+        snap_g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         let snap = snap_g.snapshot();
 
         let mut corr = EvidenceCorrelator::new();
@@ -874,7 +957,16 @@ mod tests {
     fn test_drain_diagnostics() {
         let p = pid(100, 1);
         let mut snap_g = SignalGraph::new();
-        snap_g.observe_exec(p, pid(1, 0), "claude", None, 1);
+        snap_g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         let snap = snap_g.snapshot();
 
         let mut corr = EvidenceCorrelator::new();
@@ -904,7 +996,16 @@ mod tests {
     fn test_correlate_batch_no_time_window() {
         let p = pid(100, 1);
         let mut snap_g = SignalGraph::new();
-        snap_g.observe_exec(p, pid(1, 0), "claude", None, 1);
+        snap_g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         let snap = snap_g.snapshot();
 
         let corr = EvidenceCorrelator::new();
@@ -933,7 +1034,16 @@ mod tests {
     fn test_correlate_batch_lower_confidence_for_far_apart() {
         let p = pid(100, 1);
         let mut snap_g = SignalGraph::new();
-        snap_g.observe_exec(p, pid(1, 0), "claude", None, 1);
+        snap_g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         let snap = snap_g.snapshot();
 
         let corr = EvidenceCorrelator::new();
@@ -976,7 +1086,16 @@ mod tests {
     fn test_correlate_batch_produces_refinements() {
         let p = pid(100, 1);
         let mut snap_g = SignalGraph::new();
-        snap_g.observe_exec(p, pid(1, 0), "claude", None, 1);
+        snap_g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         let snap = snap_g.snapshot();
 
         let corr = EvidenceCorrelator::new();
@@ -1007,7 +1126,16 @@ mod tests {
     fn test_correlate_batch_non_matching_intents() {
         let p = pid(100, 1);
         let mut snap_g = SignalGraph::new();
-        snap_g.observe_exec(p, pid(1, 0), "claude", None, 1);
+        snap_g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         let snap = snap_g.snapshot();
 
         let corr = EvidenceCorrelator::new();
@@ -1034,7 +1162,16 @@ mod tests {
     fn test_compute_tree_distance_same_process() {
         let p = pid(100, 1);
         let mut g = SignalGraph::new();
-        g.observe_exec(p, pid(1, 0), "claude", None, 1);
+        g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
         let snap = g.snapshot();
 
         assert_eq!(compute_tree_distance(p, p, &snap), 0);
@@ -1045,8 +1182,26 @@ mod tests {
         let parent = pid(100, 1);
         let child = pid(200, 2);
         let mut g = SignalGraph::new();
-        g.observe_exec(parent, pid(1, 0), "claude", None, 1);
-        g.observe_exec(child, parent, "cat", None, 2);
+        g.observe_exec(
+            parent,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        g.observe_exec(
+            child,
+            parent,
+            ProcessExecInfo {
+                comm: "cat".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
         let snap = g.snapshot();
 
         let d = compute_tree_distance(parent, child, &snap);
@@ -1059,9 +1214,36 @@ mod tests {
         let c1 = pid(200, 2);
         let c2 = pid(300, 3);
         let mut g = SignalGraph::new();
-        g.observe_exec(p, pid(1, 0), "claude", None, 1);
-        g.observe_exec(c1, p, "bash", None, 2);
-        g.observe_exec(c2, c1, "cat", None, 3);
+        g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        g.observe_exec(
+            c1,
+            p,
+            ProcessExecInfo {
+                comm: "bash".into(),
+                ..Default::default()
+            },
+            None,
+            2,
+        );
+        g.observe_exec(
+            c2,
+            c1,
+            ProcessExecInfo {
+                comm: "cat".into(),
+                ..Default::default()
+            },
+            None,
+            3,
+        );
         let snap = g.snapshot();
 
         let d = compute_tree_distance(p, c2, &snap);

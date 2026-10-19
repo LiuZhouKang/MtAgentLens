@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // PersistenceWriter — async batch writer using bounded mpsc channel + independent tokio task.
 
 use crate::responsibility::types::alert_types::{
@@ -23,7 +23,7 @@ use crate::responsibility::types::refinement::{
 };
 use crate::responsibility::types::replay_types::RunRecord;
 
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{mpsc, oneshot};
@@ -137,11 +137,16 @@ pub enum PersistRecord {
     SubagentBoundary(SubagentBoundary),
 
     // --- Direct mapping ---
-    /// Direct process-to-agent identity mapping
+    /// One observed process-to-agent belief. Append-only: the writer inserts a
+    /// row only when it differs from the process's current belief, so the
+    /// table is a history, not a mutable map.
     IdentityMapping {
         agent_id: AgentId,
         pid: u32,
         start_time_ns: u64,
+        belief_level: IdentityBeliefLevel,
+        observed_at_ns: u64,
+        source: &'static str,
     },
 
     // --- Run metadata ---
@@ -184,12 +189,49 @@ impl Default for WriterConfig {
     }
 }
 
+/// How strongly a process-to-agent belief is held.
+///
+/// Ordered: `Unknown` < `Provisional` < `Inferred` < `Authoritative`. The
+/// compatibility views resolve a process to its strongest belief, so a late
+/// weak observation can never erase an authoritative resolution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IdentityBeliefLevel {
+    Unknown,
+    Provisional,
+    Inferred,
+    Authoritative,
+}
+
+impl IdentityBeliefLevel {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            IdentityBeliefLevel::Unknown => "Unknown",
+            IdentityBeliefLevel::Provisional => "Provisional",
+            IdentityBeliefLevel::Inferred => "Inferred",
+            IdentityBeliefLevel::Authoritative => "Authoritative",
+        }
+    }
+}
+
 /// Handle to the async persistence writer.
 /// Clone is cheap (just clones the channel sender).
 #[derive(Clone)]
 pub struct PersistenceWriter {
     tx: mpsc::Sender<PersistRecord>,
+    /// Records dropped because the channel was full or had no active run.
     lost_count: Arc<AtomicU64>,
+    /// Write-path failures (commit / transaction / row writes).
+    ///
+    /// Separate from `lost_count`: dropped records never reached SQLite,
+    /// whereas these failed *at* SQLite. Surfaced so callers can tell a
+    /// healthy run from one silently degrading.
+    write_failures: Arc<AtomicU64>,
+    /// Records rejected because the writer task is gone (`TrySendError::Closed`).
+    ///
+    /// This is not "channel full": nothing will ever drain the queue again, so
+    /// every subsequent write is lost too. Counted separately so a run whose
+    /// writer died cannot report "flushed cleanly".
+    closed_count: Arc<AtomicU64>,
 }
 
 impl PersistenceWriter {
@@ -199,37 +241,78 @@ impl PersistenceWriter {
         let (tx, rx) = mpsc::channel::<PersistRecord>(config.channel_capacity);
         let lost_count = Arc::new(AtomicU64::new(0));
         let lost_for_task = Arc::clone(&lost_count);
+        let write_failures = Arc::new(AtomicU64::new(0));
+        let failures_for_task = Arc::clone(&write_failures);
+        let closed_count = Arc::new(AtomicU64::new(0));
 
-        // Open the SQLite connection with WAL mode
-        let conn = Connection::open(&config.db_path)
+        // Open through the shared schema gate: classification, version gate,
+        // pragmas and migrations happen in that order, in one place.
+        let conn = super::schema::open_responsibility_db(&config.db_path)
             .map_err(|e| format!("failed to open SQLite DB: {e}"))?;
-        conn.execute_batch(
-            "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=ON;",
-        )
-        .map_err(|e| format!("failed to set pragmas: {e}"))?;
-        super::schema::run_migrations(&conn)
-            .map_err(|e| format!("failed to run migrations: {e}"))?;
 
         let batch_size = config.batch_size;
         let batch_interval_ms = config.batch_interval_ms;
 
         tokio::spawn(async move {
-            writer_task(conn, rx, batch_size, batch_interval_ms, lost_for_task).await;
+            writer_task(
+                conn,
+                rx,
+                batch_size,
+                batch_interval_ms,
+                lost_for_task,
+                failures_for_task,
+            )
+            .await;
         });
 
-        Ok(Self { tx, lost_count })
+        Ok(Self {
+            tx,
+            lost_count,
+            write_failures,
+            closed_count,
+        })
     }
 
     /// Send a persist record. Non-blocking — discards if the channel is full.
     /// Returns `true` if the record was queued, `false` if it was dropped.
     pub fn write(&self, record: PersistRecord) -> bool {
+        let kind = record_kind(&record);
         match self.tx.try_send(record) {
             Ok(()) => true,
             Err(mpsc::error::TrySendError::Full(_)) => {
-                self.lost_count.fetch_add(1, Ordering::Relaxed);
+                let n = self.lost_count.fetch_add(1, Ordering::Relaxed) + 1;
+                // Log the first few drops with their kind: an aggregate counter
+                // cannot tell a stuck writer from one flooded by a single
+                // quadratic producer. Capped so a saturated run stays readable.
+                if n <= 20 {
+                    eprintln!(
+                        "persistence: dropped {} record (channel full, total {n})",
+                        kind
+                    );
+                }
                 false
             }
-            Err(mpsc::error::TrySendError::Closed(_)) => false,
+            Err(mpsc::error::TrySendError::Closed(_)) => {
+                self.closed_count.fetch_add(1, Ordering::Relaxed);
+                false
+            }
+        }
+    }
+
+    /// Queue a record, waiting for channel capacity instead of dropping it.
+    ///
+    /// Use this for batch/finalize paths and for parent records whose children
+    /// reference them by foreign key. `try_send` dropping a node while its edge
+    /// is already queued turns one drop into a cascade of FOREIGN KEY failures.
+    /// The live per-event path deliberately stays non-blocking: stalling the
+    /// event loop there would drop kernel events instead of database rows.
+    pub async fn write_blocking(&self, record: PersistRecord) -> bool {
+        match self.tx.send(record).await {
+            Ok(()) => true,
+            Err(_) => {
+                self.closed_count.fetch_add(1, Ordering::Relaxed);
+                false
+            }
         }
     }
 
@@ -246,6 +329,23 @@ impl PersistenceWriter {
     pub fn lost_persist_count(&self) -> u64 {
         self.lost_count.load(Ordering::Relaxed)
     }
+
+    /// Records rejected because the writer task had already exited.
+    ///
+    /// Non-zero means the run lost data after the writer died; unlike a full
+    /// channel, it will not recover on its own.
+    pub fn channel_closed_count(&self) -> u64 {
+        self.closed_count.load(Ordering::Relaxed)
+    }
+
+    /// Number of write-path failures (commit / transaction / row writes).
+    ///
+    /// Non-zero means data reached SQLite but was rejected — a materially
+    /// different (and more serious) condition than `lost_persist_count`,
+    /// which counts records that never made it to the writer at all.
+    pub fn write_failure_count(&self) -> u64 {
+        self.write_failures.load(Ordering::Relaxed)
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -258,6 +358,7 @@ async fn writer_task(
     batch_size: usize,
     batch_interval_ms: u64,
     lost_count: Arc<AtomicU64>,
+    write_failures: Arc<AtomicU64>,
 ) {
     let mut pending: usize = 0;
     let interval = tokio::time::Duration::from_millis(batch_interval_ms);
@@ -274,18 +375,26 @@ async fn writer_task(
                 match rec {
                     Some(record) => record,
                     None => {
-                        // Channel closed — flush remaining and exit
-                        if pending > 0 {
-                            let _ = conn.execute_batch("COMMIT");
+                        // Channel closed — flush remaining and exit.
+                        //
+                        // Ask SQLite whether a transaction is open instead of
+                        // trusting `pending`: a failed row write leaves the
+                        // transaction open with `pending == 0`, and skipping
+                        // the COMMIT there would roll back rows that *did*
+                        // make it into the transaction.
+                        if !conn.is_autocommit()
+                            && let Err(e) = conn.execute_batch("COMMIT")
+                        {
+                            record_write_failure(&write_failures, "final commit", &e);
                         }
                         return;
                     }
                 }
             }
             _ = &mut batch_deadline => {
-                // Timer fired — commit if there are pending records
-                if pending > 0 {
-                    let _ = commit_batch(&conn, &mut pending, &mut current_run_id);
+                // Timer fired — commit whatever the open transaction holds.
+                if let Err(e) = commit_batch(&conn, &mut pending) {
+                    record_write_failure(&write_failures, "batch commit", &e);
                 }
                 continue;
             }
@@ -294,8 +403,14 @@ async fn writer_task(
         // Process the record
         match record {
             PersistRecord::Flush(tx) => {
-                if pending > 0 {
-                    let _ = commit_batch(&conn, &mut pending, &mut current_run_id);
+                // A flush must report failure honestly: replying Ok after a
+                // failed commit told the caller its data was durable when it
+                // was not. The oneshot send itself stays best-effort (the
+                // caller may have gone away), but the payload now tells truth.
+                if let Err(e) = commit_batch(&conn, &mut pending) {
+                    record_write_failure(&write_failures, "flush commit", &e);
+                    let _ = tx.send(Err(format!("flush failed: {e}")));
+                    continue;
                 }
                 let _ = tx.send(Ok(()));
                 continue;
@@ -306,14 +421,16 @@ async fn writer_task(
             } => {
                 current_run_id = Some(run_id.clone());
                 // Commit pending batch first (belongs to previous run, if any)
-                if pending > 0 {
-                    let _ = commit_batch(&conn, &mut pending, &mut current_run_id);
+                if let Err(e) = commit_batch(&conn, &mut pending) {
+                    record_write_failure(&write_failures, "batch commit", &e);
                 }
                 // Insert run row immediately so RunEnd can UPDATE it later
-                let _ = conn.execute(
+                if let Err(e) = conn.execute(
                     "INSERT OR IGNORE INTO runs (run_id, started_at_ns) VALUES (?1, ?2)",
                     params![run_id, timestamp_ns as i64],
-                );
+                ) {
+                    record_write_failure(&write_failures, "insert run", &e);
+                }
                 continue;
             }
             PersistRecord::RunEnd {
@@ -321,22 +438,24 @@ async fn writer_task(
                 timestamp_ns,
             } => {
                 // Run end is written immediately
-                if pending > 0 {
-                    let _ = commit_batch(&conn, &mut pending, &mut current_run_id);
+                if let Err(e) = commit_batch(&conn, &mut pending) {
+                    record_write_failure(&write_failures, "batch commit", &e);
                 }
-                let _ = conn.execute(
+                if let Err(e) = conn.execute(
                     "UPDATE runs SET ended_at_ns = ?1 WHERE run_id = ?2",
                     params![timestamp_ns as i64, run_id],
-                );
+                ) {
+                    record_write_failure(&write_failures, "update run end", &e);
+                }
                 continue;
             }
             PersistRecord::RunRecord(record) => {
                 // Commit pending batch first, then write run metadata immediately
-                if pending > 0 {
-                    let _ = commit_batch(&conn, &mut pending, &mut current_run_id);
+                if let Err(e) = commit_batch(&conn, &mut pending) {
+                    record_write_failure(&write_failures, "batch commit", &e);
                 }
                 current_run_id = Some(record.run_id.clone());
-                let _ = conn.execute(
+                if let Err(e) = conn.execute(
                     "INSERT OR REPLACE INTO runs (run_id, started_at_ns, ended_at_ns, scenario_id, mode, collector_version)
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                     params![
@@ -347,7 +466,9 @@ async fn writer_task(
                         record.mode,
                         record.collector_version,
                     ],
-                );
+                ) {
+                    record_write_failure(&write_failures, "insert run record", &e);
+                }
                 continue;
             }
             other => {
@@ -359,12 +480,24 @@ async fn writer_task(
                         continue;
                     }
                 };
-                // Begin a transaction before the first write in a batch
-                if pending == 0 {
-                    let _ = conn.execute_batch("BEGIN TRANSACTION");
+                // Open a transaction before the first write in a batch.
+                //
+                // Guard on SQLite's own transaction state, not on `pending`.
+                // `pending` is a *trigger* counter (it decides when a batch is
+                // full), and it deliberately does not increment when a row
+                // write fails — so after one failed write it reads 0 while the
+                // transaction is still open. Issuing BEGIN there is rejected
+                // with "cannot start a transaction within a transaction",
+                // which used to be swallowed and is now counted as a write
+                // failure, turning one real failure into a standing false
+                // alarm. `is_autocommit()` cannot drift out of sync.
+                if conn.is_autocommit()
+                    && let Err(e) = conn.execute_batch("BEGIN TRANSACTION")
+                {
+                    record_write_failure(&write_failures, "begin transaction", &e);
                 }
-                if let Err(_e) = write_record(&conn, &other, &run_id) {
-                    lost_count.fetch_add(1, Ordering::Relaxed);
+                if let Err(e) = write_record(&conn, &other, &run_id) {
+                    record_write_failure(&write_failures, record_kind(&other), &e);
                     continue;
                 }
             }
@@ -373,8 +506,10 @@ async fn writer_task(
         pending += 1;
 
         // Commit if batch is full
-        if pending >= batch_size {
-            let _ = commit_batch(&conn, &mut pending, &mut current_run_id);
+        if pending >= batch_size
+            && let Err(e) = commit_batch(&conn, &mut pending)
+        {
+            record_write_failure(&write_failures, "batch commit", &e);
         }
     }
 }
@@ -862,17 +997,19 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             agent_id,
             pid,
             start_time_ns,
+            belief_level,
+            observed_at_ns,
+            source,
         } => {
-            conn.execute(
-                "INSERT OR REPLACE INTO identity_process_map
-                 (agent_id, pid, start_time_ns, run_id)
-                 VALUES (?1, ?2, ?3, ?4)",
-                params![
-                    agent_id.as_str(),
-                    *pid as i64,
-                    *start_time_ns as i64,
-                    run_id,
-                ],
+            append_identity_belief(
+                conn,
+                agent_id,
+                *pid,
+                *start_time_ns,
+                run_id,
+                *belief_level,
+                *observed_at_ns,
+                source,
             )?;
         }
         // RunStart, RunEnd, RunRecord, Flush handled before this function
@@ -884,21 +1021,144 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
     Ok(())
 }
 
-/// Commit the current batch with an explicit transaction boundary.
+/// Append one identity belief unless it repeats the process's current belief.
 ///
-/// Per spec §13.1, Phase 1 writes are batched into single transactions
-/// (every 500 records or 200ms) for WAL efficiency. Each batch begins
-/// with an implicit transaction (first write after commit) and ends here.
-fn commit_batch(
+/// Returns `true` when a row was inserted. The table is a history: repeating
+/// the same provisional observation on every tick would grow it without adding
+/// information, and a weaker late observation must not rewrite history.
+pub(crate) fn append_identity_belief(
     conn: &Connection,
-    pending: &mut usize,
-    _current_run_id: &mut Option<String>,
-) -> rusqlite::Result<()> {
-    if *pending > 0 {
-        conn.execute_batch("COMMIT")?;
-        *pending = 0;
-        conn.execute_batch("BEGIN TRANSACTION")?;
+    agent_id: &AgentId,
+    pid: u32,
+    start_time_ns: u64,
+    run_id: &str,
+    belief_level: IdentityBeliefLevel,
+    observed_at_ns: u64,
+    source: &str,
+) -> rusqlite::Result<bool> {
+    let current: Option<(String, String)> = conn
+        .query_row(
+            "SELECT agent_id, belief_level FROM identity_process_beliefs
+             WHERE pid = ?1 AND start_time_ns = ?2 AND run_id = ?3
+             ORDER BY CASE belief_level
+                          WHEN 'Authoritative' THEN 3
+                          WHEN 'Inferred' THEN 2
+                          WHEN 'Provisional' THEN 1
+                          ELSE 0
+                      END DESC,
+                      observed_at_ns DESC,
+                      belief_id DESC
+             LIMIT 1",
+            params![pid as i64, start_time_ns as i64, run_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    let unchanged = current
+        .as_ref()
+        .is_some_and(|(current_agent, current_level)| {
+            current_agent == agent_id.as_str() && current_level == belief_level.as_str()
+        });
+    if unchanged {
+        return Ok(false);
     }
+    conn.execute(
+        "INSERT INTO identity_process_beliefs
+         (agent_id, pid, start_time_ns, run_id, belief_level, observed_at_ns, source)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            agent_id.as_str(),
+            pid as i64,
+            start_time_ns as i64,
+            run_id,
+            belief_level.as_str(),
+            observed_at_ns as i64,
+            source,
+        ],
+    )?;
+    Ok(true)
+}
+
+/// Record a write-path failure: bump the counter and log it.
+///
+/// Every failure here was previously discarded with `let _ =`, which is how a
+/// permanently-stalling COMMIT loop stayed invisible.
+/// Short record kind used in failure logs. A "FOREIGN KEY constraint failed"
+/// without the record type forced a log-only diagnosis; with it, the exact
+/// producer (evidence vs edge vs claim) is visible.
+fn record_kind(record: &PersistRecord) -> &'static str {
+    match record {
+        PersistRecord::Process(_) => "process",
+        PersistRecord::Tls(_) => "tls",
+        PersistRecord::MessageBinding { .. } => "message_binding",
+        PersistRecord::Intent(_) => "intent",
+        PersistRecord::Action(_) => "action",
+        PersistRecord::Evidence(_) => "evidence",
+        PersistRecord::NonLink(_) => "non_link",
+        PersistRecord::ProvisionalIdentity(_) => "provisional_identity",
+        PersistRecord::GraphNode(_) => "graph_node",
+        PersistRecord::GraphEdge(_) => "graph_edge",
+        PersistRecord::PolicyEvaluation(_) => "policy_evaluation",
+        PersistRecord::Delegation(_) => "delegation",
+        PersistRecord::ContextPollution(_) => "context_pollution",
+        PersistRecord::Alert(_) => "alert",
+        PersistRecord::Claim(_) => "claim",
+        PersistRecord::Traceback(_) => "traceback",
+        PersistRecord::AuthoritativeIdentity(_) => "authoritative_identity",
+        PersistRecord::IdentityRefinement(_) => "identity_refinement",
+        PersistRecord::EvidenceRefinement(_) => "evidence_refinement",
+        PersistRecord::GraphRefinement(_) => "graph_refinement",
+        PersistRecord::GraphSnapshot(_) => "graph_snapshot",
+        PersistRecord::ClassificationRefinement(_) => "classification_refinement",
+        PersistRecord::ClaimRefinement(_) => "claim_refinement",
+        PersistRecord::SubagentBoundary(_) => "subagent_boundary",
+        PersistRecord::IdentityMapping { .. } => "identity_mapping",
+        PersistRecord::RunStart { .. } => "run_start",
+        PersistRecord::RunEnd { .. } => "run_end",
+        PersistRecord::RunRecord(_) => "run_record",
+        PersistRecord::Flush(_) => "flush",
+    }
+}
+
+fn record_write_failure(counter: &AtomicU64, what: &str, err: &dyn std::fmt::Display) {
+    let n = counter.fetch_add(1, Ordering::Relaxed) + 1;
+    eprintln!("persistence: {what} failed (total {n}): {err}");
+}
+
+/// Commit the current batch, closing whatever transaction is open.
+///
+/// Phase 1 writes are batched into single transactions for WAL efficiency.
+/// The batch trigger is `pending >= batch_size` (or the interval timer), but
+/// the *transaction boundary* is owned by SQLite: this function just asks
+/// whether a transaction is open and closes it. Callers must not infer the
+/// transaction state from `pending` — after a failed row write the counter
+/// reads 0 while the transaction is still open.
+///
+/// This function never opens a transaction. Opening is done lazily by the
+/// record path on the next write (`is_autocommit()` guard), which keeps the
+/// two operations from racing each other — the previous version re-opened a
+/// transaction here *and* in the record path, so every batch after the first
+/// produced a spurious "cannot start a transaction within a transaction".
+fn commit_batch(conn: &Connection, pending: &mut usize) -> rusqlite::Result<()> {
+    // Reset BEFORE attempting the commit. A batch that has been attempted must
+    // never be retried: if `COMMIT` fails and `pending` stays non-zero, every
+    // subsequent batch re-issues COMMIT against a transaction that no longer
+    // exists, turning a transient failure into a permanent stall.
+    *pending = 0;
+
+    // Nothing open → nothing to commit. Not an error: the flush and
+    // run-boundary paths call this unconditionally.
+    if conn.is_autocommit() {
+        return Ok(());
+    }
+
+    if let Err(e) = conn.execute_batch("COMMIT") {
+        // A failed COMMIT can leave the transaction open. Roll it back so the
+        // connection returns to a known state; SQLite reports "no transaction
+        // is active" if there was nothing to roll back, which is harmless.
+        let _ = conn.execute_batch("ROLLBACK");
+        return Err(e);
+    }
+
     Ok(())
 }
 
@@ -988,6 +1248,63 @@ mod tests {
         assert_eq!(intent_count, 1);
 
         assert_eq!(writer.lost_persist_count(), 0);
+    }
+
+    /// Regression: every batch after the first used to be rejected with
+    /// "cannot start a transaction within a transaction".
+    ///
+    /// `commit_batch` re-opened a transaction after its `COMMIT`, while the
+    /// record path also opened one whenever `pending == 0` — so the second
+    /// batch's `BEGIN` was always refused. The error was discarded with
+    /// `let _ =` and stayed invisible; now that it is counted, a healthy run
+    /// must report exactly zero write-path failures.
+    #[tokio::test]
+    async fn test_writer_reports_no_failures_across_many_batches() {
+        let (_dir, path) = test_db_path();
+        let config = WriterConfig {
+            db_path: path.clone(),
+            // Force a commit every 2 records so the test crosses many batch
+            // boundaries — the defect only appears from the *second* batch on.
+            batch_size: 2,
+            ..Default::default()
+        };
+        let writer = PersistenceWriter::new(config).unwrap();
+
+        writer.write(PersistRecord::RunStart {
+            run_id: "r1".into(),
+            timestamp_ns: 0,
+        });
+
+        for i in 0..10u32 {
+            writer.write(PersistRecord::Process(ProcessMetadata {
+                pid: 200 + i,
+                start_time_ns: i as u64,
+                parent_pid: None,
+                parent_start_time_ns: None,
+                comm: "test".into(),
+                timestamp_ns: i as u64,
+            }));
+        }
+
+        writer.flush().await.unwrap();
+        writer.write(PersistRecord::RunEnd {
+            run_id: "r1".into(),
+            timestamp_ns: 100,
+        });
+        writer.flush().await.unwrap();
+
+        assert_eq!(
+            writer.write_failure_count(),
+            0,
+            "a healthy run must not report write-path failures"
+        );
+
+        // Assert the rows really landed: this is not only about the counter.
+        let conn = Connection::open(&path).unwrap();
+        let n: i64 = conn
+            .query_row("SELECT count(*) FROM process_events", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(n, 10);
     }
 
     #[tokio::test]
@@ -1171,5 +1488,211 @@ mod tests {
             )
             .unwrap();
         assert_eq!(count, 1);
+    }
+
+    /// Regression: a failed COMMIT must not leave `pending` non-zero, and the
+    /// connection must stay usable afterwards.
+    ///
+    /// Previously `commit_batch` did `COMMIT?; *pending = 0;` — the `?`
+    /// returned early, so `pending` kept its value. Every later batch then
+    /// retried COMMIT against a transaction that no longer existed, failing
+    /// forever, while the caller discarded the error via `let _ =`.
+    ///
+    /// The failure is produced for real: a deferred foreign-key violation makes
+    /// the INSERT succeed and `COMMIT` fail, which is exactly the transient
+    /// failure this path has to survive. (The earlier version of this test used
+    /// "COMMIT with no active transaction" to force an error — that is now a
+    /// deliberate no-op, so it can no longer stand in for a real failure.)
+    #[test]
+    fn commit_batch_resets_pending_when_commit_fails() {
+        let (_dir, path) = test_db_path();
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch(crate::responsibility::persistence::schema::SCHEMA_DDL)
+            .unwrap();
+        // `foreign_keys` must be set outside a transaction to take effect;
+        // `defer_foreign_keys` pushes the violation to COMMIT time.
+        conn.execute_batch("PRAGMA foreign_keys=ON; PRAGMA defer_foreign_keys=ON;")
+            .unwrap();
+        conn.execute_batch("BEGIN TRANSACTION").unwrap();
+        conn.execute_batch(
+            "INSERT INTO correlation_evidence
+               (evidence_id, intent_id, action_id, match_level, confidence, phase, timestamp_ns, run_id)
+             VALUES ('e1', 'missing-intent', 'missing-action', 'L1Exact', 0.5, 'Phase1', 1, 'r1')",
+        )
+        .expect("the FK violation is deferred, so this INSERT must succeed");
+
+        let mut pending = 5usize;
+        let res = commit_batch(&conn, &mut pending);
+
+        assert!(
+            res.is_err(),
+            "COMMIT must surface the deferred foreign-key violation"
+        );
+        assert_eq!(
+            pending, 0,
+            "pending must be reset even on failure, otherwise every later batch retries forever"
+        );
+        assert!(
+            conn.is_autocommit(),
+            "a failed COMMIT must be rolled back so the connection is usable again"
+        );
+    }
+
+    /// Committing with no transaction open is a no-op, not a failure.
+    ///
+    /// The record path opens transactions lazily, and the flush / run-boundary
+    /// paths call `commit_batch` unconditionally, so "nothing to commit" is a
+    /// normal state. Treating it as an error is what produced the 488
+    /// "cannot start a transaction within a transaction" false alarms observed
+    /// in a real run.
+    #[test]
+    fn commit_batch_with_nothing_open_is_ok() {
+        let (_dir, path) = test_db_path();
+        let conn = Connection::open(&path).unwrap();
+        let mut pending = 7usize;
+
+        assert!(commit_batch(&conn, &mut pending).is_ok());
+        assert_eq!(pending, 0);
+    }
+
+    // ── Identity beliefs (v2) ──────────────────────────────────────────────
+
+    fn belief_conn() -> (tempfile::TempDir, Connection) {
+        let (dir, path) = test_db_path();
+        let conn =
+            crate::responsibility::persistence::schema::open_responsibility_db(&path).unwrap();
+        (dir, conn)
+    }
+
+    fn belief_count(conn: &Connection) -> i64 {
+        conn.query_row("SELECT count(*) FROM identity_process_beliefs", [], |row| {
+            row.get(0)
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn append_identity_belief_is_idempotent_for_the_same_belief() {
+        let (_dir, conn) = belief_conn();
+        let agent = AgentId::from("agent-1");
+
+        for observed_at in [100, 200, 300] {
+            let inserted = append_identity_belief(
+                &conn,
+                &agent,
+                7,
+                70,
+                "run-1",
+                IdentityBeliefLevel::Provisional,
+                observed_at,
+                "provisional_identity",
+            )
+            .unwrap();
+            assert_eq!(inserted, observed_at == 100, "only the first is new");
+        }
+        assert_eq!(belief_count(&conn), 1);
+    }
+
+    #[test]
+    fn append_identity_belief_records_stronger_and_different_beliefs() {
+        let (_dir, conn) = belief_conn();
+        let provisional = AgentId::from("agent-provisional");
+        let authoritative = AgentId::from("agent-authoritative");
+
+        append_identity_belief(
+            &conn,
+            &provisional,
+            7,
+            70,
+            "run-1",
+            IdentityBeliefLevel::Provisional,
+            100,
+            "provisional_identity",
+        )
+        .unwrap();
+        append_identity_belief(
+            &conn,
+            &authoritative,
+            7,
+            70,
+            "run-1",
+            IdentityBeliefLevel::Authoritative,
+            200,
+            "authoritative_identity_resolution",
+        )
+        .unwrap();
+        // Repeating the authoritative observation is not a new belief.
+        assert!(
+            !append_identity_belief(
+                &conn,
+                &authoritative,
+                7,
+                70,
+                "run-1",
+                IdentityBeliefLevel::Authoritative,
+                300,
+                "authoritative_identity_resolution",
+            )
+            .unwrap()
+        );
+
+        assert_eq!(belief_count(&conn), 2);
+        let current: String = conn
+            .query_row(
+                "SELECT agent_id FROM identity_process_map WHERE pid = 7 AND start_time_ns = 70",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(current, "agent-authoritative");
+    }
+
+    /// `write_blocking` must count a closed channel too: otherwise finalize
+    /// would report a clean flush after every awaited write was rejected.
+    #[tokio::test]
+    async fn blocking_write_counts_closed_channel() {
+        let (tx, rx) = mpsc::channel::<PersistRecord>(1);
+        drop(rx);
+        let writer = PersistenceWriter {
+            tx,
+            lost_count: Arc::new(AtomicU64::new(0)),
+            write_failures: Arc::new(AtomicU64::new(0)),
+            closed_count: Arc::new(AtomicU64::new(0)),
+        };
+
+        assert!(
+            !writer
+                .write_blocking(PersistRecord::RunEnd {
+                    run_id: "r1".to_string(),
+                    timestamp_ns: 1,
+                })
+                .await
+        );
+        assert_eq!(writer.channel_closed_count(), 1);
+    }
+
+    /// A closed channel means the writer task is gone: nothing will drain the
+    /// queue, so every write is lost. It must be counted separately from a
+    /// full channel, otherwise finalize reports "flushed cleanly".
+    #[test]
+    fn closed_channel_writes_are_counted() {
+        let (tx, rx) = mpsc::channel::<PersistRecord>(1);
+        drop(rx);
+        let writer = PersistenceWriter {
+            tx,
+            lost_count: Arc::new(AtomicU64::new(0)),
+            write_failures: Arc::new(AtomicU64::new(0)),
+            closed_count: Arc::new(AtomicU64::new(0)),
+        };
+
+        let queued = writer.write(PersistRecord::RunEnd {
+            run_id: "r1".to_string(),
+            timestamp_ns: 1,
+        });
+
+        assert!(!queued);
+        assert_eq!(writer.channel_closed_count(), 1);
+        assert_eq!(writer.lost_persist_count(), 0);
+        assert_eq!(writer.write_failure_count(), 0);
     }
 }

@@ -1,6 +1,6 @@
 # 论文工作区
 
-> 当前实验数字以 [`docs/evaluation/CURRENT-EVIDENCE.md`](../evaluation/CURRENT-EVIDENCE.md) 与 [`claim-evidence-matrix.md`](claim-evidence-matrix.md) 为准；本目录只放论文写作、审稿回复和修改材料。
+> 实验状态与权威结果路径见 [`docs/evaluation/CURRENT-EVIDENCE.md`](../evaluation/CURRENT-EVIDENCE.md)；论文主张与证据对应关系见 [`claim-evidence-matrix.md`](claim-evidence-matrix.md)。本目录只放论文写作、审稿回复和修改材料。
 
 ## 1. 审稿与回复
 
@@ -24,7 +24,7 @@
 
 | 文件 | 用途 |
 |---|---|
-| [`claim-evidence-matrix.md`](claim-evidence-matrix.md) | 主张-证据矩阵（当前结论只看此文件） |
+| [`claim-evidence-matrix.md`](claim-evidence-matrix.md) | 主张-证据矩阵（记录可用主张及其证据） |
 | [`claim-evidence-matrix-archive.md`](claim-evidence-matrix-archive.md) | 历史矩阵（不得引用） |
 | [`claims.json`](claims.json) | 机器可校验数字层 |
 | [`数字审计-2026-10-25.md`](数字审计-2026-10-25.md) | 初稿数字审计 |
@@ -42,6 +42,6 @@
 - [`claim-evidence-matrix-archive.md`](claim-evidence-matrix-archive.md)
 - [`根因分析.md`](根因分析.md)、[`根因指标定义.md`](根因指标定义.md)
 - [`annotation-protocol.md`](annotation-protocol.md)
-- AI/CODEX 交接不放在本目录：见 [`docs/archive/ai-2026-10-30/`](../SOURCE-NOTES.md)
+- AI/CODEX 交接不放在本目录：见 [历史交接归档（需完整仓库）](../../../docs/archive/ai-2026-10-30/README.md)
 
 写作规则：新数字先进入 `CURRENT-EVIDENCE.md` 或 `claims.json`，再写进正文；历史数字不得直接复用。

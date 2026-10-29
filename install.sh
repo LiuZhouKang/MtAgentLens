@@ -22,7 +22,7 @@ AUTO_YES=0
 DRY_RUN=0
 SUDO=""
 RUST_MIN_VERSION="1.85"
-NODE_MIN_VERSION="18"
+NODE_MIN_VERSION="22.13.0"
 NODE_TARGET_VERSION="22"
 
 # ─── 参数解析 ───────────────────────────────────────────────────────────

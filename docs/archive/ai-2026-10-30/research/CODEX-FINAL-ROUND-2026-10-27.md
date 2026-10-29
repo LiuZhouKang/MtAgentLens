@@ -3,7 +3,7 @@
 > 2026-10-28 独立续作：§5.2 是唯一当前 readiness matrix；§5.1 保留为 10-27 历史状态。三个内部缺口（消融冻结上下文、可识别且隔离的身份/归因参考、受控 capture-loss 分母）已由 DSH 对抗审计与修复推进到“合同/合成门禁通过”，真实 93 数据仍不存在；身份/归因参考的 cohort 规模仍需协议决策。数据 G0 不在本轮改动范围，不重标标签。
 > 权威上下文：`docs/research/FINAL-CODEX-HANDOFF-2026-10-26.md`、`local/audit-2026-10-27/G0-VERIFICATION.md`、`local/audit-2026-10-26/` 审计、`docs/evaluation/EXPERIMENT-SUITE-7-REVISED-2026-10-26.md`。
 
-> **2026-10-28 意见5范围更新**：开销执行协议以[实验总方案 §6](../evaluation/EXPERIMENT-SUITE-7-REVISED-2026-10-26.md#6-overheadbench5)为准：36 正式条件，TLS 微基准 + 其他探针短诊断；旧四臂全并发矩阵不再执行。下文 readiness/测试日志保留其发生时证据，不代表 36 条件已支持或已有真实开销结果。本次仅更新文档，不启动实验、不改变 DSH 正在运行的 93 场景流程。
+> **2026-10-28 意见5范围更新**：开销执行协议以[实验总方案 §6](../../../evaluation/EXPERIMENT-SUITE-7-REVISED-2026-10-26.md#6-overheadbench5)为准：36 正式条件，TLS 微基准 + 其他探针短诊断；旧四臂全并发矩阵不再执行。下文 readiness/测试日志保留其发生时证据，不代表 36 条件已支持或已有真实开销结果。本次仅更新文档，不启动实验、不改变 DSH 正在运行的 93 场景流程。
 
 ## 0. 当前事实（先读）
 - 包 `datasets/FuxiBench` release `9c7099c1d36d21af025f5050d462b273cc04aef0c69d3ff72e902779372c6ea3`；93 输入=58 attack（A47/B11）+35 benign；**0 excluded**；93/93 `paper_ready`（机械）。

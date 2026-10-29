@@ -34,8 +34,8 @@ FuxiBench 是 MtAgentLens 的评估基准，用于覆盖多 Agent 安全观测�
 
 消融实验的结论以 `compare/results/paper/ablation_summary_v16.json` 为准：该文件中 L2 的 ΔAUROC 为 0.0（不显著），与早先“L2 是主要增益来源”的表述冲突；在补做一致的消融重跑之前，不应把 L2 写成主增益来源。
 
-详见 [`datasets/FuxiBench/SCENARIOS.md`](../../datasets/FuxiBench/SCENARIOS.md) 和
-[`compare/results/paper/EXPERIMENTS.md`](../../results/paper/EXPERIMENTS.md)。
+详见 [`datasets/FuxiBench/SCENARIOS.md`](../../../datasets/FuxiBench/SCENARIOS.md) 和
+[`compare/results/paper/EXPERIMENTS.md`](../../../local/final-v1/archive/compare-legacy-2026-10-30/paper/EXPERIMENTS.md)。
 
 ---
 

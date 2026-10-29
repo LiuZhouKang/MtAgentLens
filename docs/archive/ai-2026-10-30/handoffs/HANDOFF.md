@@ -2,16 +2,16 @@
 
 # 当前工程维护
 
-当前工程状态与接续材料集中在[维护目录](superpowers/README.md)：
+当前工程状态与接续材料集中在[维护目录](../../../superpowers/README.md)：
 
-- [上轮交接](superpowers/HANDOFF-2026-10-21-DEEPSEEK.md)：已有修复、验证记录和边界。
-- [当前收口审查与执行进度](superpowers/ENGINEERING-REVIEW-2026-10-22-CODEX.md)：独立确认的问题、工作包与仓库整理。
-- [研究验证与工具建设方案](evaluation/experimental-design.md)：当前修稿依赖、数据/标注契约及 2026-10-23 首批实施状态。
-- [缺口登记](superpowers/GAP-REGISTER.md)：历史登记项需要结合源码确认当前状态。
+- [上轮交接](../superpowers/HANDOFF-2026-10-21-DEEPSEEK.md)：已有修复、验证记录和边界。
+- [当前收口审查与执行进度](../superpowers/ENGINEERING-REVIEW-2026-10-22-CODEX.md)：独立确认的问题、工作包与仓库整理。
+- [研究验证与工具建设方案](../../../evaluation/experimental-design.md)：当前修稿依赖、数据/标注契约及 2026-10-23 首批实施状态。
+- [缺口登记](../../../superpowers/GAP-REGISTER.md)：历史登记项需要结合源码确认当前状态。
 
-架构见[系统架构](architecture.md)与[ADR](adr/README.md)。旧交接已归入[历史记录](superpowers/archive/reviews/)，不作为当前指令。
+架构见[系统架构](../../../architecture.md)与[ADR](../../../adr/README.md)。旧交接已归入[历史记录](../../../superpowers/archive/reviews/)，不作为当前指令。
 
-正常使用从[项目 README](../README.md)开始；开发流程见[贡献指南](../CONTRIBUTING.md)。
+正常使用从[项目 README](../../../../README.md)开始；开发流程见[贡献指南](../../../../CONTRIBUTING.md)。
 
 ## 2026-10-24 状态快照
 
@@ -19,7 +19,7 @@
   compare/annotator/scripts 740 passed + 16 subtests，env 324，frontend 573，
   Rust 1089 passed / 3 ignored。
   未提交、未推送；工作区仍包含先前会话的未提交改动。
-- **已完成的验证工作包**（细节与边界见[实验设计](evaluation/experimental-design.md)）：
+- **已完成的验证工作包**（细节与边界见[实验设计](../../../evaluation/experimental-design.md)）：
   runner 启动前后时钟见证 v4（§29）、标识符级标注脱敏（§33）、三人 workbench 与
   codebook 版本强制（§36/§37）、Fleiss/Cohen 一致性工具（§34）、事件级对齐不可用
   的 ADR-0016（§39）、失效 cgroup 边界开关移除（§38）、pilot 尝试耐久 journal（§43）、

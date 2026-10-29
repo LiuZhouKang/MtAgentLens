@@ -90,5 +90,22 @@ class CargoPreflightTests(unittest.TestCase):
         self.assertNotIn("cargo resolved from", out)
 
 
+
+class LegacyAnnotationEntryTests(unittest.TestCase):
+    def test_legacy_annotation_requires_an_explicit_database(self):
+        result = subprocess.run(
+            ["make", "annotate-legacy", "DBS="], cwd=ROOT,
+            capture_output=True, text=True, timeout=15)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("DBS=", result.stdout + result.stderr)
+        self.assertNotIn("server.py: error", result.stderr)
+
+    def test_legacy_annotation_quotes_database_paths(self):
+        result = subprocess.run(
+            ["make", "--dry-run", "annotate-legacy", "DBS=/tmp/legacy data"],
+            cwd=ROOT, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('--dbs "/tmp/legacy data"', result.stdout)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

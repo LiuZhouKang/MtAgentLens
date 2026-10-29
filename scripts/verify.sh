@@ -53,7 +53,7 @@ IGNORED_BUDGET=${IGNORED_BUDGET:-3}   # 3 tests need a real binary or a live Ope
                                       # The 22 causal-era tests are gone with the causal schema.
                                       # Every one carries a reason; the reason gate below keeps it that way.
 HOMEPATH_BUDGET=${HOMEPATH_BUDGET:-0}  # hardcoded /home/<user> in first-party sources
-ALLOW_BUDGET=${ALLOW_BUDGET:-49}      # #[allow(..)] sites + [lints] "allow" entries
+ALLOW_BUDGET=${ALLOW_BUDGET:-44}      # #[allow(..)] sites + [lints] "allow" entries
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Arguments ───────────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ else
   ok "embedded eBPF helpers are production builds (no ASAN)"
 fi
 
-note "1/17  rustfmt"
+note "1/18  rustfmt"
 if (cd collector && flock "$CARGO_LOCK" cargo fmt -- --check > /tmp/verify_rustfmt.log 2>&1); then
   ok "cargo fmt -- --check is clean"
 else
@@ -122,7 +122,7 @@ else
   bad "cargo fmt -- --check reported diffs (see /tmp/verify_rustfmt.log)"
 fi
 
-note "2/17  clippy (budget)"
+note "2/18  clippy (budget)"
 # Touch every source file first. Cargo does not replay warnings for fresh
 # crates, so a warm cache reports a *lower* count and can hide a new warning.
 # The count must describe the source in front of us, not the cache.
@@ -146,7 +146,7 @@ else
     "fix the new lint, or justify a per-item #[allow] with a reason and lower nothing else"
 fi
 
-note "3/17  tests"
+note "3/18  tests"
 TEST_OUT=$(cd collector && flock "$CARGO_LOCK" cargo test 2>&1)
 TEST_RC=$?
 printf '%s\n' "$TEST_OUT" > /tmp/verify_rust_tests.log
@@ -209,7 +209,7 @@ else
   bad "Rust↔TS wire contract drift (see /tmp/verify_ts_contract.log)"
 fi
 
-note "4/17  eBPF programs"
+note "4/18  eBPF programs"
 if (cd bpftools && make test >/tmp/verify_bpftools.log 2>&1); then
   ok "make -C bpftools test"
 else
@@ -217,7 +217,7 @@ else
   bad "make -C bpftools test failed"
 fi
 
-note "5/17  module reachability (orphan .rs files)"
+note "5/18  module reachability (orphan .rs files)"
 ORPHANS=$(python3 - <<'PY'
 import os, re
 root = 'collector/src'
@@ -253,7 +253,7 @@ else
   bad "unreachable .rs files (never compiled — this is how 5,092 lines hid for years)"
 fi
 
-note "6/17  build reproducibility"
+note "6/18  build reproducibility"
 # libbpf and bpftool are git submodules. A clone without them cannot build a
 # single eBPF program, and the failure ("libbpf/src: no such file") reads like
 # a source bug. Name the remedy instead.
@@ -286,7 +286,7 @@ else
   bad "tracked symlink(s) into an absolute path outside the repo"
 fi
 
-note "7/17  licensing"
+note "7/18  licensing"
 if [ -n "$(grep -E '^license\s*=' collector/Cargo.toml)" ]; then
   ok "Cargo.toml declares a license: $(grep -E '^license\s*=' collector/Cargo.toml)"
 else
@@ -313,26 +313,26 @@ else
   bad "files without an SPDX identifier"
 fi
 
-note "8/17  environment-bound paths (budget)"
+note "8/18  environment-bound paths (budget)"
 HOMEPATH_N=$(grep -rn '/home/lzk' --include='*.rs' --include='*.toml' --include='*.c' --include='*.h' \
   collector/src bpftools 2>/dev/null | grep -v '^bpftools/.output' | wc -l)
 budget "hardcoded /home/lzk occurrences" "$HOMEPATH_N" "$HOMEPATH_BUDGET" \
   "move the value into a profile ([curated] / workspace root) instead of the source"
 
-note "9/17  lint-suppression budget"
+note "9/18  lint-suppression budget"
 ALLOW_N=$(( $(grep -rn '#!\[allow(\|#\[allow(' --include='*.rs' collector/src | wc -l) \
            + $(grep -c '= "allow"' collector/Cargo.toml) ))
 budget "allow sites" "$ALLOW_N" "$ALLOW_BUDGET" \
   "silencing a lint is a last resort; add a reason comment and keep the total falling"
 
-note "10/17  wire corpus + baseline integrity"
+note "10/18  wire corpus + baseline integrity"
 if python3 scripts/wire/check_baselines.py; then
   ok "wire fixtures, FPR baseline and overhead baseline are internally consistent"
 else
   bad "baseline gate failed (run with no arguments for details)"
 fi
 
-note "11/17  wire decode oracle"
+note "11/18  wire decode oracle"
 WIRE_OUT="$(cd collector && flock "$CARGO_LOCK" cargo test --quiet --test wire_corpus --test wire_intent_crosscheck \
       --test wire_current_behavior_pins 2>&1)"
 if [ $? -eq 0 ]; then
@@ -342,7 +342,7 @@ else
   bad "wire decode oracle failed"
 fi
 
-note "12/17  offline decode budget"
+note "12/18  offline decode budget"
 BUDGET_OUT="$(cd collector && flock "$CARGO_LOCK" cargo test --quiet --test overhead_gate 2>&1)"
 if [ $? -eq 0 ]; then
   ok "decode throughput and peak RSS within budget"
@@ -351,7 +351,7 @@ else
   bad "offline decode budget exceeded"
 fi
 
-note "13/17  compact_db preserves identity contract"
+note "13/18  compact_db preserves identity contract"
 COMPACT_OUT=$( (cd env/scripts && python3 -m unittest test_compact_db 2>&1) )
 if [ $? -eq 0 ]; then
   ok "v1 table and v2 beliefs/views survive compaction; header is preserved"
@@ -360,7 +360,7 @@ else
   bad "compact_db drops the identity contract (run: cd env/scripts && python3 -m unittest test_compact_db -v)"
 fi
 
-note "14/17  audit budget (offline)"
+note "14/18  audit budget (offline)"
 # Network audits (cargo-audit / npm audit) run separately before release:
 # `python3 scripts/audit_deps.py all` needs the RustSec DB and npm registry.
 # verify.sh stays offline. What can be checked offline — that every accepted
@@ -390,7 +390,7 @@ else
   bad "audit gate contract tests failed or ran fewer than 28 (ran=${AUDIT_RAN:-0}, rc=$AUDIT_RC)"
 fi
 
-note "15/17  comparison and annotation contracts (offline)"
+note "15/18  comparison and annotation contracts (offline)"
 if [ -f compare/tests/test_evaluate_frozen.py ] && [ -f tools/annotator/tests/test_annotator.py ] \
     && "$PYTHON" -m pytest -q compare/tests tools/annotator/tests scripts/tests \
          > /tmp/verify_comparison.log 2>&1; then
@@ -401,7 +401,7 @@ else
   bad "comparison gate failed (see /tmp/verify_comparison.log; requires pytest)"
 fi
 
-note "16/17  benchmark execution and capture contracts (offline)"
+note "16/18  benchmark execution and capture contracts (offline)"
 if [ -f env/tests/test_executor_collector_health.py ] \
     && "$PYTHON" -m pytest -q env/tests > /tmp/verify_environment.log 2>&1; then
   tail -2 /tmp/verify_environment.log
@@ -411,7 +411,7 @@ else
   bad "environment contracts failed (see /tmp/verify_environment.log)"
 fi
 
-note "17/17  GT provenance and scenario integrity"
+note "17/18  GT provenance and scenario integrity"
 if "$PYTHON" scripts/evaluation/validate_gt.py --dataset datasets/FuxiBench \
        > /tmp/verify_gt.log 2>&1 \
     && "$PYTHON" scripts/evaluation/check_scenario_integrity.py --strict \

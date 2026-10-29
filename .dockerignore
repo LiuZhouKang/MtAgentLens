@@ -15,10 +15,19 @@ frontend/node_modules/
 env/
 
 # Experiment data (large, not needed for build)
-compare/Dataset/FuxiBench/traces/
-compare/models/
-compare/results/
-compare/.venv-*/
+compare/
+datasets/
+local/
+dist/
+compare-handoff-*.tar.gz
+*.zip
+*.tar.gz
+*.tgz
+
+# Local credentials (Git ignore rules do not filter Docker contexts)
+.env
+.env.*
+.envrc
 
 # Git
 .git/
@@ -36,6 +45,7 @@ compare/.venv-*/
 .planning/
 .kiro/
 .gstack/
+.superpowers/
 .playwright-mcp/
 CLAUDE.md
 AGENTS.md

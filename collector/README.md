@@ -8,7 +8,7 @@ MtAgentLens 的 Rust 核心引擎。编译为单个静态二进制 `mtagentlens`
 枚举并非原子快照；不支持、传输失败或过期事件跳过都会显式报告，不能视为无损采集。
 EXEC 的 PGID 与原始 cgroup ID 直接来自内核；
 未核验的 cgroup unit 名称保持未知。不会按裸内核 PID 读取 procfs 或把 proc ticks 换算成内核身份。
-当前进展与验收边界见 [实验设计](../docs/evaluation/experimental-design.md)。
+当前实验状态与证据边界见 [当前证据入口](../docs/evaluation/CURRENT-EVIDENCE.md)，测量方法见 [实验设计](../docs/evaluation/experimental-design.md)。
 
 ## 流水线
 
@@ -56,7 +56,7 @@ EXEC 的 PGID 与原始 cgroup ID 直接来自内核；
 |  +------------------------------------------+                 |
 |                                                               |
 |  +----------+  +----------+  +----------------------------+   |
-|  |FileLogger|  |  Output  |  | 26 other Analyzers         |   |
+|  |FileLogger|  |  Output  |  | Additional Analyzers         |   |
 |  |(rotation)|  |(console) |  | HandoffInjection .         |   |
 |  +----------+  +----------+  | MultiAgentAnomaly .        |   |
 |                              | AuthHeaderRemover .        |   |
@@ -76,7 +76,8 @@ EXEC 的 PGID 与原始 cgroup ID 直接来自内核；
 |                                                               |
 | HTTP Server (Hyper 1.0)  .  :7395                            |
 | Embedded frontend (rust-embed) . Next.js 16 static export     |
-| Legacy event stream       .  /api/events                     |
+| Live SSE                  .  /api/live/events                |
+| Legacy log response       .  /api/events                     |
 | REST API                  .  /api/runs/{id}/alerts          |
 |                           .  /api/runs/{id}/evidence        |
 |                           .  /api/runs/{id}/events          |
@@ -88,116 +89,47 @@ EXEC 的 PGID 与原始 cgroup ID 直接来自内核；
 
 ```
 src/
-├── main.rs                     clap derive CLI，8 个子命令路由
-│
+├── main.rs                     clap derive CLI，9 个子命令路由
 ├── framework/                  流式数据采集管线
-│   ├── runners/                7 个 Runner
-│   │   ├── ssl.rs              TLS 明文捕获 (uprobe)
-│   │   ├── process.rs          进程生命周期 (tracepoint/kprobe)
-│   │   ├── stdio.rs            MCP stdio 捕获
-│   │   ├── system.rs           CPU/内存 (/proc 轮询)
-│   │   ├── agent.rs            组合 Runner + 全局 analyzer 管理
-│   │   └── fake.rs             合成事件流 (测试/性能基准)
-│   │
-│   ├── analyzers/              30+ 个 Analyzer (管道-过滤器模式)
-│   │   ├── sse_processor.rs    SSE 分片重组 (Content-Type: text/event-stream)
-│   │   ├── http_parser.rs      HTTP 请求行/头/体解析
-│   │   ├── http_filter.rs      基于正则的 HTTP 事件过滤
-│   │   ├── ssl_filter.rs       基于正则的 SSL 事件过滤
-│   │   ├── timestamp_normalizer.rs  btime → epoch ms 转换
-│   │   ├── auth_header_remover.rs   Authorization 头剥离
-│   │   ├── handoff_injection.rs     交接文档注入检测
-│   │   ├── multi_agent_anomaly.rs   多 Agent 异常检测
-│   │   ├── file_access_audit.rs     文件访问审计 (工作区边界)
-│   │   ├── connection_buffer.rs     连接缓冲管理
-│   │   ├── security_signoff.rs      安全签核追踪
-│   │   ├── file_logger.rs           文件日志 (轮转)
-│   │   ├── output.rs                控制台输出
-│   │   └── ...
-│   │
-│   ├── core/                   Event 类型 · 时间戳工具
+│   ├── runners/                SSL、Process、Stdio、System、Agent、OpenClaw 与 Fake
+│   │   ├── outofband.rs        OpenClaw 旁路轨迹读取
+│   │   └── fake.rs             合成事件流（测试/性能基准）
+│   ├── analyzers/              SSE、HTTP、时间戳、脱敏、检测与日志处理
+│   ├── normalize/              事件规范化
+│   ├── core/                   Event 类型与时间戳工具
 │   └── binary_extractor.rs     include_bytes! 内嵌 BPF 二进制
-│
-├── responsibility/             因果分析引擎 (17 个子模块)
-│   ├── graph/                  ResponsibilityGraph
-│   │   ├── graph.rs            核心图结构 (节点·边)
-│   │   ├── graph_builder.rs    事件→图构建器
-│   │   ├── taint.rs            TaintTracker 跨进程污点传播
-│   │   ├── pattern_matcher.rs  攻击模式匹配（模板要求见 capabilities 的 unbacked_graph_types）
-│   │   ├── snapshot.rs         图快照
-│   │   └── delta.rs            增量差异
-│   │
-│   ├── identity/               身份解析
-│   │   ├── union_find.rs       UnionFind 数据结构
-│   │   └── resolver.rs         三信号融合解析器
-│   │
-│   ├── classification/         分类引擎
-│   │   ├── engine.rs           ClassificationEngine
-│   │   ├── scoring.rs          6 维组合评分
-│   │   ├── rule_engine.rs      规则引擎 (25 条：5 safe + 20 unsafe)
-│   │   ├── rules.rs            规则定义
-│   │   ├── pattern_matcher.rs  GraphPatternMatcher
-│   │   └── types.rs            分类类型
-│   │
-│   ├── claims/                 声明构建
-│   │   ├── claim_builder.rs    ClaimBuilder
-│   │   ├── traceback.rs        TracebackBuilder
-│   │   ├── alert_builder.rs    AlertBuilder
-│   │   └── accountability_evidence.rs 证据契约
-│   │
-│   ├── outofband/              Agent 自落盘轨迹（只读）
-│   │   └── openclaw.rs         OpenClaw tool.call → asserted intent
-│   │
-│   ├── observer/               Observer LLM
-│   │   ├── cache.rs            CachePrior (L1 精确/L2 语义)
-│   │   ├── llm.rs              LLM 调用客户端
-│   │   ├── provider.rs         Observer 提供者接口
-│   │   ├── system_prompt.rs    系统提示词
-│   │   └── types.rs            Observer 类型定义
-│   │
-│   ├── persistence/            持久化
-│   │   ├── writer.rs           PersistenceWriter（SQLite 批次 + 丢弃/失败计数）
-│   │   ├── schema.rs           单一 schema 与版本门
-│   │   └── reader.rs           只读查询（损坏 JSON 报错，不返回空结构）
-│   │
-│   ├── replay/                 回放与跨 run 差异
-│   │   ├── executor.rs          权威回放执行器
-│   │   └── run_diff.rs          跨 run 操作差异
-│   │
-│   ├── judgment/               策略评估
-│   │   ├── policy.rs           策略定义与评估
-│   │   ├── delegation.rs       委派追踪
-│   │
-│   ├── runtime/                事件循环编排
-│   │   ├── runtime.rs          ResponsibilityRuntime (阶段 1+2)
-│   │   ├── routing.rs          事件路由
-│   │   └── buffer.rs           事件缓冲
-│   │
-│   ├── server/                 HTTP API (Hyper 1.0)
-│   │   └── routes/             graph · alerts · evidence · diff · runs · SSE
-│   │
-│   ├── signals/                实时信号
-│   │   ├── signal_graph.rs     SignalGraph
-│   │   └── signal_snapshot.rs  信号快照
-│   │
-│   └── types/                  共享类型 (40+ 结构体)
-│
-├── server/                     HTTP 服务器
-│   ├── web.rs                  路由处理
-│   ├── assets.rs               rust-embed 前端内嵌
-│   └── api_types.rs            请求/响应类型
-│
-└── auth/                       TOTP 2FA 认证
+├── responsibility/             因果分析引擎
+│   ├── graph/                  图构建、污点传播、模式匹配与快照
+│   ├── identity/               身份解析与并查集
+│   ├── classification/         规则、评分与最终裁决（final_decision.rs）
+│   ├── scoring/                风险因子与分数融合
+│   ├── claims/                 声明、回溯与告警构建
+│   ├── evidence/               证据关联、质量与留存
+│   ├── provenance/             来源标签、权限包络与 span
+│   ├── outofband/              OpenClaw asserted intent
+│   ├── observer/               Observer LLM、缓存与提供者
+│   ├── persistence/            SQLite schema、写入与只读查询
+│   ├── replay/                 回放、消融、敏感性与跨 run 差异
+│   ├── judgment/               策略评估与委派追踪
+│   ├── runtime/                事件循环与批量终结
+│   ├── signals/                实时信号图与快照
+│   └── types/                  共享类型
+└── server/                     HTTP API 与静态资源
+    ├── web.rs                  路由处理与实时 SSE
+    ├── assets.rs               rust-embed 前端内嵌
+    └── api_types.rs            请求/响应类型
 ```
 
 ## 开发
+
+以下命令从仓库根目录开始；构建前需已有 eBPF 与前端产物（根目录 `make build` 会按顺序生成）。
 
 ```bash
 cd collector
 
 cargo build              # 调试构建
 cargo build --release    # 发布构建 → build/release/mtagentlens
-cargo test               # 1223 lib tests / 3 ignored（当前）
+cargo test               # 测试数量以本次输出为准
 cargo fmt -- --check     # 格式检查 (edition 2024)
 cargo clippy             # Lint
 ```

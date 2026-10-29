@@ -20,9 +20,8 @@
 <a href="#架构"><img src="https://img.shields.io/badge/eBPF-0a0b10?logo=linux&logoColor=white" alt="eBPF"></a>
 <a href="#架构"><img src="https://img.shields.io/badge/Rust-CE422B?logo=rust&logoColor=white" alt="Rust"></a>
 <a href="#架构"><img src="https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white" alt="Next.js"></a>
-<a href="#性能"><img src="https://img.shields.io/badge/runtime_latency-measurement_pending-60a5fa" alt="Runtime latency is reported as P50/P95/P99"></a>
-<a href="#性能"><img src="https://img.shields.io/badge/overhead-remeasurement_pending-amber" alt="Full and lite profiles are measured separately"></a>
-<a href="#FuxiBench"><img src="https://img.shields.io/badge/FuxiBench-93_scenarios_pending_review-f97316" alt="FuxiBench: 93 scenarios; human review and new experiments pending"></a>
+
+[冻结实验结果](docs/evaluation/CURRENT-EVIDENCE.md) · [开销测量范围与结果](compare/results/overhead/README.md) · [FuxiBench 数据卡](datasets/FuxiBench/DATASET-CARD.md)
 
 ---
 
@@ -97,7 +96,7 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |  | SSL_read      |   | exec / exit |   | read / write   |       |
   |  | SSL_write     |   | fork / clone|   | stdin / stdout |       |
   |  | uprobe (L3)   |   | open / unlink|  | MCP plaintext  |       |
-  |  | decrypt plain |   | bind / connect|  | uprobe capture|       |
+  |  | decrypt plain |   | bind / connect|  | syscall trace |       |
   |  +---------------+   +-------------+   +----------------+       |
   |                                                                 |
   |  process also emits file mutations (unlinkat / truncate)         |
@@ -119,7 +118,7 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |  +-----------------------------+-----------------------------+  |
   |                                | EventStream                    |
   |  +-----------------------------+-----------------------------+  |
-  |  | Analyzer Pipeline (17 analyzers, add_analyzer() chain)    |  |
+  |  | Analyzer Pipeline (add_analyzer() chain)    |  |
   |  |                                                           |  |
   |  |  +-----------+  +-----------+  +------------------------+ |  |
   |  |  | SSE reass |  | HTTP parse|  | TimestampNormalizer    | |  |
@@ -317,7 +316,7 @@ children as tracked (and their descendants inherit tracking).
   `openclaw-agent.sqlite` fixture 断言 `tool.call → OutOfBandAsserted intent`。
 
 > [!NOTE]
-> **当前验证状态**：MtAgentLens 已在 **Claude Code**（Bun 运行时，静态链接 BoringSSL）上完成全面测试。对于动态链接系统 `libssl.so` 的 Agent（大多数 Python/Node.js AI 工具），eBPF uprobe 机制在架构上同样适用，但尚未进行系统性验证。其他 LLM Agent 可通过 `-c <进程名>` 参数启用实验性支持。
+> **当前验证状态**：MtAgentLens 当前主要验证对象是 **Claude Code**（Bun 运行时，静态链接 BoringSSL）；具体版本与实验范围见[当前证据入口](docs/evaluation/CURRENT-EVIDENCE.md)。对于动态链接系统 `libssl.so` 的 Agent（大多数 Python/Node.js AI 工具），eBPF uprobe 机制在架构上同样适用，但尚未进行系统性验证。其他 LLM Agent 可通过 `-c <进程名>` 参数启用实验性支持。
 
 ### Docker（无需本地安装依赖）
 
@@ -345,6 +344,9 @@ docker run --rm -it --privileged --pid=host \
 | `process` | `process` tracepoint/kprobe | 进程 exec/exit、文件 open/unlink、网络 bind/connect |
 | `stdio` | `stdiocap` uprobe | 指定 PID 的 stdin/stdout/stderr 内容，用于本地 MCP |
 | `system` | `/proc` 轮询 | CPU 使用率和 RSS 内存采样 |
+| `export-genai` | 责任数据库 | 导出 GenAI 格式事件 |
+| `replay-sensitivity` | 已记录的责任数据库 | 离线参数敏感性回放 |
+| `doctor` | 本机环境 | 检查权限、依赖与采集前置条件 |
 
 ```bash
 # 灵活组合监控
@@ -366,12 +368,12 @@ sudo mtagentlens stdio --pid 12345
 MtAgentLens/
 │
 ├── collector/                     Rust 引擎 — 编译为单二进制 mtagentlens
-│   ├── src/main.rs                CLI 入口 (clap derive)，8 个子命令
+│   ├── src/main.rs                CLI 入口 (clap derive)，9 个子命令
 │   ├── src/framework/             流式数据采集管线
 │   │   ├── runners/               6 个生产 Runner（Ssl, Process, Stdio, System, Agent, OpenClaw）+ Fake 测试替身
-│   │   ├── analyzers/             16 个框架 Analyzer + ResponsibilityRuntime：SSE, HTTP, HandoffInjection, ...
+│   │   ├── analyzers/             框架 Analyzer + ResponsibilityRuntime：SSE, HTTP, HandoffInjection, ...
 │   │   └── binary_extractor.rs    include_bytes! 内嵌 BPF 二进制
-│   ├── src/responsibility/        因果分析引擎 (17 个子模块)
+│   ├── src/responsibility/        因果分析引擎
 │   │   ├── graph/                 ResponsibilityGraph：节点·边·污点·模式匹配
 │   │   ├── provenance/            OS 级内容来源标签 · 权限包络 · span 匹配
 │   │   ├── identity/              IdentityResolver：并查集（进程树 + TLS 会话）
@@ -389,7 +391,7 @@ MtAgentLens/
 ├── bpftools/                      eBPF 程序 (C, libbpf + bpftool)
 │   ├── tls_capture/               SSL_read/write uprobe → 解密明文
 │   ├── process/                   tracepoint + kprobe → 进程生命周期
-│   ├── stdiocap/                  read/write uprobe → MCP stdio 捕获
+│   ├── stdiocap/                  read/write tracepoint → MCP stdio 捕获
 │   └── process_ext/               仅供测试的 header (mem_info · map_flush)
 │
 ├── frontend/                      Next.js 16 · React 19 · TypeScript 5 · Tailwind 4
@@ -398,13 +400,13 @@ MtAgentLens/
 │
 ├── env/                           基准测试环境
 │   ├── src/mtagentlens_benchmark/ Python 包 (CLI, Engine, Evaluator, Verifier)
-│   ├── scenarios/                 按类别组织的场景定义 (36 类) + fixtures
-│   ├── scripts/verifiers/         73 个场景验证器
+│   ├── scenarios/                 按类别组织的场景定义 + fixtures
+│   ├── scripts/verifiers/         场景验证器
 │   └── runs/                      运行工件 (gitignored)
 │
 ├── compare/                       实验与论文产出
-│   ├── Dataset/FuxiBench/         93 场景基准（67 攻击 + 26 良性）+ 完整场景目录
-│   ├── results/paper/             主评估 · 消融 · 性能 · InjecAgent · LaTeX 表格
+│   ├── Dataset/FuxiBench/         93 场景基准（58 攻击 + 35 良性）+ 完整场景目录
+│   ├── results/                   检测 · 身份 · 归因 · 消融 · 敏感性 · 开销
 │   ├── results/external/          外部基线对比
 │   └── scripts/                   build · audit · run · vis · perf
 │
@@ -433,9 +435,9 @@ MtAgentLens/
 
 ## FuxiBench
 
-当前待验证数据范围为 **93 个场景（67 攻击、26 良性）**；攻击通道为 A 3 / B 55 / C 9。场景、fixture、prompt 与 GT 通过不可变 release 绑定；历史 86 场景的 prompt 和实验输出不能与当前 GT 混合评估。
+当前数据范围为 **93 个场景（58 攻击、35 良性）**；当前两类型分类为 A 47 / B 11。场景、fixture、prompt 与 GT 通过不可变 release 绑定；历史 86 场景的 prompt 和实验输出不能与当前 GT 混合评估。
 
-保留三个 reviewer agent 的原始记录；名称只作历史 agent 标签，现存来源不足以证明独立隔离。74 项 AI 规则裁决已完成，人工复核仍未执行，待审请求不会因 AI 裁决归零。当前已核验 93 项 prompt/fixture 输入，并准备了 15 个可开始人工标注的混合运行任务；93 项设计级因果草案仍禁止当作运行根因真值。数据契约、验证命令和剩余阻断见 [数据卡](datasets/FuxiBench/DATASET-CARD.md)，来源细节见 [GT 来源说明](datasets/FuxiBench/PROVENANCE.md)。
+场景标签来自 AI 盲标与裁决，尚无人工标注、人工 κ 或人工金标。设计级标签不能当作运行根因真值；归因实验 T6 的 suite 状态仍为 `not_estimable`。数据契约、标注来源和限制见 [数据卡](datasets/FuxiBench/DATASET-CARD.md)与 [GT 来源说明](datasets/FuxiBench/PROVENANCE.md)，冻结实验范围见 [当前证据入口](docs/evaluation/CURRENT-EVIDENCE.md)。
 
 ```bash
 python3 scripts/evaluation/validate_gt.py --dataset datasets/FuxiBench
@@ -447,9 +449,9 @@ python3 scripts/evaluation/build_dataset_release.py --out /tmp/mtagentlens-datas
 
 ## 性能
 
-当前代码需要重新采集端到端延迟、CPU、RSS、丢事件率及负载分布。测试中的合成吞吐预算只用于发现回归，不能替代产品性能实验。本轮无害内核验证仅覆盖当前 Linux 7.0 环境，发现的实际丢事件已保留，见 [采集验证](docs/superpowers/archive/reviews/CAPTURE-VERIFICATION-2026-10-21-CODEX.md)。
+[开销报告](compare/results/overhead/README.md)分别给出 2026-10-28 冻结完整系统批次与 2026-10-29 Collector 稳态补测。固定本地负载下，三次 Collector 稳态单核 CPU 均值为 0.661%；该结果包含 Rust Collector 和两个采集子进程，不代表完整系统或任意真实 Agent 流量。完整系统批次另按并发档位报告 CPU、内存与证据关联情况，具体负载、测量窗口和组件分账见报告。
 
-[旧评估及性能数字](docs/evaluation/HISTORICAL-README-2026-10-21.md) 已作废，仅供追溯。当前修复进度与验证边界见 [工程交接](docs/superpowers/README.md)。
+冻结结果不等于当前新构建已重新测量；测试中的合成吞吐预算仅用于回归检查。[当前实验状态](docs/evaluation/CURRENT-EVIDENCE.md)与[工程维护](docs/superpowers/README.md)分别记录实验依据和开发材料；[旧评估](docs/evaluation/HISTORICAL-README-2026-10-21.md)仅供追溯。
 
 ---
 
@@ -457,7 +459,7 @@ python3 scripts/evaluation/build_dataset_release.py --out /tmp/mtagentlens-datas
 
 ### 时间戳
 
-eBPF 使用 `bpf_ktime_get_ns()`（启动时间纳秒），`Event` 存储原始值。`TimestampNormalizer` analyzer 通过 `/proc/stat` btime 计算 UTC epoch 毫秒，管线中所有后续 analyzer 使用统一时间基准。
+eBPF 使用 `bpf_ktime_get_ns()`（启动时间纳秒），`Event` 存储原始值。`TimestampNormalizer` analyzer 通过 `/proc/stat` btime 计算 UTC epoch 纳秒，管线中后续 analyzer 使用 epoch 纳秒；展示 JSON 的 `timestamp` 字段另转为毫秒。
 
 ### 二进制内嵌
 
@@ -498,7 +500,7 @@ make build              # 全量构建 (BPF → 前端 → Rust)
 make dev                # 开发构建 (debug, 增量编译)
 make check              # 环境预检
 make test               # 快速测试 (BPF+Rust+前端构建)
-./scripts/verify.sh     # 唯一完整门禁（17 道检查）
+./scripts/verify.sh     # 唯一完整门禁（18 道检查）
 make lint               # 代码质量检查
 make fmt                # 格式化所有代码
 make help               # 显示所有可用目标
@@ -531,7 +533,7 @@ docker run --rm -it -v $(pwd):/workspace -w /workspace \
 |------|------|
 | Linux 内核 | 5.8+（ringbuf 要求；需 BTF，兼容性仍须逐内核验证） |
 | Rust | 1.85+ (edition 2024) |
-| Node.js | 20.9+（Next.js 16 要求，建议使用受支持的 LTS） |
+| Node.js | 22.13.0+（项目工具链最低要求） |
 | 构建工具 | clang, llvm, libelf-dev, zlib1g-dev, make, pkg-config |
 | 运行时权限 | root 或 `CAP_BPF` + `CAP_SYS_ADMIN` |
 

@@ -25,7 +25,7 @@ CHECK  := $(GREEN)✓$(NC)
 COLLECTOR_DIR := collector
 BPFTOOLS_DIR  := bpftools
 FRONTEND_DIR  := frontend
-DBS           ?= compare/results/p12-recollect/dbs
+DBS           ?=
 BINARY        := $(COLLECTOR_DIR)/build/release/mtagentlens
 BINARY_DEBUG  := $(COLLECTOR_DIR)/build/debug/mtagentlens
 
@@ -77,7 +77,7 @@ build-bpf: ## 构建 eBPF 程序
 .PHONY: build-frontend
 build-frontend: ## 构建前端
 	@printf "  $(CYAN)[2/3]$(NC) 构建前端 (Next.js)...\n"
-	@cd $(FRONTEND_DIR) && npm install && npm run build
+	@cd $(FRONTEND_DIR) && npm ci && npm run build
 	@printf "  $(CHECK) 前端构建完成\n"
 
 .PHONY: build-rust
@@ -95,7 +95,7 @@ dev: check ## 开发模式构建 (debug)
 	@printf "\n  $(BOLD)开发模式构建...$(NC)\n\n"
 	@$(MAKE) build-bpf
 	@printf "  $(CYAN)[2/3]$(NC) 构建前端 (debug)...\n"
-	@cd $(FRONTEND_DIR) && npm install && npm run build
+	@cd $(FRONTEND_DIR) && npm ci && npm run build
 	@printf "  $(CYAN)[3/3]$(NC) 构建 Rust collector (debug)...\n"
 	@cd $(COLLECTOR_DIR) && cargo build
 	@printf "\n  $(CHECK) 开发构建完成 → $(BINARY_DEBUG)\n\n"
@@ -126,7 +126,8 @@ repro: ## 一键构建 artifact（子模块→eBPF→前端→Rust→门禁→ma
 
 .PHONY: annotate-legacy
 annotate-legacy: ## 启动历史标注工作台（旧 DB 只读核查；新试标用 python3 -m tools.annotator serve）
-	@python3 tools/annotator/server.py --dbs $(DBS)
+	@test -n "$(DBS)" || { printf 'Usage: make annotate-legacy DBS=/path/to/database-or-directory\n' >&2; exit 2; }
+	@python3 tools/annotator/server.py --dbs "$(DBS)"
 
 .PHONY: test
 test: test-bpf test-rust test-frontend-build ## 快速测试（完整门禁见 scripts/verify.sh）
@@ -143,7 +144,7 @@ test-rust: ## 运行 Rust 单元/集成测试
 	@cd $(COLLECTOR_DIR) && cargo test
 
 .PHONY: test-rust-all
-test-rust-all: ## 运行 Rust 全部测试（含 ignored）
+test-rust-all: ## 运行 Rust 仅 ignored 测试（需运行环境）
 	@cd $(COLLECTOR_DIR) && cargo test -- --ignored
 
 .PHONY: test-frontend
@@ -174,7 +175,7 @@ lint-frontend: ## 前端 ESLint + tsc
 .PHONY: fmt
 fmt: ## 格式化所有代码
 	@cd $(COLLECTOR_DIR) && cargo fmt
-	@cd $(FRONTEND_DIR) && npx prettier --write 'src/**/*.{ts,tsx,css}' 2>/dev/null || true
+	@cd $(FRONTEND_DIR) && npm run format
 	@printf "  $(CHECK) 代码格式化完成\n"
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -218,7 +219,7 @@ clean: ## 清理所有构建产物
 # ═══════════════════════════════════════════════════════════════════════════
 
 env-%: ## 运行基准测试（透传参数到 env/Makefile）
-	$(MAKE) -C env env-$* SCENARIO="$(SCENARIO)" ARGS="$(ARGS)" AUTO_ATTACH="$(AUTO_ATTACH)" RUN_DIR="$(RUN_DIR)"
+	$(MAKE) -C env env-$* SCENARIO="$(SCENARIO)" ARGS="$(ARGS)" RUN_DIR="$(RUN_DIR)"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 帮助
@@ -246,7 +247,7 @@ help: ## 显示此帮助信息
 	@printf "    make test              快速测试（完整门禁: scripts/verify.sh）\n"
 	@printf "    make test-bpf          eBPF 测试\n"
 	@printf "    make test-rust         Rust 测试\n"
-	@printf "    make test-rust-all     Rust 测试（含 ignored）\n"
+	@printf "    make test-rust-all     Rust 仅 ignored 测试（需运行环境）\n"
 	@printf "    make test-frontend     前端 vitest\n"
 	@printf "    make annotate-legacy   历史标注工作台（只读核查旧记录）\n"
 	@printf "    make repro             一键构建 artifact + manifest\n"

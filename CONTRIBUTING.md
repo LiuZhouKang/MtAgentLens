@@ -15,7 +15,7 @@ MtAgentLens 是一个在内核层观测 agent 行为的工具。它最贵的缺�
 
 ```bash
 # 依赖：Rust 1.85+、clang/llvm、libelf-dev、zlib1g-dev、libssl-dev、
-#       libzstd-dev、Node.js/npm、Python 3.10+（含 venv）
+#       libzstd-dev、Node.js ≥22.13.0 / npm、Python 3.10+（含 venv）
 git clone --recurse-submodules <repo>   # 或之后 git submodule update --init --recursive
 python3 -m venv env/.venv
 env/.venv/bin/python -m pip install -e './env[dev]' -r compare/requirements-test.txt
@@ -31,8 +31,10 @@ Rust 产物在 `collector/build/`（`.cargo/config.toml` 设了 `target-dir`）�
 ## 唯一门禁
 
 ```bash
-./scripts/verify.sh     # 17 条门 + 4 条只许降的预算
+./scripts/verify.sh     # 完整离线门禁；检查项与预算以脚本为准
 ```
+
+完整门禁也核对冻结 FuxiBench 发布清单与历史 trace DB。Git 不保存大体积数据库；仅克隆源码时，先取得匹配 `release_id` 的完整数据集交付包，保留原清单与校验值，不用重新生成清单代替缺失原件。
 
 任何 PR/提交都必须让它全绿。网络可用的环境还应跑依赖审计
 （发布前在构建主机执行同一条命令）：

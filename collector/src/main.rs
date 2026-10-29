@@ -16,9 +16,7 @@ use tokio::sync::broadcast;
 // twice and produced two mutually incompatible type universes — `crate::X` and
 // `mtagentlens::X` were different types, and every global `static` existed in
 // two copies. It was also the reason `dead_code` had to be allowed crate-wide.
-#[allow(unused_imports)]
 use mtagentlens::framework::analyzers::file_access_audit::FileAccessAuditAnalyzer;
-#[allow(unused_imports)]
 use mtagentlens::framework::analyzers::file_access_audit_contract::FileAccessAuditConfig;
 
 use mtagentlens::framework::{

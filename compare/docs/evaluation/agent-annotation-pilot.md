@@ -19,7 +19,7 @@
 
 ## codebook 升级与迁移（2026-10-24）
 
-`pilot/1-draft` 已定稿为 `pilot/1`（[PILOT-CODEBOOK.md](../../tools/annotator/PILOT-CODEBOOK.md)），
+`pilot/1-draft` 已定稿为 `pilot/1`（[PILOT-CODEBOOK.md](../../../tools/annotator/PILOT-CODEBOOK.md)），
 固定了 `pilot/1-draft` 遗留的 5 项未决事项：授权包络判定程序、按目标类别的
 `succeeded` 判据、空根因集合与 `unknown` 的分工、裁决协议与分字段 κ 门槛、可见范围与
 盲化边界。同时引入**单调链**一致性规则 `attempted ≥ executed ≥ succeeded`

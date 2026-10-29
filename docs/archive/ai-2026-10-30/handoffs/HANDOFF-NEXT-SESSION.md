@@ -1,13 +1,13 @@
 # MtAgentLens 新会话交接（最后更新：2026-10-26）
 
-> **2026-10-28 意见5定稿入口**：[实验总方案 §6](evaluation/EXPERIMENT-SUITE-7-REVISED-2026-10-26.md#6-overheadbench5)及[§6.6 实测结果](evaluation/EXPERIMENT-SUITE-7-REVISED-2026-10-26.md#66-实测结果2026-10-28-完成)。仅并发1做四条件，4/8/16/32做C0/C3，三重复共36正式条件；TLS短微基准、其他探针顺带诊断另计。36/36已完成，T8/F2在`compare/results/overhead/raw/full-system/report/`；旧60条件与218 ns单次操作解释已撤回。此更新不改变下文历史记录。
+> **2026-10-28 意见5定稿入口**：[实验总方案 §6](../../../evaluation/EXPERIMENT-SUITE-7-REVISED-2026-10-26.md#6-overheadbench5)及[§6.6 实测结果](../../../evaluation/EXPERIMENT-SUITE-7-REVISED-2026-10-26.md#66-实测结果2026-10-28-完成)。仅并发1做四条件，4/8/16/32做C0/C3，三重复共36正式条件；TLS短微基准、其他探针顺带诊断另计。36/36已完成，T8/F2在`compare/results/overhead/raw/full-system/report/`；旧60条件与218 ns单次操作解释已撤回。此更新不改变下文历史记录。
 
 > **历史快照（2026-10-26）**：文中的 84/26/9 是当时口径；2026-10-27 盲标+裁决后 9 例困难良性已计入分母，
 > 当前为 **93 = 58 attack + 35 benign、detection_excluded 0**。见 `docs/dataset/FUXIBENCH-2.0-CONTRACT.md`。
 
 > 这是给**下一个 Lead（Codex + 更强模型，指挥 DSH 子代理）**的唯一入口。
 > 先读本文件，再按 §5 的命令在工作区核验；**不要相信旧会话叙述，以门禁与产物为准**。
-> 变更摘要见 [`CHANGELOG.md`](../CHANGELOG.md)；本地证据索引见 `local/README.md`（gitignored）。
+> 变更摘要见 [`CHANGELOG.md`](../../../../CHANGELOG.md)；本地证据索引见 `local/README.md`（gitignored）。
 > **Codex Lead 启动包（含可直接粘贴的 prompt）**：[`HANDOFF-CODEX.md`](HANDOFF-CODEX.md)。
 
 
@@ -25,7 +25,7 @@
 > **接下来的真实缺口**：DSH只读检查发现 persistence/resource/prompt 三个场景的当前fixture与旧verifier有明显漂移，不能直接沿用旧canary/路径/文本检查当目标完成。先修场景授权与完成判据，再逐个执行。另一个已发现问题：上一轮A1首步诊断虽非空，却返回DSML Bash调用而非安全分析（见pre-experiment-fixes/validation.json），不能算协议成功；后续先修模型角色/返回格式处理，禁止据此直接启动全量A1–A3。这些不改变冻结RC数字。
 
 > **FuxiBench 2.0 最终冻结（2026-10-26）**：canonical 数据集为自包含包
-[`datasets/FuxiBench/`](../datasets/FuxiBench/README.md)（版本 **2.0.0**，
+[`datasets/FuxiBench/`](../../../../datasets/FuxiBench/README.md)（版本 **2.0.0**，
 `taxonomy_version=fuxibench-2type/1`）。GT **93 = 58 attack + 35 benign**；新两类型
 **A 47 / B 11**（旧 Type A 移除、旧 B→A、旧 C→B）；**9** 个审计 benign 场景
 `detection_excluded`（旧 v4 攻击契约保留在 `legacy_v4_detection_contract`），
@@ -40,9 +40,9 @@ Type C/多智能体付费 campaign、E8/E9/E11 仍未做；dry-run harness 见
 （含包 portability/clean-room 第 18 门），compare **1266 + 16 subtests**、env **365**、
 scripts **60 + 7 subtests**、claims **54/54**、`validate_gt` **93/58/35/problems=[]**。
 PBC canonical 61 单智能体 run（28/43 attack PBC=0，AUROC 0.5278，旧 Type C 有效 run=0）。
-入口：[`DATASET-CARD.md`](../datasets/FuxiBench/DATASET-CARD.md)、
-[`AI-SILVER-RELEASE.md`](../datasets/FuxiBench/AI-SILVER-RELEASE.md)、
-[`REVIEW-RESPONSE-EVIDENCE-2026-10-26.md`](paper/REVIEW-RESPONSE-EVIDENCE-2026-10-26.md)。
+入口：[`DATASET-CARD.md`](../../../../datasets/FuxiBench/DATASET-CARD.md)、
+[`AI-SILVER-RELEASE.md`](../../../../datasets/FuxiBench/AI-SILVER-RELEASE.md)、
+[`REVIEW-RESPONSE-EVIDENCE-2026-10-26.md`](../../../paper/REVIEW-RESPONSE-EVIDENCE-2026-10-26.md)。
 
 ## 0. 目标与不可协商的诚信边界
 
@@ -72,7 +72,7 @@ PBC canonical 61 单智能体 run（28/43 attack PBC=0，AUROC 0.5278，旧 Type
 身份：binary **`de3a0894ff03162b84772aadbc031d74cca659b8f0f07f1110003435d196b3da`**；
 release **`aa364a45cbfdc3aab00679e52dace81410f9073a70f482382b1ddab9550db542`**（非 loopback
 采集端，93 cases）；config **`6d44789c86f648447e8b63ed69660f5bf5fd67e2115fb665850d561400c633d7`**；
-process 模式；observer on。完整说明：[`evaluation/rc-2026-10-25-fix4/README.md`](evaluation/rc-2026-10-25-fix4/README.md)。
+process 模式；observer on。完整说明：[`evaluation/rc-2026-10-25-fix4/README.md`](../../../evaluation/rc-2026-10-25-fix4/README.md)。
 
 | 指标 | 值 |
 |---|---|

@@ -31,11 +31,17 @@ compare/Dataset/InjecAgent/
 !compare/Dataset/FuxiBench/ground_truth/
 !compare/Dataset/external/
 
-# Results
-compare/results/*
-!compare/results/paper/
-!compare/results/perf/
-!compare/results/external/
+# Experiment maintenance files are versioned; measured data stays local.
+/compare/results/**
+!/compare/results/**/
+!/compare/results/README.md
+!/compare/results/*/README.md
+!/compare/results/*/MANIFEST.md
+!/compare/results/*/data/README.md
+!/compare/results/*/reproduce/**/*.py
+!/compare/results/*/reproduce/**/*.sh
+# External baseline summaries and source fixtures retain their existing policy.
+!/compare/results/external/**
 
 # Runtime data
 env/runs/

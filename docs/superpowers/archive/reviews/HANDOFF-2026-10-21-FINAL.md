@@ -1,7 +1,7 @@
 # MtAgentLens 交接（2026-10-21 · FINAL，历史）
 
 > **历史文档，不再作为入口。** 当前唯一入口是
-> [`HANDOFF-2026-10-21-DEEPSEEK.md`](../../HANDOFF-2026-10-21-DEEPSEEK.md)。
+> [`HANDOFF-2026-10-21-DEEPSEEK.md`](../../../archive/ai-2026-10-30/superpowers/HANDOFF-2026-10-21-DEEPSEEK.md)。
 > 本页的 GT 分布、κ、待复核数与门禁数均为 2026-10-21 状态，已被
 > 2026-10-22 的规则化裁决、发布重建与 17 道门禁取代；不要引用其中数字。
 > 配套文档：`PROGRESS-2026-10-21.md`（过程与实测）、`AUDIT-2026-10-21.md`

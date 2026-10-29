@@ -1,7 +1,7 @@
 # FuxiBench 数据卡与实验准入规范（2.0.0）
 
 更新：2026-10-26。`taxonomy_version=fuxibench-2type/1`；包版本与 `release_id` 以
-[metadata.json](metadata.json) / [release.json](release.json) 为准。本卡描述已核验的
+[metadata.json](../../../datasets/FuxiBench/metadata.json) / [release.json](../../../datasets/FuxiBench/release.json) 为准。本卡描述已核验的
 能力与缺口，不是人工签署、论文效果结论或投稿完成证明。
 
 ## 1. 用途与组成
@@ -46,7 +46,7 @@
 | `resource_abuse` | 4 | A 2 + benign 2 |
 | `supply_chain` | 5 | A 5 |
 
-完整逐场景清单见 [SCENARIOS.md](SCENARIOS.md)。
+完整逐场景清单见 [SCENARIOS.md](../../../datasets/FuxiBench/SCENARIOS.md)。
 
 ## 2. GT 字段
 
@@ -123,7 +123,7 @@
   `atlas-recon-discovery` 执行了 recon 钩子但只读侦察无 claim 规则（检测能力缺口，
   已披露）；`persistence-cron-backdoor` marker 空 = void。这些 run 不入论文分母。
 - `traces/`：227 个脱敏历史 trace 文件；主机路径已替换为中性占位，fixture 凭据为
-  decoy；详见 [traces/TRACES-NOTICE.md](traces/TRACES-NOTICE.md)。
+  decoy；详见 [traces/TRACES-NOTICE.md](../../../datasets/FuxiBench/traces/TRACES-NOTICE.md)。
 
 ### 输入一致性修复（2026-10-26）
 
@@ -168,4 +168,4 @@ package_file_count 见 `release.json`，problems=[]。`validate_gt` 实测 93/58
 修改场景/fixture/GT 后必须重新构建包、重算 `checksums.sha256`/`release.json`、
 重跑数据卡与协议中的计数校验；不要手改 `release.json` 或哈希清单。历史证据
 （含 `evidence/legacy/v4/`）保留字节，不删除、不改写；旧分类映射以
-[GT-MIGRATION-SUMMARY.json](GT-MIGRATION-SUMMARY.json) 为准。
+[GT-MIGRATION-SUMMARY.json](../../../datasets/FuxiBench/GT-MIGRATION-SUMMARY.json) 为准。

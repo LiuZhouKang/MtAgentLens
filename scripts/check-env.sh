@@ -213,10 +213,10 @@ main() {
     if check_cmd node; then
         local node_ver
         node_ver=$(node --version 2>/dev/null | sed 's/^v//')
-        if version_ge "$node_ver" "18"; then
+        if version_ge "$node_ver" "22.13.0"; then
             check_pass "node v$node_ver"
         else
-            version_fail "node" "v$node_ver" "v18+"
+            version_fail "node" "v$node_ver" "v22.13.0+"
         fi
     else
         check_fail "node: 未安装 — 请运行 ./install.sh" "nodejs"

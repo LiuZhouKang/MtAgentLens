@@ -1,7 +1,7 @@
 # 运行级人工标注协议与证据体系（修订稿素材）
 
 > 状态：**方法/协议素材，未包含任何结果数字**。真实三人独立标注尚未执行。
-> codebook `pilot/1` 已于 2026-10-24 定稿（[PILOT-CODEBOOK.md](../../tools/annotator/PILOT-CODEBOOK.md)），
+> codebook `pilot/1` 已于 2026-10-24 定稿（[PILOT-CODEBOOK.md](../../../tools/annotator/PILOT-CODEBOOK.md)），
 > 但定稿不等于完成标注。本文供作者整合进修改稿 §5，不得据此宣称已完成人工标注
 > 或 κ 达标。实现细节与边界见 [实验设计 §33–§64](../evaluation/experimental-design.md)。
 

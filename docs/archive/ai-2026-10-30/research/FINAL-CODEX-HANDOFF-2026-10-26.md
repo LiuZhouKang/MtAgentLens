@@ -4,7 +4,7 @@
 > 这是**唯一权威交接**；§11 是接手后复核合同，冲突时以 §11 为准。旧的实验设计/审计草稿不再作为执行口径；证据审计保留在 `local/audit-2026-10-26/`。  
 > 接手时仅完成设计/审查；后续代码实施与实测证据见 §11。未跑最终 campaign，数据修复由 DSH/Lead 负责。凡未跑项均为 pending，不写结果。
 
-> **2026-10-28 开销协议覆盖项（已实测完成）**：意见 5 以[实验总方案 §6](../evaluation/EXPERIMENT-SUITE-7-REVISED-2026-10-26.md#6-overheadbench5)与[§6.6 实测结果](../evaluation/EXPERIMENT-SUITE-7-REVISED-2026-10-26.md#66-实测结果2026-10-28-完成)为准，覆盖本交接中旧 60 条件、探针/告警分解与工期安排。36/36 正式条件、15 配对区组、372 并发实例已完成；TLS 三次短微基准与其他探针 C1 短诊断已实测。T8/F2 在 `compare/results/overhead/raw/full-system/report/`；旧 driver/metrics 的 60 条件硬编码已替换并支持完整批次校验。历史验收记录保留，不是本协议的完成证据。DSH 的 93 场景流程不因本次测量停止或重启。
+> **2026-10-28 开销协议覆盖项（已实测完成）**：意见 5 以[实验总方案 §6](../../../evaluation/EXPERIMENT-SUITE-7-REVISED-2026-10-26.md#6-overheadbench5)与[§6.6 实测结果](../../../evaluation/EXPERIMENT-SUITE-7-REVISED-2026-10-26.md#66-实测结果2026-10-28-完成)为准，覆盖本交接中旧 60 条件、探针/告警分解与工期安排。36/36 正式条件、15 配对区组、372 并发实例已完成；TLS 三次短微基准与其他探针 C1 短诊断已实测。T8/F2 在 `compare/results/overhead/raw/full-system/report/`；旧 driver/metrics 的 60 条件硬编码已替换并支持完整批次校验。历史验收记录保留，不是本协议的完成证据。DSH 的 93 场景流程不因本次测量停止或重启。
 
 > **2026-10-27 G0 状态**：后续 agent 已完成机械修复并通过独立验收：release `9c7099c1d36d21af025f5050d462b273cc04aef0c69d3ff72e902779372c6ea3`；93=58 attack+35 benign、0 excluded、93 paper_ready；30 multi=22+8；A1/A2/A3/A4/A7/A8 通过；**A6 `/tmp` blind prepare 已修（`repo_rel` 支持外部 work，回归测试通过）；A5 env 声明 491 但实际 298（全量 870）**。`identity-confusion` 的 paper_ready 是机械判据，notes 仍有 A/C 歧义/registry 不可达/needs_human_review。C0 未跑。
 

@@ -121,5 +121,5 @@ v4 检测元数据与 v5 共识只要在 label 或 attack_type 上不同，就�
   （`ai-silver/1`）与旧 release ID 只作历史映射，不是当前 label 或论文指标。
 - 旧 v4 一致性 κ（label 0.9823 / type 0.8754）只描述旧 reviewer agents，不是人类
   κ，也已不是当前 GT 数字。
-- 旧 v4 过程文档 [ADJUDICATION-PROTOCOL.md](evidence/legacy/docs/ADJUDICATION-PROTOCOL.md) 等保留为
+- 旧 v4 过程文档 [ADJUDICATION-PROTOCOL.md](../../../datasets/FuxiBench/evidence/legacy/docs/ADJUDICATION-PROTOCOL.md) 等保留为
   provenance，不覆盖本协议。

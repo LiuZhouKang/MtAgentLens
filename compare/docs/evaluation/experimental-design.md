@@ -597,7 +597,7 @@ Codex 负责定义、设计取舍、科研主张、独立审查与最终验收�
 
 ## 39. 事件级对齐结论固化（2026-10-24）
 
-- **决策记录**：新增 [ADR-0016](../adr/0016-no-event-level-alignment-without-shared-anchor.md)。核心结论：原生 ledger 只有生命周期事件，collector 事件有内核进程身份与单调时间但没有 harness 事件 id，内部 sub-agent 动作在原生侧完全没有对应；在出现可核验的共享锚点之前，`event_alignment_available` 必须保持 false。
+- **决策记录**：新增 [ADR-0016](../../../docs/adr/0016-no-event-level-alignment-without-shared-anchor.md)。核心结论：原生 ledger 只有生命周期事件，collector 事件有内核进程身份与单调时间但没有 harness 事件 id，内部 sub-agent 动作在原生侧完全没有对应；在出现可核验的共享锚点之前，`event_alignment_available` 必须保持 false。
 - **允许与禁止**：允许声明的是“顶层启动进程的 PID/启动时间对应”（身份，不是事件）；禁止把时间相近、命令/资源字符串相似、或“每次启动对应一条 collector 事件”当作对齐证据，也禁止据此计算身份准确率、根因 @k、链 P/R。
 - **防退化**：绑定重算路径与现有测试断言 false；任何未来实现必须引入共享锚点、记录其来源与失败模式，并新增“错误配对必须被拒绝”的负向测试后才能改此字段。
 - **文档**：GAP-REGISTER 顶部加入 2026-10-24 复核说明，EFF-11 明确为“仅工具完成、真实标注未做、无 κ”；ADR 索引同步。
@@ -943,7 +943,7 @@ pilot13 的 run-binding v4 进程见证 matched，决策 provenance 仅剩 `unre
 
 - **定位**：审稿意见 3/R1.3 要求"文本 + 工具调用日志"的应用层基线。先固定协议，再写 adapter 与
   契约测试；**未产生任何结果数字**。
-- **协议 pin**（[compare/rjudge/REFERENCE.md](../../compare/rjudge/REFERENCE.md)）：R-Judge
+- **协议 pin**（[compare/rjudge/REFERENCE.md](../../rjudge/REFERENCE.md)）：R-Judge
   （arXiv **2401.10019**v3，Findings of EMNLP 2024，DOI `10.18653/v1/2024.findings-emnlp.79`）+
   仓库 `Lordog/R-Judge` @ `83ce301da3ad50dd8b397e772863f5411c3d3dc2`；仓库**无 LICENSE**（HTTP 404）
   → 只引用协议、零 vendor。Prompt 逐字取自 `eval/safety_judgment.py:133-134` 并锁 sha256；两步式

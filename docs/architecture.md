@@ -51,6 +51,7 @@ MtAgentLens 是一个基于 eBPF 的零插桩 LLM Agent 可观测性系统。它
   |  | Runner Layer                                   | |
   |  | SslRunner  ProcessRunner  StdioRunner                     | |
   |  | SystemRunner  AgentRunner  FakeRunner (test)              | |
+  |  | OpenClawRunner (out-of-band asserted intents)            | |
   |  +-----------------------------+-----------------------------+ |
   |                                | EventStream                   |
   |  +-----------------------------+-----------------------------+ |
@@ -106,7 +107,8 @@ MtAgentLens 是一个基于 eBPF 的零插桩 LLM Agent 可观测性系统。它
   |  /traces     trace workbench and replay timeline                |
   |  /investigations  claim, evidence and traceback workbench       |
   |  /research/fuxibench  dataset documentation                     |
-  |  /api/events legacy log-backed event stream                     |
+  |  /api/live/events live SSE                                      |
+  |  /api/events legacy log-backed response                         |
   |  /api/runs/{id}/{alerts,evidence,events,snapshots,db}            |
   +-----------------------------------------------------------------+
 ```
@@ -123,7 +125,7 @@ eBPF 程序是独立编译的 C 程序，通过 libbpf 加载到内核 hook 点�
 |------|---------|---------|---------|
 | `tls_capture` | `SSL_read`/`SSL_write` uprobe | SSL/TLS 解密后明文 HTTP 流量 | Agent-API 通信、间接注入检测 |
 | `process` | raw syscall enter/exit + lifecycle tracepoint | `exec`/`exit`/`open`/文件变更/`connect`/`sendto` 及返回值 | 进程血缘、边界检测、文件操作 |
-| `stdiocap` | `read`/`write` uprobe | 本地 MCP 进程的 stdin/stdout/stderr | MCP 协议明文捕获 |
+| `stdiocap` | raw syscall enter/exit tracepoint（筛选 `read`/`write`） | 本地 MCP 进程的 stdin/stdout/stderr | MCP 协议明文捕获 |
 | `system` | `/proc` 轮询 | CPU 使用率、RSS 内存 | 性能监控、资源滥用检测 |
 
 ### `--binary-path` 与静态链接 SSL
@@ -158,6 +160,7 @@ Runner 执行 eBPF 程序并产生异步事件流。每个 Runner 返回 `Pin<Bo
 | `StdioRunner` | `stdiocap` eBPF 程序 | stdin/stdout/stderr 内容 |
 | `SystemRunner` | `/proc` 文件系统 | CPU 使用率、内存 RSS |
 | `AgentRunner` | 组合多个 Runner | 统一事件流 + 全局 analyzer 管理 |
+| `OpenClawRunner` | agent 自落盘轨迹（只读轮询） | 带外工具调用；证据等级为 `OutOfBandAsserted` |
 | `FakeRunner` | 合成数据 | 测试和性能基准 |
 
 ### Analyzer 管道
@@ -181,16 +184,11 @@ Analyzer 采用**管道-过滤器模式**。每个 analyzer 接收一个 `EventS
 | `FileLogger` | 文件日志（支持轮转） | 终端 |
 | `OutputAnalyzer` | 控制台输出 | 终端 |
 
-#### 未激活的 Analyzer
+#### 历史 Analyzer
 
-以下历史实现已删除；不属于可调用能力：
-
-| Analyzer | 状态 | 阻塞问题 |
-|----------|------|---------|
-| `EventDedup` | 已删除 | 能力被意图级内容去重覆盖；原文件从未参与编译 |
-| `SharedStateStore` / `pipeline_contract.rs` | **已删除（2026-10-22）** | 该契约无生产者/消费者，只被自身测试引用；由 `producer_wiring_contract.rs` 取代 |
-| `ContextPollutionAnalyzer` | 已删除 | 编译错误 ×6（`get_or_create_scenario()` 双重可变借用）；判定门写死 Benchmark 场景字面量，能力已由 `graph/taint.rs` + `graph_builder` 通用污点传播覆盖（门控语义见 ADR-0015：未授权共享 + Observed 置信度才产生 `TaintedContextUse`） |
-| `CredentialLeakAnalyzer` | 已删除 | 440 行是 `handoff_injection.rs` 的逐行克隆；闸门只认一个 fixture 路径 |
+`EventDedup`、`SharedStateStore` / `pipeline_contract.rs`、`ContextPollutionAnalyzer` 和
+`CredentialLeakAnalyzer` 已删除，不属于可调用能力。历史删除理由保留在工程归档；当前
+污点传播边界以 `responsibility/graph/taint.rs`、`graph_builder.rs` 与 ADR-0015 为准。
 
 ### 事件格式
 
@@ -215,9 +213,9 @@ ResponsibilityRuntime 是 MtAgentLens 的核心——它将原始事件流转化
 ### 两阶段架构
 
 **阶段 1（流式）**——每个事件到达时立即处理：
-1. **ClassificationEngine**：19 条规则（5 safe + 14 unsafe）+ 6 维分诊评分；分数只负责把候选路由给 Observer
+1. **ClassificationEngine**：规则引擎 + 6 维分诊评分；分数只负责把候选路由给 Observer
 2. **GraphBuilder**：事件 → 责任图节点和边
-3. **IdentityResolver**：并查集（UnionFind），进程树 + TLS 会话两信号
+3. **IdentityResolver**：并查集（UnionFind），root_pid、TLS 会话与 conversation_id 信号
 4. **TaintTracker**：跨进程污点传播
 5. **Observer LLM**：仅有边界/模式/硬规则候选时触发；精确签名去重并复用裁决
 
@@ -286,7 +284,8 @@ conversation_id ───┘
 | 端点 | 方法 | 功能 |
 |------|------|------|
 | `/` | GET | 内嵌前端 SPA |
-| `/api/events` | GET | legacy log-backed event stream |
+| `/api/live/events` | GET | 实时 SSE：原始事件、责任告警与心跳 |
+| `/api/events` | GET | legacy 日志兼容响应 |
 | `/api/runs` | GET | 运行历史（最新优先） |
 | `/api/runs/active` | GET | 当前活动 run：本进程 live 产物，或 `state=running` 的归档；否则 `{data:null}` |
 | `/api/runs/live` | GET | 本进程 `record`/`trace` 的实时 run 摘要（保留 id `live`） |
@@ -323,9 +322,15 @@ Next.js 16 + React 19 + TypeScript 5 + Tailwind CSS 4。
 | `trace` | 多源可选组合 | `--ssl` `--process` `--stdio` `--system` 独立开关 |
 | `ssl` | `tls_capture` uprobe | 原始 SSL 解密明文流 + HTTP 解析 |
 | `process` | `process` raw syscall/lifecycle tracepoint | 进程 exec/exit、文件、网络事件 |
-| `stdio` | `stdiocap` uprobe | MCP/CLI 进程的 stdio 捕获 |
+| `stdio` | `stdiocap` syscall tracepoint | MCP/CLI 进程的 stdio 捕获 |
 | `system` | `/proc` 轮询 | CPU 使用率和 RSS 内存 |
-| `replay` | SQLite DB | 从责任数据库回放事件流 + 差异对比 |
+| `export-genai` | 责任数据库 | 导出 GenAI spans（JSONL） |
+| `replay-sensitivity` | 含冻结 checkpoint 的责任数据库 | 离线阈值、权重与消融敏感性分析 |
+| `doctor` | 本机环境 | 检查权限、依赖和采集前置条件 |
+
+以上是 `mtagentlens` 的 9 个主命令。`replay` 是 Cargo 自动发现的辅助二进制
+（`collector/src/bin/replay.rs`），在 `collector/` 中通过
+`cargo run --bin replay -- --sqlite <db> --validate-recording` 使用，不是 `mtagentlens` 子命令。
 
 ---
 
@@ -371,18 +376,22 @@ collector/src/
 │   ├── runners/               组合 Runner
 │   ├── analyzers/             流式 Analyzer
 │   └── binary_extractor.rs    编译期 BPF 内嵌
-├── responsibility/            因果引擎（17 个子模块）
+├── responsibility/            因果引擎
 │   ├── graph/                 ResponsibilityGraph
 │   ├── identity/              IdentityResolver (UnionFind)
 │   ├── claims/                ClaimBuilder · TracebackBuilder · AlertBuilder
 │   ├── classification/        ClassificationEngine
+│   ├── scoring/               风险因子与分数融合
+│   ├── evidence/              证据关联、质量与留存
+│   ├── provenance/            来源标签、权限包络与 span
+│   ├── outofband/             OpenClaw asserted intent
 │   ├── observer/              Observer LLM (CachePrior)
 │   ├── persistence/           SQLite（单一 schema + 版本门）
 │   ├── replay/                回放 + 差异引擎
 │   ├── judgment/              策略评估 · 委派追踪
 │   ├── runtime/               事件循环编排
 │   ├── signals/               SignalGraph
-│   └── types/                 共享类型（40+ 结构体）
+│   └── types/                 共享类型
 ├── server/                    Hyper 1.0 HTTP 服务器
 │   ├── web.rs                 路由处理
 │   ├── assets.rs              rust-embed 前端内嵌

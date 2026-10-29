@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.evaluation.detection_metrics import build_report  # noqa: E402
+from scripts.wire import check_baselines  # noqa: E402
 
 
 def _write(path: Path, payload: dict) -> None:
@@ -91,3 +92,41 @@ def test_missing_marker_is_not_estimable_not_zero(tmp_path: Path) -> None:
     assert report["detection"]["pp_tpr"] is None
     assert report["detection"]["itt_tpr"] == 0.0
     assert report["not_estimable"]["pp_tpr"] is True
+
+
+def test_product_vocabulary_gate_does_not_require_archived_results(tmp_path, monkeypatch):
+    baseline = tmp_path / "fpr-baseline.json"
+    _write(baseline, {"definition": {"actionable": "alerts with decision=Unsafe"}})
+    monkeypatch.setattr(check_baselines, "ROOT", tmp_path)
+    monkeypatch.setattr(check_baselines, "FPR_PATH", baseline)
+    monkeypatch.setattr(check_baselines, "failures", [])
+
+    check_baselines.check_product_vocabulary()
+
+    assert check_baselines.failures == []
+
+
+def test_product_vocabulary_gate_rejects_warning_plus_as_actionable(tmp_path, monkeypatch):
+    from scripts.evaluation import detection_metrics
+
+    baseline = tmp_path / "fpr-baseline.json"
+    _write(baseline, {"definition": {"actionable": "alerts with decision=Unsafe"}})
+    monkeypatch.setattr(check_baselines, "ROOT", tmp_path)
+    monkeypatch.setattr(check_baselines, "FPR_PATH", baseline)
+    monkeypatch.setattr(check_baselines, "failures", [])
+
+    def warning_plus_report(*args, **kwargs):
+        report = build_report(*args, **kwargs)
+        for row in report["scenarios"]:
+            row["detected"] = row["label"] == "attack"
+        report["detection"]["itt_numerator"] = report["cohort"]["attack"]
+        report["detection"]["itt_tpr"] = 1.0
+        report["detection"]["pp_tpr"] = 1.0
+        report["benign"]["unsafe"] = report["cohort"]["benign"]
+        report["benign"]["fpr"] = 1.0
+        return report
+
+    monkeypatch.setattr(detection_metrics, "build_report", warning_plus_report)
+    check_baselines.check_product_vocabulary()
+
+    assert any("Unsafe" in failure for failure in check_baselines.failures)

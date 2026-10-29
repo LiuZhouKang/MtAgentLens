@@ -16,6 +16,6 @@
 
 ## 口径
 
-- 当前实验数字只看 `evaluation/CURRENT-EVIDENCE.md`；
+- 当前实验状态与权威结果路径见 `evaluation/CURRENT-EVIDENCE.md`；
 - 历史实验/旧 RC 文档保留在 `evaluation/` 中，但不得作为当前结论；
 - `claims.json` 是机器可校验数字层，修改论文数字前先改它并跑 `verify_claims.py`。

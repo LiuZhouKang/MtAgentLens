@@ -2,6 +2,9 @@
   "name": "mtagentlens-frontend",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "dev": "next dev -p 7395",
     "build": "next build && node ./scripts/normalize-static-export.mjs",
@@ -24,7 +27,6 @@
     "audit:compat:webkit": "playwright test e2e/compatibility-smoke.spec.ts --project=webkit --workers=1",
     "audit:lighthouse": "npx -y @lhci/cli autorun --config=./lighthouserc.json",
     "glass:map": "node ./scripts/generate-liquid-glass-displacement.mjs",
-    "data:fuxibench": "node ./scripts/generate-fuxibench-atlas.mjs",
     "report:quality": "node ./scripts/generate-quality-report.mjs",
     "audit:release": "npm run ci:quality && npm run audit:compat && npm run report:quality",
     "ci:quality": "npm run format:check && npm run lint && npm run type-check && npm run test:coverage && npm run build && npm run audit:a11y && npm run audit:responsive && npm run audit:interaction && npm run audit:theme && npm run audit:visual"

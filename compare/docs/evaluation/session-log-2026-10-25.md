@@ -2,7 +2,7 @@
 
 > 本文件是 2026-10-25 会话的**逐段工作记录**（原 `HANDOFF-NEXT-SESSION.md` §2–§3.4r 的
 > 原文，未删除任何事实）。新的交接文档只保留"当前事实 + 待办"，细节与证据链在此。
-> 每轮的变更摘要另见 [`CHANGELOG.md`](../../CHANGELOG.md)；实验协议与根因见
+> 每轮的变更摘要另见 [`CHANGELOG.md`](../../../CHANGELOG.md)；实验协议与根因见
 > [`docs/evaluation/experimental-design.md`](experimental-design.md)。
 
 ## 2. 本次会话完成的工作

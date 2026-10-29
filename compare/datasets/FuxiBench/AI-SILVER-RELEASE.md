@@ -24,7 +24,7 @@ FuxiBench 2.0 是**自包含、可移植的 93 场景数据包**：GT 为 3 个�
 | `release_id` | `release.json` 的 `release_id`（不硬编码，避免自指） |
 | 文件数 | `release.json` 的 `package_file_count`（`checksums.sha256` 提供逐文件哈希） |
 | 许可 | 数据 **CC-BY-4.0**；代码 **Apache-2.0 OR MIT** |
-| 引用 | [CITATION.cff](CITATION.cff) |
+| 引用 | [CITATION.cff](../../../datasets/FuxiBench/CITATION.cff) |
 
 包内文件清单/哈希以 `release.json` 与 `checksums.sha256` 为权威；任何文件变化都
 必须重算这两者，不能手改。
@@ -43,7 +43,7 @@ GT 字段：`schema`（v4 兼容）、`taxonomy_version`、`label`/`attack_type`
 两类型）、`legacy_label`/`legacy_attack_type`、`legacy_v4_detection_contract`
 （仅 excluded）、`label_annotation`、`annotation`/`legacy_annotation`、`quality`。
 完整定义见 [DATASET-CARD.md](DATASET-CARD.md) §2；逐场景见
-[SCENARIOS.md](SCENARIOS.md)。
+[SCENARIOS.md](../../../datasets/FuxiBench/SCENARIOS.md)。
 
 ### 3.1 标注规模
 
@@ -67,7 +67,7 @@ GT 字段：`schema`（v4 兼容）、`taxonomy_version`、`label`/`attack_type`
 | `evidence/pbc/` | 61 单 Agent run 的 PBC 分布与分层指标（历史 fix4 证据，非检测分母） |
 | `evidence/validation/` | 修复前诊断与 post-fix 真实验证证据 |
 | `evidence/legacy/v4/` | 旧 v4 GT/reviewer 树（283 文件，内容保留（路径已中性化；原始哈希见 `original_sha256`），仅历史） |
-| `traces/` | 脱敏历史 eBPF/collector traces（227 文件；见 [TRACES-NOTICE](traces/TRACES-NOTICE.md)） |
+| `traces/` | 脱敏历史 eBPF/collector traces（227 文件；见 [TRACES-NOTICE](../../../datasets/FuxiBench/traces/TRACES-NOTICE.md)） |
 
 ## 5. 校验
 
@@ -118,8 +118,8 @@ verdict Safe/Info、claims 0；`atlas-recon-discovery` 的只读侦察无 claim 
 旧 v4/v5 与 AI-silver v1 只作历史：旧 AI-silver v1 是 `ai-silver/1` 的双会话参考
 （旧发布 ID `400cbcbb…`），旧 v4 为三 reviewer 规则裁决记录；二者都不是当前 label、
 不是论文指标，也不代表人工。旧证据内容保留（路径已中性化；原始哈希见 `original_sha256`）在
-[evidence/legacy/v4/](evidence/legacy/v4/)；旧过程文档
-[ADJUDICATION-PROTOCOL.md](evidence/legacy/docs/ADJUDICATION-PROTOCOL.md)、
-[AI-SILVER-REVIEWER-MAP.md](evidence/legacy/docs/AI-SILVER-REVIEWER-MAP.md)、
-[QUALITY_STANDARD.md](evidence/legacy/docs/QUALITY_STANDARD.md)、
-[BASELINE-ENGINES.md](evidence/legacy/docs/BASELINE-ENGINES.md) 保留为历史记录，不覆盖当前两类型口径。
+[evidence/legacy/v4/](../../../datasets/FuxiBench/evidence/legacy/v4/)；旧过程文档
+[ADJUDICATION-PROTOCOL.md](../../../datasets/FuxiBench/evidence/legacy/docs/ADJUDICATION-PROTOCOL.md)、
+[AI-SILVER-REVIEWER-MAP.md](../../../datasets/FuxiBench/evidence/legacy/docs/AI-SILVER-REVIEWER-MAP.md)、
+[QUALITY_STANDARD.md](../../../datasets/FuxiBench/evidence/legacy/docs/QUALITY_STANDARD.md)、
+[BASELINE-ENGINES.md](../../../datasets/FuxiBench/evidence/legacy/docs/BASELINE-ENGINES.md) 保留为历史记录，不覆盖当前两类型口径。

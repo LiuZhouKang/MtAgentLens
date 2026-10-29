@@ -18,7 +18,7 @@ export default function nextConfig(phase: string): NextConfig {
         },
       ],
     },
-    // Proxy /api/* to Python data server in development
+    // Proxy /api/* to the separately started Rust backend in development
     ...(isDev && {
       rewrites: async () => [
         {

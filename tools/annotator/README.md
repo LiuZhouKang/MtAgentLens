@@ -492,7 +492,7 @@ python3 scripts/evaluation/annotation_agreement.py \
 
 ## 历史工作台的限制
 
-历史工作台仍可用 `make annotate-legacy`（或 `python3 tools/annotator/server.py --dbs <目录>`）
+历史工作台仍可用 `make annotate-legacy DBS=/path/to/database-or-directory`（或 `python3 tools/annotator/server.py --dbs <目录>`）
 打开，只用于核查旧记录；它不提供新试标的脱敏、版本门禁与三人修订流程，不要用于正式标注。
 
 - 任务发现仍以数据库文件为单位；入口现在拒绝缺失 run、多个 run 或非空 WAL，尚不支持拆分多 run 数据库。

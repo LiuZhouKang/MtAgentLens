@@ -52,7 +52,7 @@ COPY . .
 RUN make -C bpftools V=1
 
 # ── 2. Build frontend (Next.js static export) ──
-RUN cd frontend && npm install && npm run build
+RUN cd frontend && npm ci && npm run build
 
 # ── 3. Build Rust collector (embeds BPF binaries + frontend) ──
 RUN cd collector && cargo build --release

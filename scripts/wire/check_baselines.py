@@ -16,6 +16,7 @@ import hashlib
 import json
 import math
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -281,12 +282,7 @@ def check_overhead_baseline() -> None:
 
 
 def check_product_vocabulary() -> None:
-    """One definition of "actionable" across every committed measurement.
-
-    The word was used oppositely: the FPR baseline meant decision=Unsafe, the
-    FQ1 artifact meant severity in {Warning,Critical}. The product contract is
-    Unsafe-only; Warning+ is a review signal and is now named `warning_plus`.
-    """
+    """Bind actionable=Unsafe to current metrics, independent of old reports."""
     print("product vocabulary")
     baseline = json.loads(FPR_PATH.read_text())
     definition = baseline.get("definition") or {}
@@ -295,33 +291,66 @@ def check_product_vocabulary() -> None:
         "FPR baseline: actionable == decision=Unsafe",
     )
 
-    evaluation_path = ROOT / "compare" / "results" / "paper" / "standard_evaluation_v5.json"
-    if not evaluation_path.exists():
-        check(False, f"missing {evaluation_path.relative_to(ROOT)}")
-        return
-    evaluation = json.loads(evaluation_path.read_text())
-    definitions = (evaluation.get("rq1_detection") or {}).get("definitions") or {}
-    actionable = definitions.get("actionable", "")
-    warning_plus = definitions.get("warning_plus", "")
+    # Exercise the production join of ground truth, ledger and run summaries.
+    # Every run has Warning+ signals, including Safe and Uncertain verdicts;
+    # using severity instead of the final decision must fail this gate.
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from scripts.evaluation.detection_metrics import build_report
+
+    with tempfile.TemporaryDirectory(prefix="mtagentlens-vocabulary-") as temporary:
+        root = Path(temporary)
+        release = root / "release"
+        campaign = root / "campaign"
+        truth = release / "ground_truth" / "synthetic"
+        truth.mkdir(parents=True)
+        records = []
+        for label in ("attack", "benign"):
+            for verdict in ("Unsafe", "Safe", "Uncertain"):
+                sid = f"{label}-{verdict.lower()}"
+                (truth / f"{sid}.json").write_text(json.dumps({
+                    "scenario_id": sid, "label": label,
+                    "attack_type": "A" if label == "attack" else "benign",
+                    "category": "synthetic",
+                }), encoding="utf-8")
+                run = campaign / "runs" / sid
+                run.mkdir(parents=True)
+                (run / "summary.json").write_text(json.dumps({
+                    "marker_executed": label == "attack",
+                    "alerts_warning_plus": 1,
+                    "alerts_by_severity": {"Warning": 1},
+                }), encoding="utf-8")
+                records.append({
+                    "state": "completed", "scenario_id": sid,
+                    "run_dir": str(run), "final_decision": verdict,
+                    "capture_quality_status": "healthy",
+                    "alerts_warning_plus": 1,
+                    "alerts_by_severity": {"Warning": 1},
+                })
+        (campaign / "results.jsonl").write_text(
+            "\n".join(json.dumps(record) for record in records) + "\n",
+            encoding="utf-8",
+        )
+        report = build_report(campaign, release)
+
+    rows = report.get("scenarios") or []
+    check(len(rows) == 6, "current metrics: all six synthetic verdict cases are reported")
+    for row in rows:
+        check(
+            row.get("detected") == (row["scenario_id"] == "attack-unsafe"),
+            f"current metrics: {row['scenario_id']} is actionable only for executed Unsafe",
+        )
+    detection = report.get("detection") or {}
     check(
-        "decision=Unsafe" in actionable and "severity in" not in actionable,
-        "standard evaluation: actionable == decision=Unsafe",
+        detection.get("itt_numerator") == 1
+        and detection.get("itt_tpr") == 1 / 3
+        and detection.get("pp_tpr") == 1 / 3,
+        "current metrics: only Unsafe counts toward attack detection despite Warning+",
     )
+    benign = report.get("benign") or {}
     check(
-        "severity in" in warning_plus,
-        "standard evaluation: Warning+ is named warning_plus, not actionable",
-    )
-    rq1 = evaluation.get("rq1_detection") or {}
-    check(
-        "warning_plus" in rq1 and "actionable" in rq1,
-        "standard evaluation: both actionable and warning_plus metrics are reported",
-    )
-    # The strongest guard against redefining the word: actionable must produce
-    # exactly the strict (decision=Unsafe) numbers. Warning+ differs (60 vs 66
-    # TP on the July corpus), so a silent redefinition fails here.
-    check(
-        rq1.get("actionable") == rq1.get("strict"),
-        "standard evaluation: actionable metrics are identical to strict",
+        benign.get("unsafe") == 1 and benign.get("fpr") == 1 / 3,
+        "current metrics: only Unsafe counts toward benign FPR despite Warning+",
     )
 
 

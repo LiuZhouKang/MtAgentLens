@@ -4,12 +4,14 @@
 
 ## 快速开始
 
+以下命令均在仓库根目录执行；先按[贡献指南](../CONTRIBUTING.md#环境)安装依赖。
+
 ```bash
 # 1. 配置 API 密钥
-ln -sf vendors/deepseek/claude.env config/claude.env
-# 编辑 config/claude.env，填写 ANTHROPIC_AUTH_TOKEN
+ln -sf vendors/deepseek/claude.env env/config/claude.env
+# 编辑 env/config/claude.env，填写 ANTHROPIC_AUTH_TOKEN
 
-# 2. 构建采集器（项目根目录）
+# 2. 构建采集器
 make build
 
 # 3. 冒烟测试
@@ -142,7 +144,7 @@ config/
     └── claude-aws/claude.env                  # Claude AWS API 配置
 ```
 
-切换 vendor：`ln -sf vendors/claude-aws/claude.env config/claude.env`
+仓库根目录切换 vendor：`ln -sf vendors/claude-aws/claude.env env/config/claude.env`
 
 ## 目录结构
 
@@ -171,12 +173,12 @@ env/
 ├── scripts/                    ← 工具脚本
 │   ├── task_wrapper.sh         ← tmux agent 生命周期管理
 │   ├── legacy/                 ← 一次性迁移/旧评估脚本（历史，保留复现）
-│   ├── verifiers/              ← 场景验证器（73 个）
+│   ├── verifiers/              ← 场景验证器
 │   └── ...                     ← 数据库检查、数据集冻结等
 │
 ├── scenarios/                  ← 按类别组织的场景定义（以 make env-list-scenarios 为准）
 │   └── fixtures/               ← 攻击触发 fixture 文件
-├── tests/                      ← 测试（23 个文件）
+├── tests/                      ← 离线回归测试
 ├── config/                     ← 本地配置（真实凭据 gitignored）
 └── runs/                       ← 运行工件（gitignored）
 ```

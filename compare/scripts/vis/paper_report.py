@@ -34,6 +34,8 @@ def load_paper_report_v1(path: Path = DEFAULT_REPORT) -> dict[str, Any]:
         raise PaperReportError("paper report root must be an object")
     if report.get("schema") != EXPECTED_SCHEMA:
         raise PaperReportError(f"paper report schema must be {EXPECTED_SCHEMA}")
+    if report.get("status") != "completed":
+        raise PaperReportError("paper report is not completed; diagnostic or unverified metrics cannot support publication")
 
     main_metrics = report.get("main_metrics")
     if not isinstance(main_metrics, list):

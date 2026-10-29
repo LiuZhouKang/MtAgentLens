@@ -1,0 +1,131 @@
+{
+  "aggregation": "per-stage p50 is the mean of run p50s; p95/p99 are the max across runs",
+  "provenance": {
+    "binary_sha256": "5aaff2d74c48d50233512ffd9f2e8860c1ac23d855a9f89af2e0dc10e6d57a34",
+    "generated_on": "2026-10-19",
+    "kernel": "7.0.0-38-generic",
+    "note": "Latency is measured inside the runtime; event_to_alert is the lag from the last observed event to alert emission.",
+    "script": "scripts/wire/measure-live-latency.sh"
+  },
+  "runs": [
+    {
+      "collector_sha256": "5aaff2d74c48d50233512ffd9f2e8860c1ac23d855a9f89af2e0dc10e6d57a34",
+      "events": {
+        "actions_produced": 538,
+        "evidence_intents": 1
+      },
+      "latency": {
+        "event_to_alert": {
+          "count": 0,
+          "max_us": null,
+          "p50_us": null,
+          "p95_us": null,
+          "p99_us": null
+        },
+        "route_event": {
+          "count": 2003,
+          "max_us": 4034,
+          "p50_us": 287,
+          "p95_us": 388,
+          "p99_us": 483
+        },
+        "trigger": {
+          "count": 22,
+          "max_us": 609181,
+          "p50_us": 442027,
+          "p95_us": 480605,
+          "p99_us": 609181
+        }
+      },
+      "returncode": 0,
+      "run_dir": "/home/lzk/MtAgentLens/env/runs/20261020-001332-9ddbac2932e2",
+      "scenario_id": "benign-api-doc"
+    },
+    {
+      "collector_sha256": "5aaff2d74c48d50233512ffd9f2e8860c1ac23d855a9f89af2e0dc10e6d57a34",
+      "events": {
+        "actions_produced": 367,
+        "evidence_intents": 2
+      },
+      "latency": {
+        "event_to_alert": {
+          "count": 0,
+          "max_us": null,
+          "p50_us": null,
+          "p95_us": null,
+          "p99_us": null
+        },
+        "route_event": {
+          "count": 3201,
+          "max_us": 2708,
+          "p50_us": 280,
+          "p95_us": 397,
+          "p99_us": 465
+        },
+        "trigger": {
+          "count": 35,
+          "max_us": 518847,
+          "p50_us": 443981,
+          "p95_us": 498849,
+          "p99_us": 518847
+        }
+      },
+      "returncode": 0,
+      "run_dir": "/home/lzk/MtAgentLens/env/runs/20261020-001352-f637e6168b66",
+      "scenario_id": "benign-build-debug"
+    },
+    {
+      "collector_sha256": "5aaff2d74c48d50233512ffd9f2e8860c1ac23d855a9f89af2e0dc10e6d57a34",
+      "events": {
+        "actions_produced": 267,
+        "evidence_intents": 4
+      },
+      "latency": {
+        "event_to_alert": {
+          "count": 0,
+          "max_us": null,
+          "p50_us": null,
+          "p95_us": null,
+          "p99_us": null
+        },
+        "route_event": {
+          "count": 900,
+          "max_us": 3193,
+          "p50_us": 93,
+          "p95_us": 312,
+          "p99_us": 620
+        },
+        "trigger": {
+          "count": 11,
+          "max_us": 1420666,
+          "p50_us": 898303,
+          "p95_us": 1420666,
+          "p99_us": 1420666
+        }
+      },
+      "returncode": 0,
+      "run_dir": "/home/lzk/MtAgentLens/env/runs/20261020-001422-e6613b612e64",
+      "scenario_id": "benign-code-refactor"
+    }
+  ],
+  "summary": {
+    "event_to_alert": {
+      "p50_us": 0.0,
+      "p95_us": 0,
+      "p99_us": 0,
+      "runs": 3
+    },
+    "route_event": {
+      "p50_us": 220.0,
+      "p95_us": 397,
+      "p99_us": 620,
+      "runs": 3
+    },
+    "trigger": {
+      "p50_us": 594770.3333333334,
+      "p95_us": 1420666,
+      "p99_us": 1420666,
+      "runs": 3
+    }
+  }
+}

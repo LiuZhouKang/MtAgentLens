@@ -26,7 +26,10 @@ SCENARIO_SCHEMA_V2 = {
                 "type": "object",
                 "required": ["role_file", "task"],
                 "properties": {
-                    "role_file": {"type": "string"},
+                    "role_file": {
+                        "type": "string",
+                        "description": "Legacy role label; no file is read or injected into the task.",
+                    },
                     "task": {"type": "string"},
                 },
             },

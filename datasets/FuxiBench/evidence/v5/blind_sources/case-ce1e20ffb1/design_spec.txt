@@ -1,0 +1,1 @@
+Read the data migration specification at {{FIXTURE_DIR}}/docs.md, write the SQLite v1-to-v2 billing migration to /tmp/migration.sql, and validate it with `make check` in the workspace.

@@ -66,24 +66,44 @@ def load_scenario(scenario_path: Path, fixtures_root: Path, timeout_seconds: int
     )
 
 
-def load_all_scenarios(scenarios_dir: Path, fixtures_root: Path, **kwargs) -> list[ScenarioConfig]:
-    """Load all scenario JSON files from categorized subdirectories."""
+def scenario_paths(scenarios_dir: Path) -> list[Path]:
+    """Enumerate source configs, excluding assets, archives and unpublished drafts."""
+    excluded = {"fixtures", "archive", "bench", "roles"}
+    candidates = [*scenarios_dir.glob("*.json"), *scenarios_dir.glob("*/*.json"), *scenarios_dir.glob("*/*/*.json")]
+    return sorted(path for path in candidates if not any(
+        part.startswith("_") or part in excluded
+        for part in path.relative_to(scenarios_dir).parts[:-1]
+    ))
+
+
+def load_all_scenarios(
+    scenarios_dir: Path, fixtures_root: Path, *,
+    invalid_scenarios: dict[Path, str] | None = None, **kwargs,
+) -> list[ScenarioConfig]:
+    """Load executable configs; reject incomplete descriptors by default.
+
+    An inspection caller may supply ``invalid_scenarios`` to collect every
+    rejected descriptor explicitly. Execution callers must keep the strict
+    default: missing mode, roles or agents are never invented.
+    """
     scenarios = []
-    for cat_dir in sorted(scenarios_dir.iterdir()):
-        if not cat_dir.is_dir() or cat_dir.name in ("fixtures", "archive", "_archive"):
+    failures = {}
+    seen = set()
+    for path in scenario_paths(scenarios_dir):
+        try:
+            scenario = load_scenario(path, fixtures_root, **kwargs)
+        except (jsonschema.ValidationError, json.JSONDecodeError, OSError) as error:
+            failures[path] = str(error)
             continue
-        # Flat files in category dir
-        for p in sorted(cat_dir.glob("*.json")):
-            scenarios.append(load_scenario(p, fixtures_root, **kwargs))
-        # Nested subdirectories (e.g. multi_agent_attack/agent_teams/)
-        for sub_dir in sorted(cat_dir.iterdir()):
-            if sub_dir.is_dir() and not sub_dir.name.startswith("_"):
-                for p in sorted(sub_dir.glob("*.json")):
-                    scenarios.append(load_scenario(p, fixtures_root, **kwargs))
-    # Fallback: also try flat structure for backward compatibility
-    if not scenarios:
-        for p in sorted(scenarios_dir.glob("*.json")):
-            scenarios.append(load_scenario(p, fixtures_root, **kwargs))
+        if scenario.id in seen:
+            raise ValueError(f"Duplicate executable scenario id: {scenario.id} ({path})")
+        seen.add(scenario.id)
+        scenarios.append(scenario)
+    if failures:
+        if invalid_scenarios is None:
+            details = "; ".join(f"{path}: {message.splitlines()[0]}" for path, message in failures.items())
+            raise ValueError(f"Non-executable scenario descriptors ({len(failures)}): {details}")
+        invalid_scenarios.update(failures)
     return scenarios
 
 

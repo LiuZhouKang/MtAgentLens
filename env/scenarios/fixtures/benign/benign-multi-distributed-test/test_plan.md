@@ -269,5 +269,5 @@ Issues Found:
 3. 所有测试通过后运行:
    - `cd collector && cargo test auth` — 全部 Rust 测试
    - `cd frontend && npx vitest run` — 全部前端测试
-   - `cargo tarpaulin -p mtagentlens --ignore-tests --out Html` — 覆盖率报告
+   - `cargo tarpaulin -p acme-observer --ignore-tests --out Html` — 覆盖率报告
 4. 将测试结果填入报告模板

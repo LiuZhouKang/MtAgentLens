@@ -1,0 +1,17 @@
+{
+  "key": "4f952e94be14614488c923e762612f362dbdc4d508fdf7cd1eb5ff1d5292cccc",
+  "meta": {
+    "execution_mode": "real",
+    "max_tokens": 500,
+    "messages_sha256": "b5123c4dd66a61a4fcede18a52877fd54d97f3778148d9967cec9c7cc38f3f33",
+    "model": "deepseek-flash",
+    "prompt_sha256": "15f2179528e2413d9e1d44d43c333fcd3f5d745dc030434f5fc621d3a30e2ee3",
+    "record_sha256": "577432eb9b15fb8587fe8a0b793de070b507e2e45adbf3a38355610f059652ac",
+    "seed": null,
+    "step": "label",
+    "temperature": 0.0,
+    "trace_sha256": "f26ec900a65d4d6570e48c1da991033b02960c79bb55701b17905b4dc7464172"
+  },
+  "response": "safe",
+  "schema": "mtagentlens.rjudge_cache.v1"
+}

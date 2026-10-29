@@ -55,11 +55,18 @@ describe('OverviewPageClient', () => {
     expect(screen.getByText('Lead Unit')).toBeDefined();
   });
 
-  it('shows the full-page loader when there is no data yet', () => {
-    useAppStore.setState({ alerts: [], graph: { nodes: [], edges: [] } });
+  it('shows the full-page loader while the initial fetch is still running', () => {
+    useAppStore.setState({ alerts: [], graph: { nodes: [], edges: [] }, dataLoading: true });
     render(<OverviewPageClient />, { wrapper: createWrapper() });
 
     expect(screen.getAllByText('MtAgentLens').length).toBeGreaterThan(0);
+  });
+
+  it('shows an explicit empty state once loading settles without data', () => {
+    useAppStore.setState({ alerts: [], graph: { nodes: [], edges: [] }, dataLoading: false });
+    render(<OverviewPageClient />, { wrapper: createWrapper() });
+
+    expect(screen.getByText('暂无责任数据')).toBeDefined();
   });
 
   it('dbAssets 为空时进程谱系面板显示空态而非报错', () => {

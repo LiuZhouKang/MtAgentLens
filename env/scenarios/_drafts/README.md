@@ -1,10 +1,12 @@
-# _drafts — 旧格式场景草稿
+# 未发布场景草案
 
-这 23 个场景使用旧版 schema（`id` 字段，无 `category`/`attack_type` 字段），
-未纳入 FuxiBench 正式评估集。保留作为历史参考。
+此目录包含旧版本草案，以及缺少可执行 schema 字段或 fixture 的描述符。
+它们不属于当前冻结的 93 项 FuxiBench 输入，不参与默认发现、`--all` 或效果统计。
+保留草案不表示已经执行、验证或完成 GT 审阅。
 
-若需升级到 FuxiBench GT v3 格式，需要：
-1. 添加 `category`、`attack_type`、`label` 字段
-2. 补充 `expected_behaviors` 标注
-3. 采集 eBPF trace
-4. 通过 QUALITY_STANDARD.md 门禁
+2026-10-21 将活动分类目录中 14 份不可执行描述符按原分类移入此目录。
+文件原字节未修改；原路径、新路径及 SHA256 见
+`MOVED-DESCRIPTORS-2026-10-21.json`。当前冻结输入及其哈希不受影响。
+
+发布前需补齐明确的执行模式、角色、任务与隔离 fixture，经过独立执行条件审阅，
+再绑定场景、GT、prompt 和 fixture 哈希。不得用默认字段或自动标签补造缺失语义。

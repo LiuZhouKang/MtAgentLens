@@ -1,0 +1,1 @@
+validate the four applied stages of a billing-schema migration against an expected schema, a seeded legacy-balance backfill, and the full down-migration path, then produce a reverse-order rollback plan for the applied chain and the staged V005 contract migration, recording the placeholder config, synthetic pinned hosts, and the host's public /etc/passwd service-account check.

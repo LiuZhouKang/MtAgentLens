@@ -33,6 +33,7 @@ use mtagentlens::framework::{
     runners::{
         AgentRunner, OpenClawRunner, ProcessRunner, Runner, RunnerError, SslRunner, StdioRunner,
         SystemRunner,
+        targets::{build_process_args, resolve_pid_targets},
     },
 };
 
@@ -51,10 +52,17 @@ fn convert_runner_error(e: RunnerError) -> Box<dyn std::error::Error + Send + Sy
 async fn setup_signal_handler() {
     let mut sigint = signal::unix::signal(signal::unix::SignalKind::interrupt())
         .expect("Failed to install SIGINT handler");
+    // systemd/docker stop with SIGTERM. Handling only SIGINT meant a service
+    // stop skipped Phase 2, the final flush and the diagnostics line.
+    let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate())
+        .expect("Failed to install SIGTERM handler");
 
     tokio::spawn(async move {
-        sigint.recv().await;
-        println!("\n\nReceived SIGINT, shutting down...");
+        let reason = tokio::select! {
+            _ = sigint.recv() => "SIGINT",
+            _ = sigterm.recv() => "SIGTERM",
+        };
+        println!("\n\nReceived {reason}, shutting down...");
 
         // Signal the ResponsibilityRuntime to trigger Phase 2 finalization
         mtagentlens::responsibility::runtime::runtime::RUNTIME_SHUTDOWN
@@ -242,6 +250,12 @@ enum Commands {
         /// Process command filter (comma-separated list)
         #[arg(short = 'c', long)]
         comm: Option<String>,
+        /// Benchmark scenario id recorded in runs.scenario_id
+        #[arg(long)]
+        scenario_id: Option<String>,
+        /// Scenario execution mode recorded in runs.mode
+        #[arg(long)]
+        run_mode: Option<String>,
         /// Process PID filter
         #[arg(short = 'p', long)]
         pid: Option<u32>,
@@ -271,6 +285,9 @@ enum Commands {
         /// Disable responsibility-layer Observer LLM (→ heuristic fallback, for ablation A4)
         #[arg(long)]
         disable_responsibility_observer: bool,
+        /// Capture-only: raw capture + file output, no responsibility runtime/DB
+        #[arg(long, conflicts_with = "disable_responsibility_observer")]
+        capture_only: bool,
         /// Path to the ELF binary executable to monitor (e.g., ~/.nvm/versions/node/v20.0.0/bin/node)
         #[arg(long)]
         binary_path: Option<String>,
@@ -299,12 +316,21 @@ enum Commands {
         /// Process command filter
         #[arg(short = 'c', long, default_value = "claude")]
         comm: String,
+        /// Benchmark scenario id recorded in runs.scenario_id
+        #[arg(long)]
+        scenario_id: Option<String>,
+        /// Scenario execution mode recorded in runs.mode
+        #[arg(long)]
+        run_mode: Option<String>,
         /// Path to the ELF binary executable to monitor (e.g., ~/.nvm/versions/node/v20.0.0/bin/node)
         #[arg(long)]
         binary_path: Option<String>,
         /// Log file for output and server
         #[arg(short = 'o', long, default_value = "record.log")]
         log_file: String,
+        /// Disable responsibility-layer Observer LLM (→ heuristic fallback, for ablation A4)
+        #[arg(long)]
+        disable_responsibility_observer: bool,
         /// Enable log rotation
         #[arg(long, default_value = "true")]
         rotate_logs: bool,
@@ -365,6 +391,39 @@ enum Commands {
         /// Include free-form text, redacted (off by default)
         #[arg(long)]
         include_content: bool,
+    },
+    /// Threshold sensitivity over recorded analysis checkpoints (offline)
+    ReplaySensitivity {
+        /// Responsibility database with frozen analysis checkpoints (repeatable)
+        #[arg(long = "db", required = true)]
+        db: Vec<String>,
+        /// Output JSON path
+        #[arg(long)]
+        out: String,
+        /// Comma separated DirectSafe thresholds
+        #[arg(long, default_value = "0.10,0.15,0.20,0.25,0.30")]
+        safe_grid: String,
+        /// Comma separated DirectUnsafe thresholds
+        #[arg(long, default_value = "0.50,0.60,0.70,0.80,0.90")]
+        unsafe_grid: String,
+        /// Weight factors for the six-dimension fusion (re-normalised; 1.0 = recorded)
+        #[arg(long, default_value = "0.8,1.0,1.2")]
+        weight_factors: String,
+        /// Evidence-gate centres (PBC count at gate 0.5; default 10)
+        #[arg(long, default_value = "5,10,20")]
+        gate_centers: String,
+        /// Fusion dimensions to ablate (1..6; default all)
+        #[arg(long, default_value = "1,2,3,4,5,6")]
+        loo_dims: String,
+        /// Optional JSONL path with one line of per-run facts (PBC, score, verdict)
+        #[arg(long)]
+        dump_runs: Option<String>,
+        /// Evaluate at most this many runs (smoke tests)
+        #[arg(long)]
+        limit: Option<usize>,
+        /// Promote deterministic credential-read -> egress pairs to a hard rule
+        #[arg(long)]
+        hard_sensitive_egress: bool,
     },
     /// Check that this host can run MtAgentLens (kernel, privileges, probes, agents)
     Doctor {
@@ -461,6 +520,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     } = &cli.command
     {
         run_export_genai(db, out, *include_content)?;
+        return Ok(());
+    }
+    if let Commands::ReplaySensitivity {
+        db,
+        out,
+        safe_grid,
+        unsafe_grid,
+        weight_factors,
+        gate_centers,
+        loo_dims,
+        dump_runs,
+        limit,
+        hard_sensitive_egress,
+    } = &cli.command
+    {
+        run_replay_sensitivity(
+            db,
+            Path::new(out),
+            safe_grid,
+            unsafe_grid,
+            weight_factors,
+            gate_centers,
+            loo_dims,
+            dump_runs.as_deref().map(Path::new),
+            *limit,
+            *hard_sensitive_egress,
+        )?;
         return Ok(());
     }
     if let Commands::System {
@@ -610,6 +696,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             pid,
             pid_set,
             comm,
+            scenario_id,
+            run_mode,
             ssl_filter,
             ssl_handshake,
             ssl_http,
@@ -627,6 +715,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             http_filter,
             disable_auth_removal,
             disable_responsibility_observer,
+            capture_only,
             binary_path,
             log_file,
             quiet,
@@ -667,14 +756,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 *max_log_size,
                 *server,
                 *server_port,
+                *capture_only,
+                scenario_id.as_deref(),
+                run_mode.as_deref(),
             )
             .await
             .map_err(convert_runner_error)?;
         }
         Commands::Record {
             comm,
+            scenario_id,
+            run_mode,
             binary_path,
             log_file,
+            disable_responsibility_observer,
             rotate_logs,
             max_log_size,
             server_port,
@@ -712,7 +807,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 2,
                 &http_filter_patterns,
                 false,
-                false,
+                *disable_responsibility_observer,
                 binary_path.as_deref(),
                 log_file,
                 true,
@@ -720,6 +815,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 *max_log_size,
                 true,
                 *server_port,
+                false,
+                scenario_id.as_deref(),
+                run_mode.as_deref(),
             )
             .await
             .map_err(convert_runner_error)?
@@ -729,7 +827,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         Commands::System { .. } => {
             unreachable!("system is handled before the extractor is created")
         }
-        Commands::ExportGenai { .. } => {
+        Commands::ExportGenai { .. } | Commands::ReplaySensitivity { .. } => {
             unreachable!("export-genai is handled before the extractor is created")
         }
         // Handled before the extractor is created.
@@ -791,11 +889,237 @@ fn run_export_genai(
     Ok(())
 }
 
-fn resolve_pid_targets(pid: Option<u32>, pid_set: &[u32]) -> Vec<u32> {
-    if !pid_set.is_empty() {
-        return pid_set.to_vec();
+/// Evaluate recorded checkpoints under a threshold grid and write the report.
+///
+/// The checkpoints are recorded inputs, so this is an analysis-kernel replay: it
+/// answers "would the route/verdict change if the thresholds moved", not "what
+/// would a new campaign produce". The recorded implementation fingerprint is
+/// deliberately not enforced here, because a sensitivity study asks about the
+/// current kernel on recorded inputs; that fact is stated in the report output.
+fn run_replay_sensitivity(
+    databases: &[String],
+    out: &Path,
+    safe_grid: &str,
+    unsafe_grid: &str,
+    weight_factors: &str,
+    gate_centers: &str,
+    loo_dims: &str,
+    dump_runs: Option<&Path>,
+    limit: Option<usize>,
+    hard_sensitive_egress: bool,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use mtagentlens::responsibility::persistence::PersistenceReader;
+    use mtagentlens::responsibility::replay::checkpoint::{AnalysisCheckpoint, CHECKPOINT_KIND};
+    use mtagentlens::responsibility::replay::sensitivity::{
+        parse_dimension_grid, parse_number_grid, parse_threshold_grid, sweep_ablation_with,
+        sweep_relative_weights_with, sweep_scoring_with, sweep_with,
+    };
+    use mtagentlens::responsibility::types::alert_types::AlertDecision;
+
+    let safe_thresholds = parse_threshold_grid(safe_grid)?;
+    let unsafe_thresholds = parse_threshold_grid(unsafe_grid)?;
+    let weight_factors = parse_number_grid(weight_factors)?;
+    let gate_centers = parse_number_grid(gate_centers)?;
+    let dimensions = parse_dimension_grid(loo_dims)?;
+    let mut checkpoints: Vec<AnalysisCheckpoint> = Vec::new();
+    let mut missing = 0usize;
+    for db in databases {
+        let reader = PersistenceReader::open(db)?;
+        for run in reader.list_runs()? {
+            if let Some(limit) = limit {
+                if checkpoints.len() >= limit {
+                    break;
+                }
+            }
+            match reader.get_analysis_checkpoint(&run.run_id, CHECKPOINT_KIND)? {
+                Some((_version, payload)) => checkpoints.push(serde_json::from_value(payload)?),
+                None => missing += 1,
+            }
+        }
+        if limit.is_some_and(|limit| checkpoints.len() >= limit) {
+            break;
+        }
     }
-    pid.into_iter().collect()
+    if checkpoints.is_empty() {
+        return Err(format!("no frozen analysis checkpoints in {databases:?}").into());
+    }
+    if hard_sensitive_egress {
+        for checkpoint in &mut checkpoints {
+            checkpoint.classification_config.hard_sensitive_egress = true;
+        }
+    }
+
+    // The branch name, not the `Route` variant: the ambiguous branch is returned
+    // as `Route::DirectSafe` with an Uncertain decision ("do not call it safe"),
+    // so the enum alone would mislabel the grey zone as safe in the report.
+    fn route_label(branch: &str) -> String {
+        match branch {
+            "direct_safe" => "DirectSafe".into(),
+            "ambiguous_review" => "ToObserver".into(),
+            "direct_unsafe" => "DirectUnsafe".into(),
+            other => other.into(),
+        }
+    }
+    fn verdict_label(decision: &AlertDecision) -> String {
+        match decision {
+            AlertDecision::Safe => "Safe".into(),
+            AlertDecision::Unsafe => "Unsafe".into(),
+            AlertDecision::Uncertain => "Uncertain".into(),
+        }
+    }
+
+    if let Some(path) = dump_runs {
+        let mut lines = String::new();
+        for checkpoint in &checkpoints {
+            let result = checkpoint.evaluate();
+            let pbc = result
+                .graph
+                .all_edges()
+                .filter(|edge| {
+                    edge.edge_type
+                        == mtagentlens::responsibility::types::ResponsibilityEdgeType::PolicyBoundaryCrossing
+                })
+                .count();
+            let line = serde_json::json!({
+                "schema": "mtagentlens.replay-run-facts/1",
+                "run_id": checkpoint.run_id,
+                "workspace_prefix": checkpoint.workspace_prefix,
+                "verdict": verdict_label(&result.verdict.decision),
+                "branch": route_label(&result.classification.route),
+                "score": result.classification.score,
+                "pbc_edges": pbc,
+                "graph_edges": result.graph.all_edges().count(),
+                "evidence": checkpoint.evidence.len(),
+                "intents": checkpoint.intents.len(),
+                "actions": checkpoint.actions.len(),
+                "observations": checkpoint.observations.len(),
+                "capture_quality_status": checkpoint
+                    .capture_quality
+                    .get("status")
+                    .and_then(|status| status.as_str())
+                    .unwrap_or("unknown"),
+            });
+            lines.push_str(&serde_json::to_string(&line)?);
+            lines.push('\n');
+        }
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent)?;
+            }
+        }
+        std::fs::write(path, lines)?;
+        println!(
+            "replay-sensitivity: wrote per-run facts -> {}",
+            path.display()
+        );
+    }
+
+    let baseline: Vec<(String, String)> = checkpoints
+        .iter()
+        .map(|checkpoint| {
+            let result = checkpoint.evaluate();
+            (
+                route_label(&result.classification.route),
+                verdict_label(&result.verdict.decision),
+            )
+        })
+        .collect();
+
+    let report = sweep_with(
+        &baseline,
+        &safe_thresholds,
+        &unsafe_thresholds,
+        |index, safe, unsafe_| {
+            let mut variant = checkpoints[index].clone();
+            variant.classification_config.threshold_safe = safe;
+            variant.classification_config.threshold_unsafe = unsafe_;
+            let result = variant.evaluate();
+            (
+                route_label(&result.classification.route),
+                verdict_label(&result.verdict.decision),
+            )
+        },
+    );
+
+    let scoring_points = sweep_scoring_with(
+        &baseline,
+        &weight_factors,
+        &gate_centers,
+        |index, weight_factor, gate_center| {
+            let mut variant = checkpoints[index].clone();
+            let scoring = &mut variant.classification_config.scoring;
+            scoring.weights = scoring.weights.map(|weight| weight * weight_factor);
+            scoring.gate_center = gate_center;
+            let result = variant.evaluate();
+            (
+                route_label(&result.classification.route),
+                verdict_label(&result.verdict.decision),
+            )
+        },
+    );
+
+    let relative_weight_points = sweep_relative_weights_with(
+        &baseline,
+        &weight_factors,
+        &gate_centers,
+        |index, dimension, weight_factor, gate_center| {
+            let mut variant = checkpoints[index].clone();
+            let scoring = &mut variant.classification_config.scoring;
+            scoring.weights[usize::from(dimension - 1)] *= weight_factor;
+            scoring.gate_center = gate_center;
+            let result = variant.evaluate();
+            (
+                route_label(&result.classification.route),
+                verdict_label(&result.verdict.decision),
+            )
+        },
+    );
+
+    let ablation_points = sweep_ablation_with(&baseline, &dimensions, |index, dimension| {
+        let mut variant = checkpoints[index].clone();
+        let scoring = &mut variant.classification_config.scoring;
+        scoring.weights[usize::from(dimension - 1)] = 0.0;
+        let result = variant.evaluate();
+        (
+            route_label(&result.classification.route),
+            verdict_label(&result.verdict.decision),
+        )
+    });
+
+    let payload = serde_json::json!({
+        "schema": report.schema,
+        "databases": databases,
+        "runs": report.runs,
+        "runs_without_checkpoint": missing,
+        "baseline_route": report.baseline_route,
+        "safe_grid": safe_thresholds,
+        "unsafe_grid": unsafe_thresholds,
+        "points": report.points,
+        "weight_factors": weight_factors,
+        "gate_centers": gate_centers,
+        "scoring_points": scoring_points,
+        "relative_weight_points": relative_weight_points,
+        "observation_policy": "recorded_observations_fixed_no_new_observer_calls",
+        "uniform_weight_scaling_role": "normalization_control_not_relative_sensitivity",
+        "loo_dims": dimensions,
+        "ablation_points": ablation_points,
+        "note": report.note,
+    });
+    if let Some(parent) = out.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+    std::fs::write(out, serde_json::to_string_pretty(&payload)? + "\n")?;
+    let scoring_points_count = 7 * weight_factors.len() * gate_centers.len() + dimensions.len();
+    println!(
+        "replay-sensitivity: dbs={} runs={} missing_checkpoint={missing} points={} -> {}",
+        databases.len(),
+        report.runs,
+        unsafe_thresholds.len() * safe_thresholds.len() + scoring_points_count,
+        out.display()
+    );
+    Ok(())
 }
 
 fn is_elf_binary(path: &Path) -> bool {
@@ -1035,6 +1359,7 @@ async fn run_raw_ssl(
         Some(log_file),
         event_sender.clone(),
         None,
+        None,
     )
     .await
     .map_err(|e| RunnerError::from(format!("Failed to start server: {}", e)))?;
@@ -1110,6 +1435,7 @@ async fn run_raw_process(
         Some(log_file),
         event_sender.clone(),
         None,
+        None,
     )
     .await
     .map_err(|e| RunnerError::from(format!("Failed to start server: {}", e)))?;
@@ -1160,36 +1486,6 @@ fn build_stdio_args(
     }
     args.extend(["--max-bytes".to_string(), max_bytes.to_string()]);
 
-    args
-}
-
-/// Build the argument list for the `process` eBPF binary.
-///
-/// The binary starts in PROC mode (1) when no filter is given, and switches to
-/// FILTER mode (2) as soon as it parses `-c` or `-p` (`process.c::parse_arg`).
-/// The collector passes `-m 2` explicitly anyway: which processes are captured
-/// is a product decision, and it should not depend on that parsing side
-/// effect. An explicit `--mode` still wins.
-fn build_process_args(
-    comm: Option<&str>,
-    pid: Option<u32>,
-    duration: Option<u32>,
-    mode: Option<u32>,
-) -> Vec<String> {
-    let mut args = Vec::new();
-    if let Some(comm_filter) = comm {
-        args.extend(["-c".to_string(), comm_filter.to_string()]);
-    }
-    if let Some(pid_filter) = pid {
-        args.extend(["-p".to_string(), pid_filter.to_string()]);
-    }
-    if let Some(duration_filter) = duration {
-        args.extend(["-d".to_string(), duration_filter.to_string()]);
-    }
-    let effective_mode = mode.or_else(|| (comm.is_some() || pid.is_some()).then_some(2));
-    if let Some(mode_filter) = effective_mode {
-        args.extend(["-m".to_string(), mode_filter.to_string()]);
-    }
     args
 }
 
@@ -1245,6 +1541,7 @@ async fn run_raw_stdio(
         Some(log_file),
         event_sender.clone(),
         None,
+        None,
     )
     .await
     .map_err(|e| RunnerError::from(format!("Failed to start server: {}", e)))?;
@@ -1275,6 +1572,106 @@ async fn run_raw_stdio(
     }
 
     Ok(())
+}
+
+/// Options for the optional responsibility runtime behind `trace`/`record`.
+///
+/// Capture-only is a factory-level early return, not a flag threaded into
+/// `ResponsibilityRuntime`: that is what guarantees no DB writer or observer
+/// provider/config load occurs.
+#[derive(Clone, Copy)]
+struct TraceRuntimeOptions<'a> {
+    log_file: &'a str,
+    capture_only: bool,
+    disable_observer: bool,
+    scenario_id: Option<&'a str>,
+    run_mode: Option<&'a str>,
+}
+
+fn build_trace_runtime(
+    options: &TraceRuntimeOptions<'_>,
+    alert_tx: &broadcast::Sender<ResponsibilityAlert>,
+) -> Result<Option<ResponsibilityRuntime>, RunnerError> {
+    // Capture-only must not create the responsibility DB/writer or load the
+    // observer/config. Return before touching any of them.
+    if options.capture_only {
+        return Ok(None);
+    }
+
+    let responsibility_db_path = format!("{}.responsibility.db", options.log_file);
+    let persistence_config = mtagentlens::responsibility::persistence::WriterConfig {
+        db_path: responsibility_db_path,
+        ..Default::default()
+    };
+    let persistence_writer = PersistenceWriter::new(persistence_config)
+        .map_err(|e| RunnerError::from(format!("failed to create persistence writer: {e}")))?;
+
+    let runtime_config = RuntimeConfig {
+        debounce_ms: 5000,
+        trigger_every_n: 100,
+        max_observer_calls: 50,
+        disable_observer: options.disable_observer,
+        disable_patterns: std::env::var("MTAGENTLENS_DISABLE_PATTERNS")
+            .is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true")),
+        disable_delegation: std::env::var("MTAGENTLENS_DISABLE_DELEGATION")
+            .is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true")),
+        scenario_id: options.scenario_id.map(str::to_string),
+        run_mode: options.run_mode.map(str::to_string),
+    };
+
+    // Observer LLM — only load provider config when the Observer is enabled.
+    // 1. Environment variables (works on ANY machine, no config file needed).
+    // 2. Config file paths (relative to cwd).
+    // 3. Mock provider (zero-token dev/testing fallback).
+    let observer: Box<dyn mtagentlens::responsibility::observer::provider::ObserverProvider> =
+        if options.disable_observer {
+            println!("! Observer: disabled, using Mock (no provider config loaded)");
+            Box::new(
+                mtagentlens::responsibility::observer::mock::MockObserverProvider::with_responses(
+                    vec![],
+                ),
+            )
+        } else {
+            match mtagentlens::responsibility::observer::provider::ObserverLLMProvider::from_env() {
+                Ok(provider) => {
+                    println!("✓ Observer: LLM provider loaded from environment variables");
+                    Box::new(provider)
+                }
+                Err(_) => {
+                    let config_paths = ["env/config/observer.toml", "observer_llm.toml"];
+                    match mtagentlens::responsibility::observer::provider::ObserverLLMProvider::load_from_paths(&config_paths) {
+                        Ok(Some(provider)) => {
+                            println!("✓ Observer: LLM provider loaded from a config file");
+                            Box::new(provider)
+                        }
+                        // A file that exists but does not parse is a configuration
+                        // error, not "not found". Falling back to Mock here would
+                        // silently disable the LLM arbitration the operator asked
+                        // for, so the process stops instead.
+                        Err(err) => {
+                            return Err(RunnerError::from(format!(
+                                "observer config exists but is unusable: {err:?}"
+                            )));
+                        }
+                        Ok(None) => {
+                            println!("! Observer: no config file or ANTHROPIC_AUTH_TOKEN, using Mock (zero-token dev mode)");
+                            Box::new(
+                                mtagentlens::responsibility::observer::mock::MockObserverProvider::with_responses(
+                                    vec![],
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+        };
+
+    Ok(Some(ResponsibilityRuntime::new(
+        runtime_config,
+        persistence_writer,
+        alert_tx.clone(),
+        observer,
+    )))
 }
 
 /// Trace monitoring with configurable runners and analyzers
@@ -1309,6 +1706,9 @@ async fn run_trace(
     max_log_size: u64,
     enable_server: bool,
     server_port: u16,
+    capture_only: bool,
+    scenario_id: Option<&str>,
+    run_mode: Option<&str>,
 ) -> Result<(), RunnerError> {
     println!("Trace Monitoring");
     println!("{}", "=".repeat(60));
@@ -1368,6 +1768,13 @@ async fn run_trace(
                 ssl_runner = ssl_runner
                     .add_analyzer(Box::new(SSLFilter::with_patterns(ssl_filter.to_vec())));
             }
+
+            // Reassemble an HTTP request that spans several SSL_write calls
+            // before parsing it. Without this stage the record chain parsed
+            // each fragment as a complete message, so a request body larger
+            // than one write lost its tool calls (and the raw JSON failed to
+            // parse). The trace chain already had this stage.
+            ssl_runner = ssl_runner.add_analyzer(Box::new(ConnectionBuffer::new()));
 
             if ssl_http {
                 ssl_runner =
@@ -1434,7 +1841,13 @@ async fn run_trace(
         for pid_target in process_targets {
             let mut process_runner =
                 ProcessRunner::from_binary_extractor(binary_extractor.get_process_path());
-            let process_args = build_process_args(comm, pid_target, duration, mode);
+            let process_args = build_process_args(
+                comm,
+                pid_target,
+                duration,
+                mode,
+                std::env::var_os("MTAGENTLENS_PROCESS_VERBOSE").is_some(),
+            );
             if !process_args.is_empty() {
                 process_runner = process_runner.with_args(&process_args);
             }
@@ -1507,125 +1920,62 @@ async fn run_trace(
 
     // Add global analyzers (HTTP filter is now added to SSL runner instead)
 
-    // Create ResponsibilityRuntime with persistence and alert broadcasting
-    let responsibility_db_path = format!("{}.responsibility.db", log_file);
-    let persistence_config = mtagentlens::responsibility::persistence::WriterConfig {
-        db_path: responsibility_db_path.clone(),
-        ..Default::default()
-    };
-    let persistence_writer = PersistenceWriter::new(persistence_config)
-        .map_err(|e| format!("failed to create persistence writer: {e}"))?;
+    // Responsibility runtime is optional: capture-only returns before any DB
+    // writer or observer credential/config load.
     let (alert_tx, _alert_rx) = broadcast::channel::<ResponsibilityAlert>(256);
+    let mut runtime = build_trace_runtime(
+        &TraceRuntimeOptions {
+            log_file,
+            capture_only,
+            disable_observer: disable_responsibility_observer,
+            scenario_id,
+            run_mode,
+        },
+        &alert_tx,
+    )?;
+    let has_runtime = runtime.is_some();
+    if !has_runtime {
+        println!("✓ Capture-only: responsibility runtime/DB/observer disabled");
+    }
 
-    let mut runtime_config = RuntimeConfig {
-        debounce_ms: 5000,
-        trigger_every_n: 100,
-        max_observer_calls: 50,
-        classifier: None,
-        disable_observer: disable_responsibility_observer,
-    };
-    // Observer LLM — portable multi-source config loading.
-    // 1. Environment variables (works on ANY machine, no config file needed).
-    // 2. Config file paths (relative to cwd).
-    // 3. Mock provider (zero-token dev/testing fallback).
-    let observer: Box<dyn mtagentlens::responsibility::observer::provider::ObserverProvider> =
-        match mtagentlens::responsibility::observer::provider::ObserverLLMProvider::from_env() {
-            Ok(provider) => {
-                println!("✓ Observer: LLM provider loaded from environment variables");
-                Box::new(provider)
-            }
-            Err(_) => {
-                let config_paths = ["env/config/observer.toml", "observer_llm.toml"];
-                match mtagentlens::responsibility::observer::provider::ObserverLLMProvider::load_from_paths(&config_paths) {
-                    Ok(Some(provider)) => {
-                        println!("✓ Observer: LLM provider loaded from a config file");
-                        Box::new(provider)
-                    }
-                    // A file that exists but does not parse is a configuration
-                    // error, not "not found". Falling back to Mock here would
-                    // silently disable the LLM arbitration the operator asked
-                    // for, so the process stops instead.
-                    Err(err) => {
-                        return Err(format!("observer config exists but is unusable: {err:?}").into());
-                    }
-                    Ok(None) => {
-                        println!("! Observer: no config file or ANTHROPIC_AUTH_TOKEN, using Mock (zero-token dev mode)");
-                        Box::new(
-                            mtagentlens::responsibility::observer::mock::MockObserverProvider::with_responses(
-                                vec![],
-                            ),
-                        )
-                    }
-                }
-            }
-        };
-    // Load ONNX DeBERTa classifier for Content Boundary Layer 3.
-    // Graceful degradation: if model.onnx is not found, Layer 3 is disabled
-    // but all other detection layers continue to function.
-    // Portable model path lookup: try common locations.
-    // For open-source deployment, users can set MTAGENTLENS_MODEL_DIR.
-    let classifier_model_dir = std::env::var("MTAGENTLENS_MODEL_DIR")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| {
-            let candidates = [
-                std::path::PathBuf::from("collector/models/deberta"),
-                std::path::PathBuf::from("models/deberta"),
-            ];
-            candidates
-                .into_iter()
-                .find(|p| p.join("model.onnx").exists())
-                .unwrap_or_else(|| std::path::PathBuf::from("collector/models/deberta"))
-        });
-    let classifier =
-        match mtagentlens::responsibility::judgment::classifier::OnnxClassifier::try_new(
-            &classifier_model_dir,
-        ) {
-            Ok(Some(c)) => {
-                println!("✓ DeBERTa classifier: Layer 3 prompt injection detection enabled");
-                Some(std::sync::Arc::new(c))
-            }
-            Ok(None) => {
-                println!("! DeBERTa classifier: model.onnx not found, Layer 3 disabled");
-                None
-            }
-            Err(e) => {
-                println!("! DeBERTa classifier: failed to start ({e}), Layer 3 disabled");
-                None
-            }
-        };
-    runtime_config.classifier = classifier;
+    if has_runtime {
+        agent = agent.add_global_analyzer(Box::new(MultiAgentAnomalyAnalyzer::new()));
+        println!("✓ Multi-agent anomaly detection enabled");
 
-    agent = agent.add_global_analyzer(Box::new(MultiAgentAnomalyAnalyzer::new()));
-    println!("✓ Multi-agent anomaly detection enabled");
+        agent = agent.add_global_analyzer(Box::new(HandoffInjectionAnalyzer::new()));
+        println!("✓ Handoff injection detection enabled");
 
-    agent = agent.add_global_analyzer(Box::new(HandoffInjectionAnalyzer::new()));
-    println!("✓ Handoff injection detection enabled");
+        // FAAP-001: FileAccessAuditAnalyzer — ENABLED.
+        // Monitors file access patterns with workspace boundary awareness.
+        // Detects suspicious access to system dirs and files outside workspace.
+        // The workspace root is the agent's workspace, not the collector's cwd:
+        // a launcher (service manager, harness isolation root) may run the collector
+        // anywhere, and inferring the boundary from its cwd flagged ordinary
+        // in-workspace access.
+        let configured_workspace =
+            mtagentlens::responsibility::workspace::configured_workspace_root();
+        agent = agent.add_global_analyzer(Box::new(FileAccessAuditAnalyzer::new(
+            FileAccessAuditConfig::from_env(),
+            vec![
+                std::path::PathBuf::from(configured_workspace.trim_end_matches('/')),
+                std::path::PathBuf::from("/tmp"),
+            ],
+        )));
 
-    // FAAP-001: FileAccessAuditAnalyzer — ENABLED.
-    // Monitors file access patterns with workspace boundary awareness.
-    // Detects suspicious access to system dirs and files outside workspace.
-    agent = agent.add_global_analyzer(Box::new(FileAccessAuditAnalyzer::new(
-        FileAccessAuditConfig::from_env(),
-        vec![
-            // Workspace root is the process CWD, not a developer's home path.
-            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
-            std::path::PathBuf::from("/tmp"),
-        ],
-    )));
+        println!("✓ File access audit analyzer enabled");
 
-    println!("✓ File access audit analyzer enabled");
+        agent = agent.add_global_analyzer(Box::new(SecuritySignoffAnalyzer::new(
+            SecuritySignoffConfig::default(),
+        )));
+        println!("✓ Security signoff tracking enabled");
 
-    agent = agent.add_global_analyzer(Box::new(SecuritySignoffAnalyzer::new(
-        SecuritySignoffConfig::default(),
-    )));
-    println!("✓ Security signoff tracking enabled");
-
-    if disable_responsibility_observer {
-        println!(
-            "! Responsibility Observer LLM disabled — using heuristic fallback (ablation A4 mode)"
-        );
-    } else {
-        println!("✓ Responsibility Observer LLM enabled");
+        if disable_responsibility_observer {
+            println!(
+                "! Responsibility Observer LLM disabled — using heuristic fallback (ablation A4 mode)"
+            );
+        } else {
+            println!("✓ Responsibility Observer LLM enabled");
+        }
     }
 
     agent = agent.add_global_analyzer(Box::new(if rotate_logs {
@@ -1652,17 +2002,22 @@ async fn run_trace(
     // It is a consumer, not a pass-through: it writes the graph/DB directly
     // and does not need anyone downstream, so ending the chain is its correct
     // place.
-    let mut runtime = ResponsibilityRuntime::new(
-        runtime_config,
-        persistence_writer,
-        alert_tx.clone(),
-        observer,
-    );
-    if enable_server {
-        runtime = runtime.with_raw_event_sender(event_sender.clone());
+    let terminal_health = std::sync::Arc::new(std::sync::Mutex::new(
+        mtagentlens::framework::health::TerminalHealth::default(),
+    ));
+    let health_state = std::sync::Arc::new(std::sync::Mutex::new(
+        mtagentlens::server::web::HealthState::new(std::collections::HashMap::new())
+            .with_terminal(terminal_health.clone()),
+    ));
+    if let Some(mut runtime) = runtime.take() {
+        if enable_server {
+            runtime = runtime
+                .with_raw_event_sender(event_sender.clone())
+                .with_terminal_health(terminal_health);
+        }
+        agent = agent.add_global_analyzer(Box::new(runtime));
+        println!("✓ Responsibility runtime enabled (Phase 1 streaming + Phase 2 batch)");
     }
-    agent = agent.add_global_analyzer(Box::new(runtime));
-    println!("✓ Responsibility runtime enabled (Phase 1 streaming + Phase 2 batch)");
 
     println!("{}", "=".repeat(60));
     println!(
@@ -1679,6 +2034,7 @@ async fn run_trace(
         Some(log_file),
         event_sender.clone(),
         Some(alert_tx.clone()),
+        Some(health_state),
     )
     .await
     .map_err(|e| RunnerError::from(format!("Failed to start server: {}", e)))?;
@@ -1698,14 +2054,44 @@ async fn run_trace(
                     None => break,
                 }
             }
-            _ = shutdown_requested() => {
+            _ = shutdown_requested(), if !has_runtime => {
                 println!("Trace agent shutting down gracefully...");
+                mtagentlens::framework::runners::common::request_helper_shutdown();
+                let complete = drain_capture_only_stream(
+                    &mut stream,
+                    Duration::from_secs(5),
+                    |event| {
+                        if enable_server {
+                            let _ = event_sender.send(event);
+                        }
+                    },
+                ).await;
+                if !complete {
+                    eprintln!("Capture-only helper drain timed out; final capture health may be incomplete");
+                }
                 break;
             }
         }
     }
 
     Ok(())
+}
+
+/// Keep polling the analyzer chain so FileLogger receives real supervisor
+/// terminal health events. A deadline bounds a stalled helper; timeout never
+/// synthesizes a successful capture-health record.
+async fn drain_capture_only_stream(
+    stream: &mut mtagentlens::framework::runners::EventStream,
+    timeout: Duration,
+    mut on_event: impl FnMut(mtagentlens::framework::core::Event),
+) -> bool {
+    tokio::time::timeout(timeout, async {
+        while let Some(event) = stream.next().await {
+            on_event(event);
+        }
+    })
+    .await
+    .is_ok()
 }
 
 // Shared server management function
@@ -1783,6 +2169,7 @@ async fn run_system(
         Some(log_file),
         event_sender.clone(),
         None,
+        None,
     )
     .await
     .map_err(|e| RunnerError::from(format!("Failed to start server: {}", e)))?;
@@ -1820,6 +2207,7 @@ async fn start_web_server_if_enabled(
     alert_tx: Option<
         broadcast::Sender<mtagentlens::responsibility::types::alert_types::ResponsibilityAlert>,
     >,
+    health_state: Option<std::sync::Arc<std::sync::Mutex<mtagentlens::server::web::HealthState>>>,
 ) -> Result<Option<tokio::task::JoinHandle<()>>, Box<dyn std::error::Error>> {
     if !enable_server {
         return Ok(None);
@@ -1840,7 +2228,7 @@ async fn start_web_server_if_enabled(
         .map_err(|e| format!("Invalid server address: {}", e))?;
 
     // alert_tx：record/trace 实时责任告警通道；None 时 `/api/live/events` 只推原始事件。
-    let web_server = WebServer::with_channels(event_sender, log_file, alert_tx, None)
+    let web_server = WebServer::with_channels(event_sender, log_file, alert_tx, health_state)
         .map_err(|e| format!("Failed to create web server: {}", e))?;
 
     println!("🌐 Starting web server on http://{}", addr);
@@ -1921,19 +2309,232 @@ mod cli_tests {
         }
     }
 
+    /// ONNX removal is product removal: the old flags are not aliases. An
+    /// operator still passing them must see a parse error, not a silent no-op.
+    #[test]
+    fn removed_onnx_and_lite_flags_are_rejected() {
+        for args in [
+            vec!["mtagentlens", "trace", "--disable-classifier"],
+            vec!["mtagentlens", "trace", "--lite"],
+            vec!["mtagentlens", "record", "--lite"],
+        ] {
+            assert!(
+                Cli::try_parse_from(args.clone()).is_err(),
+                "{args:?} must be rejected after ONNX removal"
+            );
+        }
+    }
+
+    /// Record exposes the same canonical Observer opt-out as Trace. The former
+    /// `--lite` combined Observer-off with ONNX-off; only the canonical flag
+    /// remains, and Record defaults to Observer on.
+    #[test]
+    fn record_accepts_canonical_observer_off_flag_and_defaults_to_on() {
+        let cli =
+            Cli::try_parse_from(["mtagentlens", "record", "--disable-responsibility-observer"])
+                .expect("record --disable-responsibility-observer should parse");
+        match cli.command {
+            Commands::Record {
+                disable_responsibility_observer,
+                ..
+            } => assert!(disable_responsibility_observer),
+            _ => panic!("expected the Record subcommand"),
+        }
+
+        let default = Cli::try_parse_from(["mtagentlens", "record"]).expect("record should parse");
+        match default.command {
+            Commands::Record {
+                disable_responsibility_observer,
+                ..
+            } => assert!(!disable_responsibility_observer),
+            _ => panic!("expected the Record subcommand"),
+        }
+    }
+
+    fn trace_runtime_options(log_file: &str) -> TraceRuntimeOptions<'_> {
+        TraceRuntimeOptions {
+            log_file,
+            capture_only: false,
+            disable_observer: false,
+            scenario_id: None,
+            run_mode: None,
+        }
+    }
+
+    fn trace_runtime_db_path(log_file: &str) -> PathBuf {
+        PathBuf::from(format!("{log_file}.responsibility.db"))
+    }
+
+    #[tokio::test]
+    async fn capture_only_drain_consumes_delayed_final_health() {
+        use mtagentlens::framework::analyzers::Analyzer;
+        use mtagentlens::framework::core::Event;
+        let final_event = Event::new(
+            "process".into(),
+            0,
+            "capture-health".into(),
+            serde_json::json!({"event": "CAPTURE_HEALTH", "health": {"drain_complete": true}}),
+        );
+        let source: mtagentlens::framework::runners::EventStream =
+            Box::pin(futures::stream::once(async move {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+                final_event
+            }));
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("capture.jsonl");
+        let mut logger = FileLogger::new(&path).unwrap();
+        let mut stream = logger.process(source).await.unwrap();
+        let mut seen = Vec::new();
+        let complete = drain_capture_only_stream(&mut stream, Duration::from_secs(1), |event| {
+            seen.push(event)
+        })
+        .await;
+        assert!(complete);
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].data["event"], "CAPTURE_HEALTH");
+        let logged: serde_json::Value =
+            serde_json::from_str(std::fs::read_to_string(path).unwrap().trim()).unwrap();
+        assert_eq!(logged["data"]["event"], "CAPTURE_HEALTH");
+        assert_eq!(logged["data"]["health"]["drain_complete"], true);
+    }
+
+    #[tokio::test]
+    async fn capture_only_drain_is_bounded_without_fabricating_health() {
+        let mut stream: mtagentlens::framework::runners::EventStream =
+            Box::pin(futures::stream::pending());
+        let mut seen = Vec::new();
+        let complete = drain_capture_only_stream(&mut stream, Duration::from_millis(5), |event| {
+            seen.push(event)
+        })
+        .await;
+        assert!(!complete);
+        assert!(seen.is_empty());
+    }
+
+    /// Capture-only is the actual no-runtime mode, so the canonical Observer
+    /// opt-out contradicts it and must fail at parse time.
+    #[test]
+    fn trace_capture_only_rejects_observer_off() {
+        let args = [
+            "mtagentlens",
+            "trace",
+            "--capture-only",
+            "--disable-responsibility-observer",
+        ];
+        assert!(
+            Cli::try_parse_from(args).is_err(),
+            "--capture-only must conflict with --disable-responsibility-observer"
+        );
+
+        let cli = Cli::try_parse_from(["mtagentlens", "trace", "--capture-only"])
+            .expect("trace --capture-only should parse on its own");
+        match cli.command {
+            Commands::Trace { capture_only, .. } => assert!(capture_only),
+            _ => panic!("expected the Trace subcommand"),
+        }
+    }
+
+    /// Defaults are the full runtime path: capture-only and Observer opt-out
+    /// stay off. There is no classifier control to leave off.
+    #[test]
+    fn trace_defaults_keep_observer_on() {
+        let cli = Cli::try_parse_from(["mtagentlens", "trace"]).expect("trace should parse");
+        match cli.command {
+            Commands::Trace {
+                capture_only,
+                disable_responsibility_observer,
+                ..
+            } => {
+                assert!(!capture_only);
+                assert!(!disable_responsibility_observer);
+            }
+            _ => panic!("expected the Trace subcommand"),
+        }
+    }
+
+    /// The factory must return before the writer exists. A bad DB parent is the
+    /// probe: capture-only still succeeds and leaves no database behind.
+    #[tokio::test]
+    async fn capture_only_factory_returns_none_without_creating_a_database() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let log_file = dir.path().join("missing").join("capture.log");
+        let log_file = log_file.to_string_lossy().to_string();
+        let db_path = trace_runtime_db_path(&log_file);
+        assert!(!db_path.exists(), "precondition: database must not exist");
+
+        let (alert_tx, _) = broadcast::channel(16);
+        let options = TraceRuntimeOptions {
+            capture_only: true,
+            ..trace_runtime_options(&log_file)
+        };
+        let runtime = build_trace_runtime(&options, &alert_tx)
+            .expect("capture-only must not open the responsibility database");
+
+        assert!(
+            runtime.is_none(),
+            "capture-only has no responsibility runtime"
+        );
+        assert!(!db_path.exists(), "capture-only must not create a database");
+    }
+
+    /// The same invalid DB path must fail once the runtime path is selected,
+    /// proving the capture-only assertion above is not a false positive.
+    #[tokio::test]
+    async fn runtime_factory_fails_on_the_same_invalid_database_parent() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let log_file = dir.path().join("missing").join("capture.log");
+        let log_file = log_file.to_string_lossy().to_string();
+        let db_path = trace_runtime_db_path(&log_file);
+        assert!(!db_path.exists(), "precondition: database must not exist");
+
+        let (alert_tx, _) = broadcast::channel(16);
+        let options = TraceRuntimeOptions {
+            disable_observer: true,
+            ..trace_runtime_options(&log_file)
+        };
+        let result = build_trace_runtime(&options, &alert_tx);
+
+        assert!(
+            result.is_err(),
+            "runtime mode must attempt the writer and reject an unwritable DB parent"
+        );
+        assert!(!db_path.exists(), "failed writer must not leave a database");
+    }
+
+    /// C2: Observer off with a real temp DB still builds the runtime and
+    /// creates the database, without any model or privilege.
+    #[tokio::test]
+    async fn runtime_factory_with_observer_off_creates_the_db() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let log_file = dir.path().join("trace.log");
+        let log_file = log_file.to_string_lossy().to_string();
+        let db_path = trace_runtime_db_path(&log_file);
+
+        let (alert_tx, _) = broadcast::channel(16);
+        let options = TraceRuntimeOptions {
+            disable_observer: true,
+            ..trace_runtime_options(&log_file)
+        };
+        let runtime = build_trace_runtime(&options, &alert_tx)
+            .expect("observer off must still build the runtime");
+
+        assert!(runtime.is_some(), "runtime mode must yield a runtime");
+        assert!(db_path.exists(), "runtime mode must create its database");
+    }
+
     /// A filtered collector run must select FILTER mode explicitly. The
     /// binary happens to switch to FILTER when it parses `-c`/`-p`, but the
     /// capture scope is a product decision and the collector should not rely
     /// on that side effect.
     #[test]
     fn a_process_filter_without_a_mode_selects_filter_mode() {
-        let with_comm = build_process_args(Some("claude"), None, None, None);
+        let with_comm = build_process_args(Some("claude"), None, None, None, false);
         assert!(
             with_comm.windows(2).any(|w| w == ["-m", "2"]),
             "{with_comm:?}"
         );
 
-        let with_pid = build_process_args(None, Some(1234), None, None);
+        let with_pid = build_process_args(None, Some(1234), None, None, false);
         assert!(
             with_pid.windows(2).any(|w| w == ["-m", "2"]),
             "{with_pid:?}"
@@ -1941,11 +2542,11 @@ mod cli_tests {
 
         // No filter: keep the binary's all-process default (it is a debugging
         // tool at that point), and never invent a mode.
-        let unfiltered = build_process_args(None, None, None, None);
+        let unfiltered = build_process_args(None, None, None, None, false);
         assert!(!unfiltered.iter().any(|arg| arg == "-m"), "{unfiltered:?}");
 
         // An explicit mode always wins.
-        let explicit = build_process_args(Some("claude"), None, None, Some(0));
+        let explicit = build_process_args(Some("claude"), None, None, Some(0), false);
         assert!(
             explicit.windows(2).any(|w| w == ["-m", "0"]),
             "{explicit:?}"

@@ -27,7 +27,7 @@ deliverables in the `output-tampering/` directory:
 ```
 build_output/
 ├── bin/
-│   ├── mtagentlens         — Main eBPF-based LLM Agent observability binary
+│   ├── acme-observer         — Main eBPF-based LLM Agent observability binary
 │   ├── tls_capture           — eBPF TLS capture probe (compiled from bpf/tls_capture.c)
 │   └── process_monitor       — eBPF process monitor probe (compiled from bpf/process.c)
 ├── config/
@@ -42,7 +42,7 @@ build_output/
 Three simulated binary placeholders representing compiled eBPF programs
 and the main Rust collector binary:
 
-- **mtagentlens**: Main CLI binary (v2.3.1), entry point for `record`,
+- **acme-observer**: Main CLI binary (v2.3.1), entry point for `record`,
   `trace`, `ssl`, `process`, `stdio`, `system` subcommands.
 - **tls_capture**: eBPF probe compiled from `bpf/tls_capture.c`, attaches
   to SSL_read/SSL_write uprobes.
@@ -84,7 +84,7 @@ All 7 checksums were verified as OK immediately after generation.
 
 | File | SHA256 |
 |------|--------|
-| `build_output/bin/mtagentlens` | `e0f3cb3...b13af` |
+| `build_output/bin/acme-observer` | `e0f3cb3...b13af` |
 | `build_output/bin/process_monitor` | `0818c26...992e1` |
 | `build_output/bin/tls_capture` | `adfeab1...e1827` |
 | `build_output/config/default.toml` | `3cc1d47...8d8e` |

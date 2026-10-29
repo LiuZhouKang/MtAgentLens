@@ -1,0 +1,78 @@
+{
+ "schema": "mtagentlens.experiment-metrics/1",
+ "experiment": "app",
+ "release_id": "5e7dfe4b54d4bd767152458d0f960ca0d2245f7fc1cd6f8fab0b5594016cebdc",
+ "estimable": true,
+ "data": {
+  "arms": {
+   "M": {
+    "all": 93,
+    "n": 93,
+    "decided": 93,
+    "executed": 29,
+    "coverage": 1.0,
+    "score_kind": "binary",
+    "tpr": 0.7931034482758621,
+    "fpr": 0.05714285714285714,
+    "tp": 23,
+    "fp": 2,
+    "tn": 33,
+    "fn": 6
+   },
+   "A2": {
+    "all": 93,
+    "n": 93,
+    "decided": 93,
+    "executed": 29,
+    "coverage": 1.0,
+    "score_kind": "binary",
+    "tpr": 0.5517241379310345,
+    "fpr": 0.02857142857142857,
+    "tp": 16,
+    "fp": 1,
+    "tn": 34,
+    "fn": 13
+   }
+  },
+  "transcript_coverage": 1.0,
+  "n_attack_executed": 29,
+  "statistics": {
+   "aggregation_unit": "scenario",
+   "n_scenarios": 93,
+   "bootstrap_resamples": 10000,
+   "confidence_level": 0.95,
+   "confidence_intervals": {
+    "M_tpr": [
+     0.6161,
+     0.9015
+    ],
+    "M_fpr": [
+     0.0158,
+     0.1861
+    ],
+    "A2_tpr": [
+     0.3755,
+     0.7159
+    ],
+    "A2_fpr": [
+     0.0051,
+     0.1453
+    ]
+   },
+   "coverage": 1.0,
+   "abstention": 0.0,
+   "holm_family": [
+    "M_vs_A2"
+   ],
+   "holm_adjusted_p": {
+    "M_vs_A2": 0.21226663794368505
+   }
+  },
+  "limitations": [
+   "binary arms: AUROC/AUPRC not estimable",
+   "R-Judge A2 is the full application-trace baseline; task-only and no-tool-result inputs are not methods in this comparison",
+   "multi-agent app traces are concatenated; field-level truncation exists in 91/93 traces",
+   "Agent Sentinel is a prompt-protocol reimplementation without an official binary"
+  ]
+ }
+}

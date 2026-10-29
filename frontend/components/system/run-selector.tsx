@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import type { SnapshotImport } from '@/lib/snapshot-import';
 import { parseSnapshotJson } from '@/lib/snapshot-import';
 import type { DbImport } from '@/lib/db-import';
-import { loadDatabase as loadDatabaseFromBytes } from '@/lib/db-import';
+import { listDatabaseRunIds, loadDatabase as loadDatabaseFromBytes } from '@/lib/db-import';
 import {
   Check,
   ChevronDown,
@@ -25,6 +25,13 @@ type RunInfo = {
   run_id: string;
   scenario_ids?: string[];
   run_status?: string;
+  /** Schema v3: the run's single aggregated verdict. */
+  final_verdict?: {
+    decision: 'Safe' | 'Unsafe' | 'Uncertain';
+    severity: string | null;
+    authority: string | null;
+    alert_id: string | null;
+  } | null;
   artifact_availability?: {
     alerts?: boolean;
     correlation_evidence?: boolean;
@@ -103,8 +110,13 @@ function entryMeta(entry: SourceEntry): string | null {
         : `${entry.snapshot.nodeCount} 节点 · ${entry.snapshot.alertCount} 告警`;
     case 'import':
       return null;
-    case 'run':
-      return entry.run.scenario_ids?.length ? entry.run.run_id.slice(0, 8) : null;
+    case 'run': {
+      const label = entry.run.scenario_ids?.length ? entry.run.run_id.slice(0, 8) : null;
+      const verdict = entry.run.final_verdict?.decision;
+      if (verdict === 'Unsafe') return label ? `Unsafe · ${label}` : 'Unsafe';
+      if (verdict === 'Uncertain') return label ? `待复核 · ${label}` : '待复核';
+      return label;
+    }
   }
 }
 
@@ -159,6 +171,9 @@ export default function RunSelector() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [pendingDatabase, setPendingDatabase] = useState<{ file: File; runIds: string[] } | null>(
+    null,
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -194,7 +209,7 @@ export default function RunSelector() {
   }, []);
 
   const importFile = useCallback(
-    async (file: File) => {
+    async (file: File, selectedRunId?: string) => {
       setImportError(null);
       setLoadError(null);
       setImporting(true);
@@ -204,7 +219,17 @@ export default function RunSelector() {
       try {
         if (/\.(db|sqlite|sqlite3)$/i.test(file.name)) {
           const bytes = new Uint8Array(await file.arrayBuffer());
-          const local = await loadDatabaseFromBytes(bytes, file.name);
+          if (!selectedRunId) {
+            const runIds = await listDatabaseRunIds(bytes);
+            if (runIds.length > 1) {
+              setPendingDatabase({ file, runIds });
+              setOpen(true);
+              useAppStore.getState().setDataLoading(false);
+              return;
+            }
+          }
+          const local = await loadDatabaseFromBytes(bytes, file.name, selectedRunId);
+          setPendingDatabase(null);
           // 有效 sqlite 但无责任数据（图/告警/动作全空）→ 不导入、不静默：明确提示 + 写 store
           // 供页面横幅展示（store.errorMessage 跨页可读），避免「导入后页面没有任何变化」。
           if (!local.hasConsumableData) {
@@ -519,6 +544,27 @@ export default function RunSelector() {
                 </kbd>
               </div>
             </div>
+
+            {pendingDatabase && (
+              <div
+                role="group"
+                aria-label="选择文件中的运行"
+                style={{ padding: 12, overflowY: 'auto', maxHeight: 200 }}
+              >
+                <p style={{ fontSize: 12 }}>此文件包含多个运行，请选择：</p>
+                {pendingDatabase.runIds.map((runId) => (
+                  <button
+                    key={runId}
+                    type="button"
+                    disabled={importing}
+                    onClick={() => void importFile(pendingDatabase.file, runId)}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: 8 }}
+                  >
+                    {runId}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Import progress（大 db 解析期给反馈，用户不再以为没反应） */}
             {importing && (

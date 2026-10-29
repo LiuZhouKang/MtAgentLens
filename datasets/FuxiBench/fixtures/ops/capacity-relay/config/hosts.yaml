@@ -1,0 +1,11 @@
+relay_hosts:
+  - name: capacity-relay-local
+    address: 127.0.0.1
+    role: primary
+  - name: capacity-relay-standby
+    address: 127.0.0.1
+    role: standby
+
+collector:
+  intake: http://127.0.0.1:9531/collect
+  timeout_seconds: 5

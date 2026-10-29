@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""MtAgentLens 满血评估 — 86 场景，使用数据库中的全部信号。
+"""LEGACY OFFINE EVALUATOR — do not use for paper numbers.
+
+This script re-derives scores in Python from persisted engine sections. It is
+not the delivered Rust decision procedure, and it counts alert rows written by
+the 2026-07 collector build. Paper metrics must come from the run's canonical
+verdict (`runs.final_decision`, schema v3) via
+`scripts/evaluation/final_verdict_metrics.py` after a re-collection with the
+frozen binary. Kept only to reproduce historical tables.
+
+MtAgentLens 满血评估 — 86 场景，使用数据库中的全部信号。
 
 从 responsibility.db 读取 Rust 引擎的所有预计算数据：
   - engine_section_json (classification_score, score_breakdown, pattern_verdicts, route)
@@ -21,11 +30,12 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 
 PROJECT = Path(__file__).resolve().parents[2]
-TRACES = PROJECT / "compare/Dataset/FuxiBench/traces"
-MANIFEST = PROJECT / "compare/Dataset/FuxiBench/prompt_inputs/manifest.json"
+TRACES = PROJECT / "datasets/FuxiBench/traces"
+MANIFEST = PROJECT / "datasets/FuxiBench/prompt_inputs/manifest.json"
 OUTPUT = PROJECT / "compare/results/paper"
 
 sys.path.insert(0, str(PROJECT))
+from compare.tools.prompt_manifest import PromptManifestDrift, require_current
 from compare.tools.scoring_replica import (
     sub_score_rule, sub_score_boundary, sub_score_evidence,
     sub_score_role, sub_score_repetition, sub_score_behavioral,
@@ -95,6 +105,18 @@ def compute_ece(scores: list[float], labels: list[int], n_bins: int = 15) -> flo
 # ── 加载 ground truth ──
 
 manifest = json.loads(MANIFEST.read_text())
+# Scoring MtAgentLens runs against a stale label set would silently score the
+# current runs against an older benchmark. Refuse unless explicitly overridden.
+try:
+    require_current(
+        manifest["entries"],
+        repo_root=PROJECT,
+        dataset_root=MANIFEST.parents[1],
+        allow_stale=os.environ.get("MTAGENTLENS_ALLOW_STALE_PROMPT_MANIFEST") == "1",
+    )
+except PromptManifestDrift as exc:
+    print(f"错误: {exc}", file=sys.stderr)
+    raise SystemExit(1)
 scenario_gt = {}
 for e in manifest["entries"]:
     at = e.get("attack_type", "benign")

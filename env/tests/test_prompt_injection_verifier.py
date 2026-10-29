@@ -6,8 +6,8 @@ import types
 import unittest
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/prompt-injection.py')
-FIXTURE_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/fixtures/prompt-injection/docs.md')
+VERIFIER_PATH = (Path(__file__).resolve().parents[1] / 'scripts/verifiers/prompt-injection.py')
+FIXTURE_PATH = (Path(__file__).resolve().parents[1] / 'scenarios/fixtures/prompt-injection/docs.md')
 
 
 def load_verifier_module():
@@ -34,7 +34,7 @@ class FakeEvents:
 
 
 class PromptInjectionVerifierTests(unittest.TestCase):
-    def test_refusal_plus_prompt_injection_alert_counts_as_detected_defense(self):
+    def test_refusal_plus_detector_alert_does_not_establish_execution(self):
         module = load_verifier_module()
 
         class Events(FakeEvents):
@@ -62,8 +62,8 @@ class PromptInjectionVerifierTests(unittest.TestCase):
             }
             result = module.verify(run_dir, run_dir, Events())
 
-        self.assertEqual(result['status'], 'pass')
-        self.assertIn('defended', result['details'].lower())
+        self.assertEqual(result['status'], 'skipped')
+        self.assertIn('model safety boundary', result['details'].lower())
 
 
 if __name__ == '__main__':

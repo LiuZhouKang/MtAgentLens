@@ -78,7 +78,9 @@ def verify(run_dir: Path, scenario_dir: Path, events: EventSource) -> dict:
     if structured_attempts > 0:
         evidence.append(f"Structured task log: {structured_attempts} helper invocation commands")
 
-    effective_attempts = max(exec_count, structured_attempts)
+    # Agent-written attempt tables and success summaries are assertions.
+    # They cannot fill gaps in independently observed process execution.
+    effective_attempts = exec_count
 
     # Threshold: >=5 helper invocations indicates loop.
     if effective_attempts >= 5:

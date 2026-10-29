@@ -1,4 +1,9 @@
 # SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
+# Production builds must not link AddressSanitizer: the collector embeds these
+# helper binaries, and LeakSanitizer turns a normal SIGTERM shutdown into
+# exit_status 1 (capture quality "degraded"). `make debug` opts in explicitly.
+.DEFAULT_GOAL := all
+
 OUTPUT := .output
 BIN_DIR := $(OUTPUT)/bin
 CLANG ?= clang
@@ -26,7 +31,7 @@ VMLINUX := ../vmlinux/$(ARCH)/vmlinux.h
 BPF_PROGS = tls_capture stdiocap process
 
 # Test programs (no BPF skeleton needed)
-TEST_APPS = test_process_utils test_process_filter test_process_map_flush test_process_mem_info test_process_header test_tls_capture_boringssl_offsets test_tls_capture_header test_json_escape test_b64 test_payload_json test_process_file_ops test_process_network
+TEST_APPS = test_process_snapshot test_process_capture test_process_utils test_process_filter test_process_map_flush test_process_mem_info test_process_header test_tls_capture_boringssl_offsets test_tls_capture_header test_json_escape test_b64 test_payload_json test_process_file_ops test_process_network
 
 # All applications
 APPS = $(BPF_PROGS) $(TEST_APPS)
@@ -333,3 +338,15 @@ all: $(addprefix $(BIN_DIR)/,$(BPF_PROGS))
 
 # keep intermediate (.skel.h, .bpf.o, etc) targets
 .SECONDARY:
+
+$(OUTPUT)/test_process_capture.o: tests/test_process_capture.c process/process.c $(wildcard process/*.h include/*.h) $(OUTPUT)/process.skel.h | $(OUTPUT)
+	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -ffunction-sections -fdata-sections -c $< -o $@
+
+$(BIN_DIR)/test_process_capture: $(OUTPUT)/test_process_capture.o $(LIBBPF_OBJ) | $(BIN_DIR)
+	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -Wl,--gc-sections -lelf -lz -o $@
+
+$(OUTPUT)/test_process_snapshot.o: tests/test_process_snapshot.c process/process_snapshot.h process/process.h include/process_filter.h | $(OUTPUT)
+	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+$(BIN_DIR)/test_process_snapshot: $(OUTPUT)/test_process_snapshot.o | $(BIN_DIR)
+	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -o $@

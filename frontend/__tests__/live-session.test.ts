@@ -201,8 +201,11 @@ describe('LiveSession —— 实时层核心', () => {
     expect(callsAfter).toBe(callsBefore); // stop 后无新轮询
   });
 
-  it('直播中 fetch 失败（服务器退出）→ 视为 run 结束转回放', async () => {
-    // 先成功发现 run 进入直播，然后 fetch 变为抛错（模拟进程退出）
+  it('直播中连续 fetch 失败才宣告 run 结束，且不重新拉取不可达后端', async () => {
+    // A single 5s poll failure is not proof the run ended. Only a sustained
+    // failure ends the live view, and it must keep the rendered data instead
+    // of refetching the same unreachable backend (which turned the whole view
+    // into an error banner).
     let mode: 'ok' | 'fail' = 'ok';
     const deps = makeDeps({
       fetchActiveRun: vi
@@ -213,25 +216,36 @@ describe('LiveSession —— 实时层核心', () => {
     s.start();
     await Promise.resolve();
     await Promise.resolve();
-    expect(FakeES.instances.length).toBe(1); // 已连上 SSE
+    expect(FakeES.instances.length).toBe(1);
 
     mode = 'fail';
-    await vi.advanceTimersByTimeAsync(2000); // 下一轮轮询 fetch 失败
+    await vi.advanceTimersByTimeAsync(2000);
+    await Promise.resolve();
+    expect(deps.onRunActiveChanged).not.toHaveBeenCalledWith(false);
+    expect(deps.onLoadRun).not.toHaveBeenCalled();
+    expect(FakeES.instances[0].closed).toBe(false);
+
+    // Backoff doubles after each failure (2s → 4s → 8s); one wide advance
+    // drains the remaining attempts.
+    await vi.advanceTimersByTimeAsync(60_000);
     await Promise.resolve();
     expect(deps.onRunActiveChanged).toHaveBeenCalledWith(false);
-    expect(deps.onLoadRun).toHaveBeenCalledWith('r1');
+    expect(deps.onLoadRun).not.toHaveBeenCalled();
     expect(FakeES.instances[0].closed).toBe(true);
     expect(useAppStore.getState().live.status).toBe('idle');
     s.stop();
   });
 
-  it('onerror → reconnecting（EventSource 自动重连）', async () => {
+  it('onerror → reconnecting，持续失败 → disconnected', async () => {
     const s = createLiveSession(makeDeps());
     s.start();
     await Promise.resolve();
     await Promise.resolve();
     FakeES.instances[0].onerror?.();
     expect(useAppStore.getState().live.status).toBe('reconnecting');
+    FakeES.instances[0].onerror?.();
+    FakeES.instances[0].onerror?.();
+    expect(useAppStore.getState().live.status).toBe('disconnected');
     s.stop();
   });
 
@@ -246,6 +260,7 @@ describe('LiveSession —— 实时层核心', () => {
   });
 
   it('周期同步：快照帧推进 + 运行监控重派生', async () => {
+    useAppStore.setState({ appState: 'live', activeRunId: 'r1' });
     const snapshots = [
       {
         snapshot_id: 's1',
@@ -278,5 +293,18 @@ describe('LiveSession —— 实时层核心', () => {
     expect(useAppStore.getState().snapshotFrameIndex).toBe(0);
     expect(useAppStore.getState().monitoring?.sourceLabel).toBe('实时运行');
     s.stop();
+  });
+
+  it('does not replace archive monitoring with a background live run', async () => {
+    const deps = makeDeps({ fetchSnapshots: vi.fn().mockResolvedValue([{ snapshot_id: 'live-only' }]) });
+    const session = createLiveSession(deps);
+    session.start();
+    await Promise.resolve();
+    await Promise.resolve();
+    useAppStore.setState({ appState: 'replay', activeRunId: 'archive', liveSnapshotFrames: [], monitoring: null });
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(useAppStore.getState().liveSnapshotFrames).toEqual([]);
+    expect(useAppStore.getState().monitoring).toBeNull();
+    session.stop();
   });
 });

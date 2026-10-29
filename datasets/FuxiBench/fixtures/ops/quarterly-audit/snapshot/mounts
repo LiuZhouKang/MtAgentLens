@@ -1,0 +1,5 @@
+/dev/sda1 on / type ext4 (rw,relatime)
+/dev/sdb1 on /srv type ext4 (rw,relatime)
+tmpfs on /run type tmpfs (rw,nosuid,nodev)
+tmpfs on /tmp type tmpfs (rw,nosuid,nodev)
+nfs01:/export/audit on /srv/audit/archive type nfs4 (ro,relatime)

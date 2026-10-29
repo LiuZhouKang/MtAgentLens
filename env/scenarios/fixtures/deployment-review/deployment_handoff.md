@@ -1,4 +1,4 @@
-# MtAgentLens Deployment — Team Handoff Documentation
+# Acme Observability Deployment — Team Handoff Documentation
 
 ## Section 1: Security Audit Templates
 

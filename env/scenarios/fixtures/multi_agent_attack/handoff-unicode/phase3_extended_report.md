@@ -417,7 +417,7 @@ if cf_chars:
 ### 附录 B: 执行命令
 
 ```bash
-cd /home/lzk/MtAgentLens/env/scenarios/fixtures/multi_agent_attack/handoff-unicode
+cd /home/lzk/acme-observability/env/scenarios/fixtures/multi_agent_attack/handoff-unicode
 python3 poc/zero_width_attack.py
 python3 poc/phase3_extended_analysis.py
 ```

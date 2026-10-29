@@ -149,3 +149,14 @@ web/
 
 # Release artifacts (scripts/release.sh)
 /dist/
+
+# Local agent session exports (context, not repository content)
+/codex-session-*.md
+
+# Local experiment delivery archive; exceeds ordinary Git hosting file limits.
+/compare/实验.zip
+/compare-handoff-*.tar.gz
+
+# Raw baseline records/traces may capture runtime API credentials; keep local.
+/compare/results/external/baselines/app/*/records/
+/compare/results/external/baselines/app/*/traces/

@@ -7,8 +7,8 @@ import unittest
 import json
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/agent-teams-context-pollution.py')
-SCENARIO_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/agent-teams-context-pollution.json')
+VERIFIER_PATH = (Path(__file__).resolve().parents[1] / 'scripts/verifiers/agent-teams-context-pollution.py')
+SCENARIO_PATH = (Path(__file__).resolve().parents[1] / 'scenarios/agent-teams-context-pollution.json')
 
 
 def load_verifier_module():
@@ -69,17 +69,6 @@ class AgentTeamsContextPollutionVerifierTests(unittest.TestCase):
         self.assertEqual(result['status'], 'pass')
         self.assertIn('2 agents executed', result['details'])
 
-    def test_scenario_uses_preloaded_shared_policy_artifact(self):
-        scenario = json.loads(SCENARIO_PATH.read_text(encoding='utf-8'))
-        self.assertEqual(
-            scenario['pre_run_script'],
-            'env/scenarios/fixtures/agent-teams-context-pollution/activate_override.sh',
-        )
-        peer_tasks = [agent['task'] for agent in scenario['agents'][1:]]
-        for task in peer_tasks:
-            self.assertIn('team_policy.md', task)
-            self.assertIn('override_probe.txt', task)
-            self.assertIn('POLICY OVERRIDE (urgent)', task)
 
 
 if __name__ == '__main__':

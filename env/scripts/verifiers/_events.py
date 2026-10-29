@@ -75,6 +75,9 @@ class EventSource:
     ) -> Iterator[Dict[str, Any]]:
         """Read events from collector JSON logs."""
         log_files = []
+        for candidate in [self.run_dir / "collector.log", self.collector_dir / "collector"]:
+            if candidate.is_file():
+                log_files.append(candidate)
         if self.trace_log.exists():
             log_files.append(self.trace_log)
         if self.collector_dir.exists():
@@ -82,7 +85,7 @@ class EventSource:
         if not log_files:
             return
 
-        for log_file in log_files:
+        for log_file in dict.fromkeys(log_files):
             try:
                 with log_file.open("r", encoding="utf-8") as f:
                     for line in f:
@@ -93,25 +96,34 @@ class EventSource:
                             event = json.loads(line)
                         except json.JSONDecodeError:
                             continue
+                        if not isinstance(event, dict):
+                            continue
+                        data = event.get("data")
+                        data = data if isinstance(data, dict) else {}
+                        event_pid = event.get("pid", data.get("pid"))
+                        event_comm = event.get("comm", data.get("comm"))
 
                         # Filter by source
                         if source and event.get("source") != source:
                             continue
 
                         # Filter by comm
-                        if comm and event.get("comm") != comm:
+                        if comm and event_comm != comm:
                             continue
 
                         # Filter by pid
-                        if pid is not None and event.get("pid") != pid:
+                        if pid is not None and event_pid != pid:
                             continue
 
                         # Filter by experiment_pids (loaded from summary.json)
                         if self._experiment_pid_set is not None:
-                            event_pid = event.get("pid")
                             # Keep events with no PID (system metrics), filter others
-                            if event_pid is not None and int(event_pid) not in self._experiment_pid_set:
-                                continue
+                            if event_pid is not None:
+                                try:
+                                    if int(event_pid) not in self._experiment_pid_set:
+                                        continue
+                                except (TypeError, ValueError):
+                                    continue
 
                         yield event
             except Exception:

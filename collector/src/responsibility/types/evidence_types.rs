@@ -7,6 +7,68 @@ use serde::{Deserialize, Serialize};
 
 // ═══ Intent and Action types ═══
 
+/// Wire format that supplied a captured native tool-call id.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum NativeToolCallFormat {
+    Anthropic,
+    OpenAi,
+}
+
+impl NativeToolCallFormat {
+    /// Stable ordering for canonical snapshots.
+    pub fn rank(self) -> u8 {
+        match self {
+            Self::Anthropic => 0,
+            Self::OpenAi => 1,
+        }
+    }
+}
+
+/// A tool-call id observed in captured structured content.
+///
+/// This is a correlation reference, not authentication: it is preserved
+/// byte-for-byte and never synthesised by the collector.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct NativeToolCallRef {
+    pub format: NativeToolCallFormat,
+    pub id: String,
+}
+
+/// One structured native tool-call reference observed at PRE-resolver time.
+///
+/// The reference is a protocol correlation key, not an authenticated identity.
+/// `declared_conversation_id` is filled only when the same captured request
+/// body declared it; a response normally carries `None`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct NativeToolCallObservation {
+    pub process_id: ProcessId,
+    pub message_id: MessageId,
+    pub native_tool_call: NativeToolCallRef,
+    #[serde(default)]
+    pub declared_conversation_id: Option<String>,
+}
+
+impl NativeToolCallObservation {
+    /// Canonical order shared by the frozen snapshot and the identity DTO.
+    pub fn cmp_canonical(&self, other: &Self) -> std::cmp::Ordering {
+        (
+            self.process_id.pid,
+            self.process_id.start_time_ns,
+            self.native_tool_call.format.rank(),
+            self.native_tool_call.id.as_str(),
+            self.declared_conversation_id.as_deref(),
+        )
+            .cmp(&(
+                other.process_id.pid,
+                other.process_id.start_time_ns,
+                other.native_tool_call.format.rank(),
+                other.native_tool_call.id.as_str(),
+                other.declared_conversation_id.as_deref(),
+            ))
+            .then_with(|| self.message_id.as_str().cmp(other.message_id.as_str()))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Intent {
     pub intent_id: IntentId,
@@ -19,10 +81,57 @@ pub struct Intent {
     pub primary_matching_eligible: bool,
     pub authority_source: IntentAuthoritySource,
     pub timestamp_ns: u64,
+    #[serde(default)]
+    pub native_tool_call: Option<NativeToolCallRef>,
+    #[serde(default)]
+    pub declared_conversation_id: Option<String>,
+}
+
+/// Completion of the observed operation, independent of its suspiciousness.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionOutcome {
+    #[default]
+    Unknown,
+    Attempted,
+    Pending,
+    Succeeded,
+    Failed,
+}
+impl ActionOutcome {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Unknown => "unknown",
+            Self::Attempted => "attempted",
+            Self::Pending => "pending",
+            Self::Succeeded => "succeeded",
+            Self::Failed => "failed",
+        }
+    }
+    pub fn is_success(self) -> bool {
+        self == Self::Succeeded
+    }
+
+    /// Whether the observation proves the operation was *initiated* even though
+    /// it did not complete in the captured window.
+    ///
+    /// A non-blocking `connect(2)` returns `EINPROGRESS`: the kernel accepted the
+    /// request and will finish it asynchronously, so the destination is a fact
+    /// even though no completion was observed. Treating that as "nothing
+    /// happened" hid every egress made through a non-blocking HTTP client.
+    pub fn is_initiated(self) -> bool {
+        matches!(self, Self::Attempted | Self::Pending)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Action {
+    #[serde(default)]
+    pub outcome: ActionOutcome,
+    #[serde(default)]
+    pub syscall_ret: Option<i64>,
+    #[serde(default)]
+    pub syscall_name: Option<String>,
     pub action_id: ActionId,
     pub process_id: ProcessId,
     pub action_type: ActionCandidateType,
@@ -45,6 +154,12 @@ pub struct NormalizedArgs {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum NormalizedArg {
     Path(String),
+    /// Capture completeness, not another syscall operand or matchable path.
+    PathCaptureIncomplete {
+        normalized_path: String,
+        raw_byte_len: usize,
+    },
+    OpenFlags(i32),
     Command(String),
     Url {
         host: String,
@@ -119,6 +234,8 @@ impl std::fmt::Display for IntentAuthoritySource {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ActionCandidateType {
+    /// Opening a descriptor does not establish bytes read or written.
+    FileOpen,
     FileRead,
     FileWrite,
     FileOverwrite,
@@ -169,6 +286,12 @@ pub enum MatchLevel {
     L3Containment = 3, // 0.65
     L4Basename = 2,    // 0.50
     L5Substring = 1,   // 0.35
+    /// The action was performed by a descendant process of the process the
+    /// intent spawned (a build script, package manager hook, or installer).
+    /// No argument is shared, because the agent never typed the command that
+    /// produced the action — the program it ran did. This is the OS-level
+    /// reconciliation that prompt-level tools cannot perform.
+    ProcessLineage = 0,
 }
 
 // ═══ Non-link diagnostics ═══

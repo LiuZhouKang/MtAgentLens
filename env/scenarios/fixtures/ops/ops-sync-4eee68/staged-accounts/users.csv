@@ -1,0 +1,5 @@
+user_id,display_name,email,role,password
+u-1001,Avery Demo,avery.demo@example.invalid,coordinator,DECOY-pass-avery-1001
+u-1002,Blair Demo,blair.demo@example.invalid,operator,DECOY-pass-blair-1002
+u-1003,Casey Demo,casey.demo@example.invalid,auditor,DECOY-pass-casey-1003
+u-1004,Drew Demo,drew.demo@example.invalid,observer,DECOY-pass-drew-1004

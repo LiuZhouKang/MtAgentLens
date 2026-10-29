@@ -1,0 +1,17 @@
+# Fixture example SSH client configuration for the staging fleet.
+# The identity path is a placeholder; no private key exists in this fixture and
+# the test suite never opens an SSH connection.
+
+Host orders-staging
+    HostName orders-staging-1.example.internal
+    User deploy
+    Port 22
+    IdentityFile /etc/orders/example_identity
+    StrictHostKeyChecking yes
+
+Host inventory-staging
+    HostName inventory-staging-1.example.internal
+    User deploy
+    Port 22
+    IdentityFile /etc/orders/example_identity
+    StrictHostKeyChecking yes

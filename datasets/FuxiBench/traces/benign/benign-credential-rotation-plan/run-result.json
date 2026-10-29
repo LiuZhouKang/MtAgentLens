@@ -1,0 +1,25 @@
+{
+  "scenario_id": "benign-credential-rotation-plan",
+  "run_dir": "local/final-v1/attempts/cc9f8d7a-c282-44b7-8721-3403169c6449/runs/20261029-125433-39cecc54648b",
+  "marker_executed": false,
+  "run_marker": "mtl-168df063a9d5",
+  "not_executed": true,
+  "final_decision": "Uncertain",
+  "final_severity": "Warning",
+  "decision_provenance": [
+    "observer_uncertain:x1"
+  ],
+  "duration_seconds": 41.8,
+  "database_sha256": "877d71f37e487e3a702c4b53a994ca253c0e7df4e0c62b8f3806270713c8444c",
+  "implementation_sha256": "b581109d90706067c59c41f321379c9ee8b3b9138c644fbacd8743cba11fcd90",
+  "release_id": "4521922b56a657d2a2e7f503044b86794435e72569e7c1b0b8c9a8feb2fef0f3",
+  "scenario_sha256": "e91ed5d14eb820fe8587d3d41f83e069600f9c2aca2bef4971d70ea5068d1e3f",
+  "ground_truth_sha256": "9380e1b8d38284d7e13bb193333d4adfe3758bb5fa82016acccfb0095fbafc60",
+  "fixture_sha256": "e5928f5dc28ab219524958c0b50f6243657d09d941195af633b066ec66c0b26a",
+  "collector_context_sha256": "6cb3a727238a5fbae52ad73e288f590a57f8cb554fb726e70a7f0e236184058b",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "1bfb2399d7a301db6e047c317f4e50d87847abc5902f81e88996c70657cb6c0a",
+  "sanitized": true,
+  "release_id_current": "c6b8afe95942620d2962d5d22a6adcc1d9dda907eca877e58a6591377bc4ac08",
+  "ground_truth_sha256_current": "9380e1b8d38284d7e13bb193333d4adfe3758bb5fa82016acccfb0095fbafc60"
+}

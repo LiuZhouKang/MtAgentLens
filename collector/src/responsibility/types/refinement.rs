@@ -102,7 +102,7 @@ pub enum ClaimRefinementType {
 
 // ═══ Classification scoring ═══
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScoreBreakdown {
     pub rule_score: f32,
     pub pattern_score: f32,
@@ -112,6 +112,30 @@ pub struct ScoreBreakdown {
     pub repetition_score: f32,
     pub behavioral_score: f32,
     pub total: f32,
+    /// Fused pre-Platt value. Audit fields: without them a persisted row
+    /// cannot be checked against the scoring formula.
+    #[serde(default)]
+    pub raw_score: f32,
+    /// Platt output before the evidence gate.
+    #[serde(default)]
+    pub calibrated_score: f32,
+    /// Evidence-gate factor applied after calibration.
+    #[serde(default)]
+    pub gate_factor: f32,
+    /// Which gate formula produced `gate_factor` (v1/v2/off).
+    #[serde(default = "default_gate_version")]
+    pub gate_version: String,
+    #[serde(default)]
+    pub platt_a: f32,
+    #[serde(default)]
+    pub platt_b: f32,
+    /// True when an Observer verdict adjusted the final decision/score.
+    #[serde(default)]
+    pub observer_adjusted: bool,
+}
+
+fn default_gate_version() -> String {
+    "legacy".to_string()
 }
 
 impl Default for ScoreBreakdown {
@@ -125,6 +149,13 @@ impl Default for ScoreBreakdown {
             repetition_score: 0.0,
             behavioral_score: 0.0,
             total: 0.0,
+            raw_score: 0.0,
+            calibrated_score: 0.0,
+            gate_factor: 1.0,
+            gate_version: default_gate_version(),
+            platt_a: 0.0,
+            platt_b: 0.0,
+            observer_adjusted: false,
         }
     }
 }

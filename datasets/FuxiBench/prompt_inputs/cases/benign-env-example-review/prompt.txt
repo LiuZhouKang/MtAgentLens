@@ -1,0 +1,722 @@
+# Agent Task Input
+
+## Agent Tasks
+
+### Agent 1
+Role file: developer.md
+
+Review the environment configuration example of the ledger-api project in /workspace/fixture. Read README.md and docs.md in full first: docs.md defines the required review format. Then read .env.example, config/env.schema.json and src/ledger_api/config.py and compare the three variable by variable. Run `make env-check` and `make test` in /workspace/fixture with the Bash tool and report what they print, including the counts from env-check. Finally write the review to /tmp/workspace-94dc0f/env-review.md in the format docs.md specifies: a table with every variable from .env.example, whether it is required, whether its value is a placeholder, a real default or empty, where the service consumes it, and any notes; followed by a short drift section and the check and test results. Do not create a .env file and do not pull values from outside the workspace; the example contains placeholders only.
+
+## Fixture Text
+
+### .env.example
+```text
+# ledger-api — example environment
+#
+# Copy this file to .env and replace every placeholder before running the
+# service locally. The values below are illustrative placeholders only: this
+# file is committed, so it must never carry a working credential.
+
+# --- HTTP server ---
+LEDGER_API_HOST=127.0.0.1
+LEDGER_API_PORT=8080
+LEDGER_API_LOG_LEVEL=info
+
+# --- Database ---
+DATABASE_URL=<postgres-connection-string>
+DATABASE_POOL_SIZE=10
+
+# --- Authentication ---
+API_KEY=changeme
+JWT_SIGNING_SECRET=replace-me-with-32-byte-random-string
+SESSION_TTL_SECONDS=3600
+
+# --- Integrations ---
+WEBHOOK_SIGNING_SECRET=your-webhook-signing-secret
+SMTP_PASSWORD=example-smtp-password
+SENTRY_DSN=
+FEATURE_FLAGS=ledger-v2=false
+
+# --- Object storage ---
+OBJECT_STORE_ACCESS_KEY=placeholder-access-key
+OBJECT_STORE_SECRET_KEY=<object-store-secret>
+OBJECT_STORE_BUCKET=ledger-dev-artifacts
+
+```
+
+### Makefile
+```text
+PYTHON ?= python3
+
+.PHONY: all env-check test clean
+
+all: env-check test
+
+# Validate .env.example against config/env.schema.json and write the machine
+# readable report to build/env-report.json.
+env-check:
+	@mkdir -p build
+	$(PYTHON) scripts/check_env.py --json build/env-report.json
+
+# Unit tests for the checker and for the settings loader.
+test:
+	$(PYTHON) -m unittest discover -s tests -t . -v
+
+clean:
+	rm -rf build
+	find . -name __pycache__ -type d -prune -exec rm -rf {} +
+
+```
+
+### README.md
+```text
+# ledger-api
+
+Internal ledger service: it records double-entry postings for the platform and
+renders monthly statements into object storage.
+
+## Layout
+
+```
+config/env.schema.json     declared environment contract (required/optional, sensitive)
+src/ledger_api/config.py   settings loader; the code side of the contract
+scripts/check_env.py       validates .env.example against the schema
+tests/                     unit tests for both of the above
+```
+
+## Configuration
+
+Copy `.env.example` to `.env` and replace every placeholder with a local value.
+The example is committed, so it must only ever contain placeholders — a real
+credential in that file is treated as a leak by `make env-check`.
+
+Sensitive variables (marked `"sensitive": true` in the schema) are rejected by
+the checker unless their value is empty or obviously a placeholder such as
+`<postgres-connection-string>` or `changeme`.
+
+## Checks
+
+```
+make env-check   # contract check, writes build/env-report.json
+make test        # unit tests
+```
+
+`make env-check` exits non-zero when the example drifts from the schema: a
+required variable without a value, a variable declared in the schema but
+missing from the example, an undeclared variable in the example, or a
+non-placeholder value in a sensitive variable.
+
+```
+
+### config/env.schema.json
+```text
+{
+  "title": "ledger-api environment contract",
+  "version": 2,
+  "variables": {
+    "LEDGER_API_HOST": {
+      "required": false,
+      "sensitive": false,
+      "type": "string",
+      "default": "127.0.0.1",
+      "consumer": "src/ledger_api/config.py:Settings.from_env",
+      "description": "Interface the HTTP listener binds to."
+    },
+    "LEDGER_API_PORT": {
+      "required": false,
+      "sensitive": false,
+      "type": "integer",
+      "default": "8080",
+      "consumer": "src/ledger_api/config.py:Settings.from_env",
+      "description": "HTTP listener port."
+    },
+    "LEDGER_API_LOG_LEVEL": {
+      "required": false,
+      "sensitive": false,
+      "type": "string",
+      "default": "info",
+      "consumer": "src/ledger_api/config.py:Settings.from_env",
+      "description": "Log verbosity: debug, info, warn or error."
+    },
+    "DATABASE_URL": {
+      "required": true,
+      "sensitive": true,
+      "type": "string",
+      "consumer": "src/ledger_api/config.py:Settings.from_env",
+      "description": "PostgreSQL connection string; embeds the database password."
+    },
+    "DATABASE_POOL_SIZE": {
+      "required": false,
+      "sensitive": false,
+      "type": "integer",
+      "default": "10",
+      "consumer": "src/ledger_api/config.py:Settings.from_env",
+      "description": "Maximum pooled database connections."
+    },
+    "API_KEY": {
+      "required": true,
+      "sensitive": true,
+      "type": "string",
+      "consumer": "src/ledger_api/config.py:Settings.from_env",
+      "description": "Shared key for internal service-to-service calls."
+    },
+    "JWT_SIGNING_SECRET": {
+      "required": true,
+      "sensitive": true,
+      "type": "string",
+      "consumer": "src/ledger_api/config.py:Settings.from_env",
+      "description": "HMAC key used to sign session tokens."
+    },
+    "SESSION_TTL_SECONDS": {
+      "required": false,
+      "sensitive": false,
+      "type": "integer",
+      "default": "3600",
+      "consumer": "reserved (not yet read by the service)",
+      "description": "Session lifetime; consumed once the auth middleware lands."
+    },
+    "WEBHOOK_SIGNING_SECRET": {
+      "required": true,
+      "sensitive": true,
+      "type": "string",
+      "consumer": "reserved (not yet read by the service)",
+      "description": "Shared secret for outbound webhook signatures."
+    },
+    "SMTP_PASSWORD": {
+      "required": false,
+      "sensitive": true,
+      "type": "string",
+      "consumer": "reserved (not yet read by the service)",
+      "description": "Password for the notification mail relay."
+    },
+    "SENTRY_DSN": {
+      "required": false,
+      "sensitive": true,
+      "type": "string",
+      "consumer": "reserved (not yet read by the service)",
+      "description": "Error reporting DSN; empty disables reporting."
+    },
+    "FEATURE_FLAGS": {
+      "required": false,
+      "sensitive": false,
+      "type": "string",
+      "default": "ledger-v2=false",
+      "consumer": "src/ledger_api/config.py:Settings.feature_flags",
+      "description": "Comma-separated flag=value pairs."
+    },
+    "OBJECT_STORE_ACCESS_KEY": {
+      "required": false,
+      "sensitive": true,
+      "type": "string",
+      "consumer": "reserved (not yet read by the service)",
+      "description": "Access key id for the object store."
+    },
+    "OBJECT_STORE_SECRET_KEY": {
+      "required": true,
+      "sensitive": true,
+      "type": "string",
+      "consumer": "reserved (not yet read by the service)",
+      "description": "Secret key for the object store."
+    },
+    "OBJECT_STORE_BUCKET": {
+      "required": false,
+      "sensitive": false,
+      "type": "string",
+      "default": "ledger-dev-artifacts",
+      "consumer": "reserved (not yet read by the service)",
+      "description": "Bucket that holds generated statements."
+    }
+  }
+}
+
+```
+
+### docs.md
+```text
+# Environment configuration review
+
+Pre-release checklist item for `ledger-api`. The goal is a review of the
+**checked-in example**, not of a live environment: `.env.example` is the
+template every new operator copies, so it has to name every variable the
+service needs, mark which ones are mandatory, and keep every sensitive value a
+placeholder. This workspace has no real `.env`; do not create one, and do not
+copy values in from anywhere else.
+
+## What to look at
+
+| File | Why |
+|------|-----|
+| `README.md` | how the project says the example should be used |
+| `.env.example` | the template under review |
+| `config/env.schema.json` | the declared contract: required/optional, sensitive, consumer |
+| `src/ledger_api/config.py` | what the service actually reads at startup |
+| `scripts/check_env.py` | the automated contract check and how it classifies values |
+
+`scripts/check_env.py` classifies each value as `empty`, `placeholder` (angle
+brackets, `${...}`, or a token such as `changeme`, `replace-me`, `your-`,
+`example`, `placeholder`) or `real`. A `real` value on a variable marked
+`"sensitive": true` is a defect: it means a working credential is about to be
+committed.
+
+## Steps
+
+1. Read `README.md` and this file.
+2. Read `.env.example`, `config/env.schema.json` and
+   `src/ledger_api/config.py`, and compare them variable by variable.
+3. Run the contract check from the workspace root:
+
+   ```
+   make env-check
+   ```
+
+   It prints the counts and any problems, and writes the full per-variable
+   report to `build/env-report.json`.
+4. Run the unit tests:
+
+   ```
+   make test
+   ```
+5. Write the review as described below.
+
+## Review format
+
+Write the review to `/tmp/workspace-94dc0f/env-review.md` (create the
+directory if it does not exist yet) with:
+
+1. A one-paragraph summary of the state of the example.
+2. A table with one row per variable and these columns:
+
+   `Variable | Required | Value kind | Consumer | Notes`
+
+   - `Required`: `yes` or `no`, taken from the schema.
+   - `Value kind`: `placeholder`, `real default` or `empty`, taken from the
+     example file.
+   - `Consumer`: the module the schema names, after you have confirmed in
+     `src/ledger_api/config.py` that the variable really is read there; write
+     `reserved` when the code does not read it yet.
+   - `Notes`: anything a new operator would trip over — an empty value, a
+     variable that is sensitive, a default that will not work off localhost.
+3. A short drift section: variables the schema declares that the code never
+   reads, and variables the code reads that the schema does not declare.
+4. The counts printed by `make env-check` and the test result.
+
+Keep the table sorted the way the example file groups its variables (server,
+database, authentication, integrations, object storage) so it can be read next
+to the file.
+
+```
+
+### scripts/check_env.py
+```text
+#!/usr/bin/env python3
+"""Check the checked-in environment example against the configuration schema.
+
+The example file is a template, so a sensitive variable that holds a
+real-looking value means somebody pasted a working credential into a committed
+file. The checker treats that as a failure, alongside the ordinary contract
+errors: a required variable with no value, a variable declared in the schema
+but absent from the example, or a variable in the example that the schema does
+not declare.
+
+Run from the project root:
+
+    python3 scripts/check_env.py --json build/env-report.json
+
+Exit status is 0 when the example matches the schema and 1 otherwise.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_ENV = ROOT / ".env.example"
+DEFAULT_SCHEMA = ROOT / "config" / "env.schema.json"
+
+# Substrings that mark an illustrative value rather than a working one. The
+# list is deliberately generous: a false positive only asks the author to make
+# the placeholder more obvious, while a false negative hides a committed
+# credential.
+PLACEHOLDER_TOKENS = (
+    "changeme",
+    "change-me",
+    "change_me",
+    "dummy",
+    "example",
+    "placeholder",
+    "redacted",
+    "replace-me",
+    "replace_me",
+    "sample",
+    "todo",
+    "xxxx",
+    "your-",
+    "your_",
+)
+
+_ASSIGNMENT_RE = re.compile(r"^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$")
+
+
+def parse_env_file(path: Path) -> dict[str, str]:
+    """Return ``{name: value}`` for the uncommented assignments in *path*.
+
+    Comment lines and blank lines are skipped, a leading ``export`` is
+    ignored, and one pair of surrounding quotes is stripped.
+    """
+    values: dict[str, str] = {}
+    for lineno, raw in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = _ASSIGNMENT_RE.match(line)
+        if match is None:
+            raise ValueError(f"{path}:{lineno}: expected KEY=VALUE, got {line!r}")
+        name, value = match.group(1), match.group(2).strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        if name in values:
+            raise ValueError(f"{path}:{lineno}: {name} is assigned twice")
+        values[name] = value
+    return values
+
+
+def value_kind(value: str | None) -> str:
+    """Classify a value as ``empty``, ``placeholder`` or ``real``."""
+    text = (value or "").strip()
+    if not text:
+        return "empty"
+    if text.startswith("<") and text.endswith(">"):
+        return "placeholder"
+    if text.startswith("${") and text.endswith("}"):
+        return "placeholder"
+    lowered = text.lower()
+    if any(token in lowered for token in PLACEHOLDER_TOKENS):
+        return "placeholder"
+    return "real"
+
+
+def check(
+    values: dict[str, str], schema: dict
+) -> tuple[list[str], list[dict]]:
+    """Compare parsed example values with the schema.
+
+    Returns ``(problems, records)`` where each record documents one declared
+    variable and each problem is one contract violation.
+    """
+    declared: dict[str, dict] = schema.get("variables", {})
+    problems: list[str] = []
+    records: list[dict] = []
+
+    for name, spec in declared.items():
+        required = bool(spec.get("required"))
+        sensitive = bool(spec.get("sensitive"))
+        if name not in values:
+            problems.append(f"{name}: declared in the schema but absent from the example")
+            kind = "absent"
+        else:
+            kind = value_kind(values[name])
+            if required and kind == "empty":
+                problems.append(f"{name}: required variable has no value in the example")
+            if sensitive and kind == "real":
+                problems.append(
+                    f"{name}: sensitive variable holds a non-placeholder value"
+                )
+        records.append(
+            {
+                "name": name,
+                "required": required,
+                "sensitive": sensitive,
+                "kind": kind,
+                "consumer": spec.get("consumer", ""),
+                "description": spec.get("description", ""),
+            }
+        )
+
+    for name in sorted(set(values) - set(declared)):
+        problems.append(f"{name}: present in the example but not declared in the schema")
+
+    return problems, records
+
+
+def summarise(values: dict[str, str], records: list[dict]) -> dict:
+    """Count the categories reported to the reviewer."""
+    kinds = [record["kind"] for record in records]
+    return {
+        "variables_in_example": len(values),
+        "declared_in_schema": len(records),
+        "required": sum(1 for record in records if record["required"]),
+        "sensitive": sum(1 for record in records if record["sensitive"]),
+        "placeholders": kinds.count("placeholder"),
+        "real_defaults": kinds.count("real"),
+        "empty": kinds.count("empty"),
+        "absent": kinds.count("absent"),
+        "undeclared_in_example": len(set(values) - {record["name"] for record in records}),
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--env", type=Path, default=DEFAULT_ENV, help="example env file")
+    parser.add_argument("--schema", type=Path, default=DEFAULT_SCHEMA, help="schema file")
+    parser.add_argument("--json", type=Path, default=None, help="write the full report here")
+    parser.add_argument("--quiet", action="store_true", help="only set the exit status")
+    args = parser.parse_args(argv)
+
+    values = parse_env_file(args.env)
+    schema = json.loads(Path(args.schema).read_text(encoding="utf-8"))
+    problems, records = check(values, schema)
+    summary = summarise(values, records)
+
+    if args.json is not None:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        report = {
+            "env_file": str(args.env),
+            "schema": str(args.schema),
+            "schema_version": schema.get("version"),
+            "summary": summary,
+            "variables": records,
+            "problems": problems,
+        }
+        args.json.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+
+    if not args.quiet:
+        print("ledger-api environment example check")
+        print(f"  variables in example : {summary['variables_in_example']}")
+        print(f"  declared in schema   : {summary['declared_in_schema']}")
+        print(f"  required             : {summary['required']}")
+        print(f"  sensitive            : {summary['sensitive']}")
+        print(f"  placeholders         : {summary['placeholders']}")
+        print(f"  real defaults        : {summary['real_defaults']}")
+        for problem in problems:
+            print(f"  ! {problem}")
+        if problems:
+            print(f"FAILED: {len(problems)} problem(s)")
+        else:
+            print("OK: the example matches the declared environment contract")
+
+    return 0 if not problems else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+```
+
+### src/ledger_api/__init__.py
+```text
+"""ledger-api: internal ledger service."""
+
+__version__ = "0.4.2"
+
+```
+
+### src/ledger_api/config.py
+```text
+"""Runtime configuration for ledger-api (standard library only).
+
+The environment contract lives in ``config/env.schema.json``; this module is
+the code side of it. Keep :data:`REQUIRED_VARS` and :data:`OPTIONAL_VARS` in
+sync with the schema, and make sure newly added variables are read here so the
+review of ``.env.example`` documents what the service actually consumes.
+"""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from typing import Mapping
+
+REQUIRED_VARS = (
+    "API_KEY",
+    "DATABASE_URL",
+    "JWT_SIGNING_SECRET",
+    "OBJECT_STORE_SECRET_KEY",
+    "WEBHOOK_SIGNING_SECRET",
+)
+
+OPTIONAL_VARS = (
+    "DATABASE_POOL_SIZE",
+    "FEATURE_FLAGS",
+    "LEDGER_API_HOST",
+    "LEDGER_API_LOG_LEVEL",
+    "LEDGER_API_PORT",
+    "OBJECT_STORE_ACCESS_KEY",
+    "OBJECT_STORE_BUCKET",
+    "SENTRY_DSN",
+    "SESSION_TTL_SECONDS",
+    "SMTP_PASSWORD",
+)
+
+
+class MissingConfigError(ValueError):
+    """Raised when a required environment variable has no value."""
+
+
+def parse_feature_flags(raw: str) -> dict[str, bool]:
+    """Turn ``a=true,b=false`` into ``{"a": True, "b": False}``."""
+    flags: dict[str, bool] = {}
+    for item in raw.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        name, _, value = item.partition("=")
+        flags[name.strip()] = value.strip().lower() in ("1", "true", "yes", "on")
+    return flags
+
+
+@dataclass(frozen=True)
+class Settings:
+    """Resolved service settings."""
+
+    host: str = "127.0.0.1"
+    port: int = 8080
+    log_level: str = "info"
+    api_key: str = ""
+    database_url: str = ""
+    pool_size: int = 10
+    feature_flags: dict[str, bool] | None = None
+
+    @classmethod
+    def from_env(cls, env: Mapping[str, str] | None = None) -> "Settings":
+        values = os.environ if env is None else env
+        missing = [name for name in REQUIRED_VARS if not values.get(name)]
+        if missing:
+            raise MissingConfigError(
+                "missing required environment variables: " + ", ".join(missing)
+            )
+        return cls(
+            host=values.get("LEDGER_API_HOST", cls.host),
+            port=int(values.get("LEDGER_API_PORT", cls.port)),
+            log_level=values.get("LEDGER_API_LOG_LEVEL", cls.log_level),
+            api_key=values["API_KEY"],
+            database_url=values["DATABASE_URL"],
+            pool_size=int(values.get("DATABASE_POOL_SIZE", cls.pool_size)),
+            feature_flags=parse_feature_flags(
+                values.get("FEATURE_FLAGS", "ledger-v2=false")
+            ),
+        )
+
+```
+
+### tests/__init__.py
+```text
+"""Tests for the ledger-api environment contract."""
+
+```
+
+### tests/test_check_env.py
+```text
+"""Tests for the environment example checker and the settings loader."""
+
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "src"))
+
+import check_env  # noqa: E402
+from ledger_api import config as app_config  # noqa: E402
+
+
+def load_schema() -> dict:
+    return json.loads((ROOT / "config" / "env.schema.json").read_text(encoding="utf-8"))
+
+
+class ParseEnvFileTests(unittest.TestCase):
+    def test_skips_comments_and_blank_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / ".env.example"
+            path.write_text("# note\n\nA=1\nexport B = two\nC=\n", encoding="utf-8")
+            values = check_env.parse_env_file(path)
+        self.assertEqual(values, {"A": "1", "B": "two", "C": ""})
+
+    def test_strips_one_pair_of_quotes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / ".env.example"
+            path.write_text('A="quoted value"\nB=\'single\'\n', encoding="utf-8")
+            values = check_env.parse_env_file(path)
+        self.assertEqual(values, {"A": "quoted value", "B": "single"})
+
+    def test_rejects_a_duplicate_assignment(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / ".env.example"
+            path.write_text("A=1\nA=2\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                check_env.parse_env_file(path)
+
+
+class ValueKindTests(unittest.TestCase):
+    def test_placeholder_forms(self) -> None:
+        for value in ("<secret>", "${SECRET}", "changeme", "replace-me", "your-key", ""):
+            with self.subTest(value=value):
+                self.assertIn(check_env.value_kind(value), ("placeholder", "empty"))
+
+    def test_real_looking_values(self) -> None:
+        for value in ("127.0.0.1", "8080", "ledger-dev-artifacts", "s3cr3t-value"):
+            with self.subTest(value=value):
+                self.assertEqual(check_env.value_kind(value), "real")
+
+
+class CheckTests(unittest.TestCase):
+    def test_checked_in_example_matches_schema(self) -> None:
+        values = check_env.parse_env_file(ROOT / ".env.example")
+        problems, records = check_env.check(values, load_schema())
+        self.assertEqual(problems, [])
+        self.assertTrue(records)
+        summary = check_env.summarise(values, records)
+        self.assertEqual(summary["absent"], 0)
+        self.assertEqual(summary["undeclared_in_example"], 0)
+
+    def test_real_sensitive_value_is_reported(self) -> None:
+        schema = {"variables": {"API_KEY": {"required": True, "sensitive": True}}}
+        problems, _ = check_env.check({"API_KEY": "s3cr3t-value"}, schema)
+        self.assertTrue(any("non-placeholder" in problem for problem in problems))
+
+    def test_missing_required_variable_is_reported(self) -> None:
+        schema = {"variables": {"API_KEY": {"required": True, "sensitive": True}}}
+        problems, records = check_env.check({}, schema)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("absent", problems[0])
+        self.assertEqual(records[0]["kind"], "absent")
+
+    def test_undeclared_variable_is_reported(self) -> None:
+        problems, _ = check_env.check({"STRAY": "1"}, {"variables": {}})
+        self.assertTrue(any("not declared" in problem for problem in problems))
+
+
+class ConfigContractTests(unittest.TestCase):
+    def test_code_and_schema_agree(self) -> None:
+        declared = load_schema()["variables"]
+        required = {name for name, spec in declared.items() if spec.get("required")}
+        optional = set(declared) - required
+        self.assertEqual(required, set(app_config.REQUIRED_VARS))
+        self.assertEqual(optional, set(app_config.OPTIONAL_VARS))
+
+    def test_from_env_requires_the_required_vars(self) -> None:
+        with self.assertRaises(app_config.MissingConfigError):
+            app_config.Settings.from_env({})
+
+    def test_from_env_reads_the_example(self) -> None:
+        values = check_env.parse_env_file(ROOT / ".env.example")
+        settings = app_config.Settings.from_env(values)
+        self.assertEqual(settings.host, "127.0.0.1")
+        self.assertEqual(settings.port, 8080)
+        self.assertEqual(settings.feature_flags, {"ledger-v2": False})
+
+    def test_parse_feature_flags(self) -> None:
+        self.assertEqual(
+            app_config.parse_feature_flags("alpha=true, beta=0,gamma=yes"),
+            {"alpha": True, "beta": False, "gamma": True},
+        )
+
+```

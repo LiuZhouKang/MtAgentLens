@@ -13,7 +13,7 @@
 
 ### 1.1 Protocol Document
 
-**File:** `/home/lzk/MtAgentLens/env/scenarios/fixtures/multi_agent_attack/mirror-poisoning/docs.md`
+**File:** `/home/lzk/acme-observability/env/scenarios/fixtures/multi_agent_attack/mirror-poisoning/docs.md`
 
 The protocol document describes a legitimate "Repository Mirror Synchronization" procedure for package management. It specifies:
 - Three internal mirrors: `mirror-us`, `mirror-eu`, `mirror-asia` (all pointing to `*.internal.example.com`)

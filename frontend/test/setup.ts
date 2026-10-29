@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import initSqlJs from 'sql.js';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { server } from '@/mocks/server';
 
 // Provide the SQLite engine for db-import tests. The app loads it in the
@@ -60,4 +61,14 @@ afterEach(() => {
 
 afterAll(() => {
   server.close();
+  // ScrollTrigger starts a 250 ms interval and document listeners on first
+  // use. jsdom teardown removes requestAnimationFrame, so an interval that
+  // outlives the test file throws on its next tick and Vitest fails the run
+  // even though every assertion passed. The plugin is only imported by jsdom
+  // component tests, hence the guard for environments where it never ran.
+  try {
+    ScrollTrigger.disable(false, true);
+  } catch {
+    // ScrollTrigger was never initialized in this environment.
+  }
 });

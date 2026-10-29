@@ -23,7 +23,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TLS_CAPTURE="$ROOT/bpftools/.output/bin/tls_capture"
-SUDO_PASS="${MTAGENTLENS_SUDO_PASSWORD:-1}"
+SUDO_PASS="${MTAGENTLENS_SUDO_PASSWORD:-}"
 TARGET="${1:-}"
 OUT="${2:-}"
 

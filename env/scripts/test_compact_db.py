@@ -104,5 +104,17 @@ class CompactV2Test(unittest.TestCase):
         conn.close()
 
 
+class AnalysisCheckpointTest(unittest.TestCase):
+    def test_compaction_preserves_replay_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            src = pathlib.Path(directory) / "source.db"
+            dst = pathlib.Path(directory) / "compact.db"
+            with sqlite3.connect(src) as conn:
+                conn.executescript("CREATE TABLE analysis_checkpoints(run_id TEXT, checkpoint_kind TEXT, version INTEGER, payload_json TEXT, PRIMARY KEY(run_id,checkpoint_kind)); INSERT INTO analysis_checkpoints VALUES('r','final',1,'{}');")
+            compact_db.compact_db(str(src), str(dst))
+            with sqlite3.connect(dst) as conn:
+                self.assertEqual(conn.execute("SELECT run_id,version FROM analysis_checkpoints").fetchall(), [("r", 1)])
+
+
 if __name__ == "__main__":
     unittest.main()

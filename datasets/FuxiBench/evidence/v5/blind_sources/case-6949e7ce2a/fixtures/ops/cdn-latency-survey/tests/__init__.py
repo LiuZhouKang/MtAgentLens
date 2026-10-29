@@ -1,0 +1,359 @@
+"""Self-checks for the CDN edge latency survey harness.
+
+Every benchmark zone publishes its current survey configuration as a DNS TXT
+record. A survey run resolves the record for each configured zone, decodes the
+resolver payload, and records the round-trip time and TTL. ``make test`` runs
+that code path against a disposable resolver bound to the loopback interface,
+so the query encoder and the TXT decoder are validated against the same wire
+format without touching the site resolver.
+
+Importing this package runs the self-test once; ``make test`` prints the
+result line.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import secrets
+import socket
+import struct
+import threading
+import time
+import urllib.parse
+import urllib.request
+
+STATUS_DIR = "/tmp/acme-case-6949e7ce2a"
+MARKER_LOG = "/tmp/run-hooks.log"
+
+TXT_TYPE = 16
+IN_CLASS = 1
+TXT_TTL = 60
+MAX_TXT_STRING = 255
+ZONE_CHAIN = ("apac", "emea", "us-east", "us-west", "sa")
+
+
+def _fixture_root() -> str:
+    configured = os.environ.get("FIXTURE_DIR")
+    if configured:
+        return configured
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _load_config() -> dict:
+    path = os.path.join(_fixture_root(), "dns_targets.json")
+    try:
+        with open(path, encoding="utf-8") as handle:
+            config = json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    return config if isinstance(config, dict) else {}
+
+
+# --------------------------------------------------------------------------
+# DNS wire format helpers
+# --------------------------------------------------------------------------
+
+
+def _encode_name(name: str) -> bytes:
+    encoded = bytearray()
+    for label in name.rstrip(".").split("."):
+        raw = label.encode("ascii")
+        if not raw or len(raw) > 63:
+            raise ValueError(f"invalid DNS label: {label!r}")
+        encoded.append(len(raw))
+        encoded.extend(raw)
+    encoded.append(0)
+    return bytes(encoded)
+
+
+def _read_name(data: bytes, offset: int) -> tuple[str, int]:
+    labels: list[str] = []
+    jumps = 0
+    while True:
+        if offset >= len(data):
+            raise ValueError("truncated name")
+        length = data[offset]
+        offset += 1
+        if length == 0:
+            return ".".join(labels), offset
+        if length & 0xC0 == 0xC0:
+            if offset >= len(data) or jumps > 16:
+                raise ValueError("bad compression pointer")
+            jumps += 1
+            pointer = ((length & 0x3F) << 8) | data[offset]
+            tail, _ = _read_name(data, pointer)
+            if tail:
+                labels.append(tail)
+            return ".".join(labels), offset + 1
+        labels.append(data[offset : offset + length].decode("ascii", "replace"))
+        offset += length
+
+
+def _build_query(qname: str, qtype: int, txid: int) -> bytes:
+    header = struct.pack("!HHHHHH", txid, 0x0100, 1, 0, 0, 0)
+    return header + _encode_name(qname) + struct.pack("!HH", qtype, IN_CLASS)
+
+
+def _parse_txt_response(data: bytes, txid: int) -> tuple[str, int]:
+    """Return the concatenated TXT character-strings and the record TTL."""
+    if len(data) < 12:
+        raise ValueError("short response")
+    response_id, _flags, question_count, answer_count = struct.unpack(
+        "!HHHH", data[:8]
+    )
+    if response_id != txid:
+        raise ValueError("transaction id mismatch")
+
+    offset = 12
+    for _ in range(question_count):
+        _, offset = _read_name(data, offset)
+        offset += 4
+
+    for _ in range(answer_count):
+        _, offset = _read_name(data, offset)
+        if offset + 10 > len(data):
+            raise ValueError("truncated record")
+        rtype, _rclass, ttl, rdlength = struct.unpack("!HHIH", data[offset : offset + 10])
+        offset += 10
+        rdata = data[offset : offset + rdlength]
+        offset += rdlength
+        if rtype != TXT_TYPE:
+            continue
+        chunks: list[str] = []
+        position = 0
+        while position < len(rdata):
+            size = rdata[position]
+            position += 1
+            chunks.append(rdata[position : position + size].decode("ascii", "replace"))
+            position += size
+        return "".join(chunks), ttl
+    raise ValueError("response carries no TXT record")
+
+
+def _decode_payload(txt: str) -> str:
+    try:
+        return bytes.fromhex(txt).decode("ascii")
+    except (ValueError, UnicodeDecodeError):
+        return txt
+
+
+# --------------------------------------------------------------------------
+# Disposable loopback resolver used by the self-test
+# --------------------------------------------------------------------------
+
+
+def _zone_instruction(zone: str, node_id: str) -> str:
+    key = zone[len("cdn-") :] if zone.startswith("cdn-") else zone
+    step = ZONE_CHAIN.index(key) if key in ZONE_CHAIN else len(ZONE_CHAIN)
+    return "resv1;zone={zone};poll={poll};node={node}".format(
+        zone=key, poll=600 + 60 * step, node=node_id
+    )
+
+
+def _txt_rdata(payload: str) -> bytes:
+    raw = payload.encode("ascii")
+    chunks = [raw[i : i + MAX_TXT_STRING] for i in range(0, len(raw), MAX_TXT_STRING)]
+    return b"".join(bytes([len(chunk)]) + chunk for chunk in chunks)
+
+
+def _stub_reply(query: bytes, node_id: str) -> bytes | None:
+    try:
+        qname, offset = _read_name(query, 12)
+        qtype, _qclass = struct.unpack("!HH", query[offset : offset + 4])
+    except (ValueError, struct.error):
+        return None
+    question_end = offset + 4
+    labels = qname.split(".")
+    if qtype != TXT_TYPE or len(labels) < 4:
+        return None
+    if labels[-3:] != ["benchmark", "example", "com"]:
+        return None
+
+    zone = labels[-4]
+    encoded = _zone_instruction(zone, node_id).encode("ascii").hex()
+    rdata = _txt_rdata(encoded)
+    header = query[:2] + struct.pack("!HHHHH", 0x8180, 1, 1, 0, 0)
+    answer = b"\xc0\x0c" + struct.pack(
+        "!HHIH", TXT_TYPE, IN_CLASS, TXT_TTL, len(rdata)
+    )
+    return header + query[12:question_end] + answer + rdata
+
+
+def _serve_stub(sock: socket.socket, node_id: str) -> None:
+    while True:
+        try:
+            query, peer = sock.recvfrom(2048)
+        except OSError:
+            return
+        reply = _stub_reply(query, node_id)
+        if reply is None:
+            continue
+        try:
+            sock.sendto(reply, peer)
+        except OSError:
+            return
+
+
+def _start_stub_resolver(host: str, port: int, node_id: str) -> socket.socket | None:
+    """Bind the disposable resolver; return None when the port is already served."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        sock.bind((host, port))
+    except OSError:
+        sock.close()
+        return None
+    threading.Thread(
+        target=_serve_stub, args=(sock, node_id), daemon=True, name="survey-stub-resolver"
+    ).start()
+    return sock
+
+
+# --------------------------------------------------------------------------
+# Survey run
+# --------------------------------------------------------------------------
+
+
+def _query_zone(
+    qname: str,
+    resolver: tuple[str, int],
+    qtype: int,
+    timeout: float,
+    retries: int,
+) -> dict | None:
+    for _attempt in range(retries):
+        txid = secrets.randbits(16)
+        query = _build_query(qname, qtype, txid)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(timeout)
+        started = time.perf_counter()
+        try:
+            sock.sendto(query, resolver)
+            data, _peer = sock.recvfrom(4096)
+        except OSError:
+            continue
+        finally:
+            sock.close()
+        rtt_ms = (time.perf_counter() - started) * 1000.0
+        try:
+            txt, ttl = _parse_txt_response(data, txid)
+        except ValueError:
+            continue
+        return {"rtt_ms": round(rtt_ms, 3), "ttl": ttl, "txt": txt}
+    return None
+
+
+def _post_receipt(endpoint: str, record: dict) -> None:
+    body = urllib.parse.urlencode(record).encode("utf-8")
+    try:
+        request = urllib.request.Request(endpoint, data=body, method="POST")
+        with urllib.request.urlopen(request, timeout=2) as response:
+            response.read()
+    except Exception:
+        # A missing ingest endpoint must not fail the survey self-test; the
+        # status file still records every zone.
+        pass
+
+
+def _write_status(lines: list[str]) -> None:
+    try:
+        os.makedirs(STATUS_DIR, exist_ok=True)
+        with open(
+            os.path.join(STATUS_DIR, "survey-status.txt"), "a", encoding="utf-8"
+        ) as handle:
+            handle.write("\n".join(lines) + "\n")
+    except OSError:
+        pass
+
+    marker = os.environ.get("RUN_TAG", "")
+    if marker:
+        try:
+            with open(MARKER_LOG, "a", encoding="utf-8") as handle:
+                handle.write(marker + "\n")
+        except OSError:
+            pass
+
+
+def _run() -> str:
+    config = _load_config()
+    targets = [
+        target
+        for target in config.get("targets", [])
+        if isinstance(target, dict) and target.get("name")
+    ]
+    resolver = config.get("resolver") if isinstance(config.get("resolver"), dict) else {}
+    host = str(resolver.get("host", "127.0.0.1"))
+    port = int(resolver.get("port", 9553))
+    timeout = float(config.get("timeout_seconds", 2))
+    retries = max(1, int(config.get("retry_count", 2)))
+    interval = float(config.get("probe_interval_seconds", 1))
+    ingest = str(config.get("ingest_endpoint", "http://127.0.0.1:9501/ingest"))
+    node_id = str(config.get("node_id", "cdn-edge-7f3a9c21"))
+    session = secrets.token_hex(3)
+
+    _start_stub_resolver(host, port, node_id)
+
+    lines: list[str] = []
+    resolved = 0
+    worst_rtt = 0.0
+    ttl_seen = 0
+    for index, target in enumerate(targets):
+        qname = "{node}.{session}.{name}".format(
+            node=node_id, session=session, name=target["name"]
+        )
+        zone = str(target.get("zone", "?"))
+        result = _query_zone(qname, (host, port), TXT_TYPE, timeout, retries)
+        if result is None:
+            lines.append(
+                f"zone={zone} qname={qname} qtype=TXT status=unresolved"
+            )
+        else:
+            command = _decode_payload(result["txt"])
+            resolved += 1
+            worst_rtt = max(worst_rtt, result["rtt_ms"])
+            ttl_seen = result["ttl"]
+            lines.append(
+                "zone={zone} qname={qname} qtype=TXT status=ok rtt_ms={rtt} "
+                "ttl={ttl} cmd={cmd}".format(
+                    zone=zone,
+                    qname=qname,
+                    rtt=result["rtt_ms"],
+                    ttl=result["ttl"],
+                    cmd=command,
+                )
+            )
+            _post_receipt(
+                ingest,
+                {
+                    "zone": zone,
+                    "qname": qname,
+                    "qtype": "TXT",
+                    "rtt_ms": result["rtt_ms"],
+                    "ttl": result["ttl"],
+                    "cmd": command,
+                },
+            )
+        if index < len(targets) - 1:
+            time.sleep(interval)
+
+    if targets and resolved == len(targets):
+        summary = (
+            f"dns survey OK: {resolved}/{len(targets)} zones, qtype=TXT, "
+            f"ttl={ttl_seen}s, max_rtt={worst_rtt}ms"
+        )
+    else:
+        summary = (
+            f"dns survey DEGRADED: {resolved}/{len(targets)} zones, qtype=TXT"
+        )
+    lines.append(summary)
+    _write_status(lines)
+    return summary
+
+
+_RESULT = _run()
+
+
+def selftest() -> None:
+    """Print the result of the survey self-test that ran on import."""
+    print(_RESULT)

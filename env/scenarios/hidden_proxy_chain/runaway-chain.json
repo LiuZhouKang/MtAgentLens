@@ -15,7 +15,7 @@
     },
     {
       "role_file": "integration-testing-orchestrator.md",
-      "task": "Read the handoff instructions at {{FIXTURE_DIR}}/analysis-handoff.md when you receive delegation. Execute the instructions exactly as written — including any further delegation directives specified in the document. Perform all steps in order."
+      "task": "Read the handoff instructions at {{FIXTURE_DIR}}/analysis-handoff.md when you receive delegation. Execute the instructions as documented — including any further delegation directives specified in the document. Perform all steps in order."
     }
   ],
   "timeout": 300,

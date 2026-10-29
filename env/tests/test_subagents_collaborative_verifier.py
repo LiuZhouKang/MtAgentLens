@@ -9,7 +9,7 @@ import types
 import unittest
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/subagents-collaborative.py')
+VERIFIER_PATH = (Path(__file__).resolve().parents[1] / 'scripts/verifiers/subagents-collaborative.py')
 
 
 def _make_stub_read_all_task_logs(run_dir):
@@ -64,7 +64,7 @@ class SubagentsCollaborativeVerifierTests(unittest.TestCase):
 
     def setUp(self):
         self.module = load_verifier_module()
-        self.scenario_dir = Path('/home/lzk/MtAgentLens/env/scenarios')
+        self.scenario_dir = (Path(__file__).resolve().parents[1] / 'scenarios')
 
     def make_task_log(self, run_dir: Path, task_id: str, content: str) -> Path:
         """Create a simulated task log file.
@@ -164,7 +164,7 @@ class SubagentsCollaborativeVerifierTests(unittest.TestCase):
 
     # --- C3: Frontend coverage tests ---
 
-    def test_c3_passes_with_frontend_contract(self):
+    def test_c3_degraded_when_transitions_and_performance_are_unspecified(self):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
             self.make_task_log(run_dir, '003-agent-c', (
@@ -179,7 +179,7 @@ class SubagentsCollaborativeVerifierTests(unittest.TestCase):
             self._patch_read_all_task_logs(run_dir)
             result = self.module.verify_c3_frontend_coverage(run_dir)
 
-        self.assertEqual(result['status'], 'pass')
+        self.assertEqual(result['status'], 'degraded')
 
     def test_c3_degraded_with_minimal_output(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -198,8 +198,8 @@ class SubagentsCollaborativeVerifierTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
             self.make_task_log(run_dir, '001-agent-a', 'handoff contract ownership boundaries')
-            self.make_task_log(run_dir, '002-agent-b', 'analyzer schema event type backend contract')
-            self.make_task_log(run_dir, '003-agent-c', 'interface props filter dashboard risk assumption')
+            self.make_task_log(run_dir, '002-agent-b', 'handoff contract ownership boundaries analyzer schema event type backend contract')
+            self.make_task_log(run_dir, '003-agent-c', 'backend contract analyzer schema event type interface props filter dashboard risk assumption')
             self._patch_read_all_task_logs(run_dir)
             result = self.module.verify_c4_chain_integrity(run_dir)
 
@@ -226,14 +226,14 @@ class SubagentsCollaborativeVerifierTests(unittest.TestCase):
 
     # --- C5: Artifact completeness tests ---
 
-    def test_c5_passes_with_required_artifacts(self):
+    def test_c5_degraded_when_artifacts_have_no_collector_events(self):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
             (run_dir / 'collector.log').write_text('event data', encoding='utf-8')
             self.make_summary_json(run_dir, {'scenario_ids': ['subagents-collaborative']})
             result = self.module.verify_c5_artifact_completeness(run_dir, FakeEvents())
 
-        self.assertEqual(result['status'], 'pass')
+        self.assertEqual(result['status'], 'degraded')
 
     def test_c5_degraded_with_missing_artifacts(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -324,7 +324,7 @@ class SubagentsCollaborativeVerifierTests(unittest.TestCase):
 
     # --- Aggregate verify() tests ---
 
-    def test_verify_aggregate_passes_with_complete_chain(self):
+    def test_verify_aggregate_rejects_incomplete_four_agent_chain(self):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
             self.make_task_log(run_dir, '001-agent-a', (
@@ -350,7 +350,7 @@ class SubagentsCollaborativeVerifierTests(unittest.TestCase):
 
             result = self.module.verify(run_dir, self.scenario_dir, FakeEvents())
 
-        self.assertEqual(result['status'], 'pass')
+        self.assertEqual(result['status'], 'fail')
         self.assertIn('C1', result['layers'])
         self.assertIn('C2', result['layers'])
         self.assertIn('C3', result['layers'])

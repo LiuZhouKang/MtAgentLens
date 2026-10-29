@@ -1,0 +1,6 @@
+{"scenario_id": "benign-code-refactor", "attempt_id": "bcd025cb-e1b7-4346-b301-14521e9f75c7", "capture_quality_status": "degraded", "state": "completed", "source_ledger": "evidence/legacy/f6/benign-b1/results.jsonl"}
+{"scenario_id": "benign-credential-rotation-plan", "attempt_id": "c8b150e3-bdb2-4cf4-b77a-31f5380489bf", "capture_quality_status": "degraded", "state": "completed", "source_ledger": "evidence/legacy/f6/benign-b1/results.jsonl"}
+{"scenario_id": "benign-multi-release-orchestration", "attempt_id": "1648a67a-9a13-4f10-ac89-9a71cc127f2e", "capture_quality_status": "degraded", "state": "completed", "source_ledger": "evidence/legacy/f6/benign-b3/results.jsonl"}
+{"scenario_id": "benign-passwd-audit", "attempt_id": "85786fac-88f1-404c-a08f-cf221596ac60", "capture_quality_status": "degraded", "state": "completed", "source_ledger": "evidence/legacy/f6/benign-b4/results.jsonl"}
+{"scenario_id": "benign-test-writing", "attempt_id": "18a8fb07-285f-49ab-a284-83c049b45942", "capture_quality_status": "degraded", "state": "completed", "source_ledger": "evidence/legacy/f6/benign-b4/results.jsonl"}
+{"scenario_id": "benign-multi-release-orchestration", "attempt_id": "210f32cb-40e4-49e5-9dd3-a651dbdb75b7", "capture_quality_status": "degraded", "state": "completed", "source_ledger": "evidence/legacy/f6/benign-retry/results.jsonl"}

@@ -134,17 +134,18 @@ def _fig_main_metrics(report: dict[str, Any]) -> dict[str, Any]:
                 "scenario_recall": float(metric.get("scenario_recall", 0.0)),
             }
         )
+    count = report.get("dataset_summary", {}).get("total_cases", 0)
     svg = _svg_page(
-        "Figure 1. Frozen 67-scenario evaluation",
-        "MtAgentLens preserves scenario recall where prompt baselines do not.",
+        f"Figure 1. Frozen {count}-scenario evaluation",
+        "F1 and scenario recall from the supplied evaluation artifact.",
         [_grouped_bar_panel(70, 95, 980, 430, rows, ["f1", "scenario_recall"])],
         width=1120,
         height=620,
     )
     return {
         "id": "fig1_main_metrics",
-        "title": "Frozen 67-scenario evaluation",
-        "claim": "MtAgentLens achieves full frozen-set recall under the completed prompt-input contract.",
+        "title": f"Frozen {count}-scenario evaluation",
+        "claim": "Observed metrics for the supplied frozen inputs and evaluated tools.",
         "panels": ["F1 and scenario recall for MtAgentLens and prompt baselines."],
         "svg": svg,
         "source_data": {"schema": "mtagentlens.figure_source_data.v1", "rows": rows},
@@ -168,7 +169,7 @@ def _fig_ablation(ablation: dict[str, Any]) -> dict[str, Any]:
             )
     svg = _svg_page(
         "Figure 2. Controlled persisted-graph ablation",
-        "File-read policy-boundary signals drive the main persisted-graph recall drop.",
+        "Scenario recall from each supplied replay variant.",
         [_horizontal_bar_panel(70, 95, 980, 470, rows, "scenario_recall")],
         width=1120,
         height=660,
@@ -176,7 +177,7 @@ def _fig_ablation(ablation: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": "fig2_controlled_ablation",
         "title": "Controlled persisted-graph ablation",
-        "claim": "Within persisted SQLite replay, disabling file-read action-family signals reduces scenario recall from 1.000 to 0.537.",
+        "claim": "Observed scenario recall for the full replay and each supplied feature-flag variant.",
         "panels": ["Scenario recall for full replay and each completed action-family feature-flag variant."],
         "svg": svg,
         "source_data": {

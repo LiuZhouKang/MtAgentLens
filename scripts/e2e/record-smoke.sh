@@ -20,7 +20,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BIN="$ROOT/collector/build/release/mtagentlens"
 [ -x "$BIN" ] || BIN="$ROOT/collector/build/debug/mtagentlens"
-SUDO_PASS="${MTAGENTLENS_SUDO_PASSWORD:-1}"
+SUDO_PASS="${MTAGENTLENS_SUDO_PASSWORD:-}"
 PORT="${SMOKE_PORT:-47891}"
 WORK="$(mktemp -d /tmp/mtl-smoke.XXXXXX)"
 LOG="$WORK/record.log"
@@ -33,6 +33,12 @@ command -v python3 >/dev/null || die "python3 is required"
 
 cleanup() {
   printf '%s\n' "$SUDO_PASS" | sudo -S -p '' systemctl stop "$UNIT_SERVER" 2>/dev/null || true
+  if [ -s "$WORK/collector.pid" ]; then
+    read -r collector_pid < "$WORK/collector.pid"
+    if [[ "$collector_pid" =~ ^[0-9]+$ ]]; then
+      printf '%s\n' "$SUDO_PASS" | sudo -S -p '' kill -INT "$collector_pid" 2>/dev/null || true
+    fi
+  fi
 }
 trap cleanup EXIT INT TERM
 
@@ -77,26 +83,22 @@ PY
 echo "collector: $BIN"
 echo "workdir:   $WORK"
 
-printf '%s\n' "$SUDO_PASS" | sudo -S -p '' "$BIN" trace \
+printf '%s\n' "$SUDO_PASS" | sudo -S -p '' sh -c 'echo "$$" > "$1" || exit; shift; exec "$@"' \
+  _ "$WORK/collector.pid" "$BIN" trace \
   --ssl false --process true -c claude -o "$LOG" -q \
   >"$WORK/collector.out" 2>&1 &
 SUDO_PID=$!
 
-# Find the real collector PID by argv[0]; sudo may fork and the collector
-# spawns eBPF children (see scripts/wire/measure-overhead.sh).
+# Read the PID recorded immediately before exec, including nested sudo setups.
 COLLECTOR_PID=""
 for _ in $(seq 1 50); do
-  for candidate in $(pgrep -P "$SUDO_PID" 2>/dev/null) "$SUDO_PID"; do
-    argv0="$(tr '\0' '\n' < "/proc/$candidate/cmdline" 2>/dev/null | head -1)"
-    if [ "$argv0" = "$BIN" ]; then
-      COLLECTOR_PID="$candidate"
-      break
-    fi
-  done
-  [ -n "$COLLECTOR_PID" ] && break
+  if [ -s "$WORK/collector.pid" ]; then
+    read -r COLLECTOR_PID < "$WORK/collector.pid"
+    break
+  fi
   sleep 0.2
 done
-[ -n "$COLLECTOR_PID" ] || die "collector did not start; see $WORK/collector.out"
+[[ "$COLLECTOR_PID" =~ ^[0-9]+$ ]] || die "collector PID unavailable; see $WORK/collector.out"
 
 # Wait for the process probe to attach, not a fixed sleep: the collector
 # prints this line when the `process` binary is running. Running the workload
@@ -127,13 +129,13 @@ printf '%s\n' "$SUDO_PASS" | sudo -S -p '' cp "$DB" "$READ_DB" || die "cannot co
 printf '%s\n' "$SUDO_PASS" | sudo -S -p '' chown "$(id -u):$(id -g)" "$READ_DB" || true
 [ -f "$READ_DB" ] || die "database copy is missing"
 
-python3 - "$READ_DB" "$PORT" <<'PY'
+python3 - "$READ_DB" "$PORT" "$WORK" <<'PY'
 import json
 import os
 import sqlite3
 import sys
 
-db_path, port = sys.argv[1], int(sys.argv[2])
+db_path, port, work = sys.argv[1], int(sys.argv[2]), sys.argv[3]
 conn = sqlite3.connect(db_path)
 tables = {row[0] for row in conn.execute("select name from sqlite_master where type='table'")}
 for required in ("runs", "actions", "process_events"):
@@ -157,7 +159,7 @@ expected = ["NetworkConnect", "ProcessExec"]
 # non-sandboxed host: REQUIRE_FILES=1.
 require_files = os.environ.get("REQUIRE_FILES") == "1"
 if require_files:
-    expected += ["FileRead", "FileOverwrite", "FileDelete", "FileRename"]
+    expected += ["FileOpen", "FileDelete", "FileRename"]
 missing = [name for name in expected if actions.get(name, 0) == 0]
 
 print("action types:", json.dumps(actions, sort_keys=True))
@@ -170,6 +172,37 @@ if missing:
     failures.append(f"missing actions: {missing}")
 if not port_hit:
     failures.append(f"NetworkConnect did not record port {port}")
+
+if require_files:
+    # Open flags prove the requested access mode; an open is not evidence of
+    # an actual read/write syscall. The process probe reports FileOpen.
+    source = os.path.join(work, "e2e-source.txt")
+    destination = os.path.join(work, "e2e-renamed.txt")
+    observed = [
+        (kind, json.loads(args))
+        for kind, args in conn.execute(
+            "SELECT action_type, normalized_args_json FROM actions WHERE outcome='succeeded'"
+        )
+    ]
+    def file_action(kind, paths, flags=None):
+        return any(
+            action == kind and all({"Path": path} in args for path in paths)
+            and (flags is None or any(
+                isinstance(arg, dict) and "OpenFlags" in arg and flags(arg["OpenFlags"])
+                for arg in args
+            ))
+            for action, args in observed
+        )
+    checks = {
+        "readonly open": file_action("FileOpen", [source], lambda value: value & os.O_ACCMODE == os.O_RDONLY),
+        "truncate open": file_action("FileOpen", [source], lambda value: bool(value & os.O_TRUNC)),
+        "rename endpoints": file_action("FileRename", [source, destination]),
+        "delete destination": file_action("FileDelete", [destination]),
+    }
+    for label, passed in checks.items():
+        if not passed:
+            failures.append(f"missing successful workload file operation: {label}")
+    print("workload file operations:", json.dumps(checks, sort_keys=True))
 
 if not require_files:
     print("note: file actions not asserted in this sandbox (REQUIRE_FILES=1 on a host)")

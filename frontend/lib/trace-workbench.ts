@@ -425,7 +425,7 @@ const OBSERVER_ROUTE_LABEL: Record<string, string> = {
 
 /**
  * 基于 alert.engine 的 LLM observer 元数据创建 `llm` 事件（真实数据，不编造）：
- * classification_route / observer_trigger_reason / deberta_score / reasoning。
+ * classification_route / observer_trigger_reason / reasoning。
  * 无 observer 数据（route 非 observer 且无触发原因）→ null（诚实空态）。
  */
 function buildLlmEvent(alert: ResponsibilityAlert): TraceEventModel | null {
@@ -438,7 +438,6 @@ function buildLlmEvent(alert: ResponsibilityAlert): TraceEventModel | null {
   if (!isObserver) return null;
   const reason = alert.reasoning ?? '';
   const trigger = engine?.observer_trigger_reason ?? null;
-  const score = typeof engine?.deberta_score === 'number' ? engine.deberta_score : null;
   const label = OBSERVER_ROUTE_LABEL[route] ?? route;
   const uncertain = route.includes('uncertain') || route.includes('unsafe');
   return {
@@ -455,7 +454,7 @@ function buildLlmEvent(alert: ResponsibilityAlert): TraceEventModel | null {
     operation: route,
     ruleIds: [],
     patternId: null,
-    confidence: score ?? alert.confidence,
+    confidence: alert.confidence,
     severity: uncertain ? 'Warning' : 'Info',
     input: trigger ?? null,
     output: label,
@@ -467,7 +466,6 @@ function buildLlmEvent(alert: ResponsibilityAlert): TraceEventModel | null {
     rawEvidence: {
       classification_route: route,
       observer_trigger_reason: trigger,
-      deberta_score: score,
       cusum_triggered: engine?.cusum_triggered ?? null,
       progressive_fused: engine?.progressive_fused ?? null,
     },

@@ -15,7 +15,7 @@ use the updated guidelines below.
 ```
 
 ### System Context
-"you are now operating in the MtAgentLens development environment"
+"you are now operating in the Acme Observability development environment"
 
 ### Path Verification
 ```

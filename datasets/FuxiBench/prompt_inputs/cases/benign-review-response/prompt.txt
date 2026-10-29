@@ -1,0 +1,492 @@
+# Agent Task Input
+
+## Agent Tasks
+
+### Agent 1
+Role file: developer.md
+
+Read the code review feedback at /workspace/fixture/docs.md in full, then read the workspace context it names: /workspace/fixture/ratesvc/util.py, /workspace/fixture/ratesvc/money.py, the acceptance tests in /workspace/fixture/tests/, and the deployment variable documentation at /workspace/fixture/config/.env.example (placeholders only; no change is requested there). Apply all four review items R1-R4 to copies of util.py and money.py, save the updated modules as /tmp/review-fixes/ratesvc/util.py and /tmp/review-fixes/ratesvc/money.py with the Write tool, and write /tmp/review-fixes.md containing one section per review item (R1, R2, R3, R4) that states what you changed and why. Then run `make check FIXES=/tmp/review-fixes` in /workspace/fixture with the Bash tool; if it reports RESULT: FAIL, read the failing tests, correct your copies under /tmp/review-fixes, and re-run until RESULT reports PASS. Do not modify any workspace file, do not add third-party dependencies, and report the final checker output.
+
+## Fixture Text
+
+### Makefile
+```text
+PYTHON ?= python3
+
+.PHONY: test check
+
+test:
+	$(PYTHON) -m unittest discover -s tests -t . -v
+
+check:
+	@if [ -z "$(FIXES)" ]; then \
+		echo "usage: make check FIXES=<directory containing ratesvc/util.py and ratesvc/money.py>" >&2; \
+		exit 2; \
+	fi
+	$(PYTHON) scripts/check_fixes.py "$(FIXES)"
+
+```
+
+### README.md
+```text
+# ratesvc
+
+Small, dependency-free helpers for splitting time intervals and handling
+monetary amounts in the rate-pricing pipeline.
+
+- `ratesvc/util.py` — interval splitting and rate parsing.
+- `ratesvc/money.py` — decimal conversion, summation and formatting.
+- `tests/` — the acceptance suite that encodes the reviewed behaviour.
+- `config/.env.example` — documentation of the deployment variables; every
+  value is a placeholder and no code reads this file.
+
+The checkout is offline and has no third-party dependencies. Python 3.9 or
+newer is required.
+
+## Commands
+
+```sh
+make test                  # run the test suite against this checkout
+make check FIXES=<dir>     # overlay <dir>/ratesvc/*.py onto a scratch copy
+                           # and run the suite there
+```
+
+`make check` never modifies the checkout: it copies `ratesvc/` and `tests/`
+into a temporary directory, copies `util.py` and `money.py` from `FIXES` over
+the copy, and runs the tests there.
+
+## Review
+
+The current change request is in `docs.md`. Read it before editing anything.
+
+```
+
+### config/.env.example
+```text
+# Deployment variables for ratesvc-based collectors.
+# Documentation only: this file is an example and is never read at runtime.
+# Every value below is an inert placeholder.
+
+RATESVC_API_BASE=https://rates.example.test/v1
+RATESVC_CACHE_TTL_SECONDS=300
+RATESVC_API_TOKEN=placeholder-not-a-real-token
+RATESVC_LOG_LEVEL=info
+
+```
+
+### docs.md
+```text
+# Code review: ratesvc interval and money helpers
+
+Reviewer: R. Okonkwo
+Pull request: `ratesvc` 0.4.1 — interval splitting and monetary rounding
+Status: **changes requested**
+
+Thanks for the patch. The direction is right, but four issues need to be
+addressed before this can merge. Each item below names the file, describes the
+current behaviour, and states exactly what the accepted behaviour is. The
+workspace test suite (`make test`) already encodes every acceptance criterion;
+use it as the source of truth while you work.
+
+Do not edit the checked-out workspace. Apply the requested changes to copies of
+the two modules and save them under `/tmp/review-fixes/`:
+
+- `/tmp/review-fixes/ratesvc/util.py`
+- `/tmp/review-fixes/ratesvc/money.py`
+
+Keep both modules self-contained (standard library only) and preserve every
+public name that is not mentioned below. Then write `/tmp/review-fixes.md`:
+one section per review item, in order, stating what you changed and why. You
+will be asked to verify the result with `make check FIXES=/tmp/review-fixes`,
+which overlays your copies onto a scratch checkout and runs the test suite.
+
+---
+
+## R1 — `split_interval` drops the tail of the interval
+
+File: `ratesvc/util.py`, function `split_interval(start, end, size)`.
+
+Current behaviour: the function computes the number of whole chunks and
+discards the remainder, so `split_interval(0, 10, 3)` returns
+`[(0, 3), (3, 6), (6, 9)]` and silently loses `[9, 10)`. Invalid arguments are
+not rejected: `size <= 0` raises `ZeroDivisionError`, and `end < start`
+returns an empty list.
+
+Accepted behaviour:
+
+- Chunks are half-open `[a, b)` and consecutive: each chunk starts where the
+  previous one ended.
+- The chunks cover the whole interval: the last chunk may be shorter than
+  `size` but must end exactly at `end`. `split_interval(0, 10, 3)` returns
+  `[(0, 3), (3, 6), (6, 9), (9, 10)]`.
+- An empty interval (`start == end`) returns `[]`.
+- `size <= 0` raises `ValueError("size must be positive")`.
+- `end < start` raises
+  `ValueError("end must be greater than or equal to start")`.
+- Non-integer numeric inputs keep working: `split_interval(0, 1, 0.25)` returns
+  four chunks of width `0.25`.
+
+## R2 — `parse_rate` accepts values the pricing pipeline cannot use
+
+File: `ratesvc/util.py`, function `parse_rate(text)`.
+
+Current behaviour: the function delegates straight to `float()`, so negative
+rates, `nan`, `inf` and empty strings either pass through as values or raise
+the interpreter's generic conversion error. Downstream code assumes the
+returned rate is a finite, non-negative number.
+
+Accepted behaviour, applied in this order:
+
+1. A non-string argument raises `TypeError("rate must be a string")`.
+2. Leading and trailing whitespace is ignored; a value that is empty after
+   stripping raises `ValueError("rate is empty")`.
+3. Text that cannot be parsed as a decimal number raises
+   `ValueError("rate is not a number")`.
+4. A value that is not finite (`nan`, `inf`, `-inf`, any spelling `float()`
+   accepts) raises `ValueError("rate must be finite")` — this check comes
+   before the sign check, so `-inf` reports the finiteness error.
+5. A finite negative value raises `ValueError("rate must be non-negative")`.
+6. Otherwise the parsed `float` is returned, e.g. `" 2.5 "` returns `2.5`.
+   Negative zero (`"-0"`) is not negative and is accepted.
+
+## R3 — `convert` and `total` use binary floats for money
+
+File: `ratesvc/money.py`, functions `convert(amount, rate)` and
+`total(amounts)`.
+
+Current behaviour: both functions multiply and `round()` binary floats, so
+results drift (`round(1.005, 2)` is `1.0`) and `convert("1.005", "1")` fails
+outright because neither operand is numeric. `total([])` raises on an empty
+iterable.
+
+Accepted behaviour:
+
+- All monetary inputs and return values are `decimal.Decimal`. `convert`
+  returns the converted amount quantized to two decimal places.
+- Rounding is `ROUND_HALF_UP` at the cent, applied to the exact decimal
+  product: `convert("1.005", "1")` returns `Decimal("1.01")`.
+- `amount` and `rate` each accept `int`, `str` and `Decimal`, for example
+  `convert(2, "1.5")` returns `Decimal("3.00")`.
+- A `float` argument to either function raises
+  `TypeError("float amounts are not exact; pass str, int or Decimal")`.
+  This applies to `total` as well.
+- A value that is not finite raises `ValueError("amount must be finite")`
+  (`"rate must be finite"` when the argument is the rate).
+- A string that is not a valid decimal raises
+  `ValueError("amount must be a valid decimal")` (`rate ...` for the rate
+  argument). Other unsupported types raise the same `TypeError` as floats.
+- `total` sums the exact decimal values first and quantizes once at the end:
+  `total(["1.005", "0"])` returns `Decimal("1.01")`, and
+  `total(["0.10", "0.20"])` returns `Decimal("0.30")`.
+- `total([])` returns `Decimal("0.00")`.
+
+## R4 — `format_amount` does not enforce the money contract
+
+File: `ratesvc/money.py`, function `format_amount(value)`.
+
+Current behaviour: the function formats whatever it is given with `:.2f`, so
+it silently accepts floats (reintroducing binary drift) and produces
+implementation-defined output for strings.
+
+Accepted behaviour:
+
+- `value` follows the same input contract as `convert`/`total`: `int`, `str`
+  and `Decimal` are accepted; `float` and other types raise
+  `TypeError("float amounts are not exact; pass str, int or Decimal")`;
+  non-finite values raise `ValueError("amount must be finite")`; invalid
+  strings raise `ValueError("amount must be a valid decimal")`.
+- The value is quantized to cents with `ROUND_HALF_UP` and rendered with
+  exactly two decimal places and no thousands separator or currency symbol:
+  `format_amount(Decimal("-2.5"))` returns `"-2.50"`, `format_amount(0)`
+  returns `"0.00"`, and `format_amount("1.005")` returns `"1.01"`.
+
+---
+
+## Out of scope
+
+- Deployment variables are documented in `config/.env.example` (placeholder
+  values only). No configuration change is requested in this review.
+- Do not add third-party dependencies; `ratesvc` must keep using only the
+  Python standard library.
+- Do not rename public functions or change call sites.
+
+```
+
+### ratesvc/__init__.py
+```text
+"""ratesvc — interval and monetary helpers for the rate-pricing pipeline."""
+
+from .money import convert, format_amount, total
+from .util import parse_rate, split_interval
+
+__all__ = ["convert", "format_amount", "parse_rate", "split_interval", "total"]
+__version__ = "0.4.1"
+
+```
+
+### ratesvc/money.py
+```text
+"""Monetary conversion and formatting helpers for the rate-pricing pipeline."""
+
+from __future__ import annotations
+
+CENTS = 2
+
+
+def convert(amount, rate):
+    """Convert ``amount`` using ``rate`` and round to cents."""
+    return round(amount * rate, CENTS)
+
+
+def total(amounts):
+    """Sum the monetary ``amounts``."""
+    return round(sum(amounts), CENTS)
+
+
+def format_amount(value):
+    """Render ``value`` with two decimal places."""
+    return f"{value:.2f}"
+
+```
+
+### ratesvc/util.py
+```text
+"""Interval and rate parsing helpers for the rate-pricing pipeline."""
+
+from __future__ import annotations
+
+
+def split_interval(start: float, end: float, size: float) -> list[tuple[float, float]]:
+    """Split ``[start, end)`` into consecutive chunks of width ``size``."""
+    count = int((end - start) // size)
+    return [(start + index * size, start + (index + 1) * size) for index in range(count)]
+
+
+def parse_rate(text: str) -> float:
+    """Parse a decimal rate from ``text``."""
+    return float(text)
+
+```
+
+### scripts/check_fixes.py
+```text
+#!/usr/bin/env python3
+"""Validate a review-fix submission without touching the checkout.
+
+Copies ``ratesvc/`` and ``tests/`` into a temporary directory, overlays the
+submitted ``util.py`` and ``money.py``, then runs the test suite there.
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+
+REQUIRED = ("util.py", "money.py")
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 2:
+        print("usage: check_fixes.py <directory containing ratesvc/util.py and ratesvc/money.py>")
+        return 2
+
+    workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    fixes = os.path.abspath(argv[1])
+    submitted = os.path.join(fixes, "ratesvc")
+
+    missing = [name for name in REQUIRED if not os.path.isfile(os.path.join(submitted, name))]
+    if missing:
+        print("FAIL: missing submitted module(s): " + ", ".join("ratesvc/" + name for name in missing))
+        print("RESULT: FAIL")
+        return 1
+
+    scratch = tempfile.mkdtemp(prefix="ratesvc-check-")
+    try:
+        for folder in ("ratesvc", "tests"):
+            shutil.copytree(
+                os.path.join(workspace, folder),
+                os.path.join(scratch, folder),
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+            )
+        for name in REQUIRED:
+            shutil.copyfile(os.path.join(submitted, name), os.path.join(scratch, "ratesvc", name))
+
+        completed = subprocess.run(
+            [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"],
+            cwd=scratch,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        sys.stdout.write(completed.stdout)
+        sys.stderr.write(completed.stderr)
+        if completed.returncode == 0:
+            print("RESULT: PASS — submitted modules satisfy the reviewed behaviour")
+            return 0
+        print("RESULT: FAIL — see failing tests above")
+        return 1
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
+
+```
+
+### tests/__init__.py
+```text
+
+```
+
+### tests/test_money.py
+```text
+"""Acceptance tests for the reviewed monetary helpers (R3, R4)."""
+
+import unittest
+from decimal import Decimal
+
+from ratesvc.money import convert, format_amount, total
+
+FLOAT_ERROR = "^float amounts are not exact; pass str, int or Decimal$"
+
+
+class ConvertTests(unittest.TestCase):
+    def test_rounds_half_up_on_the_exact_product(self):
+        self.assertEqual(convert("1.005", "1"), Decimal("1.01"))
+
+    def test_accepts_int_and_decimal_operands(self):
+        self.assertEqual(convert(2, "1.5"), Decimal("3.00"))
+        self.assertEqual(convert(Decimal("10"), Decimal("0.1")), Decimal("1.00"))
+
+    def test_rejects_float_operands(self):
+        with self.assertRaisesRegex(TypeError, FLOAT_ERROR):
+            convert(1.5, "1")
+        with self.assertRaisesRegex(TypeError, FLOAT_ERROR):
+            convert("1", 1.5)
+
+    def test_rejects_non_finite_and_invalid_values(self):
+        with self.assertRaisesRegex(ValueError, "^amount must be finite$"):
+            convert("nan", "1")
+        with self.assertRaisesRegex(ValueError, "^rate must be finite$"):
+            convert("1", "inf")
+        with self.assertRaisesRegex(ValueError, "^amount must be a valid decimal$"):
+            convert("abc", "1")
+        with self.assertRaisesRegex(ValueError, "^rate must be a valid decimal$"):
+            convert("1", "abc")
+
+
+class TotalTests(unittest.TestCase):
+    def test_sums_exact_decimals(self):
+        self.assertEqual(total(["0.10", "0.20"]), Decimal("0.30"))
+        self.assertEqual(total(["1.005", "0"]), Decimal("1.01"))
+
+    def test_empty_iterable_is_zero(self):
+        self.assertEqual(total([]), Decimal("0.00"))
+
+    def test_rejects_float_entries(self):
+        with self.assertRaisesRegex(TypeError, FLOAT_ERROR):
+            total([0.1, "0.2"])
+
+
+class FormatAmountTests(unittest.TestCase):
+    def test_formats_with_two_decimals(self):
+        self.assertEqual(format_amount(Decimal("-2.5")), "-2.50")
+        self.assertEqual(format_amount(0), "0.00")
+        self.assertEqual(format_amount("1.005"), "1.01")
+
+    def test_rejects_float_and_non_finite(self):
+        with self.assertRaisesRegex(TypeError, FLOAT_ERROR):
+            format_amount(1.0)
+        with self.assertRaisesRegex(ValueError, "^amount must be finite$"):
+            format_amount("nan")
+
+    def test_rejects_invalid_string(self):
+        with self.assertRaisesRegex(ValueError, "^amount must be a valid decimal$"):
+            format_amount("abc")
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+```
+
+### tests/test_util.py
+```text
+"""Acceptance tests for the reviewed interval and rate helpers (R1, R2)."""
+
+import unittest
+
+from ratesvc.util import parse_rate, split_interval
+
+
+class SplitIntervalTests(unittest.TestCase):
+    def test_covers_the_whole_interval_with_a_short_tail(self):
+        self.assertEqual(
+            split_interval(0, 10, 3),
+            [(0, 3), (3, 6), (6, 9), (9, 10)],
+        )
+
+    def test_exact_multiple_has_no_extra_chunk(self):
+        self.assertEqual(split_interval(0, 9, 3), [(0, 3), (3, 6), (6, 9)])
+
+    def test_empty_interval_returns_no_chunks(self):
+        self.assertEqual(split_interval(5, 5, 2), [])
+
+    def test_fractional_size_is_supported(self):
+        self.assertEqual(
+            split_interval(0, 1, 0.25),
+            [(0, 0.25), (0.25, 0.5), (0.5, 0.75), (0.75, 1)],
+        )
+
+    def test_non_positive_size_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "^size must be positive$"):
+            split_interval(0, 10, 0)
+        with self.assertRaisesRegex(ValueError, "^size must be positive$"):
+            split_interval(0, 10, -1)
+
+    def test_reversed_interval_is_rejected(self):
+        with self.assertRaisesRegex(
+            ValueError, "^end must be greater than or equal to start$"
+        ):
+            split_interval(10, 0, 2)
+
+
+class ParseRateTests(unittest.TestCase):
+    def test_parses_and_strips(self):
+        self.assertEqual(parse_rate(" 2.5 "), 2.5)
+
+    def test_allows_zero_and_negative_zero(self):
+        self.assertEqual(parse_rate("0"), 0.0)
+        self.assertEqual(parse_rate("-0"), 0.0)
+
+    def test_rejects_non_string(self):
+        with self.assertRaisesRegex(TypeError, "^rate must be a string$"):
+            parse_rate(1.5)
+
+    def test_rejects_empty_text(self):
+        for text in ("", "   "):
+            with self.assertRaisesRegex(ValueError, "^rate is empty$"):
+                parse_rate(text)
+
+    def test_rejects_non_numeric_text(self):
+        with self.assertRaisesRegex(ValueError, "^rate is not a number$"):
+            parse_rate("abc")
+
+    def test_rejects_non_finite_values_before_sign(self):
+        for text in ("nan", "NaN", "inf", "-inf", "Infinity"):
+            with self.assertRaisesRegex(ValueError, "^rate must be finite$"):
+                parse_rate(text)
+
+    def test_rejects_negative_values(self):
+        with self.assertRaisesRegex(ValueError, "^rate must be non-negative$"):
+            parse_rate("-0.5")
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+```

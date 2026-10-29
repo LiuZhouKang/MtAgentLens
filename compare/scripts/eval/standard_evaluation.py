@@ -38,7 +38,12 @@ if str(PROJECT_ROOT) not in sys.path:
 # Paths
 # ─────────────────────────────────────────────────────────────
 
-DATASET_DIR = PROJECT_ROOT / "compare" / "Dataset" / "FuxiBench"
+from compare.tools.detection_scope import (  # noqa: E402
+    DEFAULT_DATASET_DIR,
+    detection_excluded_ids,
+)
+
+DATASET_DIR = DEFAULT_DATASET_DIR
 QUALITY_MANIFEST = DATASET_DIR / "quality" / "manifest.json"
 PROMPT_METRICS = PROJECT_ROOT / "compare" / "results" / "prompt_baselines" / "FuxiBench" / "metrics.csv"
 PROMPT_FINDINGS = PROJECT_ROOT / "compare" / "results" / "prompt_baselines" / "FuxiBench" / "findings.jsonl"
@@ -55,7 +60,7 @@ OUTPUT_DIR = PROJECT_ROOT / "compare" / "results" / "paper"
 class ScenarioResult:
     scenario_id: str
     label: str           # "attack" | "benign"
-    attack_type: str     # "A" | "B" | "C" | "benign"
+    attack_type: str     # "A" | "B" | "benign" (legacy "C" is historical only)
     category: str
     should_alert: bool
     has_unsafe: bool
@@ -68,6 +73,9 @@ class ScenarioResult:
     pbc_edges: int
     agent_identities: int
     subagent_boundaries: int
+    # Canonical run verdict. Uncertain is an abstention, not a confident
+    # negative; binary denominators must exclude it.
+    final_decision: str = ""
 
 
 @dataclass
@@ -140,24 +148,37 @@ class ToolMetrics:
     matched_claims: int = 0
     detected_scenarios: set[str] = field(default_factory=set)
     missed_scenarios: set[str] = field(default_factory=set)
+    abstained: int = 0
 
 
 # ─────────────────────────────────────────────────────────────
 # Data loading
 # ─────────────────────────────────────────────────────────────
 
+def _detection_excluded() -> set[str]:
+    return detection_excluded_ids(DATASET_DIR / "ground_truth")
+
+
 def load_mtagentlens_from_manifest() -> tuple[list[ScenarioResult], ToolMetrics]:
     """从 quality manifest 加载 MtAgentLens 的完整评估数据。"""
     if not QUALITY_MANIFEST.exists():
-        raise FileNotFoundError(f"Quality manifest not found: {QUALITY_MANIFEST}")
+        raise FileNotFoundError(
+            f"Quality manifest not found: {QUALITY_MANIFEST}. This evaluator reads "
+            "run results, not ground truth alone: build an input release, collect "
+            "runs, then generate the quality manifest. It refuses to emit "
+            "placeholder numbers without a run corpus."
+        )
 
     manifest = json.loads(QUALITY_MANIFEST.read_text(encoding="utf-8"))
     samples = manifest.get("samples", [])
     if not samples:
         raise ValueError("Manifest has no samples")
 
+    excluded = _detection_excluded()
     results: list[ScenarioResult] = []
     for s in samples:
+        if s.get("scenario_id") in excluded:
+            continue
         gt = s.get("ground_truth_summary", {})
         label = gt.get("label", "?")
         attack_type = gt.get("attack_type", "benign")
@@ -165,6 +186,9 @@ def load_mtagentlens_from_manifest() -> tuple[list[ScenarioResult], ToolMetrics]
             attack_type = "benign"
 
         ad = s.get("alert_decisions", {})
+        final = s.get("final_decision")
+        if final not in ("Safe", "Unsafe", "Uncertain"):
+            raise ValueError(f"{s['scenario_id']}: missing canonical final_decision; historical alerts cannot supply paper metrics")
         dbc = s.get("db_counts", {})
         eb = gt.get("expected_behavior", {})
 
@@ -174,7 +198,7 @@ def load_mtagentlens_from_manifest() -> tuple[list[ScenarioResult], ToolMetrics]
             attack_type=attack_type,
             category=s.get("category", "unknown"),
             should_alert=eb.get("should_alert", label == "attack"),
-            has_unsafe=ad.get("Unsafe", 0) > 0,
+            has_unsafe=final == "Unsafe",
             unsafe_count=ad.get("Unsafe", 0),
             safe_count=ad.get("Safe", 0),
             uncertain_count=ad.get("Uncertain", 0),
@@ -184,6 +208,7 @@ def load_mtagentlens_from_manifest() -> tuple[list[ScenarioResult], ToolMetrics]
             pbc_edges=dbc.get("graph_edges", 0),
             agent_identities=dbc.get("agent_identities", 0),
             subagent_boundaries=dbc.get("subagent_boundaries", 0),
+            final_decision=final,
         ))
 
     metrics = build_tool_metrics("mtagentlens", "MtAgentLens", "runtime-causal-observability", results)
@@ -217,12 +242,15 @@ def load_prompt_baselines() -> list[ToolMetrics]:
                 if tool_id and scenario_id:
                     findings_by_tool[tool_id].add(scenario_id)
 
-    # Load MtAgentLens detected scenarios for comparison
+    excluded = _detection_excluded()
+    # Load MtAgentLens detected scenarios for comparison (detection scope only)
     mtap_detected: set[str] = set()
     if QUALITY_MANIFEST.exists():
         manifest = json.loads(QUALITY_MANIFEST.read_text(encoding="utf-8"))
         for s in manifest.get("samples", []):
-            if s.get("alert_decisions", {}).get("Unsafe", 0) > 0:
+            if s.get("scenario_id") in excluded:
+                continue
+            if s.get("final_decision") == "Unsafe":
                 mtap_detected.add(s["scenario_id"])
 
     # Build per-scenario ground truth lookup for per-type computation
@@ -230,6 +258,8 @@ def load_prompt_baselines() -> list[ToolMetrics]:
     if QUALITY_MANIFEST.exists():
         manifest = json.loads(QUALITY_MANIFEST.read_text(encoding="utf-8"))
         for s in manifest.get("samples", []):
+            if s.get("scenario_id") in excluded:
+                continue
             gt = s.get("ground_truth_summary", {})
             scenario_gt[s["scenario_id"]] = {
                 "label": gt.get("label", "?"),
@@ -314,42 +344,54 @@ def build_tool_metrics(
     detected: set[str] = set()
     missed: set[str] = set()
 
+    abstained = 0
     for r in results:
-        if r.label == "attack":
-            if r.has_unsafe:
-                cm.tp += 1
-                detected.add(r.scenario_id)
-            else:
-                cm.fn += 1
-                missed.add(r.scenario_id)
+        if r.final_decision == "Uncertain":
+            # An abstention carries no positive/negative evidence; counting it
+            # as TN (benign) or FN (attack) inflates every binary metric.
+            abstained += 1
         else:
-            if r.has_unsafe:
-                cm.fp += 1
+            if r.label == "attack":
+                if r.has_unsafe:
+                    cm.tp += 1
+                    detected.add(r.scenario_id)
+                else:
+                    cm.fn += 1
+                    missed.add(r.scenario_id)
             else:
-                cm.tn += 1
+                if r.has_unsafe:
+                    cm.fp += 1
+                else:
+                    cm.tn += 1
 
-        # Per-type
-        at = r.attack_type if r.label == "attack" else "benign"
-        if at not in per_type:
-            per_type[at] = ConfusionMatrix()
-        pt = per_type[at]
-        if r.label == "attack":
-            if r.has_unsafe:
-                pt.tp += 1
+            # Per-type
+            at = r.attack_type if r.label == "attack" else "benign"
+            if at not in per_type:
+                per_type[at] = ConfusionMatrix()
+            pt = per_type[at]
+            if r.label == "attack":
+                if r.has_unsafe:
+                    pt.tp += 1
+                else:
+                    pt.fn += 1
             else:
-                pt.fn += 1
-        else:
-            if r.has_unsafe:
-                pt.fp += 1
-            else:
-                pt.tn += 1
+                if r.has_unsafe:
+                    pt.fp += 1
+                else:
+                    pt.tn += 1
 
-    # Claim coverage
-    total_expected = sum(
-        1 for r in results
-        if r.label == "attack" and r.should_alert
+    # Claim coverage: the fraction of alert-worthy attack scenarios that
+    # produced at least one claim. The previous code divided the number of
+    # claims across *all* runs (including benign ones) by the number of
+    # attack scenarios, so the "coverage" could exceed 1 and measured
+    # verbosity rather than coverage.
+    expected_scenarios = [
+        r for r in results if r.label == "attack" and r.should_alert
+    ]
+    matched_scenarios = sum(1 for r in expected_scenarios if r.total_claims > 0)
+    claim_coverage = (
+        matched_scenarios / len(expected_scenarios) if expected_scenarios else 0.0
     )
-    total_claims = sum(r.total_claims for r in results)
 
     return ToolMetrics(
         tool_id=tool_id,
@@ -359,9 +401,10 @@ def build_tool_metrics(
         per_type=per_type,
         detected_scenarios=detected,
         missed_scenarios=missed,
-        total_expected_claims=total_expected,
-        matched_claims=total_claims,
-        claim_coverage=total_claims / total_expected if total_expected > 0 else 0.0,
+        total_expected_claims=len(expected_scenarios),
+        matched_claims=matched_scenarios,
+        claim_coverage=claim_coverage,
+        abstained=abstained,
     )
 
 
@@ -517,23 +560,21 @@ def evaluate_rq1(
             })
 
     # ── Bootstrap CIs for MtAgentLens ──
-    # Binary outcomes: 1=detected (Unsafe), 0=missed attack, -1=benign (correctly no alert)
-    binary_outcomes = []
-    for r in mtap_results:
-        if r.label == "attack":
-            binary_outcomes.append(1 if r.has_unsafe else 0)
-        else:
-            binary_outcomes.append(-1)  # marker for benign
+    #
+    # Two independent indicators, one per denominator:
+    #   attack outcome = 1 when an attack run was actionable;
+    #   benign outcome = 1 when a benign run was actionable (a false positive).
+    # The previous version encoded benign rows as -1 and then counted 1s among
+    # them, so the FPR interval was [0, 0] for every corpus — a confident
+    # claim that no false positive can exist.
+    attack_outcomes = [1 if r.has_unsafe else 0 for r in mtap_results if r.label == "attack"]
+    benign_outcomes = [1 if r.has_unsafe else 0 for r in mtap_results if r.label != "attack"]
 
-    attack_only = [d for d in binary_outcomes if d != -1]
-    tpr_ci = bootstrap_ci(attack_only, lambda x: sum(x) / len(x) if x else 0.0)
+    def mean_value(values):
+        return sum(values) / len(values) if values else 0.0
 
-    # FPR bootstrap
-    def fpr_fn(data):
-        benigns = [d for d in data if d == -1]
-        return sum(1 for d in benigns if d == 1) / len(benigns) if benigns else 0.0
-
-    fpr_ci = bootstrap_ci(binary_outcomes, fpr_fn)
+    tpr_ci = bootstrap_ci(attack_outcomes, mean_value)
+    fpr_ci = bootstrap_ci(benign_outcomes, mean_value)
 
     # ── McNemar tests ──
     all_attacks = {r.scenario_id for r in mtap_results if r.label == "attack"}
@@ -569,6 +610,17 @@ def evaluate_rq2(
 
     Computes Ablation Gap and Relative Importance for each architectural layer.
     """
+    if not ablation_data:
+        return {
+            "rq": "RQ2",
+            "rq_question": "How much does each architectural layer contribute?",
+            "status": "not_measured",
+            "reason": (
+                "No measured ablation artifact. Run the controlled ablation on a "
+                "frozen release and pass the resulting JSON; this evaluator will "
+                "not report estimated or design-expected deltas as results."
+            ),
+        }
     # ── Compute per-scenario Unsafe counts for ablation waterfall ──
     scenarios = [
         {
@@ -692,10 +744,10 @@ def evaluate_rq3(
         by_attack_type[at]["unsafe"] += r.unsafe_count
 
     # ── Evidence level distribution (from DBs that exist) ──
-    evidence_distribution = {"L1_exact": 0, "L2_process_tree": 0, "L3_temporal": 0,
-                             "L4_tls_session": 0, "L5_cross_layer": 0}
-    # Note: Full evidence level analysis requires DB queries on each trace
-    # This provides the framework; actual numbers from DB analysis
+    # Evidence-level counts require per-trace DB queries, which this evaluator
+    # does not perform. Reporting zeros would look like a measured absence.
+    evidence_distribution = None
+    evidence_distribution_status = "not_measured"
 
     # ── Compare with baselines (all have 0 claims) ──
     baseline_comparison = {
@@ -728,6 +780,7 @@ def evaluate_rq3(
             for at, v in sorted(by_attack_type.items())
         },
         "evidence_level_distribution": evidence_distribution,
+        "evidence_level_status": evidence_distribution_status,
         "attribution_leap": baseline_comparison,
         "key_narrative": (
             "All baseline tools output binary labels (safe/unsafe) with 0 structured claims. "
@@ -785,8 +838,14 @@ def generate_report() -> dict[str, Any]:
 
     # Evaluate
     print("[3/4] Computing RQ-aligned metrics...")
+    ablation_data = None
+    if ABLATION_RESULTS.exists():
+        try:
+            ablation_data = json.loads(ABLATION_RESULTS.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            ablation_data = None
     rq1 = evaluate_rq1(mtap_metrics, prompt_metrics, mtap_results)
-    rq2 = evaluate_rq2(mtap_results)
+    rq2 = evaluate_rq2(mtap_results, ablation_data)
     rq3 = evaluate_rq3(mtap_results)
     rq4 = evaluate_rq4()
 
@@ -836,7 +895,7 @@ def generate_report() -> dict[str, Any]:
 
     # Assemble report
     report = {
-        "schema": "mtagentlens.standard_evaluation.v5",
+        "schema": "mtagentlens.standard_evaluation.rq.v5",
         "date": "2026-06-14",
         "dataset": "FuxiBench",
         "dataset_stats": {
@@ -862,7 +921,7 @@ def generate_report() -> dict[str, Any]:
 
     # Write report
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_path = OUTPUT_DIR / "standard_evaluation_v5.json"
+    output_path = OUTPUT_DIR / "standard_evaluation_rq_v5.json"
     output_path.write_text(
         json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

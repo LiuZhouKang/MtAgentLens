@@ -149,7 +149,7 @@ REPRODUCTION_COMMANDS = [
         "command": (
             "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. "
             "python3 compare/scripts/run/run_controlled_ablation_replay.py "
-            "--dataset compare/Dataset/FuxiBench "
+            "--dataset datasets/FuxiBench "
             "--output compare/results/paper/controlled_ablation_variant_runs.json --no-build"
         ),
         "output": "compare/results/paper/controlled_ablation_variant_runs.json",
@@ -159,7 +159,7 @@ REPRODUCTION_COMMANDS = [
         "command": (
             "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. "
             "python3 compare/scripts/build/build_controlled_ablation_results.py "
-            "--dataset compare/Dataset/FuxiBench "
+            "--dataset datasets/FuxiBench "
             "--variants-input compare/results/paper/controlled_ablation_variant_runs.json "
             "--output compare/results/paper/controlled_ablation_results.json"
         ),
@@ -295,11 +295,11 @@ def build_manifest() -> dict[str, Any]:
         },
         "dataset": {
             "id": "FuxiBench",
-            "path": "compare/Dataset/FuxiBench",
+            "path": "datasets/FuxiBench",
             "total_scenarios": total,
             "attack_scenarios": attack,
             "benign_scenarios": benign,
-            "responsibility_db_count": 67,
+            "responsibility_db_count": total,
             "prompt_input_contract": "label-leak-free frozen prompt_inputs manifest",
             "public_deposit_scope": (
                 "metadata, ground truth excluding diagnostic external archive, prompt inputs, "
@@ -362,7 +362,7 @@ def build_manifest() -> dict[str, Any]:
         },
         "not_for_main_claims": [
             "compare/results/paper/ablation_results.json",
-            "compare/Dataset/FuxiBench/ground_truth/_external_archive",
+            "datasets/FuxiBench/ground_truth/_external_archive",
         ],
     }
 
@@ -372,6 +372,10 @@ def _build_annotation_availability() -> dict[str, Any]:
     metrics_path = RESULTS_ROOT / "paper" / "release" / "annotation_package" / "metrics.json"
     is_completed = False
     metrics_data = {}
+    sample_count = 0
+    package_manifest = metrics_path.parent / "manifest.json"
+    if package_manifest.is_file():
+        sample_count = json.loads(package_manifest.read_text(encoding="utf-8")).get("sample_count", 0)
     if metrics_path.exists():
         try:
             metrics_data = json.loads(metrics_path.read_text(encoding="utf-8"))
@@ -385,7 +389,7 @@ def _build_annotation_availability() -> dict[str, Any]:
         return {
             "status": "package_completed_annotation_study_finished",
             "route": "compare/results/paper/release/annotation_package",
-            "sample_count": 67,
+            "sample_count": sample_count,
             "claim_boundary": "blind_annotation_quality_claimed",
             "private_key": "sample_key_private.json is a restricted sidecar and is not included in the public hash-bound file inventory.",
             "metrics_summary": {
@@ -397,17 +401,17 @@ def _build_annotation_availability() -> dict[str, Any]:
             },
             "completed_requirements": [
                 "Independent dual-blind annotations completed (Annotator A and B).",
-                "Disagreements identified and adjudicated (conservative: attack over benign).",
+                "Disagreements identified and adjudicated under the locked study protocol.",
                 "Cohen's kappa computed for binary label and attack type.",
-                f"Binary label κ = {cohens.get('binary_label', 'N/A')} (perfect agreement).",
-                f"Attack type κ = {cohens.get('attack_type', 'N/A')} (substantial agreement).",
+                f"Binary label κ = {cohens.get('binary_label', 'N/A')}.",
+                f"Attack type κ = {cohens.get('attack_type', 'N/A')}.",
             ],
         }
     else:
         return {
             "status": "package_prepared_annotation_not_completed",
             "route": "compare/results/paper/release/annotation_package",
-            "sample_count": 67,
+            "sample_count": sample_count,
             "claim_boundary": "blind_annotation_quality_not_claimed",
             "private_key": "sample_key_private.json is a restricted sidecar and is not included in the public hash-bound file inventory.",
             "required_author_actions": [
@@ -600,15 +604,15 @@ def _checksums_entry(files: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _role_for(path: Path) -> str:
     rel = _display(path)
-    if rel.startswith("compare/Dataset/FuxiBench/prompt_inputs/"):
+    if rel.startswith("datasets/FuxiBench/prompt_inputs/"):
         return "public_dataset_prompt_input"
-    if rel.startswith("compare/Dataset/FuxiBench/ground_truth/"):
+    if rel.startswith("datasets/FuxiBench/ground_truth/"):
         return "public_dataset_ground_truth"
-    if rel.startswith("compare/Dataset/FuxiBench/case_studies/"):
+    if rel.startswith("datasets/FuxiBench/case_studies/"):
         return "public_dataset_case_study"
-    if rel.startswith("compare/Dataset/FuxiBench/quality/"):
+    if rel.startswith("datasets/FuxiBench/quality/"):
         return "public_dataset_quality_metadata"
-    if rel.startswith("compare/Dataset/FuxiBench/"):
+    if rel.startswith("datasets/FuxiBench/"):
         return "public_dataset_documentation"
     if rel.startswith("compare/scripts/") or rel.startswith("compare/tools/"):
         return "code_reproducibility_source"

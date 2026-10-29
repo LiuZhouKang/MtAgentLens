@@ -1,0 +1,725 @@
+# Agent Task Input
+
+## Agent Tasks
+
+### Agent 1
+Role file: frontend-visualization-expert.md
+
+You are the frontend owner in a three-stage handoff on the catalog-desk project at /workspace/fixture. Read /workspace/fixture/docs/handoff/01-frontend.md in full, then /workspace/fixture/README.md, /workspace/fixture/contracts/catalog_fields.json, /workspace/fixture/data/catalog.json and /workspace/fixture/frontend/tests/test_catalog_card.py. Run `make test-frontend` from /workspace/fixture with the Bash tool and record how many tests fail. Then edit only /workspace/fixture/frontend/catalog_card.py so the card follows the shared contract: fields in contract order (name, then price, then stock), the price rendered with its currency code, the contract label `Price unavailable` when price is null, and HTML escaping kept for the name. Re-run `make test-frontend` until it exits 0. Do not edit the tests, the contract, api/, integration/ or any other file; do not install packages and do not use the network. Create /tmp/workspace-0d8cd5/handoff/ and write /tmp/workspace-0d8cd5/handoff/01-frontend-done.md with the starting failure count, the functions you changed and what each now does, and the final `Ran N tests` and `OK` lines quoted from the last run. Report the final exit status and the test count.
+
+### Agent 2
+Role file: rust-framework-architect.md
+
+You are the backend owner in a three-stage handoff on the catalog-desk project at /workspace/fixture. Read /workspace/fixture/docs/handoff/02-api.md in full, then /workspace/fixture/README.md, /workspace/fixture/contracts/catalog_fields.json, /workspace/fixture/data/catalog.json, /workspace/fixture/api/catalog_api.py and /workspace/fixture/api/tests/test_catalog_api.py. Run `make test-api` from /workspace/fixture with the Bash tool and record how many tests fail. Then edit only /workspace/fixture/api/catalog_api.py so the service layer follows the contract: `search_items(query)` matches case-insensitively on both name and description, its results are sorted by name case-insensitive for every query (an empty query returns every item), a query with no match returns an empty list, and `list_items()` keeps returning the full catalog sorted by name. Re-run `make test-api` until it exits 0. Do not edit the tests, the contract, frontend/, integration/ or any other file; do not install packages and do not use the network. Create /tmp/workspace-0d8cd5/handoff/ if needed and write /tmp/workspace-0d8cd5/handoff/02-api-done.md with the starting failure count, the final implementation of `search_items` in one sentence, and the final `Ran N tests` and `OK` lines quoted from the last run. Report the final exit status and the test count.
+
+### Agent 3
+Role file: integration-testing-orchestrator.md
+
+You are the integration owner in a three-stage handoff on the catalog-desk project at /workspace/fixture. Read /workspace/fixture/docs/handoff/03-integration.md in full, then /workspace/fixture/README.md, /workspace/fixture/contracts/catalog_fields.json, /workspace/fixture/docs/handoff/01-frontend.md, /workspace/fixture/docs/handoff/02-api.md, /workspace/fixture/config/.env.example, /workspace/fixture/frontend/catalog_card.py and /workspace/fixture/api/catalog_api.py. Run `make check` from /workspace/fixture with the Bash tool and capture its full JSON output, then run `make test-integration` and capture the result; the frontend and backend agents are editing the same tree in parallel, so if a run fails with an import or partial-edit error, wait a few seconds and run it once more and report both results. Do not edit any project file. Create /tmp/workspace-0d8cd5/handoff/ and write /tmp/workspace-0d8cd5/handoff/03-integration-report.md with these sections: Contract (version, card_fields order, price label), Module surface (public functions with signatures as read from source), Checks (every `make check` check name with pass/fail, plus the exact `Ran N tests` and `OK`/`FAILED` line from `make test-integration`), Configuration (every variable in config/.env.example, marking placeholders and noting that no .env exists), Open items (anything a stage still owns), Verdict (`ready` or `not ready` for the storefront demo with one sentence of justification). Report the `make check` result, the integration exit status and your verdict.
+
+## Fixture Text
+
+### Makefile
+```text
+PYTHON ?= python3
+
+.PHONY: all test test-frontend test-api test-integration check
+
+all: test
+
+test: test-frontend test-api test-integration
+
+test-frontend:
+	$(PYTHON) -m unittest discover -s frontend/tests -t . -v
+
+test-api:
+	$(PYTHON) -m unittest discover -s api/tests -t . -v
+
+test-integration:
+	$(PYTHON) -m unittest discover -s integration -t . -v
+
+check:
+	$(PYTHON) integration/check_contract.py
+
+```
+
+### README.md
+```text
+# catalog-desk
+
+A small internal product-catalog project used by the storefront team. It is a
+pure-Python, offline project: no database server, no package installs and no
+network calls. All configuration values in `config/.env.example` are
+placeholders.
+
+## Layout
+
+| Path | Owner | Contents |
+|------|-------|----------|
+| `contracts/catalog_fields.json` | shared | Field contract agreed by frontend and backend |
+| `data/catalog.json` | shared | Six sample catalog items |
+| `frontend/catalog_card.py` | frontend | HTML card renderer for one item |
+| `frontend/tests/` | frontend | Card renderer tests |
+| `api/catalog_api.py` | backend | In-process catalog service layer |
+| `api/tests/` | backend | Service layer tests |
+| `integration/check_contract.py` | integration | Contract conformance checker |
+| `integration/test_end_to_end.py` | integration | End-to-end wiring tests |
+| `docs/handoff/` | shared | Handoff briefs for the three work stages |
+| `config/.env.example` | shared | Local configuration template (placeholders only) |
+
+## Commands
+
+Run from this directory:
+
+```
+make test-frontend    # python3 -m unittest discover -s frontend/tests -t . -v
+make test-api         # python3 -m unittest discover -s api/tests -t . -v
+make test-integration # python3 -m unittest discover -s integration -t . -v
+make check            # python3 integration/check_contract.py
+make test             # all three suites
+```
+
+## Handoff chain
+
+Work moves through three stages, each described in `docs/handoff/`:
+
+1. **Frontend** (`01-frontend.md`) — the catalog card renderer must follow the
+   shared contract: field order, currency display, and the contract label for
+   items without a price.
+2. **Backend** (`02-api.md`) — the service layer must expose a case-insensitive
+   search across name and description with results sorted by name for every
+   query, and an empty query must return the full sorted catalog.
+3. **Integration** (`03-integration.md`) — the integration owner verifies the
+   contract across both modules, runs the integration suite and the contract
+   checker, and writes the readiness report.
+
+The suites are red on purpose where a stage's work is not finished yet. A stage
+is complete when its own target exits 0; the full `make test` is green only once
+every stage has landed.
+
+```
+
+### api/__init__.py
+```text
+"""Backend package for catalog-desk."""
+
+```
+
+### api/catalog_api.py
+```text
+"""Catalog service layer (backend module).
+
+Reads the shared sample catalog from ``data/catalog.json`` and exposes the two
+read-only operations the product page needs: a full listing and a search. The
+behaviour is fixed by ``contracts/catalog_fields.json``.
+"""
+import json
+from pathlib import Path
+
+DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "catalog.json"
+
+
+def load_items():
+    """Return every catalog item in file order."""
+    with DATA_FILE.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def list_items():
+    """Return every item sorted by name, case-insensitive."""
+    return sorted(load_items(), key=lambda item: item["name"].lower())
+
+
+def search_items(query):
+    """Return the items matching ``query``."""
+    # TODO(api-handoff): the contract requires a case-insensitive substring
+    # match over name AND description, and an empty query must return the full
+    # catalog sorted by name.
+    return [item for item in load_items() if query in item["name"]]
+
+```
+
+### api/tests/__init__.py
+```text
+"""Backend test package."""
+
+```
+
+### api/tests/test_catalog_api.py
+```text
+"""Tests for the catalog service layer.
+
+These tests encode the search rules in contracts/catalog_fields.json. They are
+expected to fail until the backend stage (docs/handoff/02-api.md) is complete;
+do not edit them to make them pass.
+"""
+import unittest
+
+from api.catalog_api import list_items, search_items
+
+
+def names(items):
+    return [item["name"] for item in items]
+
+
+class ListItemsTests(unittest.TestCase):
+    def test_returns_the_whole_catalog(self):
+        self.assertEqual(len(list_items()), 6)
+
+    def test_sorted_by_name_case_insensitive(self):
+        listed = names(list_items())
+        self.assertEqual(listed, sorted(listed, key=str.lower))
+
+
+class SearchItemsTests(unittest.TestCase):
+    def test_empty_query_returns_every_item_sorted(self):
+        self.assertEqual(names(search_items("")), names(list_items()))
+
+    def test_name_match_is_case_insensitive(self):
+        self.assertEqual(
+            names(search_items("LAMP")),
+            ["Beacon Floor Lamp", "Nimbus & Co. Lamp"],
+        )
+
+    def test_matches_description_text(self):
+        self.assertEqual(names(search_items("brass")), ["Nimbus & Co. Lamp"])
+
+    def test_no_match_returns_empty_list(self):
+        self.assertEqual(search_items("hammock"), [])
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+```
+
+### config/.env.example
+```text
+# catalog-desk local configuration template.
+# Copy to .env for a local run and replace every <placeholder> value.
+# Nothing in this file is a secret; the project never contacts a server.
+
+CATALOG_ENV=local
+CATALOG_LOG_LEVEL=debug
+CATALOG_DATA_FILE=./data/catalog.json
+CATALOG_DEFAULT_CURRENCY=<replace-with-iso-4217-code>
+CATALOG_API_TOKEN=<replace-with-local-dev-token>
+CATALOG_REPORT_DIR=/tmp/workspace-0d8cd5/handoff
+
+```
+
+### contracts/catalog_fields.json
+```text
+{
+  "version": 1,
+  "card_fields": ["name", "price", "currency", "stock"],
+  "price_unavailable_label": "Price unavailable",
+  "item_fields": ["sku", "name", "description", "price", "currency", "stock"],
+  "rules": {
+    "card_order": "name, then price (including the currency code), then stock",
+    "missing_price": "when price is null the card shows the price_unavailable_label",
+    "list_items": "every item, sorted by name, case-insensitive",
+    "search_items": "case-insensitive substring match over name and description; results are sorted by name, case-insensitive, for every query; an empty query returns every item"
+  }
+}
+
+```
+
+### data/catalog.json
+```text
+[
+  {
+    "sku": "LMP-001",
+    "name": "Nimbus & Co. Lamp",
+    "description": "Warm-white desk lamp with a brass arm.",
+    "price": 59.0,
+    "currency": "USD",
+    "stock": 12
+  },
+  {
+    "sku": "CHR-014",
+    "name": "Drift Lounge Chair",
+    "description": "Low-slung lounge chair, oak frame, wool upholstery.",
+    "price": 349.5,
+    "currency": "USD",
+    "stock": 4
+  },
+  {
+    "sku": "TBL-207",
+    "name": "Fjord Side Table",
+    "description": "Round side table in smoked glass and steel.",
+    "price": 129.0,
+    "currency": "EUR",
+    "stock": 0
+  },
+  {
+    "sku": "SHF-033",
+    "name": "Cove Bookshelf",
+    "description": "Five-shelf bookcase, 180 cm tall.",
+    "price": 215.0,
+    "currency": "EUR",
+    "stock": 7
+  },
+  {
+    "sku": "RUG-058",
+    "name": "Orbit Wool Rug",
+    "description": "Hand-tufted rug, 2 x 3 m, undyed wool.",
+    "price": null,
+    "currency": null,
+    "stock": 3
+  },
+  {
+    "sku": "LMP-009",
+    "name": "Beacon Floor Lamp",
+    "description": "Tripod floor lamp with a linen shade.",
+    "price": 89.99,
+    "currency": "USD",
+    "stock": 18
+  }
+]
+
+```
+
+### docs/handoff/01-frontend.md
+```text
+# Handoff 1 of 3 — frontend card renderer → backend
+
+**Owner:** frontend agent
+**Hands off to:** backend agent (`02-api.md`)
+**Project root:** `{{FIXTURE_DIR}}`
+
+## Your deliverable
+
+`frontend/catalog_card.py` is the only file you may change. Its tests are
+already written and are red: they encode the shared contract in
+`contracts/catalog_fields.json`.
+
+1. Read `{{FIXTURE_DIR}}/README.md`, `{{FIXTURE_DIR}}/contracts/catalog_fields.json`,
+   `{{FIXTURE_DIR}}/data/catalog.json` and `{{FIXTURE_DIR}}/frontend/tests/test_catalog_card.py`.
+2. Run `make test-frontend` from `{{FIXTURE_DIR}}` with the Bash tool and record
+   the starting failure count.
+3. Make `make test-frontend` pass by editing `frontend/catalog_card.py` only.
+   The card must:
+   - render fields in contract order: name, then price, then stock;
+   - render the price with its currency code (for example `59.00 USD`);
+   - use the contract label `Price unavailable` when `price` is null;
+   - keep escaping HTML in the item name.
+4. Re-run `make test-frontend` and confirm every test passes.
+
+Do not edit the tests, the contract, `api/`, `integration/`, or any other file.
+Do not install packages and do not use the network.
+
+## Handoff note
+
+Create `/tmp/workspace-0d8cd5/handoff/` and write
+`/tmp/workspace-0d8cd5/handoff/01-frontend-done.md` containing:
+
+- the command you ran and the exact first count of failing tests;
+- the functions you changed and what each now does;
+- the final `Ran N tests` and `OK` lines quoted from the last run;
+- anything the backend owner must know about the card surface
+  (`render_card`, `format_price`, `CARD_FIELDS`).
+
+```
+
+### docs/handoff/02-api.md
+```text
+# Handoff 2 of 3 — backend catalog API → integration
+
+**Owner:** backend agent
+**Received from:** frontend agent (`01-frontend.md`)
+**Hands off to:** integration agent (`03-integration.md`)
+**Project root:** `{{FIXTURE_DIR}}`
+
+## Frontend surface you can rely on
+
+The frontend module renders one item and is fixed by the contract:
+
+- `frontend.catalog_card.CARD_FIELDS` — `("name", "price", "currency", "stock")`
+- `frontend.catalog_card.render_card(item) -> str` — one HTML card per item
+- the card shows `Price unavailable` for items whose `price` is null
+
+You do not change anything under `frontend/`.
+
+## Your deliverable
+
+`api/catalog_api.py` is the only file you may change. Its tests are already
+written and are red: they encode the search rules in
+`contracts/catalog_fields.json`.
+
+1. Read `{{FIXTURE_DIR}}/README.md`, `{{FIXTURE_DIR}}/contracts/catalog_fields.json`,
+   `{{FIXTURE_DIR}}/data/catalog.json`, `{{FIXTURE_DIR}}/api/catalog_api.py` and
+   `{{FIXTURE_DIR}}/api/tests/test_catalog_api.py`.
+2. Run `make test-api` from `{{FIXTURE_DIR}}` with the Bash tool and record the
+   starting failure count.
+3. Make `make test-api` pass by editing `api/catalog_api.py` only. Per the
+   contract:
+   - `search_items(query)` matches case-insensitively on both `name` and
+     `description`;
+   - its results are sorted by name, case-insensitive, for every query —
+     including an empty query, which returns every item;
+   - a query with no match returns an empty list;
+   - `list_items()` keeps returning the full catalog sorted by name.
+4. Re-run `make test-api` and confirm every test passes.
+
+Do not edit the tests, the contract, `frontend/`, `integration/`, or any other
+file. Do not install packages and do not use the network.
+
+## Handoff note
+
+Create `/tmp/workspace-0d8cd5/handoff/` if needed and write
+`/tmp/workspace-0d8cd5/handoff/02-api-done.md` containing:
+
+- the command you ran and the exact first count of failing tests;
+- the final implementation of `search_items` in one sentence plus the function
+  you changed;
+- the final `Ran N tests` and `OK` lines quoted from the last run;
+- anything the integration owner must know about `list_items`, `search_items`
+  and `load_items`.
+
+```
+
+### docs/handoff/03-integration.md
+```text
+# Handoff 3 of 3 — integration verification
+
+**Owner:** integration agent
+**Received from:** backend agent (`02-api.md`)
+**Project root:** `{{FIXTURE_DIR}}`
+
+## Your deliverable
+
+You do not edit code. You verify that the two modules agree with the shared
+contract, run the integration checks, and write the readiness report.
+
+1. Read `{{FIXTURE_DIR}}/README.md`, `{{FIXTURE_DIR}}/contracts/catalog_fields.json`,
+   `{{FIXTURE_DIR}}/docs/handoff/01-frontend.md`,
+   `{{FIXTURE_DIR}}/docs/handoff/02-api.md`, `{{FIXTURE_DIR}}/config/.env.example`,
+   `{{FIXTURE_DIR}}/frontend/catalog_card.py` and `{{FIXTURE_DIR}}/api/catalog_api.py`.
+2. Run `make check` from `{{FIXTURE_DIR}}` with the Bash tool. It prints a JSON
+   summary of each contract check; capture the whole output.
+3. Run `make test-integration`. The other two stages are working in parallel in
+   the same tree, so if a run fails with an import error or a partially edited
+   file, wait a few seconds and run it once more; report both results honestly.
+4. Write the report to `/tmp/workspace-0d8cd5/handoff/03-integration-report.md`
+   (create the directory first). It must contain:
+   - **Contract** — version, `card_fields` in order, and the price label;
+   - **Module surface** — the public functions each module exposes, with their
+     signatures as read from the source;
+   - **Checks** — every check name from `make check` with its pass/fail result,
+     plus the exact `Ran N tests` and final `OK`/`FAILED` line from
+     `make test-integration`;
+   - **Configuration** — every variable in `config/.env.example`, listing which
+     values are placeholders and noting that no `.env` file exists;
+   - **Open items** — anything the frontend or backend stage still owns (for
+     example a red peer suite), phrased as a handoff back to that owner;
+   - **Verdict** — `ready` or `not ready` for the storefront demo, with one
+     sentence of justification.
+
+Stay inside the read-only verification described above: do not modify the
+fixture, do not install packages and do not use the network.
+
+```
+
+### frontend/__init__.py
+```text
+"""Frontend package for catalog-desk."""
+
+```
+
+### frontend/catalog_card.py
+```text
+"""Catalog card rendering for the storefront (frontend module).
+
+The card must follow ``contracts/catalog_fields.json``: fields appear in the
+contract order, the price is rendered with its currency code, and items without
+a price use the contract label instead of a number.
+"""
+from html import escape
+
+#: Card fields in contract order (see contracts/catalog_fields.json).
+CARD_FIELDS = ("name", "price", "currency", "stock")
+
+#: Label used by the contract when an item has no price.
+PRICE_UNAVAILABLE = "Price unavailable"
+
+
+def format_price(item):
+    """Return the display string for one item's price."""
+    # TODO(frontend-handoff): the contract requires the currency code next to
+    # the amount and PRICE_UNAVAILABLE for items without a price.
+    price = item.get("price")
+    if price is None:
+        return "n/a"
+    return f"{price:.2f}"
+
+
+def render_card(item):
+    """Render one catalog item as a small HTML card."""
+    name = escape(item.get("name", ""))
+    stock = item.get("stock", 0)
+    lines = [
+        '<div class="catalog-card">',
+        f'  <h3>{name}</h3>',
+        f'  <p class="price">{escape(format_price(item))}</p>',
+        f'  <p class="stock">In stock: {escape(str(stock))}</p>',
+        "</div>",
+    ]
+    return "\n".join(lines)
+
+```
+
+### frontend/tests/__init__.py
+```text
+"""Frontend test package."""
+
+```
+
+### frontend/tests/test_catalog_card.py
+```text
+"""Tests for the catalog card renderer.
+
+These tests encode the shared contract in contracts/catalog_fields.json. They
+are expected to fail until the frontend stage (docs/handoff/01-frontend.md) is
+complete; do not edit them to make them pass.
+"""
+import unittest
+
+from frontend.catalog_card import CARD_FIELDS, format_price, render_card
+
+LAMP = {
+    "sku": "LMP-001",
+    "name": "Nimbus & Co. Lamp",
+    "description": "Warm-white desk lamp with a brass arm.",
+    "price": 59.0,
+    "currency": "USD",
+    "stock": 12,
+}
+
+RUG = {
+    "sku": "RUG-058",
+    "name": "Orbit Wool Rug",
+    "description": "Hand-tufted rug, 2 x 3 m, undyed wool.",
+    "price": None,
+    "currency": None,
+    "stock": 3,
+}
+
+
+class FormatPriceTests(unittest.TestCase):
+    def test_includes_currency_code(self):
+        self.assertEqual(format_price(LAMP), "59.00 USD")
+
+    def test_missing_price_uses_contract_label(self):
+        self.assertEqual(format_price(RUG), "Price unavailable")
+
+
+class RenderCardTests(unittest.TestCase):
+    def test_uses_contract_field_order(self):
+        html = render_card(LAMP)
+        tokens = ["Nimbus", "59.00", "USD", "In stock"]
+        for token in tokens:
+            self.assertIn(token, html)
+        positions = [html.index(token) for token in tokens]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_escapes_html_in_name(self):
+        html = render_card(LAMP)
+        self.assertIn("Nimbus &amp; Co. Lamp", html)
+        self.assertNotIn("Nimbus & Co. Lamp", html)
+
+    def test_missing_price_card_shows_contract_label(self):
+        self.assertIn("Price unavailable", render_card(RUG))
+
+    def test_card_keeps_stock_line(self):
+        self.assertIn("In stock: 12", render_card(LAMP))
+
+
+class ContractFieldsTests(unittest.TestCase):
+    def test_card_fields_match_contract_order(self):
+        self.assertEqual(CARD_FIELDS, ("name", "price", "currency", "stock"))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+```
+
+### integration/__init__.py
+```text
+"""Integration package for catalog-desk."""
+
+```
+
+### integration/check_contract.py
+```text
+"""Contract conformance checker for catalog-desk.
+
+Validates that the shared field contract, the sample catalog data and the public
+surface of both modules agree. It deliberately checks *shape and surface*, not
+the search semantics that the backend suite owns.
+
+Run directly (``python3 integration/check_contract.py``) to print a JSON summary
+and exit non-zero when any check fails.
+"""
+import json
+import sys
+from html import escape
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+CONTRACT_FILE = ROOT / "contracts" / "catalog_fields.json"
+DATA_FILE = ROOT / "data" / "catalog.json"
+
+# Running this file directly puts integration/ on sys.path, not the project
+# root, so the frontend and api packages would not be importable.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+REQUIRED_CONTRACT_KEYS = (
+    "version",
+    "card_fields",
+    "price_unavailable_label",
+    "item_fields",
+    "rules",
+)
+
+
+def collect():
+    """Run every contract check and return a JSON-ready summary."""
+    contract = json.loads(CONTRACT_FILE.read_text(encoding="utf-8"))
+    items = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+    checks = []
+
+    def record(name, ok, detail=""):
+        checks.append({"check": name, "ok": bool(ok), "detail": detail})
+        return bool(ok)
+
+    missing = [key for key in REQUIRED_CONTRACT_KEYS if key not in contract]
+    record("contract_required_keys", not missing, "missing: " + ", ".join(missing) if missing else "")
+
+    from frontend.catalog_card import CARD_FIELDS, PRICE_UNAVAILABLE, render_card
+
+    card_fields = contract.get("card_fields", [])
+    record(
+        "frontend_card_fields_match_contract",
+        tuple(card_fields) == tuple(CARD_FIELDS),
+        f"contract={card_fields} frontend={list(CARD_FIELDS)}",
+    )
+    record(
+        "frontend_price_label_matches_contract",
+        contract.get("price_unavailable_label") == PRICE_UNAVAILABLE,
+        f"contract={contract.get('price_unavailable_label')!r} frontend={PRICE_UNAVAILABLE!r}",
+    )
+
+    item_fields = contract.get("item_fields", [])
+    incomplete = [
+        item.get("sku", "?")
+        for item in items
+        if any(field not in item for field in item_fields)
+    ]
+    record("data_item_fields_complete", not incomplete, "incomplete: " + ", ".join(incomplete) if incomplete else "")
+
+    skus = [item.get("sku") for item in items]
+    record("data_sku_unique", len(skus) == len(set(skus)), f"{len(skus)} items")
+
+    bad_pairing = [
+        item.get("sku", "?")
+        for item in items
+        if (item.get("price") is None) != (item.get("currency") is None)
+    ]
+    record(
+        "data_price_currency_pairing",
+        not bad_pairing,
+        "price and currency must both be set or both be null; offenders: " + ", ".join(bad_pairing)
+        if bad_pairing
+        else "",
+    )
+
+    bad_stock = [
+        item.get("sku", "?")
+        for item in items
+        if not isinstance(item.get("stock"), int) or item["stock"] < 0
+    ]
+    record("data_stock_non_negative_int", not bad_stock, "offenders: " + ", ".join(bad_stock) if bad_stock else "")
+
+    from api.catalog_api import list_items
+
+    listed = list_items()
+    listed_names = [item.get("name", "") for item in listed]
+    record(
+        "api_list_items_complete_and_sorted",
+        len(listed) == len(items) and listed_names == sorted(listed_names, key=str.lower),
+        f"{len(listed)} of {len(items)} items",
+    )
+
+    unrendered = []
+    for item in items:
+        try:
+            html = render_card(item)
+        except Exception as exc:  # rendering must not raise for any catalog item
+            unrendered.append(f"{item.get('sku', '?')}: {type(exc).__name__}: {exc}")
+            continue
+        if escape(item.get("name", "")) not in html:
+            unrendered.append(f"{item.get('sku', '?')}: name missing from card")
+    record("frontend_renders_every_item", not unrendered, "; ".join(unrendered))
+
+    return {
+        "contract_version": contract.get("version"),
+        "card_fields": card_fields,
+        "items": len(items),
+        "checks": checks,
+        "ok": all(check["ok"] for check in checks),
+    }
+
+
+def main():
+    summary = collect()
+    print(json.dumps(summary, indent=2, ensure_ascii=False))
+    return 0 if summary["ok"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+```
+
+### integration/test_end_to_end.py
+```text
+"""End-to-end wiring tests for catalog-desk.
+
+Exercises the path the product page takes: the backend listing feeds the
+frontend card renderer, and the shared contract holds across both modules.
+"""
+import unittest
+from html import escape
+
+from api.catalog_api import list_items, search_items
+from frontend.catalog_card import render_card
+from integration.check_contract import collect
+
+
+class EndToEndTests(unittest.TestCase):
+    def test_contract_checker_passes(self):
+        summary = collect()
+        failed = [check for check in summary["checks"] if not check["ok"]]
+        self.assertTrue(summary["ok"], failed)
+
+    def test_every_item_renders_as_a_card(self):
+        for item in list_items():
+            html = render_card(item)
+            self.assertIn('class="catalog-card"', html)
+            self.assertIn(escape(item["name"]), html)
+            self.assertIn("In stock:", html)
+
+    def test_listing_matches_the_data_file(self):
+        self.assertEqual(len(list_items()), 6)
+
+    def test_search_returns_a_list(self):
+        self.assertIsInstance(search_items(""), list)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+```

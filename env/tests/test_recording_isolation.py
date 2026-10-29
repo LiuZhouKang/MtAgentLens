@@ -1,3 +1,4 @@
+import shlex
 from pathlib import Path
 
 from mtagentlens_benchmark.engine.executor import _kill_leftover_claude
@@ -20,12 +21,19 @@ def test_recording_cleanup_removes_benchmark_tmux_and_claude(monkeypatch) -> Non
         fake_run,
     )
 
-    _kill_leftover_claude()
+    _kill_leftover_claude("agtlab-deadbeef")
 
     assert ["tmux", "kill-session", "-t", "agtlab-deadbeef"] in calls
     assert ["tmux", "kill-session", "-t", "other"] not in calls
-    assert ["pkill", "-x", "claude"] in calls
-    assert ["pkill", "-x", "claude.exe"] in calls
+    assert not any(command[0] == "pkill" for command in calls)
+
+
+def test_recording_cleanup_does_not_guess_ownership(monkeypatch):
+    monkeypatch.setattr(
+        "mtagentlens_benchmark.engine.executor.subprocess.run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unscoped process cleanup")),
+    )
+    _kill_leftover_claude()
 
 
 def test_tmux_task_mode_passes_detected_claude_binary(monkeypatch, tmp_path: Path) -> None:
@@ -59,5 +67,6 @@ def test_tmux_task_mode_passes_detected_claude_binary(monkeypatch, tmp_path: Pat
 
     sent = commands[-1]
     assert sent[:4] == ["tmux", "send-keys", "-t", "agtlab-test:0.0"]
-    assert "/opt/claude-code/claude" in sent[4]
-    assert "--model sonnet" in sent[4]
+    script = Path(shlex.split(sent[4])[1]).read_text(encoding="utf-8")
+    assert "/opt/claude-code/claude" in script
+    assert "--model sonnet" in script

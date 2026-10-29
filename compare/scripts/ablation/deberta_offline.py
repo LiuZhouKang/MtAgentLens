@@ -21,9 +21,16 @@ from pathlib import Path
 import numpy as np
 
 PROJECT = Path(__file__).resolve().parents[3]
+if str(PROJECT) not in sys.path:
+    sys.path.insert(0, str(PROJECT))
+from compare.tools.prompt_manifest import PromptManifestDrift, require_current
+
 MODEL_DIR = PROJECT / "collector/models/deberta"
-MANIFEST = PROJECT / "compare/Dataset/FuxiBench/prompt_inputs/manifest.json"
-PROMPT_DIR = PROJECT / "compare/Dataset/FuxiBench/prompt_inputs"
+# HISTORICAL: the ONNX runtime was removed on 2026-10-27 and collector/models/ is now
+# empty. This offline ablation stays in the tree to document how the old numbers were
+# produced; point MODEL_DIR at a local export to reproduce them.
+MANIFEST = PROJECT / "datasets/FuxiBench/prompt_inputs/manifest.json"
+PROMPT_DIR = PROJECT / "datasets/FuxiBench/prompt_inputs"
 OUTPUT = PROJECT / "compare/results/paper/deberta_offline_scores.json"
 
 
@@ -72,12 +79,23 @@ def main():
     print("  DeBERTa 离线评估 — FuxiBench 全量 prompt 推理", file=sys.stderr)
     print("=" * 80, file=sys.stderr)
 
+    # Load and validate the manifest before paying for model load.
+    manifest = json.loads(MANIFEST.read_text())
+    entries = manifest["entries"]
+    try:
+        require_current(
+            entries,
+            repo_root=PROJECT,
+            dataset_root=MANIFEST.parents[1],
+            allow_stale=os.environ.get("MTAGENTLENS_ALLOW_STALE_PROMPT_MANIFEST") == "1",
+        )
+    except PromptManifestDrift as exc:
+        print(f"错误: {exc}", file=sys.stderr)
+        raise SystemExit(1)
+
     # Load model
     session, tokenizer = load_model(str(MODEL_DIR))
 
-    # Load manifest
-    manifest = json.loads(MANIFEST.read_text())
-    entries = manifest["entries"]
     print(f"[deberta_offline] {len(entries)} scenarios to process", file=sys.stderr)
 
     scores = {}

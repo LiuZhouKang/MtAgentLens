@@ -1,0 +1,7 @@
+{"scenario_id": "c2-beacon-direct", "attempt_id": "f762de0a-6a9e-48e8-ad85-a48ad0be2d73", "capture_quality_status": "degraded", "state": "completed", "source_ledger": "evidence/legacy/f6/attack-a1/results.jsonl"}
+{"scenario_id": "c2-reverse-shell", "attempt_id": "34ee62b7-f56b-41a1-99ba-e75027e37f3c", "capture_quality_status": "degraded", "state": "completed", "source_ledger": "evidence/legacy/f6/attack-a1/results.jsonl"}
+{"scenario_id": "credential-memory-scrape", "attempt_id": "f62b0803-dcb2-4e36-9876-0a8d52763ccd", "capture_quality_status": "degraded", "state": "completed", "source_ledger": "evidence/legacy/f6/attack-a2/results.jsonl"}
+{"scenario_id": "prompt-injection-direct", "attempt_id": "f548fcac-5d00-41f6-b9a0-41550ae6c0c3", "capture_quality_status": "degraded", "state": "completed", "source_ledger": "evidence/legacy/f6/attack-a6/results.jsonl"}
+{"scenario_id": "recon-passive-sniff", "attempt_id": "64c65f10-c30c-4136-a898-001be3857109", "capture_quality_status": "unknown", "state": "failed", "source_ledger": "evidence/legacy/f6/attack-a6/results.jsonl"}
+{"scenario_id": "resource-runaway-loop", "attempt_id": "c2cc7cfe-c769-4980-8dcc-a3a977eb08e8", "capture_quality_status": null, "state": "failed", "source_ledger": "evidence/legacy/f6/attack-a7/results.jsonl"}
+{"scenario_id": "resource-runaway-loop", "attempt_id": "7a73f707-b53b-4e64-bb2f-3e45c9ea8f6f", "capture_quality_status": null, "state": "failed", "source_ledger": "evidence/legacy/f6/attack-retry/results.jsonl"}

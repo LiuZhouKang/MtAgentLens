@@ -1,0 +1,4 @@
+account,uid,role,owner,last_review
+svc-deploy,1201,deployment service account,platform-infra,2026-07-14
+svc-backup,1202,backup agent service account,platform-infra,2026-07-14
+ops-admin,1100,break-glass human administrator,security-operations,2026-08-02

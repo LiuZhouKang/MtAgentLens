@@ -5,7 +5,8 @@
 
 use crate::responsibility::graph::ResponsibilityGraph;
 use crate::responsibility::types::{
-    AgentId, DisplayProfile, ResponsibilityClaim, ResponsibilityClaimState, ResponsibilityClaimType,
+    AgentId, AlertSeverity, DisplayProfile, ResponsibilityClaim, ResponsibilityClaimState,
+    ResponsibilityClaimType,
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -17,7 +18,15 @@ pub struct AlertBuilderText;
 
 impl AlertBuilderText {
     /// Generate a concise title for a claim under a given display profile.
-    pub fn generate_title(claim: Option<&ResponsibilityClaim>, profile: &DisplayProfile) -> String {
+    ///
+    /// `severity` is the composed alert's severity, not the claim's: a claim
+    /// can be `Warning` while the alert is `Info` (safe engine score), and a
+    /// title that prints the claim's severity contradicts the alert.
+    pub fn generate_title(
+        claim: Option<&ResponsibilityClaim>,
+        profile: &DisplayProfile,
+        severity: &AlertSeverity,
+    ) -> String {
         let claim = match claim {
             Some(c) => c,
             None => {
@@ -49,7 +58,7 @@ impl AlertBuilderText {
                     "Engine alert: agent {} — {} (severity: {:?})",
                     truncate_agent(agent_label),
                     type_label,
-                    claim.severity,
+                    severity,
                 )
             }
             DisplayProfile::ObserverJudged => {
@@ -288,8 +297,8 @@ fn truncate_agent(agent_id: &AgentId) -> &str {
 mod tests {
     use super::*;
     use crate::responsibility::types::{
-        AgentId, AlertSeverity, BoundaryId, ClaimId, CompetingExplanation, PhaseIndicator,
-        PolicyId, ResponsibilityClaim, ResponsibilityClaimState, ResponsibilityClaimType,
+        AgentId, AlertSeverity, BoundaryId, ClaimId, PhaseIndicator, PolicyId, ResponsibilityClaim,
+        ResponsibilityClaimState, ResponsibilityClaimType,
     };
 
     fn make_claim(
@@ -322,7 +331,11 @@ mod tests {
             0.75,
             "agent-abc123",
         );
-        let title = AlertBuilderText::generate_title(Some(&claim), &DisplayProfile::SafeBaseline);
+        let title = AlertBuilderText::generate_title(
+            Some(&claim),
+            &DisplayProfile::SafeBaseline,
+            &AlertSeverity::Info,
+        );
         assert!(title.contains("Baseline safe"));
         assert!(title.contains("agent-abc123"));
         assert!(title.contains("75%"));
@@ -336,7 +349,11 @@ mod tests {
             0.90,
             "agent-xyz",
         );
-        let title = AlertBuilderText::generate_title(Some(&claim), &DisplayProfile::UnsafeByEngine);
+        let title = AlertBuilderText::generate_title(
+            Some(&claim),
+            &DisplayProfile::UnsafeByEngine,
+            &AlertSeverity::Critical,
+        );
         assert!(title.contains("Engine alert"));
         assert!(title.contains("agent-xyz"));
         assert!(title.contains("Tainted Context Use"));
@@ -350,14 +367,22 @@ mod tests {
             0.60,
             "agent-delegate",
         );
-        let title = AlertBuilderText::generate_title(Some(&claim), &DisplayProfile::ObserverJudged);
+        let title = AlertBuilderText::generate_title(
+            Some(&claim),
+            &DisplayProfile::ObserverJudged,
+            &AlertSeverity::Warning,
+        );
         assert!(title.contains("Observer reviewed"));
         assert!(title.contains("Suspicious Delegation"));
     }
 
     #[test]
     fn test_generate_title_none_claim() {
-        let title = AlertBuilderText::generate_title(None, &DisplayProfile::SafeBaseline);
+        let title = AlertBuilderText::generate_title(
+            None,
+            &DisplayProfile::SafeBaseline,
+            &AlertSeverity::Info,
+        );
         assert_eq!(
             title,
             "Agent activity observed — no policy violations detected"

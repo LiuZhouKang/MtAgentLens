@@ -24,7 +24,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from compare.tools.registry import load_tool_metadata  # noqa: E402
 
 
-DEFAULT_DATASET = PROJECT_ROOT / "compare" / "Dataset" / "FuxiBench"
+DEFAULT_DATASET = PROJECT_ROOT / "datasets" / "FuxiBench"
 DEFAULT_DESIGN = PROJECT_ROOT / "docs" / "superpowers" / "specs" / "2026-06-04-mtagentlens-experiment-design.md"
 DEFAULT_LOCKFILE = PROJECT_ROOT / "compare" / "tool-lock.json"
 DEFAULT_PROMPT_LOCKFILE = PROJECT_ROOT / "compare" / "tool-lock.prompt.json"
@@ -40,7 +40,7 @@ PROMPT_BASELINE_TOOLS = {"llm-guard", "meta-prompt-guard", "vigil", "nemo-guardr
 RESULTS_ROOT = PROJECT_ROOT / "compare" / "results"
 EXTERNAL_DEFERRED_POLICY_MARKER = "EXTERNAL_BENCHMARK_POLICY: deferred_from_main_claims"
 PROMPT_TEXT_FORBIDDEN_METADATA_LINE = re.compile(
-    r"^\s*(scenario\s+id|mode|category|attack\s+type|label|risk[_\s-]*level|is[_\s-]*baseline)\s*:",
+    r"^(scenario\s+id|mode|category|attack\s+type|label|risk[_\s-]*level|is[_\s-]*baseline)\s*:",
     re.IGNORECASE,
 )
 REQUIRED_PERFORMANCE_EXPERIMENTS = {"probe_latency", "throughput", "memory", "time_to_detect"}
@@ -132,7 +132,15 @@ def _check_design_doc_guard(design_doc: Path) -> AuditCheck:
 
 def _check_frozen_dataset(dataset_dir: Path) -> AuditCheck:
     evaluate_dataset = _load_evaluate_frozen()
-    result = evaluate_dataset(dataset_dir.resolve())
+    try:
+        result = evaluate_dataset(dataset_dir.resolve())
+    except (OSError, ValueError) as exc:
+        return AuditCheck(
+            id="frozen_dataset_quality", status="blocker",
+            summary="Frozen dataset inputs or canonical run artifacts failed validation.",
+            evidence={"dataset": _display_path(dataset_dir), "error": str(exc)},
+            recommendation="Build a versioned input release and recollect matching finalized run artifacts.",
+        )
     metrics = result.get("metrics", {})
     gate = result.get("quality_gate", {})
     paper_metrics_available = bool(gate.get("paper_metrics_available"))
@@ -153,6 +161,10 @@ def _check_frozen_dataset(dataset_dir: Path) -> AuditCheck:
             "f1": metrics.get("f1"),
             "claim_coverage": metrics.get("claim_coverage"),
             "quality_gate_reason": gate.get("reason"),
+            "unknown_runs": len(result.get("unknown_runs", [])),
+            "uncertain_runs": len(result.get("uncertain_runs", [])),
+            "quality_limited_runs": len(result.get("quality_limited_runs", [])),
+            "attribution_unavailable_scenarios": result.get("attribution_unavailable_scenarios", []),
         },
         recommendation="Keep this gate green before changing experiment runners or ground truth.",
     )
@@ -185,7 +197,8 @@ def _check_dataset_metadata_consistency(dataset_dir: Path) -> AuditCheck:
         for sample in samples
         if isinstance(sample, dict)
         and isinstance(sample.get("paths"), dict)
-        and (dataset_dir / sample["paths"].get("responsibility_db", "")).exists()
+        and isinstance(sample["paths"].get("responsibility_db"), str)
+        and (dataset_dir / sample["paths"]["responsibility_db"]).is_file()
     )
     total_samples = len(samples)
     paper_ready = summary.get("paper_ready")
@@ -376,19 +389,28 @@ def _check_prompt_baselines(dataset_dir: Path, prompt_lockfile: Path) -> AuditCh
     all_prompt_tools_use_prompt_text = all(
         "prompt_text" in modes for modes in prompt_modes_by_tool.values()
     )
+    release_error = None
+    expected_cases = 0
+    try:
+        from compare.tools.dataset_release import validate_release
+        release = validate_release(dataset_dir)
+        expected_cases = len(release["case_bindings"])
+    except (OSError, ValueError) as exc:
+        release_error = str(exc)
     status = (
         "pass"
-        if load_error is None
+        if load_error is None and release_error is None and expected_cases > 0
         and required_tools_ready
         and all_prompt_tools_use_prompt_text
         and manifest_evidence["manifest_valid"]
-        and manifest_evidence["prompt_manifest_total_cases"] == 67
-        and manifest_evidence["prompt_text_files"] == 67
-        and manifest_evidence["bundle_json_files"] == 67
+        and manifest_evidence["prompt_manifest_total_cases"] == expected_cases
+        and manifest_evidence["prompt_text_files"] == expected_cases
+        and manifest_evidence["bundle_json_files"] == expected_cases
         and manifest_evidence["entries_without_no_gt_leak_guarantee"] == []
         and manifest_evidence["attack_entries_without_fixture_text"] == []
         and manifest_evidence["entries_with_attack_type_mismatch"] == []
         and manifest_evidence["prompt_text_label_leaks"] == []
+        and manifest_evidence["prompt_text_hash_mismatches"] == []
         else "blocker"
     )
     return AuditCheck(
@@ -400,6 +422,8 @@ def _check_prompt_baselines(dataset_dir: Path, prompt_lockfile: Path) -> AuditCh
         evidence={
             "prompt_lockfile": _display_path(prompt_lockfile),
             "prompt_lockfile_error": load_error,
+            "release_error": release_error,
+            "expected_cases": expected_cases,
             "prompt_tools_present": prompt_tools_present,
             "prompt_modes_by_tool": prompt_modes_by_tool,
             **manifest_evidence,
@@ -491,8 +515,17 @@ def _prompt_manifest_evidence(prompt_inputs_dir: Path, prompt_manifest_path: Pat
 
 
 def _prompt_text_label_leaks(prompt_text: str) -> list[dict[str, Any]]:
+    """Forbidden evaluator metadata in the task section only.
+
+    Fixture text is the scenario's own material and may legitimately contain
+    `mode: str` or `category: ...` (dataclass fields, config keys). The
+    contract is that the *task/prompt* does not leak evaluator metadata; the
+    builder redacts those lines there, and this check must look in the same
+    place, or it flags ordinary fixture code as a leak.
+    """
+    task_text = prompt_text.split("\n## Fixture Text", 1)[0]
     leaks: list[dict[str, Any]] = []
-    for line_no, line in enumerate(prompt_text.splitlines(), start=1):
+    for line_no, line in enumerate(task_text.splitlines(), start=1):
         match = PROMPT_TEXT_FORBIDDEN_METADATA_LINE.match(line)
         if match is None:
             continue

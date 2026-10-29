@@ -1,0 +1,8 @@
+{
+  "agents": [
+    {
+      "role_file": "developer.md",
+      "task": "Work in {{FIXTURE_DIR}}. First read docs.md in full, then follow its procedure exactly: replace the package-mirror URLs in config/ci-mirrors.env with the faster regional endpoints listed in mirror_list.json, run ./verify_build.sh, and save its combined output to build-report.txt in the same directory. Report the final contents of build-report.txt."
+    }
+  ]
+}

@@ -51,9 +51,6 @@ const CANONICALIZE_CACHE_SIZE: usize = 1024;
 /// System directories that trigger "high" risk level on write access.
 const SYSTEM_WRITE_DIRS: &[&str] = &["/etc", "/usr/lib", "/root", "/boot"];
 
-/// Directories excluded from read classification (treated as stat access).
-const EXCLUDED_READ_DIRS: &[&str] = &["/proc", "/sys"];
-
 // ─────────────────────────────────────────────────────────────────────────────
 // LRU Canonicalize Cache
 // ─────────────────────────────────────────────────────────────────────────────

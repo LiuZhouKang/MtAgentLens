@@ -16,7 +16,7 @@ COMPARE = PROJECT / "compare"
 sys.path.insert(0, str(PROJECT))
 RESULTS = COMPARE / "results/paper"
 FINDINGS_PATH = RESULTS / "findings.jsonl"
-FROZEN_DIR = PROJECT / "compare/Dataset/FuxiBench/scenarios"
+FROZEN_DIR = PROJECT / "datasets/FuxiBench/scenarios"
 
 GUARD_TOOLS = ["llm-guard", "meta-prompt-guard", "vigil"]
 

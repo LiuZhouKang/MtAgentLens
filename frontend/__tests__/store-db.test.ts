@@ -83,6 +83,50 @@ beforeEach(() => {
 });
 
 describe('store — SQLite db data source', () => {
+  test('late initialization cannot replace a source selected by the user', async () => {
+    const { initializeData } = await import('@/lib/store');
+    let finishRuns!: (runs: any[]) => void;
+    vi.mocked(api.getRuns).mockImplementationOnce(() => new Promise((resolve) => { finishRuns = resolve; }));
+    const pending = initializeData();
+    await vi.waitFor(() => expect(finishRuns).toBeTypeOf('function'));
+    useAppStore.getState().loadDemo();
+    finishRuns([{ run_id: 'stale-initial-run' }]);
+    await pending;
+    expect(useAppStore.getState().activeRunId).toBeNull();
+    expect(useAppStore.getState().dataSource?.kind).toBe('demo');
+  });
+
+  test('switching runs clears old graph and investigation even if the new run fails', async () => {
+    useAppStore.setState({ graph: { nodes: [{ node_id: 'old-node' }], edges: [] } as never });
+    useAppStore.getState().setInvestigationContext({ activeIncidentId: 'old-incident' });
+    vi.mocked(api.getGraph).mockRejectedValueOnce(new Error('unavailable'));
+    await useAppStore.getState().loadRun('new-run');
+    expect(useAppStore.getState().graph.nodes).toEqual([]);
+    expect(useAppStore.getState().investigationContext.activeIncidentId).toBeNull();
+  });
+  test('loading the active run keeps live mode after the database has loaded', async () => {
+    useAppStore.setState({ appState: 'live' });
+    useAppStore.getState().setLiveRun({ runId: 'live', startedAtNs: null, endedAtNs: null, isActive: true });
+    vi.mocked(api.getRunDb).mockResolvedValueOnce(fixtureBytes());
+    await useAppStore.getState().loadRun('live');
+    expect(useAppStore.getState().appState).toBe('live');
+  });
+
+  test('a late response cannot replace the selected run with another runs graph', async () => {
+    let resolveA!: (graph: any) => void;
+    vi.mocked(api.getGraph).mockImplementation((id) => id === 'A'
+      ? new Promise((resolve) => { resolveA = resolve; })
+      : Promise.resolve({ nodes: [{ node_id: 'B-node' }], edges: [] } as never));
+    vi.mocked(api.getAlerts).mockResolvedValue([]);
+    const pendingA = useAppStore.getState().loadRun('A');
+    await vi.waitFor(() => expect(resolveA).toBeTypeOf('function'));
+    await useAppStore.getState().loadRun('B');
+    resolveA({ nodes: [{ node_id: 'A-node' }], edges: [] });
+    await pendingA;
+    expect(useAppStore.getState().activeRunId).toBe('B');
+    expect(useAppStore.getState().graph.nodes[0].node_id).toBe('B-node');
+  });
+
   test('loadDatabase applies graph/alerts/evidence from a db import', async () => {
     const dbImport = await loadDatabaseFromBytes(new Uint8Array(fixtureBytes()), 'run-42.db');
     useAppStore.getState().loadDatabase(dbImport);

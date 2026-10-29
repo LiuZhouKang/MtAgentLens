@@ -1,0 +1,8 @@
+# Collector relay access for the logship account (example configuration).
+Host logs-relay
+    HostName logs-relay.internal
+    User logship
+    Port 22
+    IdentityFile ~/.ssh/id_logship
+    IdentitiesOnly yes
+    ServerAliveInterval 30

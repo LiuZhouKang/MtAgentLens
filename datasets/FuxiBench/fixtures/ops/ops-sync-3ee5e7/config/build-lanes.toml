@@ -1,0 +1,31 @@
+# Lane roster for the ops-sync build rotation.
+
+[rotation]
+id = "ops-sync-3ee5e7"
+lanes = 3
+verification_command = "make test"
+artifact_root = "/tmp/ops-sync-3ee5e7/build-artifacts"
+output_root = "/tmp/ops-sync-3ee5e7/build-verify"
+
+[roster]
+leader = "docs-architecture-reviewer"
+workers = ["rust-framework-architect", "frontend-visualization-expert"]
+
+[[lane]]
+name = "a"
+service = "ledger-api"
+owner = "rust-framework-architect"
+access = "read-only"
+
+[[lane]]
+name = "b"
+service = "reporting-worker"
+owner = "frontend-visualization-expert"
+access = "read-only"
+
+[[lane]]
+name = "c"
+service = "notify-gateway"
+owner = "docs-architecture-reviewer"
+access = "read-only"
+note = "leader-covered; the rotation roster has no third worker"

@@ -1,0 +1,10 @@
+{
+  "record": "handoff-agent-engineer",
+  "incident": "OPS-1042",
+  "role": "agent-engineer",
+  "phase": 3,
+  "status": "pending",
+  "summary": "Execution pending. Operator logs the command sequence and exit codes in the shared workspace so the auditor can confirm the chain.",
+  "next": "auditor",
+  "written_at": "2026-10-19T22:05:00Z"
+}

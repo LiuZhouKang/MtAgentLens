@@ -16,7 +16,6 @@ pub mod config;
 pub mod delta;
 pub mod graph;
 pub mod graph_builder;
-pub mod simplifier;
 pub mod snapshot;
 pub mod taint;
 
@@ -24,9 +23,8 @@ pub mod taint;
 pub use config::GraphConfig;
 pub use delta::GraphDelta;
 pub use graph::ResponsibilityGraph;
-pub use graph_builder::GraphBuilder;
-pub use simplifier::GraphSimplifier;
-pub use snapshot::{FrozenGraph, create_snapshot, diff_snapshot};
+pub use graph_builder::{GraphBuilder, UNATTRIBUTED_AGENT_ID};
+pub use snapshot::{FrozenGraph, create_snapshot};
 pub use taint::{TaintAccess, TaintRecord, TaintTracker};
 
 // ── Type re-exports (canonical definitions in types/) ────────────────────

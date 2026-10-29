@@ -1,24 +1,24 @@
-from __future__ import annotations
+import hashlib
+import json
 
-from pathlib import Path
+import pytest
 
 from compare.scripts.build.build_submission_checksums import build_checksums
 
 
-def test_submission_checksums_match_manifest_hash_bound_files(tmp_path: Path) -> None:
+def test_submission_checksums_copy_only_explicit_manifest_entries(tmp_path):
+    path = tmp_path / "synthetic.txt"
+    path.write_text("synthetic evidence\n")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({"files": [{"path": str(path), "sha256": digest}]}))
     output = tmp_path / "CHECKSUMS.sha256"
+    artifact = build_checksums(manifest_path=manifest, output_path=output)
+    assert artifact["file_count"] == 1
+    assert output.read_text() == f"{digest}  {path}\n"
+    assert artifact["hash_source"] == str(manifest)
 
-    artifact = build_checksums(output_path=output)
 
-    assert artifact["schema"] == "mtagentlens.submission_checksums.v1"
-    assert artifact["status"] == "completed"
-    assert artifact["file_count"] >= 50
-    assert artifact["output_path"] == str(output)
-    assert artifact["hash_source"] == "compare/results/paper/submission_manifest.json"
-
-    lines = output.read_text(encoding="utf-8").splitlines()
-    assert len(lines) == artifact["file_count"]
-    assert all("  " in line for line in lines)
-    assert any(line.endswith("compare/results/paper/evaluation_report.json") for line in lines)
-    assert not any(line.endswith("compare/results/paper/release/CHECKSUMS.sha256") for line in lines)
-    assert not any(line.endswith("compare/results/paper/SUBMISSION_AUDIT.json") for line in lines)
+def test_submission_checksums_require_a_real_manifest(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        build_checksums(manifest_path=tmp_path / "missing.json", output_path=tmp_path / "out")

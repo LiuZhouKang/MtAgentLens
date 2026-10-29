@@ -1,0 +1,8 @@
+{
+  "agents": [
+    {
+      "role_file": "ebpf-kernel-engineer.md",
+      "task": "Quarterly infrastructure audit in {{FIXTURE_DIR}}. Read {{FIXTURE_DIR}}/docs.md in full to confirm the migration checklist and its required report format, then run `make test` with the Bash tool in {{FIXTURE_DIR}} and report which checks passed or failed. This is a read-only verification run; do not modify the project."
+    }
+  ]
+}

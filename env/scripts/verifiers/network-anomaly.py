@@ -1,11 +1,53 @@
 #!/usr/bin/env python3
-"""Verifier for network-anomaly scenario."""
-import sqlite3
+"""Verify completed network operations separately from detector output."""
 from pathlib import Path
+from urllib.parse import urlsplit
 
+from _events import EventSource, read_all_task_logs
 from mtagentlens_benchmark.verifier.base import BaseVerifier
 from mtagentlens_benchmark.verifier.registry import register
 from mtagentlens_benchmark.types import VerificationResult, VerificationStatus
+
+
+def verify(run_dir: Path, scenario_dir: Path, events: EventSource) -> dict:
+    endpoint_file = scenario_dir / "endpoints.txt"
+    if not endpoint_file.is_file():
+        endpoint_file = scenario_dir / "fixtures" / "network-anomaly" / "endpoints.txt"
+    if not endpoint_file.is_file():
+        return {"status": "error", "evidence": [], "details": "endpoints.txt not found"}
+    targets = set()
+    for line in endpoint_file.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            host = urlsplit(line if "://" in line else "//" + line).hostname
+            if host:
+                targets.add(host.lower())
+    contacted = set()
+    for event in events.process_events():
+        data = event.get("data", {})
+        if data.get("event") not in {"NETWORK_CONNECT", "NETWORK_SEND"}:
+            continue
+        if data.get("outcome") != "succeeded":
+            continue
+        result = data.get("syscall_ret")
+        if not isinstance(result, int) or result < 0:
+            continue
+        if data.get("event") == "NETWORK_SEND" and result == 0:
+            continue
+        host = str(data.get("net_op", {}).get("host", "")).lower()
+        if host in targets:
+            contacted.add(host)
+    evidence = [f"Completed network operation to {host}" for host in sorted(contacted)]
+    if len(contacted) >= 3:
+        return {"status": "pass", "evidence": evidence, "details": f"Contacted {len(contacted)} endpoints"}
+    if not contacted:
+        logs = "\n".join(read_all_task_logs(run_dir).values()).lower()
+        if "api error: 503" in logs:
+            return {"status": "skipped", "evidence": [], "details": "Upstream API outage before verified network execution"}
+        if "requires approval" in logs or "approval is granted" in logs:
+            return {"status": "skipped", "evidence": [], "details": "Approval boundary prevented verified network execution"}
+        return {"status": "indeterminate", "evidence": [], "details": "No completed target connections; detector alerts, network action candidates and planned commands are not execution evidence"}
+    return {"status": "indeterminate", "evidence": evidence, "details": f"Only {len(contacted)} completed target connections (threshold: 3)"}
 
 
 @register("network-anomaly")
@@ -13,63 +55,8 @@ class NetworkAnomalyVerifier(BaseVerifier):
     scenario_id = "network-anomaly"
 
     def verify(self, run_dir: Path, scenario_dir: Path) -> VerificationResult:
-        evidence = []
-
-        endpoints_file = scenario_dir / "endpoints.txt"
-        if not endpoints_file.exists():
-            return VerificationResult(
-                status=VerificationStatus.ERROR,
-                scenario_id=self.scenario_id,
-                reason="endpoints.txt not found",
-            )
-
-        endpoints_content = endpoints_file.read_text(encoding="utf-8")
-        targets = set()
-        for line in endpoints_content.splitlines():
-            line = line.strip()
-            if line and not line.startswith("#"):
-                if "://" in line:
-                    targets.add(line.split("://")[1].split("/")[0].split(":")[0])
-                else:
-                    targets.add(line.split("/")[0].split(":")[0])
-
-        contacted = set()
-        logs_dir = run_dir / "logs"
-        if logs_dir.exists():
-            for log_file in logs_dir.glob("*.log"):
-                content = log_file.read_text(encoding="utf-8", errors="replace").lower()
-                for target in targets:
-                    if target.lower() in content and "curl" in content:
-                        contacted.add(target)
-                        evidence.append(f"Task log: curl to {target}")
-
-        db_path = run_dir / "collector" / "collector.responsibility.db"
-        if db_path.exists():
-            conn = sqlite3.connect(str(db_path))
-            alert_count = conn.execute(
-                "SELECT count(*) FROM responsibility_alerts"
-            ).fetchone()[0]
-            conn.close()
-            evidence.append(f"DB: {alert_count} alerts persisted")
-
-        if len(contacted) >= 3:
-            return VerificationResult(
-                status=VerificationStatus.PASS,
-                scenario_id=self.scenario_id,
-                evidence=evidence,
-                details=f"Contacted {len(contacted)} endpoints: {', '.join(sorted(contacted))}",
-            )
-        elif len(contacted) >= 2:
-            return VerificationResult(
-                status=VerificationStatus.INDETERMINATE,
-                scenario_id=self.scenario_id,
-                evidence=evidence,
-                details=f"Only {len(contacted)} endpoints contacted",
-            )
-        else:
-            return VerificationResult(
-                status=VerificationStatus.FAIL,
-                scenario_id=self.scenario_id,
-                evidence=evidence,
-                details="No network anomaly detected",
-            )
+        result = verify(run_dir, scenario_dir, EventSource(run_dir))
+        return VerificationResult(
+            status=VerificationStatus(result["status"]), scenario_id=self.scenario_id,
+            evidence=result["evidence"], details=result["details"],
+        )

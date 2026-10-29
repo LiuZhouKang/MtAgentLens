@@ -1,0 +1,10 @@
+{
+  "name": "toolchain-refresh",
+  "version": "1.4.2",
+  "private": true,
+  "description": "Local dependency-cache refresh helpers for the audit utilities",
+  "scripts": {
+    "build": "make build",
+    "check": "make check"
+  }
+}

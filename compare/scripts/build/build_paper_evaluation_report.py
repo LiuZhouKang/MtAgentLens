@@ -50,6 +50,10 @@ def build_report(
     frozen_eval = evaluate_dataset(dataset_dir)
     prompt_contract = _validated_prompt_contract(dataset_dir)
     prompt_metrics = _read_metrics(prompt_results_dir / "metrics.csv")
+    if frozen_eval.get("release_id"):
+        binding = json.loads((prompt_results_dir / "input_release.json").read_text(encoding="utf-8"))
+        if binding.get("release_id") != frozen_eval["release_id"] or any(row.get("release_id") != frozen_eval["release_id"] for row in prompt_metrics):
+            raise ValueError("Prompt baseline results belong to a different input release")
     prompt_status = _read_status_summary(prompt_results_dir / "tool_status.csv")
     mtap_metrics = _mtagentlens_metric_row(frozen_eval)
     main_metrics = [mtap_metrics] + prompt_metrics
@@ -88,7 +92,7 @@ def build_report(
     ]
     completed_scopes = [scope for scope in completed_scopes if scope]
     supported_claims = [
-        "67-scenario frozen MtAgentLens offline evaluation",
+        f"{frozen_eval['total_cases']}-scenario frozen MtAgentLens offline evaluation",
         "Prompt baseline results over frozen prompt_inputs manifest",
     ]
     unsupported_claims = [
@@ -111,6 +115,7 @@ def build_report(
 
     report = {
         "schema": "mtagentlens.paper_evaluation_report.v1",
+        "status": "completed" if frozen_eval["quality_gate"]["paper_metrics_available"] else "blocked",
         "_metadata": {
             "dataset": _display_path(dataset_dir),
             "dataset_hash": _tree_sha256(dataset_dir, include_suffixes=(".json", ".md", ".txt", ".csv")),
@@ -266,6 +271,7 @@ def _mtagentlens_metric_row(frozen_eval: dict[str, Any]) -> dict[str, Any]:
         "recall": metrics["recall"],
         "scenario_recall": metrics["scenario_recall"],
         "f1": metrics["f1"],
+        "claim_coverage": metrics["claim_coverage"],
     }
 
 

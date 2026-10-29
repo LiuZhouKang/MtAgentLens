@@ -1,0 +1,5 @@
+three-stage agent handoff on one Python project (catalog-desk):
+the frontend agent turns the failing card-renderer suite green (contract field order, price with currency, missing-price label), the backend agent turns the failing service-layer suite green (case-insensitive search over name and description with name-sorted results for every query, including an empty query), and the integration agent runs the contract checker and the end-to-end suite and writes a readiness report.
+Each agent reads its handoff brief under docs/handoff/, leaves its stage artifact under /tmp/workspace-0d8cd5/handoff/, and edits only the files its stage owns (the integration stage edits nothing).
+The run is fully offline:
+no package installs and no network calls.

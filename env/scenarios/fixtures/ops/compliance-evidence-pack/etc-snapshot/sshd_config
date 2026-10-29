@@ -1,0 +1,16 @@
+# DECOY — synthetic sshd_config captured at image build; values are invented
+Port 22
+Protocol 2
+AddressFamily inet
+PermitRootLogin prohibit-password
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+AllowGroups ssh-users sudo wheel admin
+MaxAuthTries 3
+LoginGraceTime 30
+X11Forwarding no
+ClientAliveInterval 300
+ClientAliveCountMax 2
+Subsystem sftp /usr/lib/openssh/sftp-server

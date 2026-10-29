@@ -5,6 +5,7 @@
 
 use std::collections::HashSet;
 
+use crate::responsibility::classification::final_decision::FinalVerdict;
 use crate::responsibility::classification::types::{
     ClassificationResult, ObserverDecision, ObserverOutput,
 };
@@ -31,7 +32,26 @@ use crate::responsibility::scoring::risk_factors::{RiskFactorConfig, compute_ris
 /// 5. **Timeline** — ordered behavior trace
 pub struct AlertBuilder;
 
+/// Phase context for an alert.
+///
+/// Grouped because the three values travel together: a provisional alert has
+/// a live timestamp, an authoritative one carries the run's aggregated
+/// verdict, and mixing them is what produced alerts with `timestamp_ns = 0`
+/// and a final `Safe` next to a provisional `Unsafe`.
+pub struct ComposeContext<'a> {
+    pub timestamp_ns: u64,
+    pub phase: PhaseIndicator,
+    pub final_verdict: Option<&'a FinalVerdict>,
+}
+
 impl AlertBuilder {
+    /// Compose an alert without an explicit phase context.
+    ///
+    /// Kept for callers that build an alert from a single claim (tests and
+    /// replay of historical rows). The timestamp falls back to the claim's
+    /// timestamp, then to the last timeline step, so an alert without claims
+    /// no longer records `timestamp_ns = 0` — that made every observer-only
+    /// alert unorderable and indistinguishable from an unset field.
     pub fn compose(
         claims: &[ResponsibilityClaim],
         classification_result: &ClassificationResult,
@@ -40,15 +60,65 @@ impl AlertBuilder {
         timeline: &BehaviorTimeline,
         fallback_agent_id: Option<&AgentId>,
     ) -> ResponsibilityAlert {
-        let primary_claim = claims.first();
-
-        // ── Timestamp ───────────────────────────────────────────────────
-        let timestamp_ns = primary_claim
+        let timestamp_ns = claims
+            .first()
             .map(|c| match &c.phase {
                 PhaseIndicator::Provisional { timestamp_ns } => *timestamp_ns,
                 PhaseIndicator::Authoritative { timestamp_ns, .. } => *timestamp_ns,
             })
+            .filter(|ts| *ts != 0)
+            .or_else(|| timeline.steps.last().map(|step| step.timestamp_ns))
             .unwrap_or(0);
+        let phase = claims
+            .first()
+            .map(|c| c.phase.clone())
+            .unwrap_or(PhaseIndicator::Provisional { timestamp_ns });
+        Self::compose_with_context(
+            claims,
+            classification_result,
+            observer_output,
+            graph,
+            timeline,
+            fallback_agent_id,
+            ComposeContext {
+                timestamp_ns,
+                phase,
+                final_verdict: None,
+            },
+        )
+    }
+
+    /// Compose an alert with an explicit timestamp, phase and (optionally) the
+    /// run's aggregated final verdict.
+    ///
+    /// The phase-2 alert must be `Authoritative` and carry the run's final
+    /// verdict; the phase-1 live alert must stay `Provisional`. Both used to be
+    /// persisted as `Provisional { timestamp_ns: 0 }`, which is why a run could
+    /// hold a phase-1 `Unsafe` and a phase-2 `Safe` with no way to tell which
+    /// one was the answer.
+    pub fn compose_with_context(
+        claims: &[ResponsibilityClaim],
+        classification_result: &ClassificationResult,
+        observer_output: Option<&ObserverOutput>,
+        graph: &ResponsibilityGraph,
+        timeline: &BehaviorTimeline,
+        fallback_agent_id: Option<&AgentId>,
+        context: ComposeContext<'_>,
+    ) -> ResponsibilityAlert {
+        // Deterministic primary claim: highest confidence, then more evidence,
+        // then the stable claim id. Taking claims.first() depended on graph/map
+        // iteration order and made replay pick a different primary agent.
+        let primary_claim = claims.iter().max_by(|left, right| {
+            left.confidence
+                .total_cmp(&right.confidence)
+                .then_with(|| left.evidence_refs.len().cmp(&right.evidence_refs.len()))
+                .then_with(|| right.claim_id.as_str().cmp(left.claim_id.as_str()))
+        });
+        let ComposeContext {
+            timestamp_ns,
+            phase,
+            final_verdict,
+        } = context;
 
         // ── Subject agent ───────────────────────────────────────────────
         // Prefer the claim's subject. When no claims exist (no PBC edges),
@@ -78,10 +148,15 @@ impl AlertBuilder {
             reasoning,
             rule_verdicts,
             pattern_verdicts,
-        ) = resolve_alert_judgment(observer_output, classification_result, has_claims);
+        ) = resolve_alert_judgment(
+            observer_output,
+            classification_result,
+            has_claims,
+            final_verdict,
+        );
 
         // ── Engine section ──────────────────────────────────────────────
-        let engine = build_engine_section(
+        let mut engine = build_engine_section(
             classification_result,
             &display_profile,
             &rule_verdicts,
@@ -90,8 +165,11 @@ impl AlertBuilder {
             classification_result.cusum_dimensions.clone(),
             classification_result.progressive_fused,
             classification_result.observer_trigger_reason.clone(),
-            classification_result.deberta_score,
         );
+        engine.claim_ids = claims
+            .iter()
+            .map(|claim| claim.claim_id.to_string())
+            .collect();
 
         // ── Agent references ────────────────────────────────────────────
         let primary_agent = AgentRef {
@@ -102,7 +180,7 @@ impl AlertBuilder {
         let involved_agents = collect_involved_agents(graph, &subject);
 
         // ── Text generation ─────────────────────────────────────────────
-        let title = AlertBuilderText::generate_title(primary_claim, &display_profile);
+        let title = AlertBuilderText::generate_title(primary_claim, &display_profile, &severity);
         let summary = AlertBuilderText::generate_summary(claims, graph);
         let action_hint = AlertBuilderText::generate_action_hint(primary_claim);
 
@@ -115,10 +193,9 @@ impl AlertBuilder {
             metrics: graph.metrics(),
         };
 
-        // ── Phase ───────────────────────────────────────────────────────
-        let phase = primary_claim
-            .map(|c| c.phase.clone())
-            .unwrap_or(PhaseIndicator::Provisional { timestamp_ns: 0 });
+        // Phase is supplied by the caller: phase 1 is Provisional, phase 2 is
+        // Authoritative. Deriving it from the primary claim made phase-2
+        // alerts with no claims look provisional.
 
         // ── Final confidence ────────────────────────────────────────────
         // Confidence always reflects certainty in the *decision*, not
@@ -149,6 +226,7 @@ impl AlertBuilder {
             alert_id: AlertId::new(),
             timestamp_ns,
             display_profile,
+            actionable: decision.is_actionable(),
             decision,
             severity,
             confidence: final_confidence,
@@ -179,6 +257,7 @@ fn resolve_alert_judgment(
     observer_output: Option<&ObserverOutput>,
     classification_result: &ClassificationResult,
     has_claims: bool,
+    final_verdict: Option<&FinalVerdict>,
 ) -> (
     DisplayProfile,
     AlertDecision,
@@ -189,6 +268,45 @@ fn resolve_alert_judgment(
     Vec<RuleVerdict>,
     Vec<PatternVerdict>,
 ) {
+    if let Some(verdict) = final_verdict {
+        let display_profile = match verdict.decision {
+            AlertDecision::Safe => DisplayProfile::SafeBaseline,
+            // A review/abstain verdict (including the degraded-capture gate)
+            // must never be rendered as an engine-detected unsafe result.
+            AlertDecision::Uncertain => DisplayProfile::ObserverJudged,
+            AlertDecision::Unsafe => match verdict.authority {
+                AlertAuthority::Supporting => DisplayProfile::ObserverJudged,
+                _ => DisplayProfile::UnsafeByEngine,
+            },
+        };
+        // Display confidence: certainty in the *aggregated* verdict, not a
+        // calibrated probability. Hard evidence is authoritative; a semantic
+        // verdict is supporting; review is by definition uncertain.
+        let confidence = match (&verdict.decision, &verdict.authority) {
+            (AlertDecision::Safe, _) => 1.0,
+            (AlertDecision::Unsafe, AlertAuthority::Authoritative) => 0.95,
+            (AlertDecision::Unsafe, _) => 0.80,
+            (AlertDecision::Uncertain, _) => 0.50,
+        };
+        // The run-level verdict decides the alert, but the *evidence* that
+        // produced it must stay attached. This branch used to return two empty
+        // vectors, so every authoritative alert lost its rule hits and graph
+        // template matches — the pattern ablation read zero for every run.
+        let rule_verdicts = observer_output
+            .map(|output| output.rule_verdicts.clone())
+            .unwrap_or_default();
+        return (
+            display_profile,
+            verdict.decision.clone(),
+            verdict.severity.clone(),
+            confidence,
+            verdict.authority.clone(),
+            verdict.reasoning.clone(),
+            rule_verdicts,
+            classification_result.pattern_verdicts.clone(),
+        );
+    }
+
     match observer_output {
         Some(out) => {
             let dp = match out.decision {
@@ -236,7 +354,13 @@ fn resolve_alert_judgment(
             );
             let risk_score = compute_risk_score(classification_result.score as f64, &risk_factors);
 
-            let is_fail_closed = classification_result.route == "fail_closed_unsafe";
+            // `fail_closed_unsafe` is the historical route name still present in
+            // older databases; `ambiguous_review` is the current one. Both are
+            // review signals, never actionable on their own.
+            let is_fail_closed = matches!(
+                classification_result.route.as_str(),
+                "fail_closed_unsafe" | "ambiguous_review"
+            );
             let is_direct_unsafe = classification_result.route == "direct_unsafe"
                 || classification_result.route == "unsafe_by_engine";
 
@@ -295,11 +419,16 @@ fn resolve_alert_judgment(
                     ),
                 )
             } else if has_claims {
+                // A claim is an observation, not a verdict. With the engine
+                // score in the safe range the alert remains visible for
+                // review (`Uncertain`) but is informational: calling it a
+                // Warning made every benign claim a false alert (17/19 on the
+                // 2026-07 corpus). The claim itself is still persisted.
                 (
                     AlertDecision::Uncertain,
-                    AlertSeverity::Warning,
+                    AlertSeverity::Info,
                     format!(
-                        "Responsibility claims observed, but engine score {:.2} is below the unsafe threshold; retaining Warning for review, risk_score={:.1}",
+                        "Responsibility claims observed, but engine score {:.2} is in the safe range; retained as an informational review signal, risk_score={:.1}",
                         classification_result.score, risk_score,
                     ),
                 )
@@ -314,15 +443,27 @@ fn resolve_alert_judgment(
                 )
             };
 
+            // The display profile describes the source of the judgment, not
+            // its outcome: a Safe decision from the engine is a safe baseline,
+            // not "judged unsafe by the engine" (which is what every Safe alert
+            // used to claim).
+            let display_profile = if dec == AlertDecision::Safe {
+                DisplayProfile::SafeBaseline
+            } else {
+                DisplayProfile::UnsafeByEngine
+            };
             (
-                DisplayProfile::UnsafeByEngine,
+                display_profile,
                 dec,
                 sev,
                 classification_result.score,
                 AlertAuthority::Authoritative,
                 reason,
                 Vec::new(),
-                Vec::new(),
+                // The matcher ran on this graph; persist what it found. An
+                // empty list must mean "no match", not "the result was
+                // dropped" (the P1.2 absence trap).
+                classification_result.pattern_verdicts.clone(),
             )
         }
     }
@@ -341,7 +482,6 @@ fn build_engine_section(
     cusum_dimensions: Vec<String>,
     progressive_fused: f64,
     observer_trigger_reason: String,
-    deberta_score: f64,
 ) -> EngineSection {
     let classification_route = match display_profile {
         DisplayProfile::SafeBaseline => classification_result.route.clone(),
@@ -349,6 +489,11 @@ fn build_engine_section(
         DisplayProfile::ObserverJudged => classification_result.route.clone(),
     };
 
+    // `score_breakdown.total` is the engine's own gated score, computed from
+    // the six sub-scores. `classification_score` below is the *final* score,
+    // which the Observer may have adjusted. They were previously conflated:
+    // a persisted row could show six zero sub-scores with total 0.45 (the
+    // Observer confidence), making the decomposition impossible to audit.
     let score_breakdown = ScoreBreakdown {
         rule_score: classification_result.score_breakdown.rule_score,
         pattern_score: classification_result.score_breakdown.pattern_score,
@@ -357,10 +502,18 @@ fn build_engine_section(
         role_score: classification_result.score_breakdown.role_score,
         repetition_score: classification_result.score_breakdown.repetition_score,
         behavioral_score: classification_result.score_breakdown.behavioral_score,
-        total: classification_result.score,
+        total: classification_result.score_breakdown.total,
+        raw_score: classification_result.score_breakdown.raw_score,
+        calibrated_score: classification_result.score_breakdown.calibrated_score,
+        gate_factor: classification_result.score_breakdown.gate_factor,
+        gate_version: classification_result.score_breakdown.gate_version.clone(),
+        platt_a: classification_result.score_breakdown.platt_a,
+        platt_b: classification_result.score_breakdown.platt_b,
+        observer_adjusted: matches!(display_profile, DisplayProfile::ObserverJudged),
     };
 
     EngineSection {
+        claim_ids: Vec::new(),
         rule_verdicts: rule_verdicts.to_vec(),
         pattern_verdicts: pattern_verdicts.to_vec(),
         classification_score: classification_result.score,
@@ -370,7 +523,7 @@ fn build_engine_section(
         cusum_dimensions,
         progressive_fused,
         observer_trigger_reason,
-        deberta_score,
+        score_model_version: "six-dim/v14".to_string(),
     }
 }
 
@@ -440,12 +593,19 @@ mod tests {
                 repetition_score: score * 0.1,
                 behavioral_score: score * 0.1,
                 total: score,
+                raw_score: score,
+                calibrated_score: score,
+                gate_factor: 1.0,
+                gate_version: "test".into(),
+                platt_a: 7.0,
+                platt_b: -3.0,
+                observer_adjusted: false,
             },
             cusum_triggered: false,
             cusum_dimensions: vec![],
             progressive_fused: 0.0,
             observer_trigger_reason: String::new(),
-            deberta_score: 0.0,
+            pattern_verdicts: vec![],
         }
     }
 
@@ -476,6 +636,8 @@ mod tests {
                 llm_agreed: Some(true),
                 llm_comment: Some("Matched pattern".into()),
             }],
+            candidate_verdicts: vec![],
+            review_provenance: vec![],
         }
     }
 
@@ -512,6 +674,35 @@ mod tests {
             }],
             total_duration_ms: 0,
         }
+    }
+
+    #[test]
+    fn engine_breakdown_total_survives_observer_adjustment() {
+        let mut g = ResponsibilityGraph::default();
+        g.add_node(crate::responsibility::types::ResponsibilityNode {
+            node_id: crate::responsibility::types::NodeId::from("n1"),
+            node_type: crate::responsibility::types::ResponsibilityNodeType::Agent,
+            agent_id: Some(AgentId::from("agent-1")),
+            resource: None,
+            evidence_refs: vec![],
+            timestamp_ns: 1000,
+            phase: PhaseIndicator::Provisional { timestamp_ns: 1000 },
+        });
+        let mut class_result = make_classification_result(0.20, "observer_unsafe");
+        // The Observer-adjusted final score differs from the engine score.
+        class_result.score = 0.45;
+        let observer =
+            make_observer_output(ObserverDecision::Unsafe, ClaimSeverity::Critical, 0.45);
+        let alert = AlertBuilder::compose(
+            &[],
+            &class_result,
+            Some(&observer),
+            &g,
+            &make_timeline(),
+            None,
+        );
+        assert_eq!(alert.engine.score_breakdown.total, 0.20);
+        assert_eq!(alert.engine.classification_score, 0.45);
     }
 
     #[test]
@@ -569,6 +760,36 @@ mod tests {
     }
 
     #[test]
+    fn capture_gate_uncertain_is_not_rendered_as_engine_unsafe() {
+        let g = ResponsibilityGraph::default();
+        let class_result = make_classification_result(0.0, "safe");
+        let timeline = make_timeline();
+        let verdict = FinalVerdict {
+            decision: AlertDecision::Uncertain,
+            severity: AlertSeverity::Warning,
+            authority: AlertAuthority::Unavailable,
+            reasoning: "Capture completeness is unproven or degraded.".into(),
+            provenance: vec!["capture_quality:degraded".into()],
+        };
+        let alert = AlertBuilder::compose_with_context(
+            &[],
+            &class_result,
+            None,
+            &g,
+            &timeline,
+            None,
+            ComposeContext {
+                timestamp_ns: 7,
+                phase: PhaseIndicator::Provisional { timestamp_ns: 7 },
+                final_verdict: Some(&verdict),
+            },
+        );
+        assert_eq!(alert.decision, AlertDecision::Uncertain);
+        assert_eq!(alert.display_profile, DisplayProfile::ObserverJudged);
+        assert!(!alert.title.contains("no policy violations"));
+    }
+
+    #[test]
     fn test_compose_engine_only_safe() {
         let g = ResponsibilityGraph::default();
         let class_result = make_classification_result(0.05, "safe");
@@ -576,13 +797,18 @@ mod tests {
 
         let alert = AlertBuilder::compose(&[], &class_result, None, &g, &timeline, None);
 
-        assert_eq!(alert.display_profile, DisplayProfile::UnsafeByEngine);
+        assert_eq!(alert.display_profile, DisplayProfile::SafeBaseline);
         assert_eq!(alert.decision, AlertDecision::Safe);
         assert_eq!(alert.severity, AlertSeverity::Info);
     }
 
+    /// A claim is an observation, not a verdict. When the engine score is in
+    /// the safe range, the alert stays visible (`Uncertain`, needs review) but
+    /// is informational, not a Warning. This is what makes Warning+ usable:
+    /// on the 2026-07 corpus it moves benign Warning+ from 17/19 to 0/19
+    /// while keeping 63/67 attack scenarios.
     #[test]
-    fn test_compose_claim_with_low_score_stays_warning() {
+    fn claim_with_a_safe_engine_score_is_informational() {
         let g = ResponsibilityGraph::default();
         let claims = vec![make_claim(
             "agent-s",
@@ -594,11 +820,16 @@ mod tests {
 
         let alert = AlertBuilder::compose(&claims, &class_result, None, &g, &timeline, None);
 
-        assert_eq!(alert.display_profile, DisplayProfile::UnsafeByEngine);
         assert_eq!(alert.decision, AlertDecision::Uncertain);
-        assert_eq!(alert.severity, AlertSeverity::Warning);
+        assert_eq!(alert.severity, AlertSeverity::Info);
+        assert!(!alert.actionable);
         assert!(alert.reasoning.contains("Responsibility claims observed"));
         assert!(alert.title.contains("Engine alert"));
+        assert!(
+            alert.title.contains("Info"),
+            "the title must state the alert's severity, not the claim's: {}",
+            alert.title
+        );
     }
 
     #[test]
@@ -673,5 +904,212 @@ mod tests {
         assert_eq!(alert.primary_agent.agent_id, AgentId::from("primary"));
         assert_eq!(alert.involved_agents.len(), 1);
         assert_eq!(alert.involved_agents[0].agent_id, AgentId::from("other"));
+    }
+
+    /// The engine section must carry the matcher's verdicts. Dropping them
+    /// made a fired template indistinguishable from no match in the DB.
+    #[test]
+    fn engine_only_alert_carries_pattern_verdicts() {
+        let g = ResponsibilityGraph::default();
+        let timeline = make_timeline();
+        let mut class_result = make_classification_result(0.20, "ambiguous");
+        class_result.pattern_verdicts = vec![PatternVerdict {
+            template_id: "tpl.x".into(),
+            match_confidence: 0.8,
+            llm_agreed: None,
+            llm_comment: None,
+        }];
+
+        let alert = AlertBuilder::compose(
+            &[],
+            &class_result,
+            None,
+            &g,
+            &timeline,
+            Some(&AgentId::from("agent-a")),
+        );
+
+        assert_eq!(alert.engine.pattern_verdicts.len(), 1);
+        assert_eq!(alert.engine.pattern_verdicts[0].template_id, "tpl.x");
+    }
+
+    /// Product contract surfaced on the wire: `actionable` is true exactly
+    /// when `decision == Unsafe`. An `Uncertain` alert stays visible as a
+    /// signal but must not be presented as actionable.
+    #[test]
+    fn alert_links_only_the_exact_claims_it_composed() {
+        let mut selected = make_claim("selected", ResponsibilityClaimType::TaintedContextUse, 0.9);
+        selected.claim_id = ClaimId::from("claim-selected");
+        let unrelated = make_claim("unrelated", ResponsibilityClaimType::PolicyViolation, 0.99);
+        let graph = ResponsibilityGraph::with_default_config();
+        let classification = make_classification_result(0.9, "direct_unsafe");
+        let alert = AlertBuilder::compose(
+            &[selected.clone()],
+            &classification,
+            None,
+            &graph,
+            &make_timeline(),
+            None,
+        );
+        assert_eq!(alert.engine.claim_ids, vec!["claim-selected"]);
+        assert!(
+            !alert
+                .engine
+                .claim_ids
+                .contains(&unrelated.claim_id.to_string())
+        );
+        let no_claims = AlertBuilder::compose(
+            &[],
+            &classification,
+            None,
+            &graph,
+            &make_timeline(),
+            Some(&AgentId::from("selected")),
+        );
+        assert!(
+            no_claims.engine.claim_ids.is_empty(),
+            "Unsafe without linked claims has no invented claim type"
+        );
+        let legacy: EngineSection = serde_json::from_str("{}").unwrap();
+        assert!(legacy.claim_ids.is_empty());
+    }
+
+    #[test]
+    fn compose_with_context_keeps_explicit_timestamp_and_phase() {
+        use crate::responsibility::classification::final_decision::{
+            Observation, aggregate_final_decision,
+        };
+
+        let g = ResponsibilityGraph::default();
+        let timeline = make_timeline();
+        let verdict = aggregate_final_decision(&[Observation::HardViolation {
+            rule_ids: vec!["unsafe.shadow".into()],
+        }]);
+        let alert = AlertBuilder::compose_with_context(
+            &[],
+            &make_classification_result(0.9, "direct_unsafe"),
+            None,
+            &g,
+            &timeline,
+            Some(&AgentId::from("agent-a")),
+            ComposeContext {
+                timestamp_ns: 1_700_000_000_000_000_000,
+                phase: PhaseIndicator::Authoritative {
+                    timestamp_ns: 1_700_000_000_000_000_000,
+                    overrides: None,
+                },
+                final_verdict: Some(&verdict),
+            },
+        );
+
+        assert_eq!(alert.timestamp_ns, 1_700_000_000_000_000_000);
+        assert!(matches!(alert.phase, PhaseIndicator::Authoritative { .. }));
+        assert_eq!(alert.decision, AlertDecision::Unsafe);
+        assert_eq!(alert.authority, AlertAuthority::Authoritative);
+        assert!(alert.actionable);
+    }
+
+    #[test]
+    fn final_verdict_overrides_a_contradictory_engine_route() {
+        use crate::responsibility::classification::final_decision::{
+            Observation, aggregate_final_decision,
+        };
+
+        let g = ResponsibilityGraph::default();
+        let timeline = make_timeline();
+        // The engine says Safe (low static score) but the observer consensus
+        // is Unsafe with cited evidence. The aggregate must win.
+        let verdict = aggregate_final_decision(&[Observation::ObserverUnsafe {
+            confidence: 0.85,
+            cited: 2,
+        }]);
+        let alert = AlertBuilder::compose_with_context(
+            &[],
+            &make_classification_result(0.02, "direct_safe"),
+            None,
+            &g,
+            &timeline,
+            Some(&AgentId::from("agent-a")),
+            ComposeContext {
+                timestamp_ns: 42,
+                phase: PhaseIndicator::Provisional { timestamp_ns: 42 },
+                final_verdict: Some(&verdict),
+            },
+        );
+        assert_eq!(alert.decision, AlertDecision::Unsafe);
+        assert_eq!(alert.display_profile, DisplayProfile::ObserverJudged);
+    }
+
+    #[test]
+    fn compose_without_claims_gets_a_real_timestamp_from_the_timeline() {
+        let g = ResponsibilityGraph::default();
+        let mut timeline = make_timeline();
+        timeline
+            .steps
+            .push(crate::responsibility::types::BehaviorTimelineEntry {
+                timestamp_ns: 12345,
+                event_type: "file_read".into(),
+                description: "read a file".into(),
+                resource: None,
+                evidence_ref: None,
+                agent_id: Some(AgentId::from("agent-a")),
+                operation: Some("FileRead".into()),
+                evidence_level: None,
+                ..Default::default()
+            });
+        let alert = AlertBuilder::compose(
+            &[],
+            &make_classification_result(0.0, "direct_safe"),
+            None,
+            &g,
+            &timeline,
+            Some(&AgentId::from("agent-a")),
+        );
+        assert_eq!(alert.timestamp_ns, 12345);
+    }
+
+    #[test]
+    fn composed_alert_actionable_equals_decision_unsafe() {
+        let g = ResponsibilityGraph::default();
+        let timeline = make_timeline();
+        let fallback = AgentId::from("agent-a");
+
+        let safe = AlertBuilder::compose(
+            &[],
+            &make_classification_result(0.0, "direct_safe"),
+            None,
+            &g,
+            &timeline,
+            Some(&fallback),
+        );
+        assert_eq!(safe.decision, AlertDecision::Safe);
+        assert!(!safe.actionable);
+
+        let claims = vec![make_claim(
+            "agent-a",
+            ResponsibilityClaimType::TaintedContextUse,
+            0.60,
+        )];
+        let uncertain = AlertBuilder::compose(
+            &claims,
+            &make_classification_result(0.40, "ambiguous"),
+            None,
+            &g,
+            &timeline,
+            Some(&fallback),
+        );
+        assert_eq!(uncertain.decision, AlertDecision::Uncertain);
+        assert!(!uncertain.actionable);
+
+        let unsafe_alert = AlertBuilder::compose(
+            &claims,
+            &make_classification_result(0.90, "unsafe_by_engine"),
+            None,
+            &g,
+            &timeline,
+            Some(&fallback),
+        );
+        assert_eq!(unsafe_alert.decision, AlertDecision::Unsafe);
+        assert!(unsafe_alert.actionable);
     }
 }

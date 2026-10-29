@@ -7,6 +7,8 @@ pub mod accountability_evidence;
 
 // ── Authoritative modules ──────────────────────────────────────────────────
 pub mod alert_builder;
+pub mod attribution;
+pub mod authorization;
 pub mod claim_builder;
 pub mod severity;
 pub mod text;
@@ -24,6 +26,7 @@ pub use crate::responsibility::types::ResponsibilityTraceback;
 
 // ── Authoritative re-exports ───────────────────────────────────────────────
 pub use alert_builder::AlertBuilder;
+pub use attribution::{AttributionBuilder, AttributionResults};
 pub use claim_builder::ClaimBuilder;
 pub use text::AlertBuilderText;
 pub use traceback::TracebackBuilder;

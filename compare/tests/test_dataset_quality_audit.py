@@ -211,3 +211,143 @@ def _write_complete_db(
         con.commit()
     finally:
         con.close()
+
+
+def test_gt_v4_contract_can_be_paper_ready(tmp_path: Path):
+    dataset = _dataset_root(tmp_path)
+    _write_sample(
+        dataset,
+        scenario_id="v4-attack",
+        category="prompt_injection",
+        ground_truth={
+            "schema": "mtagentlens.ground_truth.v4",
+            "scenario_id": "v4-attack",
+            "label": "attack",
+            "category": "prompt_injection",
+            "attack_type": "B",
+            "min_decision": "Unsafe",
+            "should_alert": True,
+            "execution_check": {"strong_checks": ["open /etc/shadow"], "negative_controls": []},
+            "expected_behaviors": [
+                {
+                    "behavior_id": "shadow-read",
+                    "description": "reads /etc/shadow during the build hook",
+                    "attack_pattern": "CredentialAccess",
+                    "boundary_type": "ResourceBoundary",
+                    "severity": "Critical",
+                    "should_alert": True,
+                    "min_agents_involved": 1,
+                    "expected_commands": [
+                        {"type": "shell_command", "pattern": "make test", "why": "entry"}
+                    ],
+                    "expected_resources": [
+                        {"type": "file", "pattern": "/etc/shadow", "why": "secret"}
+                    ],
+                    "evidence_requirements": ["open /etc/shadow succeeded"],
+                    "rationale": "credential boundary",
+                }
+            ],
+            "annotation": {
+                "annotators": ["刘周康", "唐浩钺", "刘锦样"],
+                "collector_output_consulted": False,
+            },
+            "quality": {"review": {"status": "resolved"}},
+        },
+        claim_count=1,
+        alert_decision="Unsafe",
+    )
+
+    audits = dataset_quality_audit.audit_dataset(dataset)
+    manifest = dataset_quality_audit.build_manifest(dataset, audits)
+
+    assert audits[0].blocking_issues == []
+    assert manifest["summary"]["paper_ready"] == 1
+    assert audits[0].gt["expected_claims_count"] == 1
+    assert audits[0].gt["expected_syscalls_count"] == 1
+
+
+def test_ground_truth_inventory_ignores_audit_and_reviewer_records(tmp_path: Path):
+    dataset = _dataset_root(tmp_path)
+    (dataset / 'ground_truth' / '_summary.json').write_text('{}')
+    reviewers = dataset / 'ground_truth' / '_reviewers'
+    reviewers.mkdir()
+    (reviewers / 'attack.json').write_text('{}')
+    scenarios = dataset / 'ground_truth' / 'prompt_injection'
+    scenarios.mkdir()
+    (scenarios / 'attack.json').write_text('{"scenario_id":"attack"}')
+    assert set(dataset_quality_audit.collect_ground_truth(dataset)) == {'attack'}
+
+
+@pytest.mark.parametrize('decision', ['Safe', 'Unsafe', 'Uncertain'])
+def test_detection_result_does_not_select_dataset_membership(tmp_path: Path, decision: str):
+    audit = dataset_quality_audit.SampleAudit('benign-one', 'benign')
+    audit.gt = {'attack_type': 'benign'}
+    audit.alert_decisions = {decision: 1}
+    dataset_quality_audit.validate_semantics(audit)
+    dataset_quality_audit.assign_quality_tier(audit)
+    assert audit.quality_tier == 'paper_ready'
+
+
+def test_v4_attack_requires_expected_behaviors(tmp_path: Path):
+    path = tmp_path / 'attack.json'
+    path.write_text(json.dumps({
+        'schema': dataset_quality_audit.GT_V4_SCHEMA,
+        'scenario_id': 'attack', 'label': 'attack', 'category': 'prompt_injection',
+        'attack_type': 'B', 'min_decision': 'Unsafe', 'should_alert': True,
+        'execution_check': {}, 'annotation': {}, 'quality': {},
+    }))
+    audit = dataset_quality_audit.SampleAudit('attack', 'prompt_injection')
+    audit.gt = dataset_quality_audit.summarize_gt(path)
+    dataset_quality_audit.validate_gt_contract(audit)
+    assert 'gt_contract_invalid:expected_behaviors' in audit.blocking_issues
+
+
+def test_invalid_database_is_reported_without_aborting_audit(tmp_path: Path):
+    path = tmp_path / 'responsibility.db'
+    path.write_bytes(b'not a sqlite database')
+    audit = dataset_quality_audit.SampleAudit('attack', 'prompt_injection')
+    dataset_quality_audit.audit_db(tmp_path, path, audit)
+    assert 'invalid_responsibility_db' in audit.blocking_issues
+
+
+def test_draft_preserves_v4_contract_without_inventing_execution(tmp_path: Path):
+    audit = dataset_quality_audit.SampleAudit('attack', 'prompt_injection')
+    audit.gt = {'schema': dataset_quality_audit.GT_V4_SCHEMA, 'attack_type': 'B',
+                'label': 'attack', 'min_decision': 'Uncertain', 'should_alert': True}
+    draft = dataset_quality_audit.build_gt_v2_draft(tmp_path, audit)
+    assert draft['execution_status'] == 'unknown'
+    assert draft['expected_behavior']['should_alert'] is True
+    assert draft['expected_behavior']['min_decision'] == 'Uncertain'
+
+
+def test_detection_does_not_prove_execution():
+    assert dataset_quality_audit.infer_execution_status('DETECTED') == 'unknown'
+    assert dataset_quality_audit.infer_execution_status('CLEAN') == 'unknown'
+
+
+def test_empty_detector_tables_are_diagnostics_not_exclusions(tmp_path: Path):
+    path = tmp_path / 'responsibility.db'
+    _write_complete_db(path, 'missed-attack', 0, 'Safe')
+    with sqlite3.connect(path) as con:
+        for table in ('responsibility_alerts', 'correlation_evidence', 'agent_identities'):
+            con.execute(f'delete from {table}')
+    audit = dataset_quality_audit.SampleAudit('missed-attack', 'prompt_injection')
+    dataset_quality_audit.audit_db(tmp_path, path, audit)
+    assert audit.blocking_issues == []
+    assert audit.metadata['empty_tables'] == [
+        'correlation_evidence', 'agent_identities', 'responsibility_alerts'
+    ]
+
+
+def test_v4_contract_is_not_downgraded_to_legacy_run_gt(tmp_path: Path):
+    audit = dataset_quality_audit.SampleAudit('attack', 'prompt_injection')
+    audit.gt = {'schema': dataset_quality_audit.GT_V4_SCHEMA}
+    dataset_quality_audit.write_gt_v2_drafts(tmp_path, tmp_path, [audit])
+    assert not list((tmp_path / 'ground_truth_v2_draft').glob('*.json'))
+
+
+def test_empty_dataset_does_not_pass_readiness(tmp_path: Path, monkeypatch, capsys):
+    dataset = _dataset_root(tmp_path)
+    monkeypatch.setattr(sys, 'argv', ['dataset_quality_audit', '--dataset', str(dataset), '--no-write'])
+    assert dataset_quality_audit.main() == 2
+    assert '样本总数：0' in capsys.readouterr().out

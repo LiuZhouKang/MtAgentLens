@@ -1,0 +1,406 @@
+{
+  "schema": "mtagentlens.paper-claims/1",
+  "measurement": "RC 2026-10-25-fix4 (binary de3a0894, release aa364a45, campaign 2026-10-25 11:54-12:59)",
+  "artifact_root": "local/workpackages/2026-10-25-rc-fix4",
+  "note": "Every number quoted in the paper must be traceable to an artifact through this file. paper_metrics_available=false and blocker text are deliberate claims: a green verifier must never imply publication readiness.",
+  "claims": [
+    {
+      "id": "status.paper_metrics_unavailable",
+      "statement": "paper_metrics_available is false; blockers are part of the claim",
+      "artifact": "metrics.json",
+      "path": "paper_metrics_available",
+      "equals": false
+    },
+    {
+      "id": "release.id",
+      "statement": "the measured release is aa364a45 (sink-host release, 93 cases)",
+      "artifact": "rc.json",
+      "path": "dataset.release_id",
+      "equals": "aa364a45cbfdc3aab00679e52dace81410f9073a70f482382b1ddab9550db542"
+    },
+    {
+      "id": "binary.sha256",
+      "statement": "the measured collector binary is de3a0894",
+      "artifact": "rc.json",
+      "path": "binary.sha256",
+      "equals": "de3a0894ff03162b84772aadbc031d74cca659b8f0f07f1110003435d196b3da"
+    },
+    {
+      "id": "benign.rows",
+      "statement": "18 benign runs are valid (healthy capture, canonical verdict)",
+      "artifact": "metrics.json",
+      "path": "benign.rows",
+      "equals": 18
+    },
+    {
+      "id": "benign.decided",
+      "statement": "15 benign runs received a binary decision",
+      "artifact": "metrics.json",
+      "path": "benign.decided",
+      "equals": 15
+    },
+    {
+      "id": "benign.actionable_fp",
+      "statement": "no benign run was actionable (0 false positives)",
+      "artifact": "metrics.json",
+      "path": "benign.actionable",
+      "equals": 0
+    },
+    {
+      "id": "benign.decided_safe",
+      "statement": "15 benign runs were decided Safe",
+      "artifact": "metrics.json",
+      "path": "benign.safe",
+      "equals": 15
+    },
+    {
+      "id": "benign.review",
+      "statement": "3 benign runs abstained (review)",
+      "artifact": "metrics.json",
+      "path": "benign.review",
+      "equals": 3
+    },
+    {
+      "id": "benign.abstention",
+      "statement": "benign abstention is 16.7%",
+      "artifact": "metrics.json",
+      "path": "benign.abstention_rate",
+      "close_to": 0.16666666666666666,
+      "tolerance": 0.0005
+    },
+    {
+      "id": "benign.coverage",
+      "statement": "benign healthy binary coverage is 83.3%",
+      "artifact": "metrics.json",
+      "path": "benign.all_attempts.healthy_binary_coverage",
+      "close_to": 0.8333333333333334,
+      "tolerance": 0.0005
+    },
+    {
+      "id": "benign.fp_wilson_upper",
+      "statement": "benign actionable Wilson upper bound is 20.4%",
+      "artifact": "metrics.json",
+      "path": "benign.actionable_wilson_95.1",
+      "close_to": 0.2039,
+      "tolerance": 0.001
+    },
+    {
+      "id": "attack.rows",
+      "statement": "43 attack runs are valid",
+      "artifact": "metrics.json",
+      "path": "attack.rows",
+      "equals": 43
+    },
+    {
+      "id": "attack.decided",
+      "statement": "22 attack runs received a binary decision",
+      "artifact": "metrics.json",
+      "path": "attack.decided",
+      "equals": 22
+    },
+    {
+      "id": "attack.actionable",
+      "statement": "4 attack runs were actionable Unsafe",
+      "artifact": "metrics.json",
+      "path": "attack.actionable",
+      "equals": 4
+    },
+    {
+      "id": "attack.conditional_rate",
+      "statement": "conditional actionable rate is 4/22 = 18.2%",
+      "artifact": "metrics.json",
+      "path": "attack.actionable_rate",
+      "close_to": 0.1818,
+      "tolerance": 0.0005
+    },
+    {
+      "id": "attack.safe_outputs",
+      "statement": "18 attack-scenario runs were decided Safe; execution evidence is required before calling any a false negative",
+      "artifact": "metrics.json",
+      "path": "attack.safe",
+      "equals": 18
+    },
+    {
+      "id": "attack.abstention",
+      "statement": "attack abstention is 48.8%",
+      "artifact": "metrics.json",
+      "path": "attack.abstention_rate",
+      "close_to": 0.4883720930232558,
+      "tolerance": 0.0005
+    },
+    {
+      "id": "attack.coverage",
+      "statement": "attack healthy binary coverage is 51.2%",
+      "artifact": "metrics.json",
+      "path": "attack.all_attempts.healthy_binary_coverage",
+      "close_to": 0.5116279069767442,
+      "tolerance": 0.0005
+    },
+    {
+      "id": "attack.all_attempts_rate",
+      "statement": "actionable over all attack attempts is 9.3%",
+      "artifact": "metrics.json",
+      "path": "attack.all_attempts.unsafe_output_rate",
+      "close_to": 0.09302325581395349,
+      "tolerance": 0.0005
+    },
+    {
+      "id": "attack.wilson_lower",
+      "statement": "conditional actionable Wilson lower bound is 7.3%",
+      "artifact": "metrics.json",
+      "path": "attack.actionable_wilson_95.0",
+      "close_to": 0.0731,
+      "tolerance": 0.001
+    },
+    {
+      "id": "attack.wilson_upper",
+      "statement": "conditional actionable Wilson upper bound is 38.5%",
+      "artifact": "metrics.json",
+      "path": "attack.actionable_wilson_95.1",
+      "close_to": 0.3852,
+      "tolerance": 0.001
+    },
+    {
+      "id": "execution.executed_runs",
+      "statement": "16 of 43 attack runs produced independent marker execution evidence",
+      "artifact": "metrics-with-execution.json",
+      "path": "attack_execution_audit.executed_runs",
+      "equals": 16
+    },
+    {
+      "id": "execution.asr",
+      "statement": "marker hook-reach rate is 37.2% (16/43); it is not completed attack success",
+      "artifact": "metrics-with-execution.json",
+      "path": "attack_execution_audit.asr",
+      "close_to": 0.37209302325581395,
+      "tolerance": 0.0005
+    },
+    {
+      "id": "execution.unsafe",
+      "statement": "4 of 16 executed attacks were actionable Unsafe",
+      "artifact": "metrics-with-execution.json",
+      "path": "attack_executed.actionable",
+      "equals": 4
+    },
+    {
+      "id": "execution.review",
+      "statement": "9 executed attacks abstained (review)",
+      "artifact": "metrics-with-execution.json",
+      "path": "attack_executed.review",
+      "equals": 9
+    },
+    {
+      "id": "execution.conditional_rate",
+      "statement": "actionable rate among decided executed attacks is 57.1% (4/7)",
+      "artifact": "metrics-with-execution.json",
+      "path": "attack_executed.actionable_rate",
+      "close_to": 0.5714,
+      "tolerance": 0.0005
+    },
+    {
+      "id": "execution.wilson_lower",
+      "statement": "executed conditional Wilson lower bound is 25.1%",
+      "artifact": "metrics-with-execution.json",
+      "path": "attack_executed.actionable_wilson_95.0",
+      "close_to": 0.2505,
+      "tolerance": 0.001
+    },
+    {
+      "id": "execution.wilson_upper",
+      "statement": "executed conditional Wilson upper bound is 84.2%",
+      "artifact": "metrics-with-execution.json",
+      "path": "attack_executed.actionable_wilson_95.1",
+      "close_to": 0.8418,
+      "tolerance": 0.001
+    },
+    {
+      "id": "replay.runs",
+      "statement": "replay ablation covers 61 recorded runs",
+      "artifact": "replay-ablation.json",
+      "path": "runs",
+      "equals": 61
+    },
+    {
+      "id": "replay.exact_reproduction",
+      "statement": "current kernel reproduces every recorded verdict on replay (0 mismatches)",
+      "artifact": "replay-ablation.json",
+      "path": "recorded_vs_replay_mismatches",
+      "equals": 0
+    },
+    {
+      "id": "replay.hard_rule_flips",
+      "statement": "the hard sensitive-egress rule flips 2 executed attacks to Unsafe",
+      "artifact": "replay-ablation.json",
+      "path": "flips",
+      "equals": 2
+    },
+    {
+      "id": "replay.benign_flips",
+      "statement": "the hard sensitive-egress rule changes no benign verdict",
+      "artifact": "replay-ablation.json",
+      "path": "benign_flips",
+      "equals": 0
+    },
+    {
+      "id": "measurement.blocker_count",
+      "statement": "publication blockers are recorded honestly",
+      "artifact": "metrics.json",
+      "path": "publication_blockers.0",
+      "equals": "Incomplete healthy binary coverage, including empty or unobserved attempts; all attempts retained beside conditional rates: benign, attack"
+    },
+    {
+      "id": "e2.pbc_auroc",
+      "statement": "pure-activity baseline PBC rank AUROC is 0.528 on RC fix4",
+      "artifact": "/home/lzk/MtAgentLens/local/workpackages/2026-10-25-e3-fix4/e2-summary.json",
+      "path": "pbc_rank_auroc",
+      "close_to": 0.5277777777777778,
+      "tolerance": 0.0005
+    },
+    {
+      "id": "e2.benign_pbc_mean",
+      "statement": "RC fix4 benign PBC mean is 0.72",
+      "artifact": "/home/lzk/MtAgentLens/local/workpackages/2026-10-25-e3-fix4/e2-summary.json",
+      "path": "benign.distribution.mean",
+      "close_to": 0.7222222222222222,
+      "tolerance": 0.0005
+    },
+    {
+      "id": "e2.attack_pbc_mean",
+      "statement": "RC fix4 attack PBC mean is 1.77",
+      "artifact": "/home/lzk/MtAgentLens/local/workpackages/2026-10-25-e3-fix4/e2-summary.json",
+      "path": "attack.distribution.mean",
+      "close_to": 1.7674418604651163,
+      "tolerance": 0.0005
+    },
+    {
+      "id": "e3.grid_points",
+      "statement": "fixed-observation threshold replay covers 25 grid points in the attack arm",
+      "artifact": "/home/lzk/MtAgentLens/local/workpackages/2026-10-25-e3-fix4/summary.json",
+      "path": "arms.0.grid_points",
+      "equals": 25
+    },
+    {
+      "id": "e3.verdict_invariant",
+      "statement": "fixed-observation replay verdicts are invariant over the threshold grid for the attack arm (43 runs)",
+      "artifact": "/home/lzk/MtAgentLens/local/workpackages/2026-10-25-e3-fix4/summary.json",
+      "path": "arms.0.verdict_invariant_across_grid",
+      "equals": true
+    },
+    {
+      "id": "e4.first_dimension",
+      "statement": "the first fixed-observation LOO point removes dimension 1; full dimension coverage is verified separately",
+      "artifact": "/home/lzk/MtAgentLens/local/workpackages/2026-10-25-e3-fix4/attack.json",
+      "path": "ablation_points.0.dimension",
+      "equals": 1
+    },
+    {
+      "id": "execution.safe",
+      "statement": "Marker hook-reach subset: attack_executed.safe",
+      "artifact": "metrics-with-execution.json",
+      "path": "attack_executed.safe",
+      "equals": 3
+    },
+    {
+      "id": "execution.coverage",
+      "statement": "Marker hook-reach subset: attack_executed.binary_decision_coverage",
+      "artifact": "metrics-with-execution.json",
+      "path": "attack_executed.binary_decision_coverage",
+      "equals": 0.4375
+    },
+    {
+      "id": "execution.abstention",
+      "statement": "Marker hook-reach subset: attack_executed.abstention_rate",
+      "artifact": "metrics-with-execution.json",
+      "path": "attack_executed.abstention_rate",
+      "equals": 0.5625
+    },
+    {
+      "id": "sensitivity.attack.runs",
+      "statement": "attack fixed-recorded-observation replay: runs",
+      "artifact": "../../../datasets/FuxiBench/evidence/pbc/fix4/e3/summary.json",
+      "path": "arms.0.runs",
+      "equals": 43
+    },
+    {
+      "id": "sensitivity.attack.missing",
+      "statement": "attack replay: runs without checkpoint",
+      "artifact": "../../../datasets/FuxiBench/evidence/pbc/fix4/e3/summary.json",
+      "path": "arms.0.runs_without_checkpoint",
+      "equals": 0
+    },
+    {
+      "id": "sensitivity.attack.grid_points",
+      "statement": "attack E3 threshold grid points",
+      "artifact": "../../../datasets/FuxiBench/evidence/pbc/fix4/e3/summary.json",
+      "path": "arms.0.grid_points",
+      "equals": 25
+    },
+    {
+      "id": "sensitivity.attack.verdict_flips",
+      "statement": "attack E3 verdict flips across grid",
+      "artifact": "../../../datasets/FuxiBench/evidence/pbc/fix4/e3/summary.json",
+      "path": "arms.0.verdict_flip_counts",
+      "equals": [
+        0
+      ]
+    },
+    {
+      "id": "sensitivity.attack.max_route_flips",
+      "statement": "attack E3 max route flips across grid",
+      "artifact": "../../../datasets/FuxiBench/evidence/pbc/fix4/e3/summary.json",
+      "path": "arms.0.max_route_flips",
+      "equals": 1
+    },
+    {
+      "id": "sensitivity.attack.ablation_invariant",
+      "statement": "attack LOO ablation verdict invariant",
+      "artifact": "../../../datasets/FuxiBench/evidence/pbc/fix4/e3/summary.json",
+      "path": "arms.0.ablation_verdict_invariant",
+      "equals": true
+    },
+    {
+      "id": "sensitivity.benign.runs",
+      "statement": "benign fixed-recorded-observation replay: runs",
+      "artifact": "../../../datasets/FuxiBench/evidence/pbc/fix4/e3/summary.json",
+      "path": "arms.1.runs",
+      "equals": 18
+    },
+    {
+      "id": "sensitivity.benign.missing",
+      "statement": "benign replay: runs without checkpoint",
+      "artifact": "../../../datasets/FuxiBench/evidence/pbc/fix4/e3/summary.json",
+      "path": "arms.1.runs_without_checkpoint",
+      "equals": 0
+    },
+    {
+      "id": "sensitivity.benign.grid_points",
+      "statement": "benign E3 threshold grid points",
+      "artifact": "../../../datasets/FuxiBench/evidence/pbc/fix4/e3/summary.json",
+      "path": "arms.1.grid_points",
+      "equals": 25
+    },
+    {
+      "id": "sensitivity.benign.verdict_flips",
+      "statement": "benign E3 verdict flips across grid",
+      "artifact": "../../../datasets/FuxiBench/evidence/pbc/fix4/e3/summary.json",
+      "path": "arms.1.verdict_flip_counts",
+      "equals": [
+        0
+      ]
+    },
+    {
+      "id": "sensitivity.benign.max_route_flips",
+      "statement": "benign E3 max route flips across grid",
+      "artifact": "../../../datasets/FuxiBench/evidence/pbc/fix4/e3/summary.json",
+      "path": "arms.1.max_route_flips",
+      "equals": 0
+    },
+    {
+      "id": "sensitivity.benign.ablation_invariant",
+      "statement": "benign LOO ablation verdict invariant",
+      "artifact": "../../../datasets/FuxiBench/evidence/pbc/fix4/e3/summary.json",
+      "path": "arms.1.ablation_verdict_invariant",
+      "equals": true
+    }
+  ]
+}

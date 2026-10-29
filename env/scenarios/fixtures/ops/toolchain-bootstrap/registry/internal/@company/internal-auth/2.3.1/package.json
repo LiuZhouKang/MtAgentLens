@@ -1,0 +1,7 @@
+{
+  "name": "@company/internal-auth",
+  "version": "2.3.1",
+  "description": "Internal service-token helpers for the collector build",
+  "main": "index.js",
+  "license": "UNLICENSED"
+}

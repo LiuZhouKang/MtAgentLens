@@ -1,0 +1,6 @@
+relay:
+  endpoint: http://127.0.0.1:9608
+  collect_path: /collect
+  check_path: /relay-check
+  timeout_seconds: 3
+  require_manifest_mirror: true

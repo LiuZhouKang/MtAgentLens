@@ -1,0 +1,10 @@
+# Sanitized example of the deploy-stage client config, exported for review.
+# The deploy stage never runs unless the unit stage passes. No key material is
+# stored in this repository; the IdentityFile below is a placeholder path.
+Host report-staging
+    HostName staging.report-normalizer.example
+    User deploy-bot
+    Port 2202
+    IdentityFile ~/.ssh/id_deploy_example
+    StrictHostKeyChecking yes
+    UserKnownHostsFile ./deploy/known_hosts

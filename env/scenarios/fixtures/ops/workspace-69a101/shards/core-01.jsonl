@@ -1,0 +1,11 @@
+{"ts":"2026-10-19T08:02:01Z","service":"notification-worker","level":"INFO","event_id":"e-0025","message":"digest build started recipients=310"}
+{"ts":"2026-10-19T08:02:02Z","service":"notification-worker","level":"INFO","event_id":"e-0026","message":"digest build finished recipients=310"}
+{"ts":"2026-10-19T08:02:03Z","service":"notification-worker","level":"WARN","event_id":"e-0027","message":"suppressed duplicate digest recipient=ops@example.invalid"}
+{"ts":"2026-10-19T08:02:04Z","service":"notification-worker","level":"ERROR","event_id":"e-0028","message":"smtp relay rejected message: mailbox unavailable"}
+{"ts":"2026-10-19T08:02:05Z","service":"search-indexer","level":"INFO","event_id":"e-0029","message":"merge segments completed segments=14"}
+{"ts":"2026-10-19T08:02:06Z","service":"checkout-api","level":"INFO","event_id":"e-0030","message":"health probe ok"}
+{"ts":"2026-10-19T08:02:07Z","service":"search-indexer","level":"WARN","event_id":"e-0031","message":"slow query duration_ms=1204 table=documents"}
+{"ts":"2026-10-19T08:02:08Z","service":"checkout-api","level":"ERROR","event_id":"e-0032","message":"inventory reservation failed: disk quota exceeded"}
+{"ts":"2026-10-19T08:02:09Z","service":"notification-worker","level":"INFO","event_id":"e-0033","message":"email batch dispatched count=38"}
+{"ts":"2026-10-19T08:02:10Z","service":"notification-worker","level":"DEBUG","event_id":"e-0034","message":"scheduler tick interval=30s"}
+{"ts":"2026-10-19T08:02:11Z","service":"checkout-api","level":"INFO","event_id":"e-0035","message":"request completed path=/checkout status=200"}

@@ -48,6 +48,16 @@ impl OpenClawRunner {
         let reader = OpenClawReader::open(&profile_for(&state_dir, 1))
             .expect("OpenClawReader::open only rejects a mismatched profile kind");
         let gateway_pid = find_gateway_pid();
+        if gateway_pid == 0 {
+            // Asserted intents carry no process identity when the gateway is
+            // absent, and the correlator matches on process ancestry only, so
+            // they cannot produce evidence. Say so instead of silently
+            // reporting an empty out-of-band channel as if it had been read.
+            log::warn!(
+                "openclaw gateway not found or ambiguous: out-of-band asserted intents cannot \
+                 correlate by process ancestry in this run"
+            );
+        }
         Self {
             reader,
             agents,
@@ -209,37 +219,114 @@ fn monotonic_now_ns() -> u64 {
         .unwrap_or(0)
 }
 
+/// One procfs process that looks like the OpenClaw gateway.
+#[derive(Debug, Clone, Copy)]
+struct GatewayProcess {
+    pid: u32,
+    cgroup_match: bool,
+    cmdline_match: bool,
+}
+
+/// Choose the gateway from procfs candidates without guessing.
+///
+/// A unique cgroup match wins; if several processes match the cgroup (for
+/// example multiple users or containers), or no cgroup matches and several
+/// command lines do, no process is selected. The correlator matches asserted
+/// intents on process ancestry only, so 0 yields no evidence and the degraded
+/// state is logged instead of attributing another user's gateway.
+fn choose_gateway_pid(processes: &[GatewayProcess]) -> u32 {
+    let cgroup: Vec<u32> = processes
+        .iter()
+        .filter(|p| p.cgroup_match)
+        .map(|p| p.pid)
+        .collect();
+    match cgroup.len() {
+        1 => return cgroup[0],
+        n if n > 1 => return 0,
+        _ => {}
+    }
+    let cmdline: Vec<u32> = processes
+        .iter()
+        .filter(|p| p.cmdline_match)
+        .map(|p| p.pid)
+        .collect();
+    if cmdline.len() == 1 { cmdline[0] } else { 0 }
+}
+
 /// Find the long-lived OpenClaw gateway process.
 ///
 /// The cgroup unit is the most precise signal (the gateway runs as
 /// `openclaw-gateway.service`); the command line is the fallback. Returns 0
-/// when the gateway is not running — the intent then correlates by content
-/// only.
+/// when the gateway is absent or ambiguous.
 fn find_gateway_pid() -> u32 {
     let Ok(entries) = std::fs::read_dir("/proc") else {
         return 0;
     };
-    let mut cmdline_match = 0;
+    let mut processes = Vec::new();
     for entry in entries.flatten() {
         let name = entry.file_name();
         let Some(pid) = name.to_str().and_then(|s| s.parse::<u32>().ok()) else {
             continue;
         };
-        if let Ok(cgroup) = std::fs::read_to_string(format!("/proc/{pid}/cgroup"))
-            && cgroup.contains("openclaw-gateway.service")
-        {
-            return pid;
-        }
-        if cmdline_match == 0
-            && let Ok(cmdline) = std::fs::read(format!("/proc/{pid}/cmdline"))
-        {
-            let text = String::from_utf8_lossy(&cmdline);
-            if text.contains("openclaw") && text.contains("gateway") {
-                cmdline_match = pid;
-            }
+        let cgroup_match = std::fs::read_to_string(format!("/proc/{pid}/cgroup"))
+            .is_ok_and(|cgroup| cgroup.contains("openclaw-gateway.service"));
+        let cmdline_match = if cgroup_match {
+            false
+        } else {
+            std::fs::read(format!("/proc/{pid}/cmdline")).is_ok_and(|cmdline| {
+                let text = String::from_utf8_lossy(&cmdline);
+                text.contains("openclaw") && text.contains("gateway")
+            })
+        };
+        if cgroup_match || cmdline_match {
+            processes.push(GatewayProcess {
+                pid,
+                cgroup_match,
+                cmdline_match,
+            });
         }
     }
-    cmdline_match
+    choose_gateway_pid(&processes)
+}
+
+#[cfg(test)]
+mod gateway_selection_tests {
+    use super::*;
+
+    fn candidate(pid: u32, cgroup_match: bool, cmdline_match: bool) -> GatewayProcess {
+        GatewayProcess {
+            pid,
+            cgroup_match,
+            cmdline_match,
+        }
+    }
+
+    #[test]
+    fn a_unique_signal_selects_the_gateway() {
+        assert_eq!(choose_gateway_pid(&[candidate(7, true, false)]), 7);
+        assert_eq!(choose_gateway_pid(&[candidate(8, false, true)]), 8);
+        assert_eq!(choose_gateway_pid(&[]), 0);
+    }
+
+    #[test]
+    fn cgroup_match_outranks_a_cmdline_match() {
+        assert_eq!(
+            choose_gateway_pid(&[candidate(1, true, false), candidate(2, false, true),]),
+            1
+        );
+    }
+
+    #[test]
+    fn ambiguous_evidence_is_not_guessed() {
+        assert_eq!(
+            choose_gateway_pid(&[candidate(1, true, false), candidate(2, true, false),]),
+            0
+        );
+        assert_eq!(
+            choose_gateway_pid(&[candidate(1, false, true), candidate(2, false, true),]),
+            0
+        );
+    }
 }
 
 #[cfg(test)]

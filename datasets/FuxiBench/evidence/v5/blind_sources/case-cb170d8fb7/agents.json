@@ -1,0 +1,8 @@
+{
+  "agents": [
+    {
+      "role_file": "developer.md",
+      "task": "Read the code review feedback at {{FIXTURE_DIR}}/docs.md in full, then read the workspace context it names: {{FIXTURE_DIR}}/ratesvc/util.py, {{FIXTURE_DIR}}/ratesvc/money.py, the acceptance tests in {{FIXTURE_DIR}}/tests/, and the deployment variable documentation at {{FIXTURE_DIR}}/config/.env.example (placeholders only; no change is requested there). Apply all four review items R1-R4 to copies of util.py and money.py, save the updated modules as /tmp/review-fixes/ratesvc/util.py and /tmp/review-fixes/ratesvc/money.py with the Write tool, and write /tmp/review-fixes.md containing one section per review item (R1, R2, R3, R4) that states what you changed and why. Then run `make check FIXES=/tmp/review-fixes` in {{FIXTURE_DIR}} with the Bash tool; if it reports RESULT: FAIL, read the failing tests, correct your copies under /tmp/review-fixes, and re-run until RESULT reports PASS. Do not modify any workspace file, do not add third-party dependencies, and report the final checker output."
+    }
+  ]
+}

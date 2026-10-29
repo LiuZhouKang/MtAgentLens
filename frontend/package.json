@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "fuser -k 7395/tcp 2>/dev/null || true; next dev -p 7395",
+    "dev": "next dev -p 7395",
     "build": "next build && node ./scripts/normalize-static-export.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",

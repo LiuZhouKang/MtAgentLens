@@ -80,8 +80,9 @@ impl LiveSseEvent {
 /// 构造统一实时 SSE 事件流：原始事件（必有）+ 责任告警（可选）+ 30s 心跳。
 ///
 /// 三条来源经 `futures::stream::select` 合并；事件 id 由**共享 `AtomicU64`** 提供
-/// 全局单调序列（跨类型不重复，客户端断线重连可据此判断缺口）。任意来源落后时
-/// 产出 `lag` 事件并携带丢弃数，前端据此提示实时缺口。
+/// 全局单调序列（跨类型不重复，随 SSE `id` 下发）。客户端记录该值但**不做
+/// 断线回填**；实时缺口以服务端 `lag` 事件（携带丢弃数）为准，重连后的历史
+/// 事件不在本端点补发。
 pub fn live_event_stream(
     event_rx: broadcast::Receiver<Event>,
     alert_rx: Option<broadcast::Receiver<ResponsibilityAlert>>,
@@ -147,6 +148,7 @@ mod tests {
             timestamp_ns: 1000,
             display_profile: DisplayProfile::UnsafeByEngine,
             decision: AlertDecision::Unsafe,
+            actionable: true,
             severity: AlertSeverity::Warning,
             confidence: 0.85,
             authority: AlertAuthority::Supporting,
@@ -160,6 +162,7 @@ mod tests {
             },
             involved_agents: vec![],
             engine: EngineSection {
+                claim_ids: Vec::new(),
                 rule_verdicts: vec![],
                 pattern_verdicts: vec![],
                 classification_score: 0.0,
@@ -173,12 +176,19 @@ mod tests {
                     repetition_score: 0.0,
                     behavioral_score: 0.0,
                     total: 0.0,
+                    raw_score: 0.0,
+                    calibrated_score: 0.0,
+                    gate_factor: 1.0,
+                    gate_version: "test".into(),
+                    platt_a: 0.0,
+                    platt_b: 0.0,
+                    observer_adjusted: false,
                 },
                 cusum_triggered: false,
                 cusum_dimensions: vec![],
                 progressive_fused: 0.0,
                 observer_trigger_reason: String::new(),
-                deberta_score: 0.0,
+                score_model_version: "test".into(),
             },
             timeline: BehaviorTimeline {
                 steps: vec![],

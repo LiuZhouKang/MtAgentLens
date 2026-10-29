@@ -43,6 +43,7 @@ const REASON_LABELS: Record<string, LabelEntry> = {
 };
 
 const ACTION_TYPE_LABELS: Record<string, LabelEntry> = {
+  FileOpen: { label: '文件打开', desc: '已打开文件；不证明内容已读取或写入' },
   FileRead: { label: '文件读取', desc: '读取文件内容' },
   FileWrite: { label: '文件写入', desc: '写入文件内容' },
   FileOverwrite: { label: '文件覆写', desc: '覆盖已有文件' },

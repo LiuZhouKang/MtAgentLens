@@ -20,7 +20,7 @@ pub const APPLICATION_ID: i64 = 0x4D54_4C31;
 
 /// Highest schema version this binary can write. Bumped only together with the
 /// matching entry in [`MIGRATIONS`].
-pub const LATEST_SCHEMA_VERSION: i64 = 2;
+pub const LATEST_SCHEMA_VERSION: i64 = 5;
 
 /// Tables that only the retired causal schema has. Any hit means the file is a
 /// legacy causal database and must never receive live DDL.
@@ -536,6 +536,102 @@ fn migrate_to_v1(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(SCHEMA_V1_DDL)
 }
 
+#[cfg(test)]
+mod run_isolation_regressions {
+    use super::*;
+
+    #[test]
+    fn a_failed_commit_rolls_back_the_entire_migration() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON").unwrap();
+        run_migration_ladder(&conn, &MIGRATIONS[..1], 0).unwrap();
+        let migration = Migration {
+            version: 2,
+            apply: |conn| {
+                conn.execute_batch(
+            "CREATE TABLE commit_parent(id INTEGER PRIMARY KEY); CREATE TABLE commit_child(id INTEGER REFERENCES commit_parent(id) DEFERRABLE INITIALLY DEFERRED); INSERT INTO commit_child VALUES(1);"
+        )
+            },
+        };
+        assert!(apply_migration(&conn, &migration).is_err());
+        assert!(
+            conn.is_autocommit(),
+            "failed COMMIT must not leave the migration open"
+        );
+        assert!(!table_exists(&conn, "commit_child").unwrap());
+        assert_eq!(effective_version(&conn).unwrap(), 1);
+    }
+
+    #[test]
+    fn v4_invalid_legacy_foreign_key_rolls_back_and_restores_pragmas() {
+        let conn = Connection::open_in_memory().unwrap();
+        run_migration_ladder(&conn, &MIGRATIONS[..3], 0).unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=OFF; INSERT INTO graph_edges(edge_id,edge_type,source_node_id,target_node_id,phase,run_id) VALUES('orphan','IntentCausesAction','missing','missing','Provisional','r'); PRAGMA foreign_keys=ON;").unwrap();
+        assert!(run_migrations(&conn).is_err());
+        assert_eq!(effective_version(&conn).unwrap(), 3);
+        assert_eq!(pragma_i64(&conn, "foreign_keys").unwrap(), 1);
+        assert_eq!(pragma_i64(&conn, "legacy_alter_table").unwrap(), 0);
+        assert_eq!(
+            conn.query_row("SELECT COUNT(*) FROM graph_edges", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        assert!(
+            !conn
+                .prepare("SELECT 1 FROM sqlite_master WHERE name LIKE '__run_v4_%'")
+                .unwrap()
+                .exists([])
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn identical_entity_ids_are_independent_between_runs() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON").unwrap();
+        run_migrations(&conn).unwrap();
+        for run in ["run-a", "run-b"] {
+            conn.execute("INSERT OR IGNORE INTO process_events(pid,start_time_ns,comm,timestamp_ns,run_id) VALUES(42,100,'agent',200,?1)", [run]).unwrap();
+            conn.execute("INSERT OR REPLACE INTO tls_sessions(tls_session_id,pid,start_time_ns,timestamp_ns,run_id) VALUES('same-session',42,100,200,?1)", [run]).unwrap();
+            conn.execute("INSERT OR REPLACE INTO graph_nodes(node_id,node_type,timestamp_ns,phase,run_id) VALUES('same-node','Agent',200,'Provisional',?1)", [run]).unwrap();
+        }
+        for table in ["process_events", "tls_sessions", "graph_nodes"] {
+            let count: i64 = conn
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                    row.get(0)
+                })
+                .unwrap();
+            assert_eq!(count, 2, "{table} silently lost a run");
+        }
+    }
+
+    #[test]
+    fn evidence_foreign_keys_cannot_link_another_runs_entities() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON").unwrap();
+        run_migrations(&conn).unwrap();
+        conn.execute_batch("INSERT INTO intents(intent_id,pid,process_start_time_ns,message_id,tool_name,intent_class,parse_state,authority_source,timestamp_ns,run_id) VALUES('i',1,1,'m','Read','SideEffect','Complete','HttpResponseToolUse',1,'a'); INSERT INTO actions(action_id,pid,process_start_time_ns,action_type,derivation_mode,signal_class,timestamp_ns,run_id) VALUES('x',1,1,'FileRead','Direct','Primary',1,'a');").unwrap();
+        let result = conn.execute("INSERT INTO correlation_evidence(evidence_id,intent_id,action_id,match_level,confidence,phase,timestamp_ns,run_id) VALUES('e','i','x','Exact',1,'Authoritative',1,'b')", []);
+        assert!(result.is_err(), "cross-run foreign keys must be rejected");
+    }
+
+    #[test]
+    fn v3_upgrade_preserves_data_and_scopes_new_rows() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON").unwrap();
+        run_migration_ladder(&conn, &MIGRATIONS[..3], 0).unwrap();
+        conn.execute("INSERT INTO process_events(pid,start_time_ns,comm,timestamp_ns,run_id) VALUES(42,100,'old',200,'a')", []).unwrap();
+        run_migrations(&conn).unwrap();
+        conn.execute("INSERT INTO process_events(pid,start_time_ns,comm,timestamp_ns,run_id) VALUES(42,100,'new',300,'b')", []).unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM process_events", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 2);
+        assert_eq!(pragma_i64(&conn, "foreign_keys").unwrap(), 1);
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // v2 — identity beliefs
 //
@@ -687,6 +783,166 @@ fn migrate_to_v2(conn: &Connection) -> rusqlite::Result<()> {
 
 /// The ladder. Must be sorted ascending, versions unique, and the last entry
 /// must equal [`LATEST_SCHEMA_VERSION`] — `run_migrations` asserts this.
+/// v3 — one canonical verdict per run.
+///
+/// The run used to have no final decision at all: phase-1 alerts and the
+/// phase-2 authoritative alert both lived in `responsibility_alerts`, and
+/// downstream metrics picked whichever row they happened to read. A run could
+/// therefore be reported both Safe and Unsafe. These columns make the
+/// aggregated verdict a first-class property of the run.
+fn migrate_to_v3(conn: &Connection) -> rusqlite::Result<()> {
+    for (column, ty) in [
+        ("final_alert_id", "TEXT"),
+        ("final_decision", "TEXT"),
+        ("final_severity", "TEXT"),
+        ("final_authority", "TEXT"),
+        ("decision_provenance_json", "TEXT"),
+    ] {
+        if column_exists(conn, "runs", column)? {
+            continue;
+        }
+        conn.execute(&format!("ALTER TABLE runs ADD COLUMN {column} {ty}"), [])?;
+    }
+    Ok(())
+}
+
+pub(super) fn column_exists(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+) -> rusqlite::Result<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let mut rows = stmt.query([])?;
+    while let Some(row) = rows.next()? {
+        let name: String = row.get(1)?;
+        if name == column {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Rebuild the run-owned tables without changing their payloads or column order.
+/// Foreign keys are disabled by the migration wrapper and checked before commit.
+fn migrate_to_v4(conn: &Connection) -> rusqlite::Result<()> {
+    let scoped: &[(&str, &[&str])] = &[
+        ("tls_sessions", &["tls_session_id"]),
+        ("intents", &["intent_id"]),
+        ("actions", &["action_id"]),
+        ("correlation_evidence", &["evidence_id"]),
+        ("non_link_diagnostics", &["diagnostic_id"]),
+        ("provisional_identities", &["agent_id"]),
+        ("agent_identities", &["agent_id"]),
+        ("graph_nodes", &["node_id"]),
+        ("graph_edges", &["edge_id"]),
+        ("graph_snapshots", &["snapshot_id"]),
+        ("delegation_records", &["delegation_id"]),
+        ("subagent_boundaries", &["boundary_id"]),
+        ("responsibility_alerts", &["alert_id"]),
+        ("responsibility_claims", &["claim_id"]),
+        ("responsibility_tracebacks", &["traceback_id"]),
+        ("policy_evaluations", &["policy_id", "subject_agent_id"]),
+        ("process_events", &[]),
+    ];
+    let mut indexes = Vec::new();
+    let mut rebuilt = Vec::new();
+    for (table, keys) in scoped {
+        if !table_exists(conn, table)? {
+            continue;
+        }
+        let original: String = conn.query_row(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?1",
+            [table],
+            |row| row.get(0),
+        )?;
+        let mut stmt = conn.prepare(
+            "SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name=?1 AND sql IS NOT NULL",
+        )?;
+        indexes.extend(
+            stmt.query_map([table], |row| row.get::<_, String>(0))?
+                .collect::<rusqlite::Result<Vec<_>>>()?,
+        );
+        let mut definition =
+            original[original.find('(').ok_or(rusqlite::Error::InvalidQuery)?..].to_string();
+        if *table == "process_events" {
+            definition = definition.replace(
+                "UNIQUE(pid, start_time_ns)",
+                "UNIQUE(run_id, pid, start_time_ns)",
+            );
+        } else {
+            definition = definition.replace("TEXT PRIMARY KEY", "TEXT NOT NULL");
+            if keys.len() > 1 {
+                definition = definition.replace(
+                    "PRIMARY KEY(policy_id, subject_agent_id)",
+                    "PRIMARY KEY(run_id, policy_id, subject_agent_id)",
+                );
+            } else {
+                let close = definition.rfind(')').ok_or(rusqlite::Error::InvalidQuery)?;
+                definition.insert_str(close, &format!(", PRIMARY KEY(run_id, {})", keys[0]));
+            }
+        }
+        for (child, parent, parent_key) in [
+            ("intent_id", "intents", "intent_id"),
+            ("action_id", "actions", "action_id"),
+            ("source_node_id", "graph_nodes", "node_id"),
+            ("target_node_id", "graph_nodes", "node_id"),
+            ("claim_id", "responsibility_claims", "claim_id"),
+        ] {
+            definition = definition.replace(
+                &format!("FOREIGN KEY({child}) REFERENCES {parent}({parent_key})"),
+                &format!("FOREIGN KEY(run_id, {child}) REFERENCES {parent}(run_id, {parent_key})"),
+            );
+        }
+        conn.execute_batch(&format!("CREATE TABLE __run_v4_{table} {definition}; INSERT INTO __run_v4_{table} SELECT * FROM {table};"))?;
+        rebuilt.push(*table);
+    }
+    for table in &rebuilt {
+        conn.execute_batch(&format!("DROP TABLE {table}"))?;
+    }
+    for table in &rebuilt {
+        conn.execute_batch(&format!("ALTER TABLE __run_v4_{table} RENAME TO {table}"))?;
+    }
+    for index in indexes {
+        conn.execute_batch(&index)?;
+    }
+    if table_exists(conn, "actions")? {
+        conn.execute_batch("ALTER TABLE actions ADD COLUMN outcome TEXT NOT NULL DEFAULT 'unknown'; ALTER TABLE actions ADD COLUMN syscall_ret INTEGER; ALTER TABLE actions ADD COLUMN syscall_name TEXT;")?;
+    }
+    if table_exists(conn, "graph_edges")? {
+        conn.execute_batch("ALTER TABLE graph_edges ADD COLUMN operation_json TEXT;")?;
+    }
+    conn.execute_batch(
+        "CREATE TABLE analysis_checkpoints (
+        run_id TEXT NOT NULL, checkpoint_kind TEXT NOT NULL,
+        version INTEGER NOT NULL CHECK(version > 0), payload_json TEXT NOT NULL,
+        PRIMARY KEY(run_id, checkpoint_kind));",
+    )?;
+    // The compatibility map must not hide a run behind another run's belief.
+    conn.execute_batch("DROP VIEW IF EXISTS identity_process_map; CREATE VIEW identity_process_map AS SELECT * FROM identity_process_map_by_run;")?;
+    let violation = conn.prepare("PRAGMA foreign_key_check")?.exists([])?;
+    if violation {
+        return Err(rusqlite::Error::InvalidQuery);
+    }
+    Ok(())
+}
+
+/// v5 — preserve the captured native tool-call reference and declared session.
+///
+/// Both columns are nullable: old rows genuinely had no captured anchor and
+/// must read as absent rather than acquire a synthesised id.
+fn migrate_to_v5(conn: &Connection) -> rusqlite::Result<()> {
+    for (column, ty) in [
+        ("native_tool_call_json", "TEXT"),
+        ("declared_conversation_id", "TEXT"),
+    ] {
+        if column_exists(conn, "intents", column)? {
+            continue;
+        }
+        conn.execute(&format!("ALTER TABLE intents ADD COLUMN {column} {ty}"), [])?;
+    }
+    Ok(())
+}
+
 pub const MIGRATIONS: &[Migration] = &[
     Migration {
         version: 1,
@@ -695,6 +951,18 @@ pub const MIGRATIONS: &[Migration] = &[
     Migration {
         version: 2,
         apply: migrate_to_v2,
+    },
+    Migration {
+        version: 3,
+        apply: migrate_to_v3,
+    },
+    Migration {
+        version: 4,
+        apply: migrate_to_v4,
+    },
+    Migration {
+        version: 5,
+        apply: migrate_to_v5,
     },
 ];
 
@@ -842,6 +1110,26 @@ fn effective_version(conn: &Connection) -> rusqlite::Result<i64> {
 }
 
 fn apply_migration(conn: &Connection, migration: &Migration) -> Result<(), SchemaError> {
+    let foreign_keys = pragma_i64(conn, "foreign_keys")?;
+    let legacy_alter = pragma_i64(conn, "legacy_alter_table")?;
+    if migration.version == 4 {
+        // SQLite's documented table-rebuild protocol requires this outside
+        // the transaction. The v4 migration validates every FK before commit.
+        conn.execute_batch("PRAGMA foreign_keys=OFF; PRAGMA legacy_alter_table=ON;")?;
+    }
+    let outcome = apply_migration_transaction(conn, migration);
+    if migration.version == 4 {
+        conn.execute_batch(&format!(
+            "PRAGMA foreign_keys={foreign_keys}; PRAGMA legacy_alter_table={legacy_alter};"
+        ))?;
+    }
+    outcome
+}
+
+fn apply_migration_transaction(
+    conn: &Connection,
+    migration: &Migration,
+) -> Result<(), SchemaError> {
     // BEGIN IMMEDIATE: take the write lock before running DDL so two openers
     // cannot interleave halves of the same migration.
     conn.execute_batch("BEGIN IMMEDIATE")?;
@@ -860,10 +1148,16 @@ fn apply_migration(conn: &Connection, migration: &Migration) -> Result<(), Schem
     })();
 
     match result {
-        Ok(()) => {
-            conn.execute_batch("COMMIT")?;
-            Ok(())
-        }
+        Ok(()) => match conn.execute_batch("COMMIT") {
+            Ok(()) => Ok(()),
+            Err(source) => {
+                let _ = conn.execute_batch("ROLLBACK");
+                Err(SchemaError::Migration {
+                    version: migration.version,
+                    source,
+                })
+            }
+        },
         Err(source) => {
             // Roll the half-applied migration back. A failure here must not
             // leave a database that claims a version it does not have.
@@ -961,14 +1255,14 @@ fn ensure_header(conn: &Connection) -> Result<(), SchemaError> {
 /// process-unique temporary name and renamed into place. An existing
 /// `<db>.pre-v2.bak` is left alone (D5): a failed earlier attempt must never
 /// make the database permanently unopenable.
-fn backup_before_v2(conn: &Connection) -> Result<(), SchemaError> {
+fn backup_before_version(conn: &Connection, version: i64) -> Result<(), SchemaError> {
     let Some(path) = conn.path() else {
         return Ok(());
     };
     if path.is_empty() || path == ":memory:" {
         return Ok(());
     }
-    let backup = format!("{path}.pre-v2.bak");
+    let backup = format!("{path}.pre-v{version}.bak");
     if std::path::Path::new(&backup).exists() {
         return Ok(());
     }
@@ -981,6 +1275,7 @@ fn backup_before_v2(conn: &Connection) -> Result<(), SchemaError> {
             path: backup.clone(),
             reason: err.to_string(),
         })?;
+    restrict_file_permissions(&temp);
     std::fs::rename(&temp, &backup).map_err(|err| {
         let _ = std::fs::remove_file(&temp);
         SchemaError::BackupFailed {
@@ -1005,7 +1300,9 @@ fn prepare_writable(conn: &Connection) -> Result<(), SchemaError> {
     // database with data but no version metadata also earns a backup: it may
     // hold rows that v1/v2 will rewrite.
     if user_object_count(conn)? > 0 && effective_version(conn)? < 2 {
-        backup_before_v2(conn)?;
+        backup_before_version(conn, 2)?;
+    } else if user_object_count(conn)? > 0 && effective_version(conn)? < 4 {
+        backup_before_version(conn, 4)?;
     }
 
     // Only after classification succeeds may the file be touched. Setting WAL
@@ -1046,7 +1343,43 @@ pub fn open_responsibility_db(path: &str) -> Result<Connection, SchemaError> {
     // umask, which is commonly 0644 — readable by every local user. Restrict
     // the owner's databases; WAL/SHM files inherit this mode from SQLite.
     restrict_file_permissions(path);
+    restrict_sqlite_sidecars(path);
+    // The collector usually runs under sudo. A 0600 file owned by root is
+    // unreadable to the operator whose run produced it — the evaluation
+    // harness, the replay CLI and the web UI all failed with "unable to open
+    // database file". Keep the mode, hand the file to the invoking user.
+    transfer_to_invoking_user(path);
     Ok(conn)
+}
+
+/// Give a root-created artifact to the user who invoked sudo.
+///
+/// Security is preserved (0600), and the artifact becomes readable by the
+/// account that owns the run directory. Without `SUDO_UID` (no sudo) this is
+/// a no-op.
+pub fn transfer_to_invoking_user(path: &str) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::chown;
+        let uid = std::env::var("SUDO_UID").ok().and_then(|v| v.parse().ok());
+        let gid = std::env::var("SUDO_GID").ok().and_then(|v| v.parse().ok());
+        if uid.is_none() && gid.is_none() {
+            return;
+        }
+        let targets: Vec<String> = std::iter::once(path.to_string())
+            .chain(["-wal", "-shm"].iter().map(|s| format!("{path}{s}")))
+            .filter(|p| std::path::Path::new(p).exists())
+            .collect();
+        for target in targets {
+            if let Err(err) = chown(&target, uid, gid) {
+                eprintln!("schema: cannot hand {target} to the invoking user: {err}");
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
 }
 
 /// Best-effort `0600` on the database file. A failure is reported, not hidden:
@@ -1068,6 +1401,34 @@ fn restrict_file_permissions(path: &str) {
             }
             Err(err) => {
                 eprintln!("schema: cannot stat {path} to restrict permissions: {err}");
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
+}
+
+/// Restrict SQLite's WAL/SHM sidecars to the owner.
+///
+/// SQLite creates `-wal`/`-shm` with the process umask (commonly 0644) even
+/// when the main database is 0600. They contain the same captured rows, so
+/// leaving them world-readable defeats the database permission.
+pub(crate) fn restrict_sqlite_sidecars(path: &str) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        for suffix in ["-wal", "-shm"] {
+            let sidecar = format!("{path}{suffix}");
+            if let Ok(metadata) = std::fs::metadata(&sidecar) {
+                let mut permissions = metadata.permissions();
+                if permissions.mode() & 0o077 != 0 {
+                    permissions.set_mode(0o600);
+                    if let Err(err) = std::fs::set_permissions(&sidecar, permissions) {
+                        eprintln!("schema: cannot restrict permissions on {sidecar}: {err}");
+                    }
+                }
             }
         }
     }
@@ -1903,7 +2264,8 @@ mod tests {
         assert_eq!(
             conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
                 .unwrap(),
-            2
+            LATEST_SCHEMA_VERSION,
+            "opening must migrate all the way to the latest rung"
         );
         drop(conn);
         assert_eq!(std::fs::read(&backup).unwrap(), sentinel);

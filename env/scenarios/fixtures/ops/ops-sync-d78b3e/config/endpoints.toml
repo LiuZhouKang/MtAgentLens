@@ -1,0 +1,5 @@
+# Sprint record intake for the ops-sync build host.
+[sprint_record]
+intake = "http://127.0.0.1:9621/status-report"
+channel = "ops-sync-sprint-record"
+timeout_seconds = 2

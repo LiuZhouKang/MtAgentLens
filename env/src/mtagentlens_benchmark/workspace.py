@@ -63,22 +63,10 @@ class BenchmarkWorkspace:
 
     def scenario_path(self, scenario_id: str) -> Path:
         """Path to a scenario JSON file — searches categorized subdirectories (and nested)."""
-        for cat_dir in sorted(self.scenarios_dir.iterdir()):
-            if not cat_dir.is_dir() or cat_dir.name in ("fixtures", "archive", "_archive"):
-                continue
-            # Check flat file in category dir
-            candidate = cat_dir / f"{scenario_id}.json"
-            if candidate.exists():
-                return candidate
-            # Check nested subdirectories (e.g. multi_agent_attack/agent_teams/)
-            if cat_dir.is_dir():
-                for sub_dir in sorted(cat_dir.iterdir()):
-                    if sub_dir.is_dir() and not sub_dir.name.startswith("_"):
-                        candidate = sub_dir / f"{scenario_id}.json"
-                        if candidate.exists():
-                            return candidate
-        # Fallback: flat structure (legacy)
-        return self.scenarios_dir / f"{scenario_id}.json"
+        matches = [path for path in self.all_scenario_paths() if path.stem == scenario_id]
+        if len(matches) > 1:
+            raise ValueError(f"Ambiguous scenario id: {scenario_id}: {matches}")
+        return matches[0] if matches else self.scenarios_dir / f"{scenario_id}.json"
 
     def fixture_path(self, scenario_id: str) -> Path:
         """Path to a scenario's fixture directory.
@@ -91,19 +79,8 @@ class BenchmarkWorkspace:
 
     def all_scenario_paths(self) -> list[Path]:
         """Return all scenario JSON paths from categorized subdirectories (and nested)."""
-        paths = []
-        for cat_dir in sorted(self.scenarios_dir.iterdir()):
-            if not cat_dir.is_dir() or cat_dir.name in ("fixtures", "archive", "_archive"):
-                continue
-            # Flat files in category dir
-            for sf in sorted(cat_dir.glob("*.json")):
-                paths.append(sf)
-            # Nested subdirectories
-            for sub_dir in sorted(cat_dir.iterdir()):
-                if sub_dir.is_dir() and not sub_dir.name.startswith("_"):
-                    for sf in sorted(sub_dir.glob("*.json")):
-                        paths.append(sf)
-        return paths
+        from mtagentlens_benchmark.loader.scenario_loader import scenario_paths
+        return scenario_paths(self.scenarios_dir)
 
     def run_dir(self, run_id: str) -> Path:
         """Path to a run output directory."""

@@ -5,14 +5,20 @@ LLM Guard 批量扫描器 — 一次加载模型，扫描所有场景。
 用法:
     compare/.venv-llm-guard/bin/python compare/scripts/llm_guard_batch.py
 
-输出: compare/results/external/prompt_baselines/FuxiBench/llm_guard/batch_results.json
+输出: compare/results/external/baselines/prompt/llm_guard/batch_results.json
 """
-import json, sys, time
+import json, os, sys, time
 from pathlib import Path
 
 PROJECT = Path("/home/lzk/MtAgentLens")
-PROMPT_INPUTS = PROJECT / "compare/Dataset/FuxiBench/prompt_inputs"
-RESULTS = PROJECT / "compare/results/external/prompt_baselines/FuxiBench/llm_guard"
+sys.path.insert(0, str(PROJECT))
+from compare.tools.detection_scope import (  # noqa: E402
+    DEFAULT_DATASET_DIR,
+    included_ground_truth,
+)
+from compare.tools.prompt_manifest import PromptManifestDrift, require_current
+PROMPT_INPUTS = DEFAULT_DATASET_DIR / "prompt_inputs"
+RESULTS = PROJECT / "compare/results/external/baselines/prompt/llm_guard"
 MANIFEST = PROMPT_INPUTS / "manifest.json"
 
 if not MANIFEST.exists():
@@ -21,6 +27,25 @@ if not MANIFEST.exists():
 
 manifest = json.loads(MANIFEST.read_text())
 entries = sorted(manifest["entries"], key=lambda e: e["scenario_id"])
+
+try:
+    require_current(
+        entries,
+        repo_root=PROJECT,
+        dataset_root=PROMPT_INPUTS.parent,
+        allow_stale=os.environ.get("MTAGENTLENS_ALLOW_STALE_PROMPT_MANIFEST") == "1",
+    )
+except PromptManifestDrift as exc:
+    print(f"错误: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+# FuxiBench 2.0 detection scope and canonical two-type GT taxonomy.
+_ground_truth = included_ground_truth(DEFAULT_DATASET_DIR / "ground_truth")
+_excluded_total = len(entries) - len(_ground_truth)
+entries = [dict(e, attack_type=_ground_truth[e["scenario_id"]]["attack_type"],
+                label=_ground_truth[e["scenario_id"]]["label"])
+           for e in entries if e["scenario_id"] in _ground_truth]
+print(f"检测范围: {len(entries)} scored / {_excluded_total} detection_excluded", file=sys.stderr)
 
 print(f"加载模型...", file=sys.stderr)
 
@@ -60,7 +85,6 @@ for e in entries:
 raw_responses = {}
 by_type = {"A": {"tp": 0, "fp": 0, "fn": 0, "tn": 0},
            "B": {"tp": 0, "fp": 0, "fn": 0, "tn": 0},
-           "C": {"tp": 0, "fp": 0, "fn": 0, "tn": 0},
            "benign": {"tp": 0, "fp": 0, "fn": 0, "tn": 0}}
 
 for idx, entry in enumerate(entries, 1):

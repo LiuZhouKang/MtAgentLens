@@ -26,6 +26,7 @@ pub fn match_level_base_score(level: &MatchLevel) -> f32 {
         MatchLevel::L3Containment => 0.65,
         MatchLevel::L4Basename => 0.50,
         MatchLevel::L5Substring => 0.35,
+        MatchLevel::ProcessLineage => 0.45,
     }
 }
 
@@ -37,6 +38,7 @@ fn match_level_ord(level: &MatchLevel) -> u8 {
         MatchLevel::L3Containment => 3,
         MatchLevel::L4Basename => 2,
         MatchLevel::L5Substring => 1,
+        MatchLevel::ProcessLineage => 0,
     }
 }
 
@@ -54,27 +56,57 @@ pub fn match_args(
     intent_args: &[NormalizedArg],
     action_args: &[NormalizedArg],
 ) -> Option<(MatchLevel, f32)> {
+    match_args_detailed(intent_args, action_args).map(|m| (m.level, m.score))
+}
+
+/// A successful intent↔action match, including the arguments that caused it.
+///
+/// Correlation evidence used to record only the level and the score, leaving
+/// `matched_fields` empty: an auditor could see that a pair was linked but not
+/// which path, host or command linked it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ArgMatch {
+    pub level: MatchLevel,
+    pub score: f32,
+    pub intent_arg: NormalizedArg,
+    pub action_arg: NormalizedArg,
+}
+
+/// Like [`match_args`], but returns the winning argument pair.
+pub fn match_args_detailed(
+    intent_args: &[NormalizedArg],
+    action_args: &[NormalizedArg],
+) -> Option<ArgMatch> {
     if intent_args.is_empty() || action_args.is_empty() {
         return None;
     }
 
-    let mut best_level: Option<MatchLevel> = None;
-    let mut best_score: f32 = 0.0;
+    let mut best: Option<ArgMatch> = None;
 
     for i_arg in intent_args {
         for a_arg in action_args {
             if let Some((level, score)) = compare_args(i_arg, a_arg) {
                 let ord = match_level_ord(&level);
-                let current_best_ord = best_level.as_ref().map(match_level_ord).unwrap_or(0);
-                if ord > current_best_ord || (ord == current_best_ord && score > best_score) {
-                    best_level = Some(level);
-                    best_score = score;
+                let current_best_ord = best
+                    .as_ref()
+                    .map(|b| match_level_ord(&b.level))
+                    .unwrap_or(0);
+                if best.is_none()
+                    || ord > current_best_ord
+                    || (ord == current_best_ord && score > best.as_ref().map_or(0.0, |b| b.score))
+                {
+                    best = Some(ArgMatch {
+                        level,
+                        score,
+                        intent_arg: i_arg.clone(),
+                        action_arg: a_arg.clone(),
+                    });
                 }
             }
         }
     }
 
-    best_level.map(|l| (l, best_score))
+    best
 }
 
 /// Compare two individual NormalizedArg values.
@@ -98,17 +130,53 @@ fn compare_args(intent: &NormalizedArg, action: &NormalizedArg) -> Option<(Match
             compare_urls(ih, *ip, ah, *ap)
         }
 
+        // Command ↔ Url: a shell intent such as "curl https://host/x" is the
+        // only intent-side evidence for a NetworkConnect action (whose args
+        // are host/port). Without this arm the intent and the action never
+        // correlated, so network actions never became graph nodes and every
+        // network rule was unreachable (9 rules, 0 Network resources).
+        (NormalizedArg::Command(command), NormalizedArg::Url { host, .. })
+        | (NormalizedArg::Url { host, .. }, NormalizedArg::Command(command)) => {
+            let host = host.trim().to_lowercase();
+            if host.is_empty() || host == "unknown" {
+                None
+            } else if command.to_lowercase().contains(&host) {
+                Some((MatchLevel::L3Containment, 0.65))
+            } else {
+                None
+            }
+        }
+
         // Cross-type (including Content — not matchable to action args)
         (NormalizedArg::Url { .. }, NormalizedArg::Path(_))
-        | (NormalizedArg::Url { .. }, NormalizedArg::Command(_))
         | (NormalizedArg::Path(_), NormalizedArg::Url { .. })
-        | (NormalizedArg::Command(_), NormalizedArg::Url { .. })
         | (NormalizedArg::Content(_), _)
-        | (_, NormalizedArg::Content(_)) => None,
+        | (_, NormalizedArg::Content(_))
+        | (NormalizedArg::OpenFlags(_), _)
+        | (_, NormalizedArg::OpenFlags(_))
+        | (NormalizedArg::PathCaptureIncomplete { .. }, _)
+        | (_, NormalizedArg::PathCaptureIncomplete { .. }) => None,
     }
 }
 
 // ─── Path comparison ──────────────────────────────────────────────────
+
+fn path_component_contains(longer: &str, shorter: &str) -> bool {
+    if shorter.is_empty() || longer == shorter {
+        return false;
+    }
+    if let Some(rest) = longer.strip_prefix(shorter)
+        && rest.starts_with('/')
+    {
+        return true;
+    }
+    if let Some(rest) = longer.strip_suffix(shorter)
+        && (shorter.starts_with('/') || rest.ends_with('/'))
+    {
+        return true;
+    }
+    false
+}
 
 fn compare_paths(intent_path: &str, action_path: &str) -> Option<(MatchLevel, f32)> {
     // L1: exact match
@@ -123,8 +191,9 @@ fn compare_paths(intent_path: &str, action_path: &str) -> Option<(MatchLevel, f3
         return Some((MatchLevel::L2Normalized, 0.75));
     }
 
-    // L3: containment — one is a prefix/suffix of the other
-    if ni.contains(&na) || na.contains(&ni) {
+    // L3: containment — one is a prefix/suffix of the other at a path
+    // component boundary. Raw substring containment made /a/b match /a/bc.
+    if path_component_contains(&ni, &na) || path_component_contains(&na, &ni) {
         return Some((MatchLevel::L3Containment, 0.65));
     }
 
@@ -417,6 +486,50 @@ mod tests {
         assert_eq!(compare_commands("   ", "   "), None);
         assert_eq!(compare_command_to_path("", "/usr/bin/python3"), None);
         assert_eq!(compare_command_to_path("python3", "   "), None);
+    }
+
+    #[test]
+    fn containment_requires_a_path_component_boundary() {
+        assert_eq!(
+            compare_paths("/tmp/a/b", "/tmp/a/b/c"),
+            Some((MatchLevel::L3Containment, 0.65))
+        );
+        assert_eq!(
+            compare_paths("/tmp/a/b", "/tmp/a/bc").map(|(level, _)| level),
+            Some(MatchLevel::L5Substring),
+            "a raw prefix must not be reported as component containment"
+        );
+        assert_eq!(
+            compare_paths("/tmp/a/b", "/var/tmp/a/b"),
+            Some((MatchLevel::L3Containment, 0.65))
+        );
+    }
+
+    #[test]
+    fn command_intent_correlates_with_network_action_host() {
+        let result = match_args(
+            &[NormalizedArg::Command(
+                "curl -s https://httpbin.org/post -d @/tmp/x".into(),
+            )],
+            &[NormalizedArg::Url {
+                host: "httpbin.org".into(),
+                port: Some(443),
+            }],
+        );
+        assert_eq!(result, Some((MatchLevel::L3Containment, 0.65)));
+
+        // An unknown host must not correlate: otherwise every network action
+        // would attach to every command intent.
+        assert_eq!(
+            match_args(
+                &[NormalizedArg::Command("curl".into())],
+                &[NormalizedArg::Url {
+                    host: "unknown".into(),
+                    port: None,
+                }],
+            ),
+            None
+        );
     }
 
     // ── Path matching ────────────────────────────────────────────────

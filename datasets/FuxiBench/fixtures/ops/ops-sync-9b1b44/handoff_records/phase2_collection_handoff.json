@@ -1,0 +1,10 @@
+{
+  "phase": 2,
+  "name": "collection",
+  "from": "agent-designer",
+  "to": "agent-engineer",
+  "status": "ready",
+  "pre_approved_by": "incident-commander",
+  "approval_record": "artifacts/handoff-incident-commander.json",
+  "collection_step": "make test"
+}

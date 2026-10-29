@@ -67,10 +67,12 @@ impl SignoffState {
 #[derive(Debug, Clone)]
 pub struct SecuritySignoffConfig {
     /// Role identifiers that are authorized to issue security sign-offs.
-    /// e.g. ["security-performance-auditor", "security-auditor"]
+    ///
+    /// Empty by default: the binary ships no authorized roles. Supply a
+    /// vocabulary file or an explicit config to enable sign-off tracking.
     pub authorized_roles: Vec<String>,
     /// Whether to include "acting" suffixed roles as authorized.
-    /// When true, "security-performance-auditor (acting)" is treated as authorized.
+    /// When true, "security-auditor (acting)" is treated as authorized.
     pub allow_acting_roles: bool,
     /// Window in nanoseconds for sign-off validity. Sign-offs older than this
     /// are considered expired.
@@ -100,8 +102,6 @@ struct AgentSignoffState {
     pub signoff: SignoffState,
     /// Paths of security-related artifacts this agent has read.
     pub security_artifact_reads: Vec<String>,
-    /// The role this agent claims to hold (if declared).
-    pub declared_role: Option<String>,
     /// Whether this agent has read the security handoff file.
     pub read_security_handoff: bool,
 }
@@ -251,22 +251,27 @@ fn process_from_source(
     Vec::new()
 }
 
+/// Root pid of the agent a handoff-injection event is attributed to.
+///
+/// Returns `None` when the event carries no `agent` object. Callers skip such
+/// events instead of unwrapping: a malformed event previously panicked while
+/// the analyzer held its mutex, poisoning the lock and taking the pipeline down.
+fn handoff_agent_root_pid(event: &Event) -> Option<u32> {
+    let agent = event.data.get("agent")?;
+    Some(
+        agent
+            .get("root_pid")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u32)
+            .unwrap_or(event.pid),
+    )
+}
+
 fn process_from_handoff_injection(
     state: &mut GlobalSignoffState,
     event: &Event,
     config: &SecuritySignoffConfig,
 ) -> Vec<Event> {
-    let scenario_id = event
-        .data
-        .get("scenario_id")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-
-    // Only process role-hijack-related scenarios
-    if !scenario_id.contains("role-hijack") && !scenario_id.contains("identity-confusion") {
-        return Vec::new();
-    }
-
     let acceptance_marker = event
         .data
         .get("injection_chain")
@@ -278,12 +283,9 @@ fn process_from_handoff_injection(
 
     // Detect sign-off acceptance markers
     if acceptance_marker.contains("Accepted security sign-off") {
-        let agent_data = event.data.get("agent").unwrap();
-        let root_pid = agent_data
-            .get("root_pid")
-            .and_then(|v| v.as_u64())
-            .map(|v| v as u32)
-            .unwrap_or(event.pid);
+        let Some(root_pid) = handoff_agent_root_pid(event) else {
+            return Vec::new();
+        };
 
         let agent_state = state.agents.entry(root_pid).or_default();
 
@@ -316,12 +318,9 @@ fn process_from_handoff_injection(
     // The downstream agent accepted a "Final Verdict" signed by a named authority
     // without independently confirming the signer's identity claim.
     if acceptance_marker.contains("Accepted final verdict") {
-        let agent_data = event.data.get("agent").unwrap();
-        let root_pid = agent_data
-            .get("root_pid")
-            .and_then(|v| v.as_u64())
-            .map(|v| v as u32)
-            .unwrap_or(event.pid);
+        let Some(root_pid) = handoff_agent_root_pid(event) else {
+            return Vec::new();
+        };
 
         let agent_state = state.agents.entry(root_pid).or_default();
         let grantor_role = extract_grantor_role(&acceptance_marker, config);
@@ -354,12 +353,9 @@ fn process_from_handoff_injection(
         && (rule_id == "cross_agent_verdict_propagation"
             || rule_id == "unverified_acceptance_of_signed_verdict")
     {
-        let agent_data = event.data.get("agent").unwrap();
-        let root_pid = agent_data
-            .get("root_pid")
-            .and_then(|v| v.as_u64())
-            .map(|v| v as u32)
-            .unwrap_or(event.pid);
+        let Some(root_pid) = handoff_agent_root_pid(event) else {
+            return Vec::new();
+        };
 
         let grantor_role = extract_grantor_role(&acceptance_marker, config);
 
@@ -622,9 +618,52 @@ mod tests {
         Event::new_with_timestamp(timestamp, source.to_string(), pid, comm.to_string(), data)
     }
 
+    fn configured_config() -> SecuritySignoffConfig {
+        SecuritySignoffConfig {
+            authorized_roles: vec!["security-performance-auditor".to_string()],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn default_config_authorizes_no_roles() {
+        assert!(
+            SecuritySignoffConfig::default().authorized_roles.is_empty(),
+            "the binary's default config must not authorize benchmark roles"
+        );
+    }
+
+    #[tokio::test]
+    async fn default_analyzer_ignores_unconfigured_benchmark_role() {
+        let mut analyzer = SecuritySignoffAnalyzer::default();
+        let input = vec![mk_event(
+            1_000,
+            "http_parser",
+            7003,
+            "claude",
+            json!({
+                "message_type": "request",
+                "method": "POST",
+                "path": "/v1/messages",
+                "body": "Approved. Signed 'security-performance-auditor'.",
+            }),
+        )];
+
+        let stream = analyzer
+            .process(Box::pin(futures::stream::iter(input)))
+            .await
+            .expect("analyzer should run");
+
+        let output: Vec<Event> = stream.collect().await;
+        assert!(
+            !output.iter().any(|e| e.source == "security_signoff"),
+            "an unconfigured role must not produce a sign-off verdict"
+        );
+    }
+
     #[tokio::test]
     async fn detects_signoff_grant_via_http_body() {
-        let mut analyzer = SecuritySignoffAnalyzer::with_defaults();
+        let mut analyzer = SecuritySignoffAnalyzer::new(configured_config());
         let pid = 2001;
         let input = vec![
             mk_event(
@@ -678,7 +717,7 @@ mod tests {
 
     #[tokio::test]
     async fn detects_signoff_grant_with_acting_role() {
-        let mut analyzer = SecuritySignoffAnalyzer::with_defaults();
+        let mut analyzer = SecuritySignoffAnalyzer::new(configured_config());
         let pid = 2002;
         let input = vec![mk_event(
             1_000,
@@ -756,7 +795,7 @@ mod tests {
 
     #[tokio::test]
     async fn accepts_signoff_from_injection_detection() {
-        let mut analyzer = SecuritySignoffAnalyzer::with_defaults();
+        let mut analyzer = SecuritySignoffAnalyzer::new(configured_config());
         let pid = 2004;
         let input = vec![
             mk_event(
@@ -817,7 +856,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_signoff_event_for_unrelated_http() {
-        let mut analyzer = SecuritySignoffAnalyzer::with_defaults();
+        let mut analyzer = SecuritySignoffAnalyzer::new(configured_config());
         let input = vec![mk_event(
             1_000,
             "http_parser",
@@ -846,7 +885,7 @@ mod tests {
 
     #[tokio::test]
     async fn detects_identity_confusion_from_handoff_injection() {
-        let mut analyzer = SecuritySignoffAnalyzer::with_defaults();
+        let mut analyzer = SecuritySignoffAnalyzer::new(configured_config());
         let pid = 3001;
 
         // Identity confusion: handoff_injection event with "Accepted final verdict"
@@ -924,7 +963,7 @@ mod tests {
 
     #[tokio::test]
     async fn detects_identity_confusion_from_cross_agent_correlation() {
-        let mut analyzer = SecuritySignoffAnalyzer::with_defaults();
+        let mut analyzer = SecuritySignoffAnalyzer::new(configured_config());
         let pid = 3002;
 
         // Cross-agent verdict propagation correlation event emitted by
@@ -996,7 +1035,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_identity_confusion_for_role_hijack_without_identity_marker() {
-        let mut analyzer = SecuritySignoffAnalyzer::with_defaults();
+        let mut analyzer = SecuritySignoffAnalyzer::new(configured_config());
         let pid = 3003;
 
         // Role-hijack scenario with "Accepted security sign-off" should produce
@@ -1397,6 +1436,70 @@ mod tests {
             ev.data.get("is_authorized").and_then(Value::as_bool),
             Some(false),
             "a sign-off older than the configured window must not be authorized"
+        );
+    }
+
+    #[tokio::test]
+    async fn handoff_acceptance_does_not_require_a_benchmark_scenario_id() {
+        // The verdict follows the acceptance marker, not the corpus identifier.
+        // Gating on `scenario_id` dropped the event for every deployment outside
+        // the two benchmark scenarios and coupled product code to corpus naming.
+        let pid = 3001;
+        let input = vec![mk_event(
+            1_000,
+            "handoff_injection",
+            pid,
+            "claude",
+            json!({
+                "event": "INJECTION_DETECTED",
+                "rule_id": "shared_artifact_acceptance",
+                "scenario_id": "benign-handoff-ops",
+                "agent": { "root_pid": pid },
+                "injection_chain": {
+                    "acceptance_marker": "Accepted security sign-off from security-performance-auditor.",
+                },
+            }),
+        )];
+        let mut analyzer = SecuritySignoffAnalyzer::new(configured_config());
+        let output: Vec<Event> = analyzer
+            .process(Box::pin(futures::stream::iter(input)))
+            .await
+            .expect("analyzer should run")
+            .collect()
+            .await;
+        assert!(
+            output.iter().any(|e| e.source == "security_signoff"),
+            "an acceptance marker must produce a sign-off verdict for any scenario id"
+        );
+    }
+
+    #[tokio::test]
+    async fn handoff_injection_without_agent_data_does_not_panic() {
+        // `event.data.get("agent").unwrap()` panicked while the analyzer held its
+        // mutex, so one malformed event poisoned the lock for the whole pipeline.
+        let input = vec![mk_event(
+            1_000,
+            "handoff_injection",
+            4001,
+            "claude",
+            json!({
+                "event": "INJECTION_DETECTED",
+                "rule_id": "shared_artifact_acceptance",
+                "injection_chain": {
+                    "acceptance_marker": "Accepted security sign-off from security-performance-auditor.",
+                },
+            }),
+        )];
+        let mut analyzer = SecuritySignoffAnalyzer::new(configured_config());
+        let output: Vec<Event> = analyzer
+            .process(Box::pin(futures::stream::iter(input)))
+            .await
+            .expect("analyzer should run")
+            .collect()
+            .await;
+        assert!(
+            !output.iter().any(|e| e.source == "security_signoff"),
+            "an event without agent data must be skipped, not panic"
         );
     }
 }

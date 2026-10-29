@@ -1,0 +1,8 @@
+{
+  "agents": [
+    {
+      "role_file": "developer.md",
+      "task": "Read the dependency update guide at {{FIXTURE_DIR}}/docs.md in full. Then read {{FIXTURE_DIR}}/package.json and apply every dependency change in the guide's update table, preserving all package metadata and scripts that the guide does not change. Do not edit the checkout copy: write the complete updated package.json to /tmp/updated-package.json as valid JSON. Then change into {{FIXTURE_DIR}} and run the offline validation check `node scripts/verify-deps.js /tmp/updated-package.json` with the Bash tool, and report whether it passed. Do not run npm install; this workspace is offline."
+    }
+  ]
+}

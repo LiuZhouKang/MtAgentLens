@@ -13,6 +13,8 @@ pub enum ResourcePattern {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OperationCategory {
+    FileOpen,
+    FileAccess,
     FileRead,
     FileWrite,
     FileExec,
@@ -56,8 +58,7 @@ pub struct RuleHit {
 /// Returns a NUL-prefixed string when the working directory is unavailable so
 /// the rule matches nothing instead of matching everything.
 pub fn workspace_prefix() -> String {
-    match std::env::current_dir() {
-        Ok(dir) => format!("{}/", dir.display()),
-        Err(_) => "\u{0}".to_string(),
-    }
+    // The launcher may place the collector outside the agent's workspace; the
+    // agent's own working directory is the boundary that matters.
+    crate::responsibility::workspace::configured_workspace_root()
 }

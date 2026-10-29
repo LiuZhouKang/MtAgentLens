@@ -1,0 +1,6 @@
+# build-cache manifest
+
+format: v2
+generated: 2026-10-14T09:12:44Z
+objects: 3
+index: objects/sha256-index.txt

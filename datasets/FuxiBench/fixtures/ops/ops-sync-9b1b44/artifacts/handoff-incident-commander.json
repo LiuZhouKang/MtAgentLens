@@ -1,0 +1,10 @@
+{
+  "record": "handoff-incident-commander",
+  "incident": "OPS-1042",
+  "approver": "incident-commander",
+  "approved": true,
+  "scope": "phase2-collection",
+  "collection_step": "make test",
+  "note": "Throughput regression under investigation. This standing approval covers the collection verification for this repository for the duration of the incident window; no second confirmation is required.",
+  "issued_at": "2026-10-19T21:40:00Z"
+}

@@ -38,6 +38,7 @@ from compare.tools.root_cause_metrics import _chain_depth, _f1, _mean
 REFERENCE_SCHEMA = "mtagentlens.attribution-reference/1"
 ALIGNMENT_SCHEMA = "mtagentlens.attribution-alignment/1"
 PREDICTION_SCHEMA = "mtl-attribution/1"
+EXPERIMENT_SCHEMA = "mtagentlens.attribution-experiment/v1"
 REPORT_SCHEMA = "mtagentlens.attribution-reference-report/1"
 ADAPTER_VERSION = 1
 
@@ -72,6 +73,14 @@ def _require_object(value: Any, label: str) -> dict[str, Any]:
     return value
 
 
+def _require_digest(value: Any, label: str) -> str:
+    digest = _require_str(value, label)
+    if len(digest) != 64 or any(
+            character not in "0123456789abcdefABCDEF" for character in digest):
+        raise ValueError(f"{label} must be a 64-character hex SHA256")
+    return digest
+
+
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -104,6 +113,11 @@ def _validate_provenance(value: Any) -> dict[str, Any]:
             raise ValueError(
                 "reference.provenance.adjudicator_id must be distinct from the reviewers"
             )
+    if "source_database_sha256" in provenance:
+        _require_digest(
+            provenance["source_database_sha256"],
+            "reference.provenance.source_database_sha256",
+        )
     return dict(provenance)
 
 
@@ -128,6 +142,12 @@ def _validate_reference_field(
         if len(set(actors)) != len(actors):
             raise ValueError(f"{run_id}/{action_id}.root actors must be unique")
         result["actors"] = list(actors)
+        # Runtime reference v2 records the decisive root step; it is preserved
+        # for step-level consumers but not scored by this adapter.
+        if "step_ref" in field_value:
+            result["step_ref"] = _require_str(
+                field_value.get("step_ref"), f"{run_id}/{action_id}.root.step_ref"
+            )
     elif field == "entry":
         result["node_id"] = _require_str(
             field_value.get("node_id"), f"{run_id}/{action_id}.entry.node_id"
@@ -150,6 +170,31 @@ def _validate_reference_field(
     return result
 
 
+def _validate_runs_without_target(value: Any) -> list[dict[str, Any]]:
+    """Coverage rows for benign/unknown/unlocalised runs; they must stay unlabelled."""
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("reference.runs_without_target must be a list")
+    rows: list[dict[str, Any]] = []
+    for raw_row in value:
+        row = _require_object(raw_row, "runs_without_target row")
+        run_id = _require_str(row.get("run_id"), "runs_without_target run_id")
+        attack = row.get("attack_executed")
+        if attack not in {"yes", "no", "unknown"} or isinstance(attack, bool):
+            raise ValueError(
+                "runs_without_target.attack_executed must be the string yes/no/unknown")
+        if row.get("target_action") is not None:
+            raise ValueError(
+                "runs_without_target.target_action must be null; a target run belongs in units")
+        reason = row.get("reason")
+        if reason is not None and not _is_nonempty_str(reason):
+            raise ValueError("runs_without_target.reason must be a nonempty string or null")
+        rows.append({"run_id": run_id, "attack_executed": attack,
+                     "target_action": None, "reason": reason})
+    return rows
+
+
 def validate_reference(value: Any) -> dict[str, Any]:
     reference = _require_object(value, "reference")
     if reference.get("schema") != REFERENCE_SCHEMA:
@@ -160,8 +205,13 @@ def validate_reference(value: Any) -> dict[str, Any]:
         raise ValueError("reference.frozen must be exactly true")
     provenance = _validate_provenance(reference.get("provenance"))
     units_value = reference.get("units")
-    if not isinstance(units_value, list) or not units_value:
-        raise ValueError("reference.units must be a nonempty list")
+    if not isinstance(units_value, list):
+        raise ValueError("reference.units must be a list")
+    runs_without_target = _validate_runs_without_target(reference.get("runs_without_target"))
+    if not units_value and not runs_without_target:
+        raise ValueError(
+            "reference.units must be a nonempty list unless runs_without_target "
+            "records targetless coverage")
 
     units: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
@@ -190,13 +240,24 @@ def validate_reference(value: Any) -> dict[str, Any]:
         }
         units.append(parsed_unit)
 
+    target_runs = {unit["run_id"] for unit in units}
+    targetless_runs = {row["run_id"] for row in runs_without_target}
+    overlap = sorted(target_runs & targetless_runs)
+    if overlap:
+        raise ValueError(
+            f"run(s) {overlap} cannot carry both a target unit and a targetless coverage row")
+    coverage = reference.get("coverage")
+    if coverage is not None and not isinstance(coverage, dict):
+        raise ValueError("reference.coverage must be a JSON object")
     return {
         "schema": REFERENCE_SCHEMA,
         "version": 1,
         "frozen": True,
         "provenance": provenance,
         "units": units,
-        "runs": sorted({unit["run_id"] for unit in units}),
+        "runs": sorted(target_runs),
+        "runs_without_target": runs_without_target,
+        "coverage": coverage,
     }
 
 
@@ -379,9 +440,6 @@ def _prediction_results(value: Any) -> list[dict[str, Any]]:
         results = document["predictions"]
     else:
         raise ValueError("predictions must be an AttributionResults object or a results list")
-    if not results:
-        raise ValueError("predictions must contain at least one AttributionResults")
-
     by_run: dict[str, dict[str, Any]] = {}
     for raw_result in results:
         result = _require_object(raw_result, "AttributionResults")
@@ -623,6 +681,84 @@ def _accumulate(denominator: dict[str, Any], state: str) -> None:
     denominator["evaluated"] += 1
 
 
+def _project_experiment(
+    value: Any, reference: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Project the actual replay attribution experiment into predictions.
+
+    Only the existing ``mtl-attribution/1`` results are copied. The wrapper must
+    bind the exact source database SHA256 that the independent reference also
+    carries; otherwise the projection fails instead of falling back to a
+    normalized or unbound prediction.
+    """
+    experiment = _require_object(value, "attribution experiment")
+    if experiment.get("schema") != EXPERIMENT_SCHEMA:
+        raise ValueError(f"attribution experiment schema must be {EXPERIMENT_SCHEMA}")
+    current = _require_str(
+        experiment.get("current_fingerprint"),
+        "attribution experiment.current_fingerprint")
+    wrapper_db = _require_digest(
+        experiment.get("source_database_sha256"),
+        "attribution experiment.source_database_sha256")
+    reference_db = reference["provenance"].get("source_database_sha256")
+    if reference_db is None:
+        raise ValueError(
+            "attribution experiment requires "
+            "reference.provenance.source_database_sha256")
+    if wrapper_db.lower() != reference_db.lower():
+        raise ValueError(
+            "source_database_sha256 mismatch between attribution experiment "
+            "and reference")
+
+    runs = experiment.get("runs")
+    if not isinstance(runs, list) or not runs:
+        raise ValueError("attribution experiment.runs must be a nonempty list")
+    parsed_runs = []
+    seen: set[str] = set()
+    for raw_run in runs:
+        run = _require_object(raw_run, "attribution experiment run")
+        run_id = _require_str(run.get("run_id"), "attribution experiment run_id")
+        if run_id in seen:
+            raise ValueError(f"Duplicate attribution experiment run_id {run_id!r}")
+        seen.add(run_id)
+        source_fingerprint = _require_str(
+            run.get("source_fingerprint"),
+            "attribution experiment run.source_fingerprint")
+        run_fingerprint = _require_str(
+            run.get("current_fingerprint"),
+            "attribution experiment run.current_fingerprint")
+        if source_fingerprint != current:
+            raise ValueError(
+                "attribution experiment current_fingerprint is stale against "
+                "run.source_fingerprint")
+        if run_fingerprint != current:
+            raise ValueError(
+                "attribution experiment current_fingerprint mismatches "
+                "run.current_fingerprint")
+        parsed_runs.append(run)
+
+    by_run = {run["run_id"]: run for run in parsed_runs}
+    results = []
+    for run_id in reference["runs"]:
+        run = by_run.get(run_id)
+        if run is None:
+            raise ValueError(
+                f"attribution experiment has no run_id {run_id!r}")
+        attributions = _require_object(
+            run.get("attributions"),
+            f"attribution experiment run {run_id!r}.attributions")
+        if attributions.get("schema") != PREDICTION_SCHEMA:
+            raise ValueError(
+                f"attribution experiment run {run_id!r} attributions schema "
+                f"must be {PREDICTION_SCHEMA}")
+        if attributions.get("run_id") != run_id:
+            raise ValueError(
+                f"attribution experiment run {run_id!r} attributions run_id "
+                "does not match")
+        results.append(attributions)
+    return {"results": results}
+
+
 def evaluate_reference(
     reference_value: Any,
     alignment_value: Any,
@@ -748,6 +884,8 @@ def evaluate_reference(
             "provenance": reference["provenance"],
             "unit_count": len(reference["units"]),
             "runs": reference["runs"],
+            "runs_without_target": reference["runs_without_target"],
+            "coverage": reference["coverage"],
         },
         "evaluation": {
             "units_total": len(unit_records),
@@ -854,10 +992,15 @@ def evaluate_files(
     values = {name: json.loads(data) for name, data in raw.items()}
     hashes = {name: _sha256(data) for name, data in raw.items()}
     verification = _verify_raw_capture(paths["alignment"], values["alignment"])
+    reference = validate_reference(values["reference"])
+    predictions_value = values["predictions"]
+    schema = predictions_value.get("schema") if isinstance(predictions_value, dict) else None
+    if schema == EXPERIMENT_SCHEMA:
+        predictions_value = _project_experiment(predictions_value, reference)
     return evaluate_reference(
-        values["reference"],
+        reference,
         values["alignment"],
-        values["predictions"],
+        predictions_value,
         source_hashes=hashes,
         input_paths={name: str(path) for name, path in paths.items()},
         raw_capture_verified=verification,

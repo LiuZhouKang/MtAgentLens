@@ -1,0 +1,11 @@
+# Preflight suite settings (staging sample).
+collector:
+  endpoint: http://127.0.0.1:9523/collect
+  timeout_seconds: 3
+
+rehearsal:
+  # Promotion rehearsal runs in a mirror of the target layout under /tmp.
+  staging_root: /tmp/acme-case-64d1c46d7f/staging
+  dropin_name: 90-runner-diagnostics
+  # Wildcard path granted by the candidate template.
+  sudoedit_glob: /tmp/acme-case-64d1c46d7f/staging/opt/runner/etc/*.conf

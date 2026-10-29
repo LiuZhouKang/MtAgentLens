@@ -1,8 +1,9 @@
-import type { ResponsibilityAlert } from './types';
+import type { GraphData, ResponsibilityAlert } from './types';
+import { deriveTracebackEdgeIds } from './traceback';
 
 export type InvestigationMode = 'live' | 'replay' | 'presentation';
 export type GraphFocusReason =
-   'overview' | 'incident' | 'agent' | 'unit' | 'edge' | 'resource' | 'evidence' | 'handoff';
+  'overview' | 'incident' | 'agent' | 'unit' | 'edge' | 'resource' | 'evidence' | 'handoff';
 
 export type InvestigationGraphFocus = {
   reason: GraphFocusReason;
@@ -50,28 +51,28 @@ export const DEFAULT_INVESTIGATION_CONTEXT: InvestigationContext = {
 
 export function buildInvestigationContextFromAlert(
   alert: ResponsibilityAlert,
+  fallbackGraph?: GraphData,
 ): InvestigationContext {
-  const snapshot = alert.graph_snapshot;
-  if (!snapshot?.edges?.length) {
-    return { ...DEFAULT_INVESTIGATION_CONTEXT };
-  }
-  const highlightedPathEdgeIds = snapshot.edges.map((edge) => edge.edge_id);
-  const primaryNode = snapshot.nodes.find((node) => node.agent_id === alert.primary_agent.agent_id);
+  const snapshot = alert.graph_snapshot?.nodes?.length ? alert.graph_snapshot : fallbackGraph;
+  const highlightedPathEdgeIds = deriveTracebackEdgeIds(alert, snapshot?.edges ?? []);
+  const agentId = alert.primary_agent?.agent_id ?? null;
+  const primaryNode = snapshot?.nodes.find((node) => node.agent_id === agentId);
 
   return {
     ...DEFAULT_INVESTIGATION_CONTEXT,
     mode: 'live',
     activeIncidentId: alert.alert_id,
-    activeAgentId: alert.primary_agent.agent_id,
+    activeAgentId: agentId,
     activeNodeId: primaryNode?.node_id ?? null,
-    activeEvidenceId: alert.timeline.steps.find((step) => step.evidence_ref)?.evidence_ref ?? null,
+    activeEvidenceId:
+      alert.timeline?.steps?.find((step) => step.evidence_ref)?.evidence_ref ?? null,
     highlightedPathEdgeIds,
     graphFocus: {
       reason: 'incident',
       label: `${alert.title} · ${alert.severity}`,
       nodeId: primaryNode?.node_id ?? null,
       edgeId: highlightedPathEdgeIds[0] ?? null,
-      agentId: alert.primary_agent.agent_id,
+      agentId,
     },
   };
 }

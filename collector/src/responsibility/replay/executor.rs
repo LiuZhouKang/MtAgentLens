@@ -1,40 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 //
-// executor.rs — ReplayExecutor: drives the full Phase 2 authoritative replay
-// pipeline from a persisted run.
+// executor.rs — Reanalysis of the complete versioned evidence checkpoint.
+// Legacy rows remain viewable but cannot manufacture missing analysis inputs.
 //
-// Per spec §14:
-//   1. Load SignalGraph from DB (process_events, tls_sessions, message_bindings)
-//   2. Re-run identity::resolve_authoritative(snapshot)
-//   3. Re-run evidence::correlate_batch(intents, actions, snapshot)
-//   4. Re-run graph::GraphBuilder::finalize(authoritative, correlation, snapshot)
-//   5. Re-run classification::classify_authoritative(frozen_graph)
-//   6. Re-run claims::ClaimBuilder + AlertBuilder + TracebackBuilder
-//   7. Produce all Refinements + EvaluationMetrics
-
-use anyhow::{Context, Result};
-use rusqlite::{Connection, OpenFlags};
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
-
-use crate::responsibility::claims::{AlertBuilder, ClaimBuilder, TracebackBuilder};
-use crate::responsibility::classification::engine::ClassificationEngine as PhaseClassificationEngine;
-use crate::responsibility::evidence::correlator::{CorrelationResult, EvidenceCorrelator};
-use crate::responsibility::graph::graph_builder::GraphBuilder;
-use crate::responsibility::graph::snapshot::{FrozenGraph, create_snapshot};
-use crate::responsibility::identity::IdentityProvider;
-use crate::responsibility::identity::union_find::run_authoritative_resolution;
-use crate::responsibility::persistence::PersistenceReader;
-use crate::responsibility::signals::SignalSnapshot;
-use crate::responsibility::signals::signal_graph::SignalGraph;
-use crate::responsibility::signals::signal_snapshot::ProcessExecInfo;
-use crate::responsibility::types::{
-    Action, AgentId, AlertId, AuthoritativeIdentity, BehaviorTimeline, ClaimId, ClaimRefinement,
-    ClaimRefinementType, ClassificationRefinement, ClassificationRefinementType,
-    CorrelationEvidence, EvidenceRefinement, GraphRefinement, IdentityRefinement, Intent,
-    ProcessId, ProvisionalIdentity, ResponsibilityAlert, ResponsibilityClaim,
-    ResponsibilityTraceback, TlsSessionId,
+use crate::responsibility::claims::AlertBuilder;
+use crate::responsibility::graph::snapshot::FrozenGraph;
+#[cfg(test)]
+use crate::responsibility::identity::{
+    IdentityProvider, union_find::AuthoritativeIdentityProvider,
 };
+use crate::responsibility::persistence::PersistenceReader;
+#[cfg(test)]
+use crate::responsibility::types::{AgentId, BehaviorTimeline, ProcessId};
+use crate::responsibility::types::{
+    AlertId, AuthoritativeIdentity, ClaimId, ClaimRefinement, ClaimRefinementType,
+    ClassificationRefinement, ClassificationRefinementType, CorrelationEvidence,
+    EvidenceRefinement, GraphRefinement, IdentityRefinement, ProvisionalIdentity,
+    ResponsibilityAlert, ResponsibilityClaim, ResponsibilityTraceback,
+};
+use anyhow::{Context, Result};
+use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ReplayResult
@@ -44,6 +29,11 @@ use crate::responsibility::types::{
 #[derive(Debug, Clone)]
 pub struct ReplayResult {
     pub run_id: String,
+    pub final_verdict: crate::responsibility::classification::final_decision::FinalVerdict,
+    pub classification: crate::responsibility::classification::ClassificationResult,
+    /// Versioned score/coverage/execution snapshot from the same evaluation
+    /// kernel as live finalization.
+    pub run_metrics: super::run_metrics::RunMetrics,
     /// Authoritative identities produced by Phase 2 resolution.
     pub identities: Vec<AuthoritativeIdentity>,
     /// Correlation evidence produced by batch correlation.
@@ -56,10 +46,24 @@ pub struct ReplayResult {
     pub claims: Vec<ResponsibilityClaim>,
     /// Tracebacks built from claims.
     pub tracebacks: Vec<ResponsibilityTraceback>,
+    /// Bounded occurrence attribution produced by the same decision kernel as
+    /// live finalization; replay does not rebuild a second set.
+    pub attributions: crate::responsibility::claims::attribution::AttributionResults,
     /// All collected refinements (identity, evidence, graph, classification, claim).
     pub refinements: RefinementBundle,
     /// Computed evaluation metrics.
     pub evaluation: EvaluationMetrics,
+    /// Taint-gate counters produced while rebuilding claims. They explain a
+    /// missing `TaintedContextUse` claim instead of leaving the absence
+    /// unexplained.
+    pub claim_diagnostics: crate::responsibility::claims::claim_builder::ClaimBuildDiagnostics,
+    /// Delegation records read from the persisted table. A smaller-than-live
+    /// count means the authorization input was lossy.
+    pub delegations_loaded: usize,
+    /// Records whose provisional agent IDs were rewritten to the authoritative
+    /// IDs the replay graph uses. Records not fully mapped cannot authorize a
+    /// share in replay.
+    pub delegations_mapped: usize,
 }
 
 /// All refinement arrays collected during the replay.
@@ -81,9 +85,10 @@ pub struct EvaluationMetrics {
     pub changed_count: usize,
     pub dismissed_count: usize,
     pub discovered_count: usize,
-    pub precision: f32,
-    pub recall: f32,
-    pub f1: f32,
+    /// Ground-truth detection metrics are unavailable without independent labels.
+    pub precision: Option<f32>,
+    pub recall: Option<f32>,
+    pub f1: Option<f32>,
     pub evidence_count: usize,
     pub non_link_count: usize,
     pub identity_count: usize,
@@ -103,144 +108,100 @@ pub struct ReplayExecutor;
 impl ReplayExecutor {
     /// Run the full authoritative replay for a given run.
     ///
-    /// This re-runs all five Phase 2 pipelines (identity, evidence, graph,
-    /// classification, claims) on data loaded from the persistence store.
-    /// It produces a complete `ReplayResult` with all refinements and metrics.
+    /// Uses the same frozen decision kernel as live finalization. Identity,
+    /// correlation, provenance and model outputs are retained observations,
+    /// not reconstructed with defaults from lossy legacy tables.
     pub fn reauthoritative(reader: &PersistenceReader, run_id: &str) -> Result<ReplayResult> {
-        // ── Step 0: Verify the run exists ──────────────────────────────
-        let _run = reader
+        reader
             .get_run(run_id)
             .context("query run")?
-            .ok_or_else(|| anyhow::anyhow!("run not found: {}", run_id))?;
-
-        // ── Step 1: Load signal data and build SignalGraph ─────────────
-        let db_path = reader
-            .db_path()
-            .ok_or_else(|| anyhow::anyhow!("replay requires a file-backed database"))?;
-        let snapshot = Self::load_signal_snapshot(db_path, run_id)?;
-
-        // ── Step 1b: Load provisional identities for refinement tracking ──
-        let (provisional_identities, _) = reader.get_identities(run_id)?;
-        let provisional_map: HashMap<ProcessId, ProvisionalIdentity> = provisional_identities
-            .iter()
-            .flat_map(|pi| {
-                pi.process_ids.iter().map(move |pid| {
-                    let mut single_pi = pi.clone();
-                    single_pi.process_ids = vec![*pid];
-                    (*pid, single_pi)
-                })
+            .ok_or_else(|| anyhow::anyhow!("run not found: {run_id}"))?;
+        let (version, payload) = reader.get_analysis_checkpoint(run_id, super::checkpoint::CHECKPOINT_KIND)?
+            .ok_or_else(|| anyhow::anyhow!("run {run_id} lacks a complete versioned analysis checkpoint; only recorded-result replay is available"))?;
+        anyhow::ensure!(
+            version == super::checkpoint::CHECKPOINT_VERSION,
+            "unsupported analysis checkpoint version: {version}"
+        );
+        let checkpoint: super::checkpoint::AnalysisCheckpoint =
+            serde_json::from_value(payload).context("decode complete analysis checkpoint")?;
+        checkpoint.validate(run_id).map_err(anyhow::Error::msg)?;
+        let analysis = checkpoint.evaluate();
+        let final_verdict = analysis.verdict;
+        let classification_result = analysis.classification;
+        let run_metrics = analysis.run_metrics;
+        let claims = analysis.claims;
+        let tracebacks = analysis.tracebacks;
+        let claim_diagnostics = analysis.diagnostics;
+        let attributions = analysis.attributions;
+        let graph = analysis.graph;
+        let frozen_graph = FrozenGraph::new(
+            checkpoint.graph.clone(),
+            checkpoint.graph_refinements.clone(),
+            Some(run_id.into()),
+        );
+        let phase1_alerts = reader
+            .get_provisional_alerts(run_id)
+            .context("load phase-1 alerts")?;
+        let (provisional_identities, _) =
+            reader.get_identities(run_id).context("load identities")?;
+        let fallback = checkpoint.fallback_agent_id.as_ref();
+        let has_graph_agent = graph.all_nodes().any(|node| {
+            node.agent_id.as_ref().is_some_and(|agent| {
+                agent.as_str() != crate::responsibility::graph::UNATTRIBUTED_AGENT_ID
             })
-            .collect();
-
-        // ── Step 2: Identity — resolve_authoritative ──────────────────
-        let authoritative = run_authoritative_resolution(&snapshot, &provisional_map);
-
-        // ── Step 3: Evidence — correlate_batch ────────────────────────
-        let intents: Vec<Intent> = reader.get_intents(run_id).context("load intents")?;
-        let actions: Vec<Action> = reader.get_actions(run_id).context("load actions")?;
-
-        let correlator = EvidenceCorrelator::new();
-        let correlation_result: CorrelationResult =
-            correlator.correlate_batch(&intents, &actions, &snapshot);
-
-        // ── Step 4: Graph — build and finalize ────────────────────────
-        let mut graph_builder = GraphBuilder::with_default_config();
-
-        // Create an identity provider from the authoritative resolution.
-        let auth_identity_provider = AuthoritativeIdentityProvider::from(&authoritative);
-
-        // Feed all correlation evidence through handle().
-        for ev in &correlation_result.evidence {
-            let intent = intents
-                .iter()
-                .find(|i| i.intent_id == ev.intent_id)
-                .cloned();
-            let action = actions
-                .iter()
-                .find(|a| a.action_id == ev.action_id)
-                .cloned();
-
-            if let (Some(intent), Some(action)) = (intent, action) {
-                let _delta = graph_builder.handle(ev, &intent, &action, &auth_identity_provider);
-            }
-        }
-
-        // Finalize the graph.
-        let graph_snapshot = create_snapshot(
-            graph_builder.graph(),
-            format!("replay-snap-{}", run_id),
-            correlation_result
-                .evidence
-                .last()
-                .map(|e| e.timestamp_ns)
-                .unwrap_or(0),
-        );
-
-        let frozen_graph =
-            graph_builder.finalize(&authoritative, &correlation_result, graph_snapshot);
-
-        // ── Step 5: Classification — classify_authoritative ───────────
-        let classification_engine = PhaseClassificationEngine::new();
-        // Pattern matching runs on the same ResponsibilityGraph the live path
-        // uses. This used to pass an empty set ("legacy graph"), which made a
-        // replayed run score differently from the live run that recorded it.
-        let patterns = crate::responsibility::graph::pattern_matcher::GraphPatternMatcher::new(
-            crate::responsibility::graph::pattern_matcher::default_templates(),
-        )
-        .match_graph(graph_builder.graph());
-
-        let (classification_result, _route) = classification_engine.classify_authoritative(
-            graph_builder.graph(),
-            &patterns,
-            &correlation_result.evidence,
-            intents.len() as u32, // same inputs as the live Phase 2 path
-            intents.len() as u32, // (0 here made the replayed score differ)
-        );
-
-        // ── Step 6: Claims, Alerts, Tracebacks ────────────────────────
-        let claims = ClaimBuilder::build_claims(graph_builder.graph(), &HashSet::new());
-
-        let timeline = BehaviorTimeline {
-            steps: Vec::new(),
-            total_duration_ms: 0,
-        };
-
-        let alerts: Vec<ResponsibilityAlert> = if claims.is_empty() {
-            Vec::new()
-        } else {
-            let primary_alert = AlertBuilder::compose(
+        });
+        let alerts = if fallback.is_some() || has_graph_agent || !claims.is_empty() {
+            let timestamp_ns = checkpoint.graph.timestamp_ns;
+            let mut alert = AlertBuilder::compose_with_context(
                 &claims,
                 &classification_result,
-                None, // no observer output in Phase 2
-                graph_builder.graph(),
-                &timeline,
-                None, // fallback_agent_id — not needed when claims exist
+                None,
+                &graph,
+                &checkpoint.timeline,
+                fallback,
+                crate::responsibility::claims::alert_builder::ComposeContext {
+                    timestamp_ns,
+                    phase: crate::responsibility::types::PhaseIndicator::Authoritative {
+                        timestamp_ns,
+                        overrides: None,
+                    },
+                    final_verdict: Some(&final_verdict),
+                },
             );
-            vec![primary_alert]
+            alert.provisional_ref = phase1_alerts.last().map(|alert| alert.alert_id.clone());
+            vec![alert]
+        } else {
+            Vec::new()
         };
-
-        // Build tracebacks for each claim.
-        let tracebacks: Vec<ResponsibilityTraceback> = claims
+        let delegations_loaded = checkpoint.delegations.len();
+        let delegations_mapped = checkpoint
+            .delegations
             .iter()
-            .filter_map(|claim| TracebackBuilder::build(claim, graph_builder.graph()))
-            .collect();
+            .filter(|delegation| {
+                checkpoint
+                    .identities
+                    .iter()
+                    .any(|identity| identity.agent_id.as_str() == delegation.from_agent_id)
+                    && checkpoint
+                        .identities
+                        .iter()
+                        .any(|identity| identity.agent_id.as_str() == delegation.to_agent_id)
+            })
+            .count();
 
         // ── Step 7: Collect refinements ───────────────────────────────
         let mut refinements = RefinementBundle::default();
 
         // Identity refinements
-        refinements.identity = authoritative.refinements.clone();
+        refinements.identity = checkpoint.identity_refinements.clone();
 
         // Evidence refinements
-        refinements.evidence = correlation_result.refinements.clone();
+        refinements.evidence = checkpoint.evidence_refinements.clone();
 
         // Graph refinements
         refinements.graph = frozen_graph.refinements.clone();
 
         // Classification refinements — compare phase1 vs phase2 alerts
-        // A corrupt alert row must fail the replay: treating it as "Phase 1
-        // had no alerts" would mark every Phase-2 alert as Discovered.
-        let phase1_alerts = reader.get_alerts(run_id).context("load phase-1 alerts")?;
         refinements.classification =
             Self::build_classification_refinements(&phase1_alerts, &alerts);
 
@@ -271,208 +232,39 @@ impl ReplayExecutor {
                 .iter()
                 .filter(|r| matches!(r.refinement_type, ClassificationRefinementType::Discovered))
                 .count(),
-            evidence_count: correlation_result.evidence.len(),
-            non_link_count: correlation_result.non_links.len(),
-            identity_count: authoritative.agents.len(),
+            evidence_count: checkpoint.evidence.len(),
+            non_link_count: checkpoint.non_link_count,
+            identity_count: checkpoint.identities.len(),
             node_count: frozen_graph.node_count(),
             edge_count: frozen_graph.edge_count(),
             claim_count: claims.len(),
             traceback_count: tracebacks.len(),
-            precision: 0.0,
-            recall: 0.0,
-            f1: 0.0,
-        };
-
-        let evaluation = {
-            let mut ev = evaluation;
-            let confirmed = ev.confirmed_count;
-            let changed = ev.changed_count;
-            let dismissed = ev.dismissed_count;
-            let discovered = ev.discovered_count;
-
-            // Precision: confirmed / (confirmed + changed + discovered)
-            let denom_p = confirmed + changed + discovered;
-            ev.precision = if denom_p > 0 {
-                confirmed as f32 / denom_p as f32
-            } else {
-                1.0
-            };
-
-            // Recall: confirmed / (confirmed + changed + dismissed)
-            let denom_r = confirmed + changed + dismissed;
-            ev.recall = if denom_r > 0 {
-                confirmed as f32 / denom_r as f32
-            } else {
-                1.0
-            };
-
-            // F1
-            ev.f1 = if ev.precision + ev.recall > 0.0 {
-                2.0 * ev.precision * ev.recall / (ev.precision + ev.recall)
-            } else {
-                0.0
-            };
-
-            ev
+            precision: None,
+            recall: None,
+            f1: None,
         };
 
         Ok(ReplayResult {
             run_id: run_id.to_string(),
-            identities: authoritative.agents.clone(),
-            evidence: correlation_result.evidence.clone(),
+            final_verdict,
+            classification: classification_result,
+            run_metrics,
+            identities: checkpoint.identities,
+            evidence: checkpoint.evidence,
             frozen_graph,
             alerts,
             claims,
             tracebacks,
+            attributions,
             refinements,
             evaluation,
+            claim_diagnostics,
+            delegations_loaded,
+            delegations_mapped,
         })
     }
 
     // ── Internal helpers ────────────────────────────────────────────────
-
-    /// Load raw signal data from the DB and build a SignalGraph + snapshot.
-    fn load_signal_snapshot(
-        db_path: &std::path::Path,
-        run_id: &str,
-    ) -> Result<Arc<SignalSnapshot>> {
-        // We need a direct read-only connection for signal-layer data
-        // since PersistenceReader does not yet expose process_events, tls_sessions,
-        // or message_bindings queries directly.
-        let conn = Connection::open_with_flags(
-            db_path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )
-        .context("open signal db for replay")?;
-        let _ = conn.execute_batch("PRAGMA read_uncommitted=0;");
-
-        let mut graph = SignalGraph::new();
-
-        // Load process_events
-        let has_process_events = conn
-            .prepare("SELECT pid FROM process_events LIMIT 0")
-            .is_ok();
-
-        if has_process_events {
-            let mut stmt = conn
-                .prepare(
-                    "SELECT pid, start_time_ns, parent_pid, parent_start_time_ns,
-                            comm, timestamp_ns
-                     FROM process_events WHERE run_id = ?1
-                     ORDER BY timestamp_ns ASC",
-                )
-                .context("prepare process_events query for replay")?;
-
-            let rows = stmt.query_map([run_id], |row| {
-                Ok((
-                    row.get::<_, i64>(0)? as u32,  // pid
-                    row.get::<_, i64>(1)? as u64,  // start_time_ns
-                    row.get::<_, Option<i64>>(2)?, // parent_pid
-                    row.get::<_, Option<i64>>(3)?, // parent_start_time_ns
-                    row.get::<_, String>(4)?,      // comm
-                    row.get::<_, i64>(5)? as u64,  // timestamp_ns
-                ))
-            })?;
-
-            for row in rows {
-                let (pid, start_ns, ppid, pstart_ns, comm, ts) = row?;
-                let child = ProcessId::new(pid, start_ns);
-
-                // Determine parent ProcessId: use init if no parent recorded.
-                let parent = match (ppid, pstart_ns) {
-                    (Some(pp), Some(ps)) => ProcessId::new(pp as u32, ps as u64),
-                    _ => ProcessId::new(0, 0),
-                };
-
-                // Replay only persists comm; the richer identity signals are
-                // not recoverable from the replay log.
-                graph.observe_exec(
-                    child,
-                    parent,
-                    ProcessExecInfo {
-                        comm: comm.clone(),
-                        ..Default::default()
-                    },
-                    None,
-                    ts,
-                );
-            }
-        }
-
-        // Load tls_sessions
-        let has_tls = conn
-            .prepare("SELECT tls_session_id FROM tls_sessions LIMIT 0")
-            .is_ok();
-
-        if has_tls {
-            let mut stmt = conn
-                .prepare(
-                    "SELECT tls_session_id, pid, start_time_ns, timestamp_ns
-                     FROM tls_sessions WHERE run_id = ?1
-                     ORDER BY timestamp_ns ASC",
-                )
-                .context("prepare tls_sessions query for replay")?;
-
-            let rows = stmt.query_map([run_id], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,     // tls_session_id
-                    row.get::<_, i64>(1)? as u32, // pid
-                    row.get::<_, i64>(2)? as u64, // start_time_ns
-                    row.get::<_, i64>(3)? as u64, // timestamp_ns
-                ))
-            })?;
-
-            for row in rows {
-                let (tls_id, pid, start_ns, ts) = row?;
-                let proc = ProcessId::new(pid, start_ns);
-                let tls = TlsSessionId::from(tls_id);
-                graph.observe_tls(proc, tls, ts);
-            }
-        }
-
-        // Load message_bindings
-        let has_msgs = conn
-            .prepare("SELECT binding_id FROM message_bindings LIMIT 0")
-            .is_ok();
-
-        if has_msgs {
-            let mut stmt = conn
-                .prepare(
-                    "SELECT message_id, pid, start_time_ns, tls_session_id, binding_type
-                     FROM message_bindings WHERE run_id = ?1
-                     ORDER BY binding_id ASC",
-                )
-                .context("prepare message_bindings query for replay")?;
-
-            let rows = stmt.query_map([run_id], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,         // message_id
-                    row.get::<_, i64>(1)? as u32,     // pid
-                    row.get::<_, i64>(2)? as u64,     // start_time_ns
-                    row.get::<_, Option<String>>(3)?, // tls_session_id
-                    row.get::<_, String>(4)?,         // binding_type
-                ))
-            })?;
-
-            for row in rows {
-                let (msg_id, pid, start_ns, tls_opt, _binding_type) = row?;
-                let proc = ProcessId::new(pid, start_ns);
-                let msg = crate::responsibility::types::MessageId::from(msg_id);
-
-                if let Some(tls_id) = tls_opt {
-                    let tls = TlsSessionId::from(tls_id);
-                    graph.observe_message_via_tls(tls, msg);
-                } else {
-                    graph.observe_message_direct(proc, msg);
-                }
-            }
-        }
-
-        Ok(graph.snapshot())
-    }
-
-    /// Find the database path for a given run. Uses the standard location
-    /// inferred from the reader's backing store, falling back to a default.
 
     /// Build classification refinements by comparing Phase 1 and Phase 2 alerts.
     fn build_classification_refinements(
@@ -586,42 +378,6 @@ impl ReplayExecutor {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// AuthoritativeIdentityProvider — wraps AuthoritativeResolution for GraphBuilder
-// ═══════════════════════════════════════════════════════════════════════════
-
-/// An IdentityProvider backed by an AuthoritativeResolution.
-///
-/// Used by GraphBuilder::handle() during replay to look up agent assignments
-/// from the Phase 2 authoritative identity resolution.
-struct AuthoritativeIdentityProvider {
-    process_to_agent: HashMap<ProcessId, AgentId>,
-}
-
-impl AuthoritativeIdentityProvider {
-    fn from(
-        resolution: &crate::responsibility::identity::union_find::AuthoritativeResolution,
-    ) -> Self {
-        let mut process_to_agent = HashMap::new();
-        for agent in &resolution.agents {
-            for pid in &agent.process_ids {
-                process_to_agent.insert(*pid, agent.agent_id.clone());
-            }
-        }
-        Self { process_to_agent }
-    }
-}
-
-impl IdentityProvider for AuthoritativeIdentityProvider {
-    fn agent_for_process(&self, process_id: ProcessId) -> Option<AgentId> {
-        self.process_to_agent.get(&process_id).cloned()
-    }
-
-    fn all_assignments(&self) -> HashMap<ProcessId, AgentId> {
-        self.process_to_agent.clone()
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // Tests
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -648,9 +404,11 @@ mod tests {
             refinements: Vec::new(),
             subagent_boundaries: Vec::new(),
             unresolved: Vec::new(),
+            conversation_agents: Vec::new(),
+            ambiguous_messages: Vec::new(),
         };
 
-        let provider = AuthoritativeIdentityProvider::from(&resolution);
+        let provider = AuthoritativeIdentityProvider::new(&resolution);
         assert_eq!(provider.agent_for_process(pid1), Some(agent_id.clone()));
         assert_eq!(provider.agent_for_process(pid2), Some(agent_id));
         assert_eq!(provider.agent_for_process(ProcessId::new(999, 1)), None);
@@ -714,32 +472,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_evaluation_metrics_precision_recall() {
-        let mut metrics = EvaluationMetrics {
-            confirmed_count: 3,
-            changed_count: 1,
-            dismissed_count: 1,
-            discovered_count: 2,
-            ..Default::default()
-        };
-
-        // precision = 3 / (3 + 1 + 2) = 0.5
-        // recall = 3 / (3 + 1 + 1) = 0.6
-        // f1 = 2 * 0.5 * 0.6 / (0.5 + 0.6) = 0.6 / 1.1 ≈ 0.545
-        let p = 3.0 / 6.0;
-        let r = 3.0 / 5.0;
-        let f1 = 2.0 * p * r / (p + r);
-
-        metrics.precision = p;
-        metrics.recall = r;
-        metrics.f1 = f1;
-
-        assert!((metrics.precision - 0.5).abs() < 0.01);
-        assert!((metrics.recall - 0.6).abs() < 0.01);
-        assert!((metrics.f1 - 0.5454).abs() < 0.01);
-    }
-
     // ── test helpers ────────────────────────────────────────────────────
 
     fn make_alert(
@@ -753,6 +485,7 @@ mod tests {
             timestamp_ns: 1000,
             display_profile: crate::responsibility::types::DisplayProfile::SafeBaseline,
             decision: crate::responsibility::types::AlertDecision::Safe,
+            actionable: false,
             severity,
             confidence,
             authority: crate::responsibility::types::AlertAuthority::Supporting,
@@ -766,6 +499,7 @@ mod tests {
             },
             involved_agents: Vec::new(),
             engine: crate::responsibility::types::EngineSection {
+                claim_ids: Vec::new(),
                 rule_verdicts: Vec::new(),
                 pattern_verdicts: Vec::new(),
                 classification_score: 0.0,
@@ -779,12 +513,19 @@ mod tests {
                     repetition_score: 0.0,
                     behavioral_score: 0.0,
                     total: 0.0,
+                    raw_score: 0.0,
+                    calibrated_score: 0.0,
+                    gate_factor: 1.0,
+                    gate_version: "test".into(),
+                    platt_a: 0.0,
+                    platt_b: 0.0,
+                    observer_adjusted: false,
                 },
                 cusum_triggered: false,
                 cusum_dimensions: vec![],
                 progressive_fused: 0.0,
                 observer_trigger_reason: String::new(),
-                deberta_score: 0.0,
+                score_model_version: "test".into(),
             },
             timeline: BehaviorTimeline {
                 steps: Vec::new(),
@@ -797,4 +538,106 @@ mod tests {
     }
 }
 
-impl ReplayExecutor {}
+#[cfg(test)]
+mod delegation_mapping_tests {
+    use super::*;
+    use crate::responsibility::judgment::delegation::DelegationObservation;
+    use crate::responsibility::types::identity_types::AgentConfidence;
+
+    fn identity(auth: &str, provisional: &[&str]) -> AuthoritativeIdentity {
+        AuthoritativeIdentity {
+            agent_id: AgentId::from(auth),
+            process_ids: vec![],
+            message_ids: vec![],
+            tls_sessions: vec![],
+            confidence: AgentConfidence::Authoritative,
+            provisional_refs: provisional.iter().map(|p| AgentId::from(*p)).collect(),
+        }
+    }
+
+    fn delegation(from: &str, to: &str) -> DelegationObservation {
+        DelegationObservation {
+            delegation_id: format!("d:{from}->{to}"),
+            from_agent_id: from.to_string(),
+            to_agent_id: to.to_string(),
+            parent_pid: 1,
+            parent_start_time_ns: 1,
+            child_pid: 2,
+            child_start_time_ns: 2,
+            timestamp_ns: 3,
+            child_comm: String::new(),
+            confidence: 0.85,
+        }
+    }
+
+    #[test]
+    fn maps_provisional_delegation_ids_to_authoritative_ids() {
+        let identities = vec![
+            identity("agent-a", &["prov-a"]),
+            identity("agent-b", &["prov-b"]),
+        ];
+        let mut delegations = vec![delegation("prov-a", "prov-b")];
+        assert_eq!(
+            map_delegations_to_authoritative(&mut delegations, &identities),
+            1
+        );
+        assert_eq!(delegations[0].from_agent_id, "agent-a");
+        assert_eq!(delegations[0].to_agent_id, "agent-b");
+    }
+
+    #[test]
+    fn unmapped_delegations_are_left_unchanged_and_not_counted() {
+        let identities = vec![identity("agent-a", &["prov-a"])];
+        let mut delegations = vec![delegation("prov-a", "prov-unknown")];
+        assert_eq!(
+            map_delegations_to_authoritative(&mut delegations, &identities),
+            0
+        );
+        assert_eq!(delegations[0].from_agent_id, "agent-a");
+        assert_eq!(delegations[0].to_agent_id, "prov-unknown");
+    }
+}
+
+/// Rewrite persisted (Phase-1 provisional) delegation agent IDs to the
+/// authoritative IDs the replay graph uses.
+///
+/// The live run records delegations with provisional UUIDs; replay rebuilds
+/// the graph from authoritative `agent-<sha>` identities. Comparing the two
+/// ID spaces directly would authorize nothing and mint false
+/// `TaintedContextUse` claims. Returns the number of records whose *both*
+/// endpoints were mapped.
+#[cfg(test)]
+fn map_delegations_to_authoritative(
+    delegations: &mut [crate::responsibility::judgment::delegation::DelegationObservation],
+    authoritative: &[AuthoritativeIdentity],
+) -> usize {
+    use std::collections::HashMap;
+
+    let mut mapping: HashMap<&str, &str> = HashMap::new();
+    for identity in authoritative {
+        for provisional in &identity.provisional_refs {
+            mapping.insert(provisional.as_str(), identity.agent_id.as_str());
+        }
+    }
+
+    let mut fully_mapped = 0;
+    for delegation in delegations.iter_mut() {
+        let from = mapping
+            .get(delegation.from_agent_id.as_str())
+            .map(|id| (*id).to_string());
+        let to = mapping
+            .get(delegation.to_agent_id.as_str())
+            .map(|id| (*id).to_string());
+        let both_mapped = from.is_some() && to.is_some();
+        if let Some(id) = from {
+            delegation.from_agent_id = id;
+        }
+        if let Some(id) = to {
+            delegation.to_agent_id = id;
+        }
+        if both_mapped {
+            fully_mapped += 1;
+        }
+    }
+    fully_mapped
+}

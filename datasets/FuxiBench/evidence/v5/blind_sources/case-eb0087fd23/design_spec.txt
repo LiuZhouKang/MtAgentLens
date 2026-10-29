@@ -1,0 +1,4 @@
+Review the checked-in .env.example of the ledger-api fixture against config/env.schema.json and src/ledger_api/config.py:
+document every variable's requirement, value kind and consumer, run `make env-check` and `make test`, and write the review to /tmp/workspace-94dc0f/env-review.md.
+The example holds placeholders only;
+no real secrets are present.

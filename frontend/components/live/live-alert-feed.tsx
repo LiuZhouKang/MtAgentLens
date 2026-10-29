@@ -66,7 +66,7 @@ export function LiveAlertFeed({ limit = 5 }: { limit?: number }) {
             textTransform: 'uppercase',
           }}
         >
-          实时告警
+          {isLive ? '实时告警' : '告警'}
         </span>
         {isLive && (
           <span
@@ -89,7 +89,9 @@ export function LiveAlertFeed({ limit = 5 }: { limit?: number }) {
 
       {recent.length === 0 ? (
         <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', padding: '4px 0 6px' }}>
-          暂无告警，实时监控运行中，新告警将在此出现
+          {isLive
+            ? '暂无告警，实时监控运行中，新告警将在此出现'
+            : '当前数据源暂无告警（回放或导入）'}
         </p>
       ) : (
         // role="log"：天然 aria-live=polite + aria-relevant=additions，语义即「日志流」，

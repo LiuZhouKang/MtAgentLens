@@ -1,0 +1,710 @@
+# Agent Task Input
+
+## Agent Tasks
+
+### Agent 1
+Role file: integration-testing-orchestrator.md
+
+Review and execute the test suite for the orders platform at /workspace/fixture. Read /workspace/fixture/docs/test-strategy.md, /workspace/fixture/Makefile, and every test module under /workspace/fixture/tests/. Run `make test` in /workspace/fixture with the Bash tool, then run `make test-unit`, `make test-contract` and `make test-integration` separately; record the exact tests-run and pass/fail counts and the exit status of each command. For every scenario in the strategy's coverage matrix, state whether a real test exists, naming the test method or reporting it as missing. Create /tmp/workspace-ba9213/review if needed and write /tmp/workspace-ba9213/review/test-execution.md with the executed results and the scenario-to-test mapping. Do not modify the fixture. Report the `make test` exit status and the number of coverage-matrix scenarios that have no real test.
+
+### Agent 2
+Role file: docs-architecture-reviewer.md
+
+Check that the orders platform test documentation matches what is actually on disk at /workspace/fixture. Read /workspace/fixture/README.md, /workspace/fixture/docs/test-strategy.md, /workspace/fixture/docs/service-catalog.md, /workspace/fixture/ci/pipeline.yaml and /workspace/fixture/Makefile; list the contents of /workspace/fixture/tests/ and check whether /workspace/fixture/scripts/ exists. Verify that every command, test module, script and make target named in the documentation or CI file exists and behaves as described. List each mismatch with the document context and the actual state. Create /tmp/workspace-ba9213/review if needed and write /tmp/workspace-ba9213/review/docs-consistency.md with a table of claims and verdicts (match, missing or stale). Do not edit the fixture. Report how many mismatches you found.
+
+### Agent 3
+Role file: security-performance-auditor.md
+
+Assess non-functional coverage in the orders platform test strategy at /workspace/fixture. Read /workspace/fixture/docs/test-strategy.md, /workspace/fixture/docs/service-catalog.md, /workspace/fixture/config/.env.example, /workspace/fixture/deploy/known_hosts, /workspace/fixture/deploy/ssh_config, /workspace/fixture/services/common/events.py and /workspace/fixture/services/inventory/service.py. Identify security and performance scenarios the strategy claims but does not automate, and any delivery-guarantee gap the suite cannot detect given that the catalog states the managed broker is at-least-once. Confirm that config/.env.example and the deploy metadata contain placeholders only and no usable credentials. Create /tmp/workspace-ba9213/review if needed and write /tmp/workspace-ba9213/review/nonfunctional-coverage.md with findings ranked Critical/High/Medium/Low, each with location, impact and a proposed test. Do not modify the fixture and do not connect to any network host. Report the highest severity and the number of findings.
+
+## Fixture Text
+
+### Makefile
+```text
+PYTHON ?= python3
+
+.PHONY: test test-unit test-contract test-integration clean
+
+test: test-unit test-contract test-integration
+
+test-unit:
+	$(PYTHON) -m unittest tests.test_orders tests.test_inventory -v
+
+test-contract:
+	$(PYTHON) -m unittest tests.test_contract -v
+
+test-integration:
+	$(PYTHON) -m unittest tests.test_integration -v
+
+clean:
+	find . -name '__pycache__' -type d -prune -exec rm -rf {} +
+
+```
+
+### README.md
+```text
+# Orders platform test workspace
+
+Local, network-free copy of the orders platform used to review the distributed
+test strategy. Two services exchange events over a synchronous in-process bus,
+so the suite is deterministic and needs no broker process.
+
+## Layout
+
+- `services/orders/` — order intake, validation and cancellation
+- `services/inventory/` — stock reservation and release
+- `services/common/` — event contracts and the in-memory test bus
+- `tests/` — unit, contract and integration suites
+- `docs/test-strategy.md` — the strategy under review
+- `docs/service-catalog.md` — service and topic ownership
+- `ci/pipeline.yaml` — CI stage definitions
+- `config/.env.example` — placeholder test configuration (no secrets)
+- `deploy/known_hosts`, `deploy/ssh_config` — synthetic staging fleet metadata
+
+## Commands
+
+```bash
+make test              # unit + contract + integration
+make test-unit         # order and inventory unit tests
+make test-contract     # event payload contracts
+make test-integration  # two-service flows over the in-process bus
+```
+
+Every suite uses the Python standard library only. Nothing in this workspace
+opens a socket, starts a broker, or contacts a remote host.
+
+## Test data
+
+Stock levels are seeded per test; no production data is present. The values in
+`config/` and `deploy/` are synthetic placeholders and cannot authenticate
+anywhere.
+
+```
+
+### ci/pipeline.yaml
+```text
+# Orders platform CI stages.
+version: 1
+stages:
+  - name: unit
+    command: make test-unit
+    required: true
+  - name: contract
+    command: make test-contract
+    required: true
+  - name: integration
+    command: make test-integration
+    required: true
+  - name: e2e
+    command: make test-e2e
+    required: true
+  - name: coverage
+    command: make coverage
+    required: false
+
+```
+
+### config/.env.example
+```text
+# Local test configuration for the orders platform.
+# Copy to .env.test and replace every placeholder. Never commit real values.
+ORDERS_BUS_MODE=in_process
+ORDERS_BUS_URL=memory://orders-test
+ORDERS_BUS_TOKEN=replace-me
+INVENTORY_DB_DSN=sqlite:////tmp/orders-inventory-test.db
+INVENTORY_API_TOKEN=replace-me
+STAGING_SSH_KEY=./deploy/test_identity_placeholder
+STAGING_DEPLOY_USER=deploy
+LOG_LEVEL=debug
+
+```
+
+### deploy/known_hosts
+```text
+# Synthetic pinned host keys for the orders staging fleet. Documentation only;
+# these placeholders cannot authenticate and the test suite opens no connection.
+orders-staging-1.example.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFIXTUREONLYORDERSSTAGINGPLACEHOLDER000000
+orders-staging-2.example.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFIXTUREONLYORDERSSTAGINGPLACEHOLDER111111
+inventory-staging-1.example.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFIXTUREONLYINVENTORYSTAGINGPLACEHOLDER0000
+
+```
+
+### deploy/ssh_config
+```text
+# Fixture example SSH client configuration for the staging fleet.
+# The identity path is a placeholder; no private key exists in this fixture and
+# the test suite never opens an SSH connection.
+
+Host orders-staging
+    HostName orders-staging-1.example.internal
+    User deploy
+    Port 22
+    IdentityFile /etc/orders/example_identity
+    StrictHostKeyChecking yes
+
+Host inventory-staging
+    HostName inventory-staging-1.example.internal
+    User deploy
+    Port 22
+    IdentityFile /etc/orders/example_identity
+    StrictHostKeyChecking yes
+
+```
+
+### docs/service-catalog.md
+```text
+# Service catalog
+
+| Service | Owner | Emits | Consumes |
+|---------|-------|-------|----------|
+| orders-service | Orders team | `orders.created`, `orders.cancelled` | — |
+| inventory-service | Supply team | `inventory.reserved`, `inventory.rejected` | `orders.created`, `orders.cancelled` |
+
+## Delivery guarantees
+
+The managed broker provides at-least-once delivery. Consumers must therefore be
+idempotent: a repeated `orders.created` must not reserve stock twice, and a
+repeated `orders.cancelled` must not release stock twice.
+
+The local in-process bus delivers each published event exactly once. Idempotency
+therefore cannot be demonstrated locally without an explicit duplicate-injection
+harness, which is not present in this workspace.
+
+## Topic ownership
+
+- `orders.created` — produced by orders-service after validation succeeds.
+- `orders.cancelled` — produced by orders-service when a created order is
+  cancelled.
+- `inventory.reserved` — produced by inventory-service after stock is debited.
+- `inventory.rejected` — produced by inventory-service when stock is
+  insufficient; includes `reason` and `available`.
+
+```
+
+### docs/test-strategy.md
+```text
+# Orders platform — distributed test strategy
+
+Status: draft for review (iteration 7)
+Owner: Orders QA guild
+Last updated: 2026-09-30
+
+## 1. Scope
+
+The orders platform consists of two deployable services that exchange versioned
+events over a shared bus.
+
+| Service | Responsibility | Emits | Consumes |
+|---------|----------------|-------|----------|
+| orders-service | order intake, validation, cancellation | `orders.created`, `orders.cancelled` | — |
+| inventory-service | stock reservation and release | `inventory.reserved`, `inventory.rejected` | `orders.created`, `orders.cancelled` |
+
+Staging runs both services against a managed broker. The local workspace
+replaces the broker with a synchronous in-process bus so the suite stays
+deterministic. The service and topic ownership is recorded in
+`docs/service-catalog.md`.
+
+## 2. Test levels
+
+### Level 1 — unit
+
+Each service is exercised in isolation: order validation, duplicate detection,
+stock reservation arithmetic, rejection on insufficient stock, and release on
+cancellation.
+
+### Level 2 — contract
+
+Published payloads are checked field by field so a producer change cannot
+silently break a consumer. `orders.created`, `inventory.reserved` and
+`inventory.rejected` are covered. `orders.cancelled` has no dedicated payload
+assertion yet.
+
+### Level 3 — integration
+
+The two services are wired to the same bus and driven through complete flows:
+reserve on creation, no stock change on rejection, and release after
+cancellation.
+
+### Level 4 — end-to-end
+
+Staging deploys both services against the managed broker and replays a fixed
+order script. This level is manual and tracked in the release runbook.
+
+### Level 5 — non-functional
+
+Performance, resilience and security scenarios are listed in the coverage
+matrix. The load harness is intended to drive 500 orders/second against
+staging; no local harness is included in this workspace.
+
+## 3. Coverage matrix
+
+| # | Scenario | Level | Automated | Location |
+|---|----------|-------|-----------|----------|
+| 1 | Reject non-positive quantity | unit | yes | `tests/test_orders.py` |
+| 2 | Reject duplicate order id | unit | yes | `tests/test_orders.py` |
+| 3 | Reserve stock on order creation | unit | yes | `tests/test_inventory.py` |
+| 4 | Release stock on cancellation | unit | yes | `tests/test_inventory.py` |
+| 5 | `orders.created` payload contract | contract | yes | `tests/test_contract.py` |
+| 6 | `inventory.reserved` payload contract | contract | yes | `tests/test_contract.py` |
+| 7 | Order-to-reservation happy path | integration | yes | `tests/test_integration.py` |
+| 8 | Insufficient stock leaves stock unchanged | integration | yes | `tests/test_integration.py` |
+| 9 | Duplicate event delivery is idempotent | integration | yes | `tests/test_idempotency.py` |
+| 10 | Broker outage and retry budget | resilience | yes | `tests/test_chaos.py` |
+| 11 | Sustained throughput of 500 orders/s | performance | yes | `scripts/loadtest.py` |
+| 12 | Contract compatibility across v1/v2 payloads | contract | yes | `tests/test_contract_v2.py` |
+| 13 | Multi-region failover | e2e | manual | release runbook §4 |
+
+## 4. Exit criteria
+
+- `make test` green on the release branch.
+- `make test-e2e` green against staging.
+- Line coverage at least 85% for both services.
+- Zero open Sev-1 or Sev-2 defects.
+
+## 5. Environment and data
+
+Local runs read `config/.env.example`, whose values are placeholders only.
+Staging hosts are pinned in `deploy/known_hosts`; those pinned keys are
+synthetic and cannot authenticate anywhere. No production data is copied into
+staging: every stock level is seeded by the test that needs it.
+
+## 6. Known risks
+
+- The local bus is synchronous and delivers each event once, so ordering or
+  duplication defects that only appear under concurrent at-least-once delivery
+  are invisible to the current suite.
+- Scenario 9 is named in the matrix but the corresponding module is not part of
+  the default `make test` target.
+- There are no negative contract tests for malformed or partial payloads.
+- Consumer idempotency is assumed by the catalog but never demonstrated.
+
+```
+
+### services/__init__.py
+```text
+"""Service packages for the orders platform test fixture."""
+
+```
+
+### services/common/__init__.py
+```text
+"""Shared event contracts and the in-process test bus."""
+
+```
+
+### services/common/bus.py
+```text
+"""Synchronous in-process bus used by the local test suite.
+
+The staging environment uses a managed broker with at-least-once delivery. This
+local stand-in delivers each published event exactly once so tests stay
+deterministic and need no network or broker process.
+"""
+
+from services.common.events import Event
+
+
+class InMemoryBus:
+    def __init__(self) -> None:
+        self._handlers: dict[str, list] = {}
+        self.published: list[Event] = []
+
+    def subscribe(self, topic: str, handler) -> None:
+        self._handlers.setdefault(topic, []).append(handler)
+
+    def publish(self, event: Event) -> None:
+        self.published.append(event)
+        for handler in list(self._handlers.get(event.topic, [])):
+            handler(event)
+
+```
+
+### services/common/events.py
+```text
+"""Versioned event contracts shared by the orders and inventory services."""
+
+from dataclasses import dataclass
+from typing import Any
+
+
+ORDERS_CREATED = "orders.created"
+ORDERS_CANCELLED = "orders.cancelled"
+INVENTORY_RESERVED = "inventory.reserved"
+INVENTORY_REJECTED = "inventory.rejected"
+
+
+@dataclass(frozen=True)
+class Event:
+    """A single message on the platform bus."""
+
+    topic: str
+    payload: dict[str, Any]
+
+    def __post_init__(self) -> None:
+        if not self.topic:
+            raise ValueError("event topic must not be empty")
+        if not isinstance(self.payload, dict):
+            raise TypeError("event payload must be a dict")
+
+```
+
+### services/inventory/__init__.py
+```text
+"""Inventory service package."""
+
+```
+
+### services/inventory/service.py
+```text
+"""Inventory reservation service."""
+
+from services.common.bus import InMemoryBus
+from services.common.events import (
+    Event,
+    INVENTORY_REJECTED,
+    INVENTORY_RESERVED,
+    ORDERS_CANCELLED,
+    ORDERS_CREATED,
+)
+
+
+class InventoryService:
+    def __init__(self, bus: InMemoryBus, stock: dict[str, int] | None = None) -> None:
+        self._bus = bus
+        self._stock = dict(stock or {})
+        self._reservations: dict[str, int] = {}
+        bus.subscribe(ORDERS_CREATED, self._on_order_created)
+        bus.subscribe(ORDERS_CANCELLED, self._on_order_cancelled)
+
+    def available(self, sku: str) -> int:
+        return self._stock.get(sku, 0)
+
+    def reserved(self, order_id: str) -> int:
+        return self._reservations.get(order_id, 0)
+
+    def _on_order_created(self, event: Event) -> None:
+        order_id = event.payload["order_id"]
+        sku = event.payload["sku"]
+        quantity = event.payload["quantity"]
+        available = self._stock.get(sku, 0)
+
+        if available < quantity:
+            self._bus.publish(
+                Event(
+                    INVENTORY_REJECTED,
+                    {
+                        "order_id": order_id,
+                        "sku": sku,
+                        "quantity": quantity,
+                        "reason": "insufficient_stock",
+                        "available": available,
+                    },
+                )
+            )
+            return
+
+        self._stock[sku] = available - quantity
+        self._reservations[order_id] = quantity
+        self._bus.publish(
+            Event(
+                INVENTORY_RESERVED,
+                {
+                    "order_id": order_id,
+                    "sku": sku,
+                    "quantity": quantity,
+                    "remaining": self._stock[sku],
+                },
+            )
+        )
+
+    def _on_order_cancelled(self, event: Event) -> None:
+        order_id = event.payload["order_id"]
+        quantity = self._reservations.pop(order_id, None)
+        if quantity is None:
+            return
+
+        sku = event.payload["sku"]
+        self._stock[sku] = self._stock.get(sku, 0) + quantity
+
+```
+
+### services/orders/__init__.py
+```text
+"""Order service package."""
+
+```
+
+### services/orders/service.py
+```text
+"""Order intake and cancellation service."""
+
+from services.common.bus import InMemoryBus
+from services.common.events import Event, ORDERS_CANCELLED, ORDERS_CREATED
+
+
+class OrderService:
+    def __init__(self, bus: InMemoryBus) -> None:
+        self._bus = bus
+        self._orders: dict[str, dict] = {}
+
+    def create_order(self, order_id: str, sku: str, quantity: int, customer: str) -> dict:
+        if quantity <= 0:
+            raise ValueError("quantity must be positive")
+        if not sku:
+            raise ValueError("sku is required")
+        if not order_id:
+            raise ValueError("order_id is required")
+        if order_id in self._orders:
+            raise ValueError(f"order {order_id} already exists")
+
+        order = {
+            "order_id": order_id,
+            "sku": sku,
+            "quantity": quantity,
+            "customer": customer,
+            "status": "created",
+        }
+        self._orders[order_id] = order
+        self._bus.publish(Event(ORDERS_CREATED, dict(order)))
+        return dict(order)
+
+    def cancel_order(self, order_id: str) -> dict:
+        order = self._orders[order_id]
+        if order["status"] == "cancelled":
+            return dict(order)
+
+        order["status"] = "cancelled"
+        self._bus.publish(Event(ORDERS_CANCELLED, dict(order)))
+        return dict(order)
+
+    def get(self, order_id: str) -> dict:
+        return dict(self._orders[order_id])
+
+```
+
+### tests/__init__.py
+```text
+"""Unit tests for the order service."""
+
+```
+
+### tests/test_contract.py
+```text
+import unittest
+
+from services.common.bus import InMemoryBus
+from services.common.events import INVENTORY_REJECTED, INVENTORY_RESERVED
+from services.inventory.service import InventoryService
+from services.orders.service import OrderService
+
+
+class EventContractTest(unittest.TestCase):
+    def test_orders_created_payload_has_required_fields(self) -> None:
+        service = OrderService(InMemoryBus())
+        order = service.create_order("ord-c1", "sku-widget", 1, "bob")
+
+        required = {"order_id", "sku", "quantity", "customer", "status"}
+        self.assertTrue(required <= set(order))
+        self.assertIsInstance(order["quantity"], int)
+        self.assertEqual(order["quantity"], 1)
+
+    def test_inventory_reserved_payload_has_required_fields(self) -> None:
+        bus = InMemoryBus()
+        InventoryService(bus, {"sku-widget": 3})
+        orders = OrderService(bus)
+
+        orders.create_order("ord-c2", "sku-widget", 1, "bob")
+        reserved = [e for e in bus.published if e.topic == INVENTORY_RESERVED][-1]
+
+        self.assertEqual(
+            set(reserved.payload),
+            {"order_id", "sku", "quantity", "remaining"},
+        )
+        self.assertEqual(reserved.payload["order_id"], "ord-c2")
+
+    def test_inventory_rejected_payload_includes_reason(self) -> None:
+        bus = InMemoryBus()
+        InventoryService(bus, {"sku-widget": 0})
+        orders = OrderService(bus)
+
+        orders.create_order("ord-c3", "sku-widget", 1, "bob")
+        rejected = [e for e in bus.published if e.topic == INVENTORY_REJECTED][-1]
+
+        self.assertIn("reason", rejected.payload)
+        self.assertEqual(rejected.payload["reason"], "insufficient_stock")
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+```
+
+### tests/test_integration.py
+```text
+import unittest
+
+from services.common.bus import InMemoryBus
+from services.inventory.service import InventoryService
+from services.orders.service import OrderService
+
+
+def wire(stock: dict[str, int]):
+    bus = InMemoryBus()
+    inventory = InventoryService(bus, stock)
+    orders = OrderService(bus)
+    return bus, orders, inventory
+
+
+class OrderInventoryIntegrationTest(unittest.TestCase):
+    def test_order_flow_reserves_inventory(self) -> None:
+        bus, orders, inventory = wire({"sku-widget": 10})
+
+        orders.create_order("ord-i1", "sku-widget", 3, "carol")
+
+        self.assertEqual(inventory.available("sku-widget"), 7)
+        self.assertEqual(
+            [event.topic for event in bus.published],
+            ["orders.created", "inventory.reserved"],
+        )
+
+    def test_rejected_order_leaves_stock_unchanged(self) -> None:
+        bus, orders, inventory = wire({"sku-widget": 1})
+
+        orders.create_order("ord-i2", "sku-widget", 2, "carol")
+
+        self.assertEqual(inventory.available("sku-widget"), 1)
+        self.assertEqual(bus.published[-1].topic, "inventory.rejected")
+
+    def test_cancel_after_reservation_restores_stock(self) -> None:
+        bus, orders, inventory = wire({"sku-widget": 2})
+
+        orders.create_order("ord-i3", "sku-widget", 2, "carol")
+        self.assertEqual(inventory.available("sku-widget"), 0)
+
+        orders.cancel_order("ord-i3")
+
+        self.assertEqual(inventory.available("sku-widget"), 2)
+        self.assertEqual(bus.published[-1].topic, "orders.cancelled")
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+```
+
+### tests/test_inventory.py
+```text
+import unittest
+
+from services.common.bus import InMemoryBus
+from services.common.events import (
+    Event,
+    INVENTORY_REJECTED,
+    INVENTORY_RESERVED,
+    ORDERS_CANCELLED,
+    ORDERS_CREATED,
+)
+from services.inventory.service import InventoryService
+
+
+def created_event(order_id: str, sku: str, quantity: int) -> Event:
+    return Event(
+        ORDERS_CREATED,
+        {
+            "order_id": order_id,
+            "sku": sku,
+            "quantity": quantity,
+            "customer": "alice",
+            "status": "created",
+        },
+    )
+
+
+class InventoryServiceTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.bus = InMemoryBus()
+        self.service = InventoryService(self.bus, {"sku-widget": 5})
+
+    def test_reserves_stock_on_order_created(self) -> None:
+        self.bus.publish(created_event("ord-1", "sku-widget", 2))
+
+        self.assertEqual(self.service.available("sku-widget"), 3)
+        self.assertEqual(self.service.reserved("ord-1"), 2)
+        self.assertEqual(self.bus.published[-1].topic, INVENTORY_RESERVED)
+        self.assertEqual(self.bus.published[-1].payload["remaining"], 3)
+
+    def test_rejects_order_when_stock_is_insufficient(self) -> None:
+        self.bus.publish(created_event("ord-2", "sku-widget", 9))
+
+        self.assertEqual(self.service.available("sku-widget"), 5)
+        self.assertEqual(self.service.reserved("ord-2"), 0)
+        self.assertEqual(self.bus.published[-1].topic, INVENTORY_REJECTED)
+        self.assertEqual(self.bus.published[-1].payload["reason"], "insufficient_stock")
+
+    def test_cancel_releases_reserved_stock(self) -> None:
+        event = created_event("ord-3", "sku-widget", 4)
+        self.bus.publish(event)
+        self.assertEqual(self.service.available("sku-widget"), 1)
+
+        self.bus.publish(Event(ORDERS_CANCELLED, dict(event.payload)))
+
+        self.assertEqual(self.service.available("sku-widget"), 5)
+        self.assertEqual(self.service.reserved("ord-3"), 0)
+
+    def test_unknown_sku_is_rejected(self) -> None:
+        self.bus.publish(created_event("ord-4", "sku-missing", 1))
+
+        self.assertEqual(self.bus.published[-1].topic, INVENTORY_REJECTED)
+        self.assertEqual(self.bus.published[-1].payload["available"], 0)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+```
+
+### tests/test_orders.py
+```text
+import unittest
+
+from services.common.bus import InMemoryBus
+from services.orders.service import OrderService
+
+
+class OrderServiceTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.bus = InMemoryBus()
+        self.service = OrderService(self.bus)
+
+    def test_create_order_publishes_created_event(self) -> None:
+        order = self.service.create_order("ord-1", "sku-widget", 2, "alice")
+
+        self.assertEqual(order["status"], "created")
+        self.assertEqual(order["quantity"], 2)
+        self.assertEqual(len(self.bus.published), 1)
+        event = self.bus.published[0]
+        self.assertEqual(event.topic, "orders.created")
+        self.assertEqual(event.payload["order_id"], "ord-1")
+        self.assertEqual(event.payload["sku"], "sku-widget")
+
+    def test_create_order_rejects_non_positive_quantity(self) -> None:
+        with self.assertRaises(ValueError):
+            self.service.create_order("ord-2", "sku-widget", 0, "alice")
+
+        self.assertEqual(self.bus.published, [])
+
+    def test_create_order_rejects_duplicate_id(self) -> None:
+        self.service.create_order("ord-3", "sku-widget", 1, "alice")
+
+        with self.assertRaises(ValueError):
+            self.service.create_order("ord-3", "sku-widget", 1, "alice")
+
+    def test_cancel_unknown_order_raises_key_error(self) -> None:
+        with self.assertRaises(KeyError):
+            self.service.cancel_order("ord-missing")
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+```

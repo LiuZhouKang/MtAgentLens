@@ -2,7 +2,7 @@
 """Generate minimal fixture files for all 28 fixture-dependent scenarios."""
 import json, os, re
 
-FROZEN_DIR = "/home/lzk/MtAgentLens/compare/Dataset/FuxiBench"
+FROZEN_DIR = "/home/lzk/MtAgentLens/datasets/FuxiBench"
 ENV_DIR = "/home/lzk/MtAgentLens/env"
 FIXTURES_DIR = os.path.join(ENV_DIR, "scenarios", "fixtures")
 

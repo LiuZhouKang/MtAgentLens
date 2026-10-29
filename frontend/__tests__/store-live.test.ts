@@ -3,7 +3,13 @@ import { DEFAULT_LIVE_STATE } from '@/lib/live/live-types';
 
 // 阻止 store 模块加载时 initData 触发真实网络请求
 vi.mock('@/lib/api', () => ({
-  api: { getRuns: vi.fn().mockResolvedValue([]) },
+  api: {
+    getRuns: vi.fn().mockResolvedValue([]),
+    getActiveRun: vi.fn().mockResolvedValue(null),
+    getRunDb: vi.fn().mockRejectedValue(new Error('no db')),
+    getGraph: vi.fn().mockRejectedValue(new Error('no graph')),
+    getAlerts: vi.fn().mockRejectedValue(new Error('no alerts')),
+  },
 }));
 
 type StoreModule = typeof import('@/lib/store');
@@ -20,6 +26,20 @@ describe('AppStore live 切片', () => {
       appState: 'replay',
       live: DEFAULT_LIVE_STATE,
     });
+  });
+
+  it('starting another live run clears evidence from the previous source', () => {
+    useAppStore.setState({
+      activeRunId: 'archive',
+      alerts: [{ alert_id: 'archive-alert' }] as never,
+    });
+    useAppStore
+      .getState()
+      .setLiveRun({ runId: 'new-live', startedAtNs: 1, endedAtNs: null, isActive: true });
+    useAppStore.getState().onRunActiveChanged(true);
+    expect(useAppStore.getState().activeRunId).toBe('new-live');
+    expect(useAppStore.getState().alerts).toEqual([]);
+    expect(useAppStore.getState().dataSource).toEqual({ kind: 'run', runId: 'new-live' });
   });
 
   it('live 切片默认态：idle 离线', () => {
@@ -76,6 +96,29 @@ describe('AppStore live 切片', () => {
     expect(useAppStore.getState().appState).toBe('replay');
   });
 
+  it('loadRun 重载当前直播 run 不把 appState 打回 replay', async () => {
+    useAppStore.getState().onRunActiveChanged(true);
+    useAppStore
+      .getState()
+      .setLiveRun({ runId: 'live', startedAtNs: null, endedAtNs: null, isActive: true });
+
+    const loading = useAppStore.getState().loadRun('live');
+    // 初始 set 同步执行：live 必须保留（LIVE-04 竞态）
+    expect(useAppStore.getState().appState).toBe('live');
+    await loading.catch(() => undefined);
+  });
+
+  it('loadRun 加载其他 run 仍转 replay', async () => {
+    useAppStore.getState().onRunActiveChanged(true);
+    useAppStore
+      .getState()
+      .setLiveRun({ runId: 'live', startedAtNs: null, endedAtNs: null, isActive: true });
+
+    const loading = useAppStore.getState().loadRun('archive-run');
+    expect(useAppStore.getState().appState).toBe('replay');
+    await loading.catch(() => undefined);
+  });
+
   it('setLiveSnapshotFrames 封顶 200 帧（防无界内存）', () => {
     const metrics = {
       node_counts: {},
@@ -118,6 +161,35 @@ describe('AppStore live 切片', () => {
     const f2 = { snapshot_id: 's2', timestamp_ns: 2, nodes: [], edges: [], metrics };
     useAppStore.getState().setLiveSnapshotFrames([f1, f2]);
     expect(useAppStore.getState().snapshotFrameIndex).toBe(1);
+  });
+
+  it('advances a full live timeline and replaces refreshed frames in timestamp order', () => {
+    const metrics = {
+      node_counts: {},
+      edge_counts: {},
+      agent_count: 0,
+      cross_agent_edges: 0,
+      delegation_depth: 0,
+      taint_chains: 0,
+      avg_confidence: 0,
+    };
+    const frame = (i: number) => ({
+      snapshot_id: `s${i}`,
+      timestamp_ns: i,
+      nodes: [],
+      edges: [],
+      metrics,
+    });
+    useAppStore.getState().setLiveSnapshotFrames(Array.from({ length: 200 }, (_, i) => frame(i)));
+    useAppStore.setState({ snapshotFrameIndex: 3 });
+    useAppStore.getState().setLiveSnapshotFrames([frame(201), frame(200)]);
+    expect(useAppStore.getState().snapshotFrameIndex).toBe(199);
+    expect(useAppStore.getState().liveSnapshotFrames.at(-1)?.snapshot_id).toBe('s201');
+    const updated = { ...frame(201), metrics: { ...metrics, agent_count: 7 } };
+    useAppStore.setState({ snapshotFrameIndex: 4 });
+    useAppStore.getState().setLiveSnapshotFrames([updated]);
+    expect(useAppStore.getState().liveSnapshotFrames.at(-1)?.metrics.agent_count).toBe(7);
+    expect(useAppStore.getState().snapshotFrameIndex).toBe(4);
   });
 
   it('同帧多告警按时间降序前插（最新置顶）', () => {

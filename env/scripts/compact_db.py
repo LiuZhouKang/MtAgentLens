@@ -11,6 +11,7 @@ view that cannot be recreated fails the run instead of vanishing.
 import sqlite3, sys, os
 
 ESSENTIAL_TABLES = {
+    'analysis_checkpoints',
     'responsibility_alerts',
     'responsibility_claims',
     'responsibility_tracebacks',

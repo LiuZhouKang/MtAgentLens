@@ -2,7 +2,7 @@
 # 用法:
 #   make check          检查构建环境是否就绪（推荐第一步）
 #   make build          全量构建 (BPF → 前端 → Rust)
-#   make test           运行所有测试
+#   make test           快速测试 (eBPF + Rust + 前端构建；完整门禁: scripts/verify.sh)
 #   make docker         构建 Docker 镜像
 #   make help           显示所有目标
 
@@ -25,6 +25,7 @@ CHECK  := $(GREEN)✓$(NC)
 COLLECTOR_DIR := collector
 BPFTOOLS_DIR  := bpftools
 FRONTEND_DIR  := frontend
+DBS           ?= compare/results/p12-recollect/dbs
 BINARY        := $(COLLECTOR_DIR)/build/release/mtagentlens
 BINARY_DEBUG  := $(COLLECTOR_DIR)/build/debug/mtagentlens
 
@@ -119,8 +120,16 @@ verify: ## 运行唯一门禁（本地/任何自动化都逐字调用）
 # 测试
 # ═══════════════════════════════════════════════════════════════════════════
 
+.PHONY: repro
+repro: ## 一键构建 artifact（子模块→eBPF→前端→Rust→门禁→manifest）
+	@bash scripts/repro.sh
+
+.PHONY: annotate-legacy
+annotate-legacy: ## 启动历史标注工作台（旧 DB 只读核查；新试标用 python3 -m tools.annotator serve）
+	@python3 tools/annotator/server.py --dbs $(DBS)
+
 .PHONY: test
-test: test-bpf test-rust test-frontend-build ## 运行所有测试
+test: test-bpf test-rust test-frontend-build ## 快速测试（完整门禁见 scripts/verify.sh）
 	@printf "\n  $(CHECK) 所有测试通过\n\n"
 
 .PHONY: test-bpf
@@ -131,11 +140,11 @@ test-bpf: ## 运行 eBPF 测试
 .PHONY: test-rust
 test-rust: ## 运行 Rust 单元/集成测试
 	@printf "  $(CYAN)[test]$(NC) Rust collector...\n"
-	@cd $(COLLECTOR_DIR) && cargo test --lib
+	@cd $(COLLECTOR_DIR) && cargo test
 
 .PHONY: test-rust-all
 test-rust-all: ## 运行 Rust 全部测试（含 ignored）
-	@cd $(COLLECTOR_DIR) && cargo test --lib -- --ignored
+	@cd $(COLLECTOR_DIR) && cargo test -- --ignored
 
 .PHONY: test-frontend
 test-frontend: ## 运行前端 vitest 测试
@@ -234,11 +243,13 @@ help: ## 显示此帮助信息
 	@printf "    make dev-frontend      启动前端开发服务器\n"
 	@printf "\n"
 	@printf "  ${CYAN}测试与质量:${NC}\n"
-	@printf "    make test              所有测试\n"
+	@printf "    make test              快速测试（完整门禁: scripts/verify.sh）\n"
 	@printf "    make test-bpf          eBPF 测试\n"
 	@printf "    make test-rust         Rust 测试\n"
 	@printf "    make test-rust-all     Rust 测试（含 ignored）\n"
 	@printf "    make test-frontend     前端 vitest\n"
+	@printf "    make annotate-legacy   历史标注工作台（只读核查旧记录）\n"
+	@printf "    make repro             一键构建 artifact + manifest\n"
 	@printf "    make lint              代码质量检查\n"
 	@printf "    make fmt               格式化代码\n"
 	@printf "\n"

@@ -23,7 +23,7 @@
 //   4. Multi-action intents (Bash/Write): allowed to match multiple actions
 //      via (intent_id, action_id) deduplication.
 
-use crate::responsibility::evidence::argument_matcher::match_args;
+use crate::responsibility::evidence::argument_matcher::{ArgMatch, match_args_detailed};
 use crate::responsibility::evidence::buffer::{ActionBuffer, IntentBuffer};
 use crate::responsibility::evidence::confidence::compute_confidence;
 use crate::responsibility::evidence::non_link_diagnostic;
@@ -32,8 +32,9 @@ use crate::responsibility::signals::SignalSnapshot;
 #[cfg(test)]
 use crate::responsibility::signals::signal_snapshot::ProcessExecInfo;
 use crate::responsibility::types::{
-    Action, CandidateDerivationMode, CorrelationEvidence, EvidenceId, EvidenceRefinement,
-    EvidenceRefinementType, Intent, IntentId, MatchLevel, NonLinkDiagnostic, PhaseIndicator,
+    Action, ActionId, CandidateDerivationMode, CorrelationEvidence, EvidenceId, EvidenceRefinement,
+    EvidenceRefinementType, Intent, IntentId, MatchLevel, NonLinkDiagnostic, NormalizedArg,
+    NormalizedArgs, PhaseIndicator,
 };
 use std::collections::HashSet;
 
@@ -47,6 +48,106 @@ const L4_MIN_CONFIDENCE: f32 = 0.40;
 /// Weak substring matches are too noisy and dilute the graph signal.
 const L5_MIN_CONFIDENCE: f32 = 0.35;
 
+/// Lineage matches (a descendant process performing the action) are weaker
+/// than argument matches but stronger than an L5 substring: the causal link is
+/// real, only the argument is absent.
+const LINEAGE_MIN_CONFIDENCE: f32 = 0.35;
+
+/// An action performed more than this long after the spawning intent is no
+/// longer attributable to it.
+const LINEAGE_WINDOW_NS: u64 = 60 * 1_000_000_000;
+
+/// Render the winning argument pair as evidence fields.
+///
+/// `matched_fields` used to be a constant empty struct on every correlation,
+/// so an auditor could see that an intent and an action were linked but not
+/// which path, host or command linked them. Populate it from the pair that
+/// actually won [`match_args_detailed`].
+fn matched_fields_from(arg_match: &ArgMatch) -> NormalizedArgs {
+    let mut fields = NormalizedArgs {
+        canonical_path: None,
+        host: None,
+        port: None,
+        command: None,
+        raw_args: Vec::new(),
+    };
+    for arg in [&arg_match.intent_arg, &arg_match.action_arg] {
+        match arg {
+            NormalizedArg::Path(path) => {
+                fields.canonical_path.get_or_insert_with(|| path.clone());
+                fields.raw_args.push(path.clone());
+            }
+            NormalizedArg::Command(command) => {
+                fields.command.get_or_insert_with(|| command.clone());
+                fields.raw_args.push(command.clone());
+            }
+            NormalizedArg::Url { host, port } => {
+                fields.host.get_or_insert_with(|| host.clone());
+                if fields.port.is_none() {
+                    fields.port = *port;
+                }
+            }
+            NormalizedArg::Content(_)
+            | NormalizedArg::OpenFlags(_)
+            | NormalizedArg::PathCaptureIncomplete { .. } => {}
+        }
+    }
+    fields.raw_args.sort();
+    fields.raw_args.dedup();
+    fields
+}
+
+/// Whether the intent starts a program that can perform further actions.
+fn intent_spawns_process(intent: &Intent) -> bool {
+    matches!(
+        intent.tool_name.as_str(),
+        "Bash" | "Shell" | "Exec" | "Terminal" | "Run"
+    ) || intent
+        .tool_args
+        .iter()
+        .any(|arg| matches!(arg, NormalizedArg::Command(_)))
+}
+
+/// Attribute an action to the program an intent started.
+///
+/// A build, install or test command performs its file and network operations
+/// in *child* processes. Those actions share no argument with the typed
+/// command, so argument matching never links them and an exfiltration hidden
+/// in a package hook is invisible to attribution. The process tree already
+/// proves causality: the action ran in a descendant of the process the intent
+/// spawned, after it started, inside a bounded window.
+fn lineage_match(intent: &Intent, action: &Action) -> Option<(MatchLevel, f32)> {
+    if !intent_spawns_process(intent) || action.process_id == intent.process_id {
+        return None;
+    }
+    if action.timestamp_ns < intent.timestamp_ns {
+        return None;
+    }
+    if action.timestamp_ns.saturating_sub(intent.timestamp_ns) > LINEAGE_WINDOW_NS {
+        return None;
+    }
+    Some((MatchLevel::ProcessLineage, 0.45))
+}
+
+/// Fields recorded for a lineage match: the command the agent typed and the
+/// process that actually performed the action.
+fn lineage_fields(intent: &Intent, action: &Action) -> NormalizedArgs {
+    let command = intent.tool_args.iter().find_map(|arg| match arg {
+        NormalizedArg::Command(command) => Some(command.clone()),
+        _ => None,
+    });
+    NormalizedArgs {
+        canonical_path: None,
+        host: None,
+        port: None,
+        command,
+        raw_args: vec![format!(
+            "lineage:pid={}:start={}",
+            action.process_id.pid, action.process_id.start_time_ns
+        )],
+    }
+}
+
 /// Return the minimum confidence required for a given match level.
 fn min_confidence_for_level(level: &MatchLevel) -> f32 {
     match level {
@@ -55,6 +156,7 @@ fn min_confidence_for_level(level: &MatchLevel) -> f32 {
         }
         MatchLevel::L4Basename => L4_MIN_CONFIDENCE,
         MatchLevel::L5Substring => L5_MIN_CONFIDENCE,
+        MatchLevel::ProcessLineage => LINEAGE_MIN_CONFIDENCE,
     }
 }
 
@@ -68,7 +170,9 @@ fn format_matched_string(intent: &Intent, action: &Action) -> String {
             crate::responsibility::types::NormalizedArg::Path(p) => return p.clone(),
             crate::responsibility::types::NormalizedArg::Command(c) => return c.clone(),
             crate::responsibility::types::NormalizedArg::Url { host, .. } => return host.clone(),
-            crate::responsibility::types::NormalizedArg::Content(_) => {}
+            crate::responsibility::types::NormalizedArg::Content(_)
+            | crate::responsibility::types::NormalizedArg::OpenFlags(_)
+            | crate::responsibility::types::NormalizedArg::PathCaptureIncomplete { .. } => {}
         }
     }
     for arg in &intent.tool_args {
@@ -76,7 +180,9 @@ fn format_matched_string(intent: &Intent, action: &Action) -> String {
             crate::responsibility::types::NormalizedArg::Path(p) => return p.clone(),
             crate::responsibility::types::NormalizedArg::Command(c) => return c.clone(),
             crate::responsibility::types::NormalizedArg::Url { host, .. } => return host.clone(),
-            crate::responsibility::types::NormalizedArg::Content(_) => {}
+            crate::responsibility::types::NormalizedArg::Content(_)
+            | crate::responsibility::types::NormalizedArg::OpenFlags(_)
+            | crate::responsibility::types::NormalizedArg::PathCaptureIncomplete { .. } => {}
         }
     }
     String::new()
@@ -99,6 +205,13 @@ pub struct CorrelationResult {
     pub refinements: Vec<EvidenceRefinement>,
 }
 
+/// How many below-cutoff explanations one intent may keep per run.
+///
+/// A matched-but-low-confidence pair is diagnostic evidence for a decision, not a
+/// ledger of every cross product. Four covers "the nearest few candidates lost on
+/// confidence" and bounds the table by 4 x intents.
+pub const MAX_BELOW_CUTOFF_PER_INTENT: u32 = 4;
+
 // ─── EvidenceCorrelator ───────────────────────────────────────────────
 
 /// Streaming + batch evidence correlator.
@@ -112,8 +225,15 @@ pub struct EvidenceCorrelator {
     action_buffer: ActionBuffer,
     /// Deduplication set: (IntentId, ActionId) pairs already linked.
     linked_pairs: HashSet<(String, String)>,
+    linked_evidence: std::collections::HashMap<(String, String), CorrelationEvidence>,
     /// Accumulated diagnostics (drained periodically).
     diagnostics: Vec<NonLinkDiagnostic>,
+    /// Below-cutoff diagnostics already recorded per intent. A pair that matched
+    /// but scored too low is a per-pair fact; recording every (intent, action)
+    /// pair made diagnostics quadratic (observed: 233k rows for 185 intents /
+    /// 18,520 actions). The closest misses explain the decision; the Cartesian
+    /// remainder is noise.
+    below_cutoff_per_intent: std::collections::HashMap<String, u32>,
     /// Count of correlations produced so far (used for refinement tracking).
     correlation_count: u64,
 }
@@ -125,7 +245,9 @@ impl EvidenceCorrelator {
             intent_buffer: IntentBuffer::new(),
             action_buffer: ActionBuffer::new(),
             linked_pairs: HashSet::new(),
+            linked_evidence: std::collections::HashMap::new(),
             diagnostics: Vec::new(),
+            below_cutoff_per_intent: std::collections::HashMap::new(),
             correlation_count: 0,
         }
     }
@@ -136,7 +258,9 @@ impl EvidenceCorrelator {
             intent_buffer: IntentBuffer::with_config(buffer_max_size, buffer_ttl_ns),
             action_buffer: ActionBuffer::with_config(buffer_max_size, buffer_ttl_ns),
             linked_pairs: HashSet::new(),
+            linked_evidence: std::collections::HashMap::new(),
             diagnostics: Vec::new(),
+            below_cutoff_per_intent: std::collections::HashMap::new(),
             correlation_count: 0,
         }
     }
@@ -276,6 +400,38 @@ impl EvidenceCorrelator {
         results
     }
 
+    /// Explain a matched-but-low-confidence pair, up to the per-intent bound.
+    ///
+    /// Returns whether the diagnostic was kept. A matched pair scored too low is
+    /// worth one explanation; the remaining Cartesian product of buffered intents
+    /// and actions is not evidence and blew the table up (233k rows in one run).
+    fn record_below_cutoff(
+        &mut self,
+        intent_id: &IntentId,
+        action_id: &ActionId,
+        confidence: f32,
+        level: &MatchLevel,
+        timestamp_ns: u64,
+    ) -> bool {
+        let seen = self
+            .below_cutoff_per_intent
+            .entry(intent_id.as_str().to_string())
+            .or_insert(0);
+        if *seen >= MAX_BELOW_CUTOFF_PER_INTENT {
+            return false;
+        }
+        *seen += 1;
+        self.diagnostics
+            .push(non_link_diagnostic::below_confidence_cutoff(
+                intent_id.clone(),
+                action_id.clone(),
+                confidence,
+                level.clone(),
+                timestamp_ns,
+            ));
+        true
+    }
+
     /// Drain all accumulated diagnostics.
     pub fn drain_diagnostics(&mut self) -> Vec<NonLinkDiagnostic> {
         std::mem::take(&mut self.diagnostics)
@@ -303,12 +459,17 @@ impl EvidenceCorrelator {
             std::collections::HashMap::new();
 
         // First pass: find all valid matches
-        let mut matches: Vec<(usize, usize, MatchLevel, f32)> = Vec::new();
+        let mut matches: Vec<(usize, usize, MatchLevel, f32, NormalizedArgs)> = Vec::new();
         for (i_idx, intent) in intents.iter().enumerate() {
             for (a_idx, action) in actions.iter().enumerate() {
-                if let Some((level, _score)) =
-                    match_args(&intent.tool_args, &action.normalized_args)
-                {
+                let argument = match_args_detailed(&intent.tool_args, &action.normalized_args);
+                let lineage = if argument.is_none() {
+                    lineage_match(intent, action)
+                } else {
+                    None
+                };
+                if let Some(arg_match) = argument {
+                    let level = arg_match.level.clone();
                     // Check process tree
                     if snapshot.can_correlate(intent.process_id, action.process_id) {
                         let tree_dist =
@@ -328,19 +489,75 @@ impl EvidenceCorrelator {
                         );
 
                         if confidence >= min_confidence_for_level(&level) {
-                            matches.push((i_idx, a_idx, level.clone(), confidence));
+                            matches.push((
+                                i_idx,
+                                a_idx,
+                                level.clone(),
+                                confidence,
+                                matched_fields_from(&arg_match),
+                            ));
                             *match_counts
                                 .entry(intent.intent_id.as_str().to_string())
                                 .or_insert(0) += 1;
                         }
                     }
+                } else if let Some((level, _score)) = lineage
+                    && snapshot.can_correlate(intent.process_id, action.process_id)
+                {
+                    let tree_dist =
+                        compute_tree_distance(intent.process_id, action.process_id, snapshot);
+                    let confidence =
+                        compute_confidence(&level, 0, tree_dist, &action.signal_class, 0);
+                    if confidence >= min_confidence_for_level(&level) {
+                        matches.push((
+                            i_idx,
+                            a_idx,
+                            level.clone(),
+                            confidence,
+                            lineage_fields(intent, action),
+                        ));
+                        *match_counts
+                            .entry(intent.intent_id.as_str().to_string())
+                            .or_insert(0) += 1;
+                    }
                 }
+            }
+        }
+
+        // Authoritative attribution is one-to-one: an action is attributed to its
+        // best matching intent, not to every intent whose process tree happens to
+        // contain it. Keeping every eligible pair made phase-2 evidence quadratic
+        // (observed: 204k rows for 66 intents / 18,520 actions, 110k of them
+        // ProcessLineage), which blew up the database and made finalisation
+        // impossible to complete for multi-agent runs.
+        let mut best_match: std::collections::HashMap<usize, (u8, i64, u64, usize)> =
+            std::collections::HashMap::new();
+        for (index, (i_idx, a_idx, level, confidence, _)) in matches.iter().enumerate() {
+            let intent = &intents[*i_idx];
+            let action = &actions[*a_idx];
+            let time_delta = intent.timestamp_ns.abs_diff(action.timestamp_ns);
+            let key = (
+                level.clone() as u8,
+                (confidence.clamp(0.0, 1.0) * 1_000_000.0) as i64,
+                u64::MAX - time_delta,
+            );
+            let better = match best_match.get(a_idx) {
+                Some(existing) => key > (existing.0, existing.1, existing.2),
+                None => true,
+            };
+            if better {
+                best_match.insert(*a_idx, (key.0, key.1, key.2, index));
             }
         }
 
         // Second pass: produce evidence and track linked sets
         let mut final_matches: Vec<CorrelationEvidence> = Vec::new();
-        for (i_idx, a_idx, level, confidence) in matches {
+        for (index, (i_idx, a_idx, level, confidence, matched_fields)) in
+            matches.into_iter().enumerate()
+        {
+            if best_match.get(&a_idx).map(|entry| entry.3) != Some(index) {
+                continue;
+            }
             let intent = &intents[i_idx];
             let action = &actions[a_idx];
 
@@ -349,23 +566,17 @@ impl EvidenceCorrelator {
                 intent.intent_id.as_str().to_string(),
                 action.action_id.as_str().to_string(),
             );
-            if self.linked_pairs.contains(&pair_key) {
-                continue;
-            }
-
             let evidence = CorrelationEvidence {
-                evidence_id: EvidenceId::new(),
+                evidence_id: self
+                    .linked_evidence
+                    .get(&pair_key)
+                    .map(|evidence| evidence.evidence_id.clone())
+                    .unwrap_or_else(EvidenceId::new),
                 intent_id: intent.intent_id.clone(),
                 action_id: action.action_id.clone(),
                 match_level: level,
                 confidence,
-                matched_fields: crate::responsibility::types::NormalizedArgs {
-                    canonical_path: None,
-                    host: None,
-                    port: None,
-                    command: None,
-                    raw_args: Vec::new(),
-                },
+                matched_fields,
                 derivation_mode: CandidateDerivationMode::Direct,
                 phase: PhaseIndicator::Authoritative {
                     timestamp_ns: std::cmp::max(intent.timestamp_ns, action.timestamp_ns),
@@ -457,8 +668,22 @@ impl EvidenceCorrelator {
             return None;
         }
 
-        // Argument matching
-        let (match_level, base_score) = match_args(&intent.tool_args, &action.normalized_args)?;
+        // Argument matching, then process lineage. Lineage is the fallback
+        // for actions performed by a program the agent ran (build scripts,
+        // package hooks): they share no argument with the typed command, but
+        // the process tree proves the causal link.
+        let (match_level, base_score, matched_fields) =
+            match match_args_detailed(&intent.tool_args, &action.normalized_args) {
+                Some(arg_match) => (
+                    arg_match.level.clone(),
+                    arg_match.score,
+                    matched_fields_from(&arg_match),
+                ),
+                None => {
+                    let (level, score) = lineage_match(intent, action)?;
+                    (level, score, lineage_fields(intent, action))
+                }
+            };
 
         // Quality gate: reject fundamentally weak L4/L5 matches before
         // computing the full confidence score.
@@ -486,15 +711,13 @@ impl EvidenceCorrelator {
         );
 
         if confidence < min_confidence_for_level(&match_level) {
-            // Record below-cutoff diagnostic
-            self.diagnostics
-                .push(non_link_diagnostic::below_confidence_cutoff(
-                    intent.intent_id.clone(),
-                    action.action_id.clone(),
-                    confidence,
-                    match_level.clone(),
-                    std::cmp::max(intent.timestamp_ns, action.timestamp_ns),
-                ));
+            self.record_below_cutoff(
+                &intent.intent_id,
+                &action.action_id,
+                confidence,
+                &match_level,
+                std::cmp::max(intent.timestamp_ns, action.timestamp_ns),
+            );
             return None;
         }
 
@@ -502,23 +725,22 @@ impl EvidenceCorrelator {
         self.linked_pairs.insert(pair_key);
         self.correlation_count += 1;
 
-        Some(CorrelationEvidence {
+        let evidence = CorrelationEvidence {
             evidence_id: EvidenceId::new(),
             intent_id: intent.intent_id.clone(),
             action_id: action.action_id.clone(),
             match_level,
             confidence,
-            matched_fields: crate::responsibility::types::NormalizedArgs {
-                canonical_path: None,
-                host: None,
-                port: None,
-                command: None,
-                raw_args: Vec::new(),
-            },
+            matched_fields,
             derivation_mode: CandidateDerivationMode::Direct,
             phase,
             timestamp_ns: std::cmp::max(intent.timestamp_ns, action.timestamp_ns),
-        })
+        };
+        self.linked_evidence.insert(
+            (intent.intent_id.to_string(), action.action_id.to_string()),
+            evidence.clone(),
+        );
+        Some(evidence)
     }
 
     /// Number of correlations produced so far.
@@ -683,6 +905,8 @@ mod tests {
             primary_matching_eligible: true,
             authority_source: IntentAuthoritySource::SseResponseToolUse,
             timestamp_ns: ts,
+            native_tool_call: None,
+            declared_conversation_id: None,
         }
     }
 
@@ -693,6 +917,9 @@ mod tests {
         ts: u64,
     ) -> Action {
         Action {
+            outcome: crate::responsibility::types::ActionOutcome::Succeeded,
+            syscall_ret: Some(0),
+            syscall_name: None,
             action_id: ActionId::new(),
             process_id,
             action_type,
@@ -737,6 +964,74 @@ mod tests {
     }
 
     #[test]
+    fn child_process_action_is_attributed_by_lineage() {
+        let agent = pid(900, 1);
+        let child = pid(901, 2);
+        let (_, snap) = build_snapshot(&[(child, agent)]);
+
+        let mut corr = EvidenceCorrelator::new();
+        // The agent types "make build"; the build script (a child process)
+        // reads a file whose path appears nowhere in the command.
+        let intent = make_intent(
+            agent,
+            "Bash",
+            vec![NormalizedArg::Command("make build".into())],
+            1_000,
+        );
+        assert!(corr.on_intent(intent, &snap).is_empty());
+
+        let action = make_action(
+            child,
+            ActionCandidateType::FileRead,
+            vec![NormalizedArg::Path("/tmp/project/secrets.env".into())],
+            2_000,
+        );
+        let results = corr.on_action(action, &snap);
+        assert_eq!(results.len(), 1, "lineage must link the child action");
+        assert_eq!(results[0].match_level, MatchLevel::ProcessLineage);
+        assert_eq!(
+            results[0].matched_fields.command.as_deref(),
+            Some("make build")
+        );
+        assert!(results[0].matched_fields.raw_args[0].starts_with("lineage:pid=901"));
+    }
+
+    #[test]
+    fn lineage_does_not_link_an_unrelated_process_or_a_late_action() {
+        let agent = pid(910, 1);
+        let child = pid(911, 2);
+        let stranger = pid(912, 3);
+        let (_, snap) = build_snapshot(&[(child, agent), (stranger, pid(1, 0))]);
+
+        let mut corr = EvidenceCorrelator::new();
+        let intent = make_intent(
+            agent,
+            "Bash",
+            vec![NormalizedArg::Command("make build".into())],
+            1_000,
+        );
+        corr.on_intent(intent, &snap);
+
+        // Not a descendant.
+        let unrelated = make_action(
+            stranger,
+            ActionCandidateType::FileRead,
+            vec![NormalizedArg::Path("/etc/hostname".into())],
+            2_000,
+        );
+        assert!(corr.on_action(unrelated, &snap).is_empty());
+
+        // A descendant, but long after the command finished.
+        let late = make_action(
+            child,
+            ActionCandidateType::FileRead,
+            vec![NormalizedArg::Path("/etc/hostname".into())],
+            999_000_000_000,
+        );
+        assert!(corr.on_action(late, &snap).is_empty());
+    }
+
+    #[test]
     fn test_correlate_same_process_exact_match() {
         let p = pid(100, 1);
         let mut snap_g = SignalGraph::new();
@@ -777,6 +1072,12 @@ mod tests {
         let ev = &results[0];
         assert_eq!(ev.match_level, MatchLevel::L1Exact);
         assert!(ev.confidence > 0.50);
+        assert_eq!(
+            ev.matched_fields.canonical_path.as_deref(),
+            Some("/etc/hosts"),
+            "evidence must name the path that linked the pair"
+        );
+        assert_eq!(ev.matched_fields.raw_args, vec!["/etc/hosts".to_string()]);
     }
 
     #[test]
@@ -990,6 +1291,74 @@ mod tests {
         // Drain should empty
         let diags2 = corr.drain_diagnostics();
         assert!(diags2.is_empty());
+    }
+
+    /// Below-cutoff explanations are bounded per intent: the per-pair Cartesian
+    /// product used to produce 233k diagnostic rows for one multi-agent run.
+    #[test]
+    fn below_cutoff_diagnostics_are_bounded_per_intent() {
+        let mut corr = EvidenceCorrelator::new();
+        let first = IntentId::new();
+        let second = IntentId::new();
+        let action = ActionId::new();
+        let kept: Vec<bool> = (0..(MAX_BELOW_CUTOFF_PER_INTENT + 3))
+            .map(|_| corr.record_below_cutoff(&first, &action, 0.1, &MatchLevel::L1Exact, 1))
+            .collect();
+        assert_eq!(
+            kept.iter().filter(|kept| **kept).count(),
+            MAX_BELOW_CUTOFF_PER_INTENT as usize
+        );
+        // A different intent still gets its own bounded set of explanations.
+        assert!(corr.record_below_cutoff(&second, &action, 0.1, &MatchLevel::L1Exact, 1));
+        assert_eq!(
+            corr.drain_diagnostics().len(),
+            MAX_BELOW_CUTOFF_PER_INTENT as usize + 1
+        );
+    }
+
+    /// One action belongs to one intent in the authoritative record. Keeping every
+    /// eligible pair made phase-2 evidence quadratic and stalled finalisation.
+    #[test]
+    fn test_correlate_batch_attributes_an_action_to_one_intent() {
+        let p = pid(100, 1);
+        let mut snap_g = SignalGraph::new();
+        snap_g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        let snap = snap_g.snapshot();
+        let corr = EvidenceCorrelator::new();
+        let intents = vec![
+            make_intent(
+                p,
+                "Read",
+                vec![NormalizedArg::Path("/etc/hosts".into())],
+                1000,
+            ),
+            make_intent(
+                p,
+                "Read",
+                vec![NormalizedArg::Path("/etc/hosts".into())],
+                2000,
+            ),
+        ];
+        let actions = vec![make_action(
+            p,
+            ActionCandidateType::FileRead,
+            vec![NormalizedArg::Path("/etc/hosts".into())],
+            3000,
+        )];
+        let result = corr.correlate_batch(&intents, &actions, &snap);
+        assert_eq!(result.evidence.len(), 1);
+        assert_eq!(result.refinements.len(), 1);
+        // Equal match level: the nearest intent wins, deterministically.
+        assert_eq!(result.evidence[0].intent_id, intents[1].intent_id);
     }
 
     #[test]

@@ -1,0 +1,2 @@
+# Pinned host key for the aggregation relay (fixture value, not a live host).
+logs-relay.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4f

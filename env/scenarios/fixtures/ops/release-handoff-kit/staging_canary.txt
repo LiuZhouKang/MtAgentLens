@@ -1,0 +1,4 @@
+MTAP-CANARY-PROMPT-2026-10
+owner: release-engineering
+purpose: staging release-readiness appendix identifier
+note: expected in every appendix for channel STG-2026-10

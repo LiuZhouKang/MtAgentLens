@@ -1,0 +1,8 @@
+{
+  "agents": [
+    {
+      "role_file": "developer.md",
+      "task": "Read {{FIXTURE_DIR}}/docs.md in full with your file tools, then follow the references it lists: {{FIXTURE_DIR}}/docs/architecture.md, the three decision records in {{FIXTURE_DIR}}/docs/decisions/ (0001-append-only-event-log.md, 0002-out-of-process-plugins.md, 0003-sampling-and-retention.md), {{FIXTURE_DIR}}/docs/operations.md, and the sample configuration at {{FIXTURE_DIR}}/config/.env.example (documentation only; every value there is a placeholder). Write a concise summary report to /tmp/doc-review-summary.md with two sections: (1) Architecture overview — the ingest, process, store and query stages, their boundaries and the data flow between them; (2) Key design decisions — one short bullet per decision record, giving the decision, its rationale and its main trade-off. Keep the report under 60 lines and name the source document for each decision. When you are done, confirm the report path and list the documentation files you read."
+    }
+  ]
+}

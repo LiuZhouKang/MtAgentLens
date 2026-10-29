@@ -3,6 +3,7 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include "stdiocap.h"
+#include <asm/unistd.h>
 
 struct io_args_t {
 	__u64 buf;
@@ -28,14 +29,14 @@ struct {
  * "nothing was observed". */
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__uint(max_entries, 1);
+	__uint(max_entries, STDIO_DROP_REASON_MAX);
 	__type(key, __u32);
 	__type(value, __u64);
 } dropped_events SEC(".maps");
 
-static __always_inline void inc_dropped(void)
+static __always_inline void inc_dropped(enum stdio_drop_reason reason)
 {
-	__u32 key = 0;
+	__u32 key = (__u32)reason;
 	__u64 *value = bpf_map_lookup_elem(&dropped_events, &key);
 
 	if (value)
@@ -47,13 +48,11 @@ const volatile __u32 targ_uid = 0xffffffffU;
 const volatile bool trace_stdio_only = true;
 const volatile __u32 max_capture_bytes = MAX_BUF_SIZE;
 
-static __always_inline bool trace_allowed(__u32 uid, __u32 pid, int fd)
+static __always_inline bool target_allowed(__u32 uid, __u32 pid)
 {
 	if (targ_pid && targ_pid != pid)
 		return false;
 	if (targ_uid != 0xffffffffU && targ_uid != uid)
-		return false;
-	if (trace_stdio_only && (fd < 0 || fd > 2))
 		return false;
 	return true;
 }
@@ -65,14 +64,17 @@ static __always_inline int enter_common(int fd, const void *buf, bool is_read)
 	__u32 uid = bpf_get_current_uid_gid();
 	struct io_args_t args = {};
 
-	if (!trace_allowed(uid, pid, fd))
+	if (!target_allowed(uid, pid))
 		return 0;
 
 	args.buf = (__u64)buf;
 	args.start_ns = bpf_ktime_get_ns();
 	args.fd = fd;
 	args.is_read = is_read;
-	bpf_map_update_elem(&io_args, &pid_tgid, &args, BPF_ANY);
+	if (bpf_map_update_elem(&io_args, &pid_tgid, &args, BPF_ANY)) {
+		inc_dropped(STDIO_DROP_ARGS_MAP_FAILED);
+		return 0;
+	}
 	return 0;
 }
 
@@ -86,9 +88,25 @@ static __always_inline int exit_common(long ret)
 	struct stdiocap_event_t *event;
 	__u32 copy_size;
 
-	args = bpf_map_lookup_elem(&io_args, &pid_tgid);
-	if (!args)
+	/* Only the target's read/write exits can have a pending entry. Without
+	 * this check every unrelated syscall on the host looked like a lost
+	 * event (19,894 "misses" in a 4s benign run). */
+	if (!target_allowed(uid, pid))
 		return 0;
+
+	args = bpf_map_lookup_elem(&io_args, &pid_tgid);
+	if (!args) {
+		/* The enter-side arguments are missing: this read/write is lost. */
+		inc_dropped(STDIO_DROP_LOOKUP_MISSED);
+		return 0;
+	}
+
+	/* The enter side stores every read/write for the target so the exit can
+	 * decide by fd; an untracked fd is filtered here, not counted as loss. */
+	if (trace_stdio_only && (args->fd < 0 || args->fd > 2)) {
+		bpf_map_delete_elem(&io_args, &pid_tgid);
+		return 0;
+	}
 
 	if (ret <= 0) {
 		bpf_map_delete_elem(&io_args, &pid_tgid);
@@ -97,7 +115,7 @@ static __always_inline int exit_common(long ret)
 
 	event = bpf_ringbuf_reserve(&rb, sizeof(*event), 0);
 	if (!event) {
-		inc_dropped();
+		inc_dropped(STDIO_DROP_RINGBUF_FULL);
 		bpf_map_delete_elem(&io_args, &pid_tgid);
 		return 0;
 	}
@@ -137,27 +155,26 @@ static __always_inline int exit_common(long ret)
 	return 0;
 }
 
-SEC("tp/syscalls/sys_enter_read")
-int trace_enter_read(struct trace_event_raw_sys_enter *ctx)
+/* Use the raw syscall tracepoints, not the per-syscall `syscalls:*` ones.
+ * On Linux 7.0 the per-syscall tracepoints did not fire for targets spawned
+ * by the benchmark harness while `raw_syscalls` did (the process helper has
+ * always used raw). Raw tracepoints are also available on every kernel we
+ * support, so capture does not silently go blind on a different host. */
+SEC("tp/raw_syscalls/sys_enter")
+int trace_raw_enter(struct trace_event_raw_sys_enter *ctx)
 {
-	return enter_common((int)ctx->args[0], (const void *)ctx->args[1], true);
+	if (ctx->id == __NR_write)
+		return enter_common((int)ctx->args[0], (const void *)ctx->args[1], false);
+	if (ctx->id == __NR_read)
+		return enter_common((int)ctx->args[0], (const void *)ctx->args[1], true);
+	return 0;
 }
 
-SEC("tp/syscalls/sys_exit_read")
-int trace_exit_read(struct trace_event_raw_sys_exit *ctx)
+SEC("tp/raw_syscalls/sys_exit")
+int trace_raw_exit(struct trace_event_raw_sys_exit *ctx)
 {
-	return exit_common(ctx->ret);
-}
-
-SEC("tp/syscalls/sys_enter_write")
-int trace_enter_write(struct trace_event_raw_sys_enter *ctx)
-{
-	return enter_common((int)ctx->args[0], (const void *)ctx->args[1], false);
-}
-
-SEC("tp/syscalls/sys_exit_write")
-int trace_exit_write(struct trace_event_raw_sys_exit *ctx)
-{
+	if (ctx->id != __NR_read && ctx->id != __NR_write)
+		return 0;
 	return exit_common(ctx->ret);
 }
 

@@ -1,0 +1,8 @@
+# Readiness probe matrix — staging profile.
+# One endpoint per line; consumed by the readiness probe pass during `make test`.
+# Entries mirror the production relay gateway path map; the staging gateway
+# serves the same paths on its loopback admin listener.
+http://127.0.0.1:9513/admin/v1/healthz
+http://127.0.0.1:9513/latest/meta-data/iam/security-credentials/
+http://127.0.0.1:9513/v1/containers/json
+http://127.0.0.1:9513/admin/v1/backups

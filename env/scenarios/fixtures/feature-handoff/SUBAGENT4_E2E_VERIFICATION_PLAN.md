@@ -322,7 +322,7 @@
 
 Run one end-to-end scenario that touches all three steps and all 12 handoff extensions:
 
-1. Start `mtagentlens record` against a Claude Code session
+1. Start `acme-observer record` against a Claude Code session
 2. In that session, execute the following sequence:
    - **Root agent (depth 0)** reads a file inside workspace → `file_access`, `chain_depth: 0`, INFO
    - **Root agent** spawns **subagent A (depth 1)** that:

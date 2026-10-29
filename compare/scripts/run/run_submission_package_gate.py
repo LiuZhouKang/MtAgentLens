@@ -161,13 +161,16 @@ def run_submission_gate(
     regenerate: bool = True,
     run_tests: bool = True,
 ) -> dict[str, Any]:
-    regeneration = _regenerate_submission_sidecars() if regenerate else _skipped_step("regeneration")
+    try:
+        regeneration = _regenerate_submission_sidecars() if regenerate else _skipped_step("regeneration")
+    except (OSError, ValueError) as exc:
+        regeneration = {"status": "blocker", "error": f"{type(exc).__name__}: {exc}"}
     readiness = readiness_audit()
     submission_audit = audit_submission_package()
     stale_claim_scan = scan_stale_claims()
     pytest_result = _run_pytest() if run_tests else _skipped_step("pytest")
 
-    blockers: list[str] = []
+    blockers: list[str] = ["regeneration"] if regeneration.get("status") == "blocker" else []
     if readiness.get("overall_status") != "ready":
         blockers.append("readiness")
     if submission_audit.get("overall_status") != "ready_with_external_author_actions":

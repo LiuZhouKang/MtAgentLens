@@ -3,7 +3,6 @@
 
 pub mod claims;
 pub mod classification;
-pub mod cross_layer_bus;
 pub mod evidence;
 pub mod graph;
 pub mod identity;
@@ -12,12 +11,13 @@ pub mod observer;
 pub mod outofband;
 pub mod output;
 pub mod persistence;
+pub mod provenance;
 pub mod replay;
 pub mod runtime;
 pub mod scoring;
-pub mod server;
 pub mod signals;
 pub mod types;
+pub mod workspace;
 
 pub use claims::{
     accountability_boundary_id, accountability_evidence_contract,

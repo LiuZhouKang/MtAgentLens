@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import re
 from typing import Callable, Iterable
 
 from .base import BoundaryType, EvaluationCase, ExpectedClaim, FindingRecord, ToolMetadata
@@ -145,6 +146,8 @@ def _claim_coverage(
     for case in cases:
         scenario_findings = findings_by_scenario.get(_case_key(case), [])
         for claim in case.expected_claims:
+            if not claim.should_alert:
+                continue
             total += 1
             boundary_key = claim.boundary_type.value if claim.boundary_type else "UnspecifiedBoundary"
             category_key = claim.category or "unknown"
@@ -161,6 +164,8 @@ def _claim_coverage(
 
 
 def _finding_matches_claim(finding: FindingRecord, claim: ExpectedClaim) -> bool:
+    if finding.category == "run_verdict":
+        return False
     if severity_rank(finding.severity) < severity_rank(claim.severity):
         return False
     if claim.boundary_type is not None and finding.boundary_type != claim.boundary_type:
@@ -173,9 +178,16 @@ def _finding_matches_claim(finding: FindingRecord, claim: ExpectedClaim) -> bool
         if claim.expected_agent_id != finding.agent_id:
             return False
 
+    regexes = claim.resource_patterns + claim.command_patterns + claim.content_patterns
+    if regexes:
+        # A behavior can be observed through its resource or its command. Match
+        # each regex within one evidence field; never join unrelated events.
+        fields = (finding.resource, finding.command, finding.text_span, finding.evidence)
+        return any(re.search(pattern, text, re.IGNORECASE) for pattern in regexes for text in fields if text)
+
     resource_ok = (
         not claim.resource_substrings
-        or _any_substring_matches(claim.resource_substrings, finding.resource or "")
+        or _any_substring_matches(claim.resource_substrings, finding.resource or finding.text_span or finding.evidence or "")
     )
     command_ok = (
         not claim.command_substrings
@@ -225,8 +237,14 @@ def _finding_matches_claim_lenient(finding: FindingRecord, claim: ExpectedClaim)
          finding evidence).
       3. Category fallback (if no substrings, match on category name alone).
     """
+    if finding.category == "run_verdict":
+        return False
     if severity_rank(finding.severity) < severity_rank(claim.severity):
         return False
+
+    regexes = claim.resource_patterns + claim.command_patterns + claim.content_patterns
+    if regexes:
+        return any(re.search(pattern, _finding_haystack(finding), re.IGNORECASE) for pattern in regexes)
 
     substrings = claim.resource_substrings + claim.command_substrings + claim.content_substrings
     has_substrings = any(substring for substring in substrings)

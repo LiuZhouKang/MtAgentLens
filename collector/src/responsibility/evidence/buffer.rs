@@ -254,11 +254,16 @@ mod tests {
             primary_matching_eligible: true,
             authority_source: IntentAuthoritySource::SseResponseToolUse,
             timestamp_ns: ts,
+            native_tool_call: None,
+            declared_conversation_id: None,
         }
     }
 
     fn make_action(ts: u64) -> Action {
         Action {
+            outcome: crate::responsibility::types::ActionOutcome::Succeeded,
+            syscall_ret: Some(0),
+            syscall_name: None,
             action_id: ActionId::new(),
             process_id: pid(),
             action_type: ActionCandidateType::FileRead,

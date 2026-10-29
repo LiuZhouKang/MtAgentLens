@@ -26,6 +26,9 @@ causal 15 表（`causal_schema.rs`）。两者都写 `schema_version=1`，同名
 1. `APPLICATION_ID = 0x4D54_4C31`（"MTL1"）写入每个采集器拥有的数据库；
    `PRAGMA user_version` 与 `schema_version` 表由同一事务维护。
 2. `MIGRATIONS: &[(version, fn)]` 是唯一变更通道；`SCHEMA_V1_DDL` 冻结逐字。
+   当前 v5 在 `intents` 增加 nullable 的 `native_tool_call_json` 与
+   `declared_conversation_id`，保留捕获的原生调用引用与声明会话；旧行保持 NULL。
+   reader 支持旧列缺失，但非空损坏 JSON 必须报错。引用不是身份认证或执行证明。
 3. **任何写入前先只读分类**（`classify_schema`）：因果标记 / 未知形态 / 未来
    版本 → 零写入拒绝；只有正向识别为 live（`runs`+`process_events`+`intents`）
    或空文件才允许迁移。拒绝路径绝不以读写方式打开数据库（hot WAL 会因关闭时

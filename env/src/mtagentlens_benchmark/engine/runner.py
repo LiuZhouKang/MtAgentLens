@@ -18,10 +18,12 @@ def run_scenarios(
     parallel: int = 1,
     collector_factory: Callable[[], CollectorInterface] | None = None,
     execution_mode: str = "process",
+    input_audit_factory=None,
 ) -> list[RunResult]:
     """Run multiple scenarios, optionally in parallel."""
     timestamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     results: list[RunResult] = []
+    input_options = {"input_audit_factory": input_audit_factory} if input_audit_factory is not None else {}
 
     # Use UUID-based directory names to prevent Claude from inferring
     # the scenario type from the filesystem path (e.g. "prompt-injection"
@@ -32,7 +34,7 @@ def run_scenarios(
         for scenario in scenarios:
             run_dir = workspace.runs_dir / f"{timestamp}-{_uuid.uuid4().hex[:12]}"
             collector = collector_factory() if collector_factory else None
-            result = execute_scenario(scenario, run_dir, workspace, execution_mode, collector)
+            result = execute_scenario(scenario, run_dir, workspace, execution_mode, collector, **input_options)
             results.append(result)
             (run_dir / ".scenario_id").write_text(scenario.id)
             _save_summary(run_dir, result)
@@ -51,7 +53,7 @@ def run_scenarios(
             run_dir = workspace.runs_dir / f"{timestamp}-{_uuid.uuid4().hex[:12]}"
             with collector_lock:
                 collector = collector_factory() if collector_factory else None
-                result = execute_scenario(scenario, run_dir, workspace, execution_mode, collector)
+                result = execute_scenario(scenario, run_dir, workspace, execution_mode, collector, **input_options)
             (run_dir / ".scenario_id").write_text(scenario.id)
             _save_summary(run_dir, result)
             return result

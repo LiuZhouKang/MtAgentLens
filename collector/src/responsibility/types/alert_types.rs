@@ -21,6 +21,18 @@ pub enum AlertDecision {
     Uncertain,
 }
 
+impl AlertDecision {
+    /// Whether this alert is actionable for the product.
+    ///
+    /// Only `Unsafe` is actionable. `Uncertain` remains visible as an
+    /// investigation signal; promoting it to an alert conflates "needs a
+    /// look" with "the engine decided this is unsafe" and produced a 0.8947
+    /// false-positive rate on the 2026-07 benign corpus.
+    pub fn is_actionable(&self) -> bool {
+        matches!(self, Self::Unsafe)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AlertAuthority {
     Authoritative,
@@ -63,6 +75,13 @@ pub struct ResponsibilityAlert {
     pub timestamp_ns: u64,
     pub display_profile: DisplayProfile,
     pub decision: AlertDecision,
+    /// Derived from `decision` (`Unsafe` only), not persisted. Carried on the
+    /// wire so REST and SSE consumers share one product contract instead of
+    /// each re-deriving it. Recomputed from `decision` when read back; a value
+    /// arriving through deserialization is advisory only — consumers should
+    /// use [`AlertDecision::is_actionable`] on `decision`.
+    #[serde(default)]
+    pub actionable: bool,
     pub severity: AlertSeverity,
     pub confidence: f32,
     pub authority: AlertAuthority,
@@ -88,6 +107,9 @@ pub struct AgentRef {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct EngineSection {
+    /// Exact claims composed into this alert; absent legacy links stay empty.
+    #[serde(default)]
+    pub claim_ids: Vec<String>,
     pub rule_verdicts: Vec<RuleVerdict>,
     pub pattern_verdicts: Vec<PatternVerdict>,
     pub classification_score: f32,
@@ -102,10 +124,11 @@ pub struct EngineSection {
     pub progressive_fused: f64,
     #[serde(default)]
     pub observer_trigger_reason: String,
-    /// DeBERTa ONNX prompt injection score (D2Content dimension EWMA).
-    /// Available when the ONNX model is loaded. 0.0 otherwise.
+    /// Which scoring formula produced this breakdown. Offline ablation must
+    /// filter on this: the 2026-10 DBs span at least three formula generations,
+    /// so a global recomputation silently mixes incompatible rows.
     #[serde(default)]
-    pub deberta_score: f64,
+    pub score_model_version: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -206,10 +229,14 @@ pub struct CompetingExplanation {
 pub struct ResponsibilityTraceback {
     pub traceback_id: TracebackId,
     pub claim_id: ClaimId,
+    /// Legacy field name: subgraph membership, not an ordered causal path.
     pub chain_node_ids: Vec<NodeId>,
+    /// Resolve these edges' actual endpoints; do not zip with node IDs.
     pub chain_edge_ids: Vec<EdgeId>,
+    /// Inferred origin candidate, not independently verified ground truth.
     pub root_cause_node_id: NodeId,
     pub explanation_summary: String,
+    /// Edge-product heuristic, not a calibrated probability.
     pub confidence: f32,
 }
 
@@ -217,29 +244,46 @@ pub struct ResponsibilityTraceback {
 mod tests {
     use super::*;
 
-    /// Guard the wire name of `deberta_score`.
-    ///
-    /// Migrated from the never-compiled `types/alert_types_serde_test.rs`,
-    /// which held the only assertion on this key. The frontend reads it
-    /// (`frontend/lib/trace-workbench.ts`), so a rename or a dropped field
-    /// would silently degrade that surface, and nothing else covers it.
+    /// Product contract: an alert is actionable only when the engine decided
+    /// `Unsafe`. `Uncertain` is an investigation signal, not an actionable
+    /// alert; treating Warning+ as actionable produced a 0.8947 FPR on the
+    /// 2026-07 benign corpus (17/19 scenarios had an Uncertain/Warning row).
     #[test]
-    fn deberta_score_keeps_its_wire_name() {
-        let es = EngineSection {
-            rule_verdicts: vec![],
-            pattern_verdicts: vec![],
-            classification_score: 0.5,
-            classification_route: "direct_safe".into(),
-            score_breakdown: Default::default(),
-            cusum_triggered: false,
-            cusum_dimensions: vec![],
-            progressive_fused: 0.0,
-            observer_trigger_reason: String::new(),
-            deberta_score: 0.85,
-        };
-        let json = serde_json::to_string(&es).expect("EngineSection must serialize");
-        assert!(json.contains("deberta_score"), "wire name changed: {json}");
-        assert!(json.contains("0.85"), "value missing: {json}");
+    fn only_unsafe_is_actionable() {
+        assert!(AlertDecision::Unsafe.is_actionable());
+        assert!(!AlertDecision::Uncertain.is_actionable());
+        assert!(!AlertDecision::Safe.is_actionable());
+    }
+
+    /// Current alerts carry no ONNX classifier score.
+    ///
+    /// The ONNX path was removed product-wide. Old rows may still contain a
+    /// `deberta_score`/`content_threat` key, but those legacy extras must be
+    /// ignored and never re-emitted as if this engine computed them.
+    #[test]
+    fn engine_section_has_no_onnx_classifier_signal() {
+        let current =
+            serde_json::to_value(EngineSection::default()).expect("EngineSection must serialize");
+        for key in ["deberta_score", "content_threat"] {
+            assert!(
+                current.get(key).is_none(),
+                "current alert wire still exposes {key}: {current}"
+            );
+        }
+
+        let legacy: EngineSection = serde_json::from_value(serde_json::json!({
+            "classification_score": 0.5,
+            "deberta_score": 0.85,
+            "content_threat": 0.9,
+        }))
+        .expect("legacy unknown extras must remain readable");
+        let reserialized = serde_json::to_value(&legacy).expect("EngineSection must serialize");
+        for key in ["deberta_score", "content_threat"] {
+            assert!(
+                reserialized.get(key).is_none(),
+                "legacy {key} leaked back into current output: {reserialized}"
+            );
+        }
     }
 
     /// Persisted/HTTP wire contract: these enums are written with

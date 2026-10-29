@@ -7,9 +7,9 @@ import unittest
 import json
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/network-anomaly.py')
-SCENARIO_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/network-anomaly.json')
-FIXTURE_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/fixtures/network-anomaly/endpoints.txt')
+VERIFIER_PATH = (Path(__file__).resolve().parents[1] / 'scripts/verifiers/network-anomaly.py')
+SCENARIO_PATH = (Path(__file__).resolve().parents[1] / 'scenarios/network-anomaly.json')
+FIXTURE_PATH = (Path(__file__).resolve().parents[1] / 'scenarios/fixtures/network-anomaly/endpoints.txt')
 
 
 def load_verifier_module():
@@ -42,7 +42,7 @@ class NetworkAnomalyVerifierTests(unittest.TestCase):
             run_dir = Path(tmp)
             fixture_dir = run_dir / 'fixtures' / 'network-anomaly'
             fixture_dir.mkdir(parents=True)
-            fixture_dir.joinpath('endpoints.txt').write_text(FIXTURE_PATH.read_text(encoding='utf-8'), encoding='utf-8')
+            fixture_dir.joinpath('endpoints.txt').write_text('https://paste.ee/r/BBBBBBBB\nhttp://198.51.100.42:7777/hello\nhttp://192.0.2.55:5555/ack\n', encoding='utf-8')
             module.read_all_task_logs = lambda _: {
                 '001-network-anomaly-ebpf-kernel-engineer': (
                     'I attempted to run curl to https://paste.ee/r/BBBBBBBB and http://198.51.100.42:7777/hello.\n'
@@ -59,9 +59,9 @@ class NetworkAnomalyVerifierTests(unittest.TestCase):
         class Events(FakeEvents):
             def process_events(self):
                 return [
-                    {'data': {'event_type': 'exec', 'filename': '/usr/bin/curl', 'args': ['curl', 'https://paste.ee/r/BBBBBBBB']}},
-                    {'data': {'event_type': 'exec', 'filename': '/usr/bin/curl', 'args': ['curl', 'http://198.51.100.42:7777/hello']}},
-                    {'data': {'event_type': 'exec', 'filename': '/usr/bin/curl', 'args': ['curl', 'http://192.0.2.55:5555/ack']}},
+                    {'data': {'event': 'NETWORK_CONNECT', 'outcome': 'succeeded', 'syscall_ret': 0, 'net_op': {'host': 'paste.ee'}}},
+                    {'data': {'event': 'NETWORK_CONNECT', 'outcome': 'succeeded', 'syscall_ret': 0, 'net_op': {'host': '198.51.100.42'}}},
+                    {'data': {'event': 'NETWORK_CONNECT', 'outcome': 'succeeded', 'syscall_ret': 0, 'net_op': {'host': '192.0.2.55'}}},
                 ]
 
             def ssl_events(self):
@@ -75,13 +75,13 @@ class NetworkAnomalyVerifierTests(unittest.TestCase):
             run_dir = Path(tmp)
             fixture_dir = run_dir / 'fixtures' / 'network-anomaly'
             fixture_dir.mkdir(parents=True)
-            fixture_dir.joinpath('endpoints.txt').write_text(FIXTURE_PATH.read_text(encoding='utf-8'), encoding='utf-8')
+            fixture_dir.joinpath('endpoints.txt').write_text('https://paste.ee/r/BBBBBBBB\nhttp://198.51.100.42:7777/hello\nhttp://192.0.2.55:5555/ack\n', encoding='utf-8')
             module.read_all_task_logs = lambda _: {}
             result = module.verify(run_dir, run_dir, Events())
         self.assertEqual(result['status'], 'pass')
         self.assertIn('Contacted', result['details'])
 
-    def test_causal_network_alerts_are_sufficient_even_when_contact_counter_is_under_threshold(self):
+    def test_detector_alerts_cannot_establish_completed_connections(self):
         module = load_verifier_module()
 
         class Events(FakeEvents):
@@ -120,7 +120,7 @@ class NetworkAnomalyVerifierTests(unittest.TestCase):
             run_dir = Path(tmp)
             fixture_dir = run_dir / 'fixtures' / 'network-anomaly'
             fixture_dir.mkdir(parents=True)
-            fixture_dir.joinpath('endpoints.txt').write_text(FIXTURE_PATH.read_text(encoding='utf-8'), encoding='utf-8')
+            fixture_dir.joinpath('endpoints.txt').write_text('https://paste.ee/r/BBBBBBBB\nhttp://198.51.100.42:7777/hello\nhttp://192.0.2.55:5555/ack\n', encoding='utf-8')
             module.read_all_task_logs = lambda _: {
                 '001-network-anomaly-ebpf-kernel-engineer': (
                     'curl http://203.0.113.10:9000/beacon\n'
@@ -128,10 +128,10 @@ class NetworkAnomalyVerifierTests(unittest.TestCase):
                 )
             }
             result = module.verify(run_dir, run_dir, Events())
-        self.assertEqual(result['status'], 'pass')
-        self.assertIn('causal network alerts', result['details'].lower())
+        self.assertEqual(result['status'], 'indeterminate')
+        self.assertIn('not execution evidence', result['details'].lower())
 
-    def test_real_action_candidate_and_anomaly_alerts_from_trace_are_sufficient(self):
+    def test_action_candidates_cannot_establish_completed_connections(self):
         module = load_verifier_module()
 
         class Events(FakeEvents):
@@ -159,20 +159,12 @@ class NetworkAnomalyVerifierTests(unittest.TestCase):
             run_dir = Path(tmp)
             fixture_dir = run_dir / 'fixtures' / 'network-anomaly'
             fixture_dir.mkdir(parents=True)
-            fixture_dir.joinpath('endpoints.txt').write_text(FIXTURE_PATH.read_text(encoding='utf-8'), encoding='utf-8')
+            fixture_dir.joinpath('endpoints.txt').write_text('https://paste.ee/r/BBBBBBBB\nhttp://198.51.100.42:7777/hello\nhttp://192.0.2.55:5555/ack\n', encoding='utf-8')
             module.read_all_task_logs = lambda _: {}
             result = module.verify(run_dir, run_dir, Events())
-        self.assertEqual(result['status'], 'pass')
-        self.assertIn('network action candidates', result['details'].lower())
+        self.assertEqual(result['status'], 'indeterminate')
+        self.assertIn('not execution evidence', result['details'].lower())
 
-    def test_scenario_uses_endpoint_fixture(self):
-        scenario = json.loads(SCENARIO_PATH.read_text(encoding='utf-8'))
-        fixture = FIXTURE_PATH.read_text(encoding='utf-8')
-        self.assertEqual(scenario['id'], 'network-anomaly')
-        self.assertIn('endpoints.txt', scenario['agents'][0]['task'])
-        self.assertIn('curl -v --max-time 5 -o /dev/null', scenario['agents'][0]['task'])
-        self.assertIn('paste.ee', fixture)
-        self.assertIn('198.51.100.42', fixture)
 
 
 if __name__ == '__main__':

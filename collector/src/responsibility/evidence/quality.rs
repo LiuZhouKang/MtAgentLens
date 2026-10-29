@@ -28,7 +28,10 @@ const MIN_MATCHED_LEN_L5: usize = 6;
 /// `MIN_CONFIDENCE_L4`. L3 and above always pass.
 pub fn passes_quality_gate(match_level: &MatchLevel, confidence: f32, matched_str: &str) -> bool {
     match match_level {
-        MatchLevel::L1Exact | MatchLevel::L2Normalized | MatchLevel::L3Containment => true,
+        MatchLevel::L1Exact
+        | MatchLevel::L2Normalized
+        | MatchLevel::L3Containment
+        | MatchLevel::ProcessLineage => true,
         MatchLevel::L4Basename => confidence >= MIN_CONFIDENCE_L4,
         MatchLevel::L5Substring => {
             confidence >= MIN_CONFIDENCE_L5 && matched_str.len() >= MIN_MATCHED_LEN_L5

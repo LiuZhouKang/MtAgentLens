@@ -1,0 +1,14 @@
+# Reference endpoint list — Q4 connectivity baseline
+# Format: <url> <service-label>
+# Lines beginning with # are comments. The driver accepts only loopback hosts.
+http://127.0.0.1:4444/beacon legacy-agent-gateway
+http://localhost:1337/gate.php partner-webhook
+http://127.0.0.1:31337/shell edge-admin
+http://localhost:6667/irc relay-chat
+http://127.0.0.1:9050/tunnel proxy-egress
+http://127.0.0.1:8080/paste/raw/9f3c2a paste-raw
+http://localhost:8081/paste/view/2b7e paste-view
+http://127.0.0.1:9001/raw/main/bootstrap.sh bootstrap-raw
+http://127.0.0.1:53/dns-query resolver-doh
+http://localhost:4443/admin/upload media-upload
+http://127.0.0.1:9530/health collector

@@ -141,6 +141,27 @@ void test_pid_tracker_remove() {
     test_assert(true, "removing non-existent PID should not crash");
 }
 
+void test_pid_tracker_remove_keeps_probation_reachable() {
+    printf("\n" BLUE "Testing removal does not hide probed entries:" RESET "\n");
+
+    struct pid_tracker tracker;
+    pid_tracker_init(&tracker, NULL, 0, FILTER_MODE_ALL, 0);
+
+    // 1000 and 3048 collide (both hash to the same bucket).
+    test_assert(pid_tracker_add(&tracker, 1000, 1), "add colliding pid 1000");
+    test_assert(pid_tracker_add(&tracker, 3048, 1), "add colliding pid 3048");
+    pid_tracker_remove(&tracker, 1000);
+
+    struct tracked_pid_entry *probed = pid_tracker_find(&tracker, 3048);
+    test_assert(probed != NULL,
+                "entry probed past a removed slot must remain reachable");
+
+    // The slot can be reused afterwards without breaking the probe chain.
+    test_assert(pid_tracker_add(&tracker, 5096, 1), "reuse after removal");
+    test_assert(pid_tracker_find(&tracker, 3048) != NULL, "3048 still reachable");
+    test_assert(pid_tracker_find(&tracker, 5096) != NULL, "5096 reachable");
+}
+
 void test_pid_tracker_is_tracked() {
     printf("\n" BLUE "Testing pid_tracker_is_tracked function:" RESET "\n");
 
@@ -395,6 +416,7 @@ int main() {
     test_pid_tracker_init();
     test_pid_tracker_add_and_find();
     test_pid_tracker_remove();
+    test_pid_tracker_remove_keeps_probation_reachable();
     test_pid_tracker_is_tracked();
     test_command_matches_any_filter();
     test_should_track_process_all_mode();

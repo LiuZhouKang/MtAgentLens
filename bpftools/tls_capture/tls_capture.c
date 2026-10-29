@@ -82,6 +82,14 @@
  * reported instead.
  */
 static int attach_failures = 0;
+/* Successful attaches. A capture process that attached nothing must not exit
+ * 0: the run would be indistinguishable from "this agent made no TLS calls". */
+static int attached_probes = 0;
+/* Core request/response paths. A run that misses SSL_write cannot see what the
+ * agent sent; a run that misses SSL_read cannot see what it received. Optional
+ * probes (handshake, _ex2) may fail without degrading the capture. */
+static int core_write_attached = 0;
+static int core_read_attached = 0;
 
 #define __ATTACH_UPROBE_SOFT(skel, binary_path, sym_name, prog_name, is_retprobe) \
 	do {                                                                          \
@@ -89,6 +97,8 @@ static int attach_failures = 0;
 	  if (!skel->links.prog_name) {                                               \
 		fprintf(stderr, "Warning: symbol %s could not be attached; continuing with the remaining symbols\n", #sym_name); \
 		attach_failures++;                                                        \
+	  } else {                                                                    \
+		attached_probes++;                                                        \
 	  }                                                                           \
 	} while (false)
 
@@ -102,6 +112,8 @@ static int attach_failures = 0;
 	  LIBBPF_OPTS(bpf_uprobe_opts, uprobe_opts, .retprobe = is_retprobe);         \
 	  skel->links.prog_name = bpf_program__attach_uprobe_opts(                    \
 		  skel->progs.prog_name, env.pid, binary_path, offset, &uprobe_opts);     \
+	  if (skel->links.prog_name)                                                  \
+		attached_probes++;                                                        \
 	} while (false)
 
 #define ATTACH_UPROBE_OFFSET_CHECKED(skel, binary_path, offset, prog_name)       \
@@ -409,9 +421,16 @@ int attach_openssl(struct tls_capture_bpf *skel, const char *lib) {
 	int before = attach_failures;
 
 	ATTACH_UPROBE_SOFT(skel, lib, SSL_write, probe_SSL_rw_enter);
+	int write_enter = skel->links.probe_SSL_rw_enter != NULL;
 	ATTACH_URETPROBE_SOFT(skel, lib, SSL_write, probe_SSL_write_exit);
+	int write_exit = skel->links.probe_SSL_write_exit != NULL;
+	core_write_attached |= write_enter && write_exit;
+
 	ATTACH_UPROBE_SOFT(skel, lib, SSL_read, probe_SSL_rw_enter);
+	int read_enter = skel->links.probe_SSL_rw_enter != NULL;
 	ATTACH_URETPROBE_SOFT(skel, lib, SSL_read, probe_SSL_read_exit);
+	int read_exit = skel->links.probe_SSL_read_exit != NULL;
+	core_read_attached |= read_enter && read_exit;
 
 	ATTACH_UPROBE_SOFT(skel, lib, SSL_write_ex, probe_SSL_write_ex_enter);
 	ATTACH_URETPROBE_SOFT(skel, lib, SSL_write_ex, probe_SSL_write_ex_exit);
@@ -439,6 +458,8 @@ int attach_gnutls(struct tls_capture_bpf *skel, const char *lib) {
 	ATTACH_URETPROBE_CHECKED(skel, lib, gnutls_record_send, probe_SSL_write_exit);
 	ATTACH_UPROBE_CHECKED(skel, lib, gnutls_record_recv, probe_SSL_rw_enter);
 	ATTACH_URETPROBE_CHECKED(skel, lib, gnutls_record_recv, probe_SSL_read_exit);
+	core_write_attached |= 1;
+	core_read_attached |= 1;
 
 	return 0;
 }
@@ -452,6 +473,8 @@ int attach_nss(struct tls_capture_bpf *skel, const char *lib) {
 	ATTACH_URETPROBE_CHECKED(skel, lib, PR_Read, probe_SSL_read_exit);
 	ATTACH_UPROBE_CHECKED(skel, lib, PR_Recv, probe_SSL_rw_enter);
 	ATTACH_URETPROBE_CHECKED(skel, lib, PR_Recv, probe_SSL_read_exit);
+	core_write_attached |= 1;
+	core_read_attached |= 1;
 
 	return 0;
 }
@@ -709,13 +732,27 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	if (attached_probes == 0) {
+		fprintf(stderr,
+			"{\"event\":\"TLS_CAPTURE_ERROR\",\"reason\":\"no_probe_attached\","
+			"\"attach_failures\":%d}\n", attach_failures);
+		err = -ENODEV;
+		goto cleanup;
+	}
+	fprintf(stderr,
+		"{\"event\":\"TLS_CAPTURE_PROBES\",\"attached\":%d,\"failed\":%d,"
+		"\"core_read\":%s,\"core_write\":%s}\n",
+		attached_probes, attach_failures,
+		core_read_attached ? "true" : "false",
+		core_write_attached ? "true" : "false");
+
 	rb = ring_buffer__new(bpf_map__fd(obj->maps.rb), handle_event, NULL, NULL);
 	if (!rb) {
 		err = -errno;
 		FAIL("failed to open ring buffer: %d\n", err);
 	}
 
-	if (signal(SIGINT, sig_int) == SIG_ERR) {
+	if (signal(SIGINT, sig_int) == SIG_ERR || signal(SIGTERM, sig_int) == SIG_ERR) {
 		warn("can't set signal handler: %s\n", strerror(errno));
 		err = 1;
 		goto cleanup;
@@ -732,10 +769,17 @@ int main(int argc, char **argv) {
 		poll_count++;
             if (poll_count % 50 == 0) fflush(stdout);
 		if (poll_count % 100 == 0) {
-			__u32 key = 0;
+			__u64 reasons[TLS_DROP_REASON_MAX] = {};
 			__u64 dropped = 0;
 			int map_fd = bpf_map__fd(obj->maps.dropped_events);
-			if (map_fd >= 0 && bpf_map_lookup_elem(map_fd, &key, &dropped) == 0 && dropped > 0) {
+			int ok = map_fd >= 0;
+			for (__u32 key = 0; ok && key < TLS_DROP_REASON_MAX; key++) {
+				if (bpf_map_lookup_elem(map_fd, &key, &reasons[key]) != 0)
+					ok = 0;
+				else
+					dropped += reasons[key];
+			}
+			if (ok && dropped > 0) {
 				fprintf(stderr, "{\"event\":\"RINGBUF_STATS\",\"dropped_events\":%llu}\n",
 					(unsigned long long)dropped);
 			}
@@ -744,14 +788,27 @@ int main(int argc, char **argv) {
 		err = 0;
 	}
 
+    tls_capture_bpf__detach(obj);
+    ring_buffer__consume(rb);
+    fflush(stdout);
 	/* Print final dropped count on exit */
 	{
-		__u32 key = 0;
+		__u64 reasons[TLS_DROP_REASON_MAX] = {};
 		__u64 dropped = 0;
 		int map_fd = bpf_map__fd(obj->maps.dropped_events);
-		if (map_fd >= 0 && bpf_map_lookup_elem(map_fd, &key, &dropped) == 0) {
-			fprintf(stderr, "{\"event\":\"TLS_RINGBUF_STATS\",\"dropped_events\":%llu}\n",
-				(unsigned long long)dropped);
+		int ok = map_fd >= 0;
+		for (__u32 key = 0; ok && key < TLS_DROP_REASON_MAX; key++) {
+			if (bpf_map_lookup_elem(map_fd, &key, &reasons[key]) != 0)
+				ok = 0;
+			else
+				dropped += reasons[key];
+		}
+		if (ok) {
+			fprintf(stderr, "{\"event\":\"TLS_RINGBUF_STATS\",\"dropped_events\":%llu,"
+				"\"ringbuf_full_dropped\":%llu,\"state_map_dropped\":%llu}\n",
+				(unsigned long long)dropped,
+				(unsigned long long)reasons[TLS_DROP_RINGBUF_FULL],
+				(unsigned long long)reasons[TLS_DROP_STATE_MAP_FAILED]);
 		}
 	}
 

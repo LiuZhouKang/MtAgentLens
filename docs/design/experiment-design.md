@@ -4,7 +4,7 @@
 > **当前实现口径（2026-10-19）**：本文件保留 v5 实验设计思路。FuxiBench 86 场景
 > （67 attack + 19 benign；Type A=10、B=34、C=23）。指标必须分口径：
 >
-> - **交付二进制裁决**（`responsibility_alerts`，`compare/results/paper/standard_evaluation_v5.json`）：
+> - **旧语料裁决（由 2026-07 构建写入，非交付二进制重跑）**（`responsibility_alerts`，`compare/results/paper/standard_evaluation_v5.json`）：
 >   `decision=Unsafe` TPR=0.8955（Wilson 0.7997–0.9485）、FPR=0.000（0–0.168）、
 >   F1=0.9449、MCC=0.809；Warning+ TPR=0.9851 但 FPR=0.8947（不可作为产品口径）。
 > - **评估脚本复合分**（`main_evaluation.json` 的 `full_scores`）：
@@ -109,7 +109,7 @@
 | 方法 | 用途 | 标准来源 |
 |------|------|---------|
 | **McNemar's test** (Yates correction) | 配对二元结果比较 | Dietterich (1998), "Approximate Statistical Tests for Comparing Supervised Classification Learning Algorithms" |
-| **Bootstrap 95% CI** (10,000 resamples, BCa) | 交付二进制的 TPR/FPR 不确定性量化（当前仅两种裁决口径；见 §Bootstrap 95% CI 的范围说明） | Efron & Tibshirani (1994) |
+| **Bootstrap 95% CI** (10,000 resamples, BCa) | 旧语料二进制裁决的 TPR/FPR 不确定性量化（当前仅两种裁决口径；重采见 P1.2；见 §Bootstrap 95% CI 的范围说明） | Efron & Tibshirani (1994) |
 | **Cohen's κ** | 标注者间一致性 | 盲标注质量保证 |
 | **Fisher's exact test** | 小样本 2×2 列联表 | 替代 χ²（小 n 时更准确） |
 
@@ -160,7 +160,7 @@
 - **当前主评估 86 场景**：67 attack (10 Type A, 34 Type B, 23 Type C) + 19 benign
 - **全部 86 场景有 ground truth**（三标注者交叉验证 + 共识裁判）
 - **全部 86 场景有 prompt input bundle**（用于 LLM Guard、Meta Prompt Guard、Agent Sentinel 文本基线）
-- `compare/Dataset/FuxiBench/traces/` 中还包含主评估外的扩展/灰区/历史运行归档，不应直接等同于 86 场景主评估规模。
+- `datasets/FuxiBench/traces/` 中还包含主评估外的扩展/灰区/历史运行归档，不应直接等同于 86 场景主评估规模。
 
 ### 3.2 攻击类型定义
 
@@ -203,9 +203,14 @@
 
 ### Table 1a: Overall Detection
 
+> The MtAgentLens row is read from alert rows written by the **2026-07 collector
+> build**. The corpus predates the delivered 2026-10-19 binary and the ADR-0015
+> alert/taint gates; it is not a rerun of the deliverable. P1.2 recollects the
+> 86 scenarios with the delivered binary.
+
 | Tool | TPR | FPR | Precision | F1 | MCC | Detected/Total |
 |------|-----|-----|-----------|----|-----|----------------|
-| **MtAgentLens (delivered binary, decision=Unsafe)** | 0.8955 | 0.000 | 1.000 | 0.9449 | 0.8090 | 60/67 |
+| **MtAgentLens (2026-07 corpus build, decision=Unsafe)** | 0.8955 | 0.000 | 1.000 | 0.9449 | 0.8090 | 60/67 |
 | LLM Guard | 详见 `compare/results/paper/EXPERIMENTS.md` | — | — | — | — | — |
 | Agent Sentinel | 详见 `compare/results/paper/EXPERIMENTS.md` | — | — | — | — | — |
 | Meta Prompt Guard | 详见 `compare/results/paper/EXPERIMENTS.md` | — | — | — | — | — |
@@ -234,10 +239,16 @@
 
 ### Bootstrap 95% CI
 
-交付二进制的检测指标报告 Bootstrap 95% CI（BCa，10,000 resamples，固定种子
-20261019）：`compare/results/paper/standard_evaluation_v5.json` 的
-`rq1_detection.strict` / `rq1_detection.actionable`。当每次重采样结果完全一致
-（例如 FPR 0/19）时 BCa 区间退化为 [0, 0]，该文件同时报告 Wilson 95% 区间。
+旧语料（由 2026-07 构建写入；非交付二进制重跑）的检测指标报告 Bootstrap 95% CI
+（BCa，10,000 resamples，固定种子 20261019）：
+`compare/results/paper/standard_evaluation_v5.json` 的
+`rq1_detection.strict`、`rq1_detection.actionable`（两者都定义为
+`decision=Unsafe`，见 ADR-0015）与 `rq1_detection.warning_plus`
+（`severity∈{Warning,Critical}`，review 信号，不是可行动口径）。当每次重采样
+结果完全一致（例如 FPR 0/19）时 BCa 区间退化为 [0, 0]，该文件同时报告 Wilson
+95% 区间。`warning_plus_after_alert_semantics_fix` 与
+`rq3_attribution.tainted_context_gate` 是**反事实重算**，必须在正文中如此标注，
+不能当作二进制重跑结果。
 
 **范围说明（原承诺为“所有 TPR/FPR/F1/MCC”）**：本仓库目前只对从
 `responsibility_alerts` 直接读取的二进制裁决（`decision=Unsafe` 与
@@ -374,7 +385,7 @@ Baseline (eBPF ON, 全系统) → 选择性禁用 Layer N 的信号 → 重新�
 
 ### 10.2 Cost-Optimized LLM Integration
 
-DeepSeek v4-flash + thinking disabled + compact prompt + JSON truncation recovery。每次调用 <$0.001。
+DeepSeek V4.1 Flash (`deepseek-flash`) + thinking disabled + compact prompt + JSON truncation recovery。每次调用 <$0.001。
 
 ### 10.3 eBPF Ring Buffer Optimization
 
@@ -409,7 +420,7 @@ make build-bpf && cd collector && cargo build --release --bin mtagentlens
 # 单场景采集（eBPF ON）
 echo "1" | sudo -S bash -c 'MTAGENTLENS_SUDO_PASSWORD=1 \
   ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic \
-  ANTHROPIC_AUTH_TOKEN=<token> MODEL=deepseek-v4-flash \
+  ANTHROPIC_AUTH_TOKEN=<token> MODEL=deepseek-flash \
   PYTHONPATH=env/src:. python3 -m mtagentlens_benchmark.cli run \
   --scenario <id> --mode process --collector'
 

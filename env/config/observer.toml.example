@@ -8,6 +8,12 @@
 
 base_url = "https://api.deepseek.com/anthropic"
 auth_token = "<set-me>"
-model = "deepseek-v4-flash"
+model = "deepseek-flash"
+# Per-attempt deadline. A whole call may take up to timeout_ms × max_retries.
 timeout_ms = 30000
+# Attempts including the first. Only timeouts, HTTP 429 and 5xx are retried;
+# 4xx/validation/config errors fail immediately.
 max_retries = 3
+
+# Environment selection: MTAGENTLENS_OBSERVER_MODEL overrides ANTHROPIC_MODEL,
+# then legacy MODEL. Keep agent family aliases (haiku/sonnet) out of observer IDs.

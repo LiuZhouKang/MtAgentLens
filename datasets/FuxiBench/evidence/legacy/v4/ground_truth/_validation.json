@@ -1,0 +1,10 @@
+{
+  "schema": "mtagentlens.gt-validation/1",
+  "total": 93,
+  "present": 93,
+  "attacks": 67,
+  "benign": 26,
+  "review": 0,
+  "human_review_pending": 74,
+  "problems": []
+}

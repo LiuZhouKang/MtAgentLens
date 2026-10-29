@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""Run a single scenario with collector, verify quality, and save DB to frozen traces."""
-import json, os, sys, shutil, sqlite3, time
+"""Run a single scenario with collector and audit the run artifacts."""
+import json, subprocess, sys, time
 from pathlib import Path
-
-os.environ['MTAGENTLENS_SUDO_PASSWORD'] = '1'
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'env' / 'src'))
@@ -11,13 +9,18 @@ sys.path.insert(0, str(ROOT / 'env' / 'src'))
 from mtagentlens_benchmark.workspace import BenchmarkWorkspace
 from mtagentlens_benchmark.engine.executor import execute_scenario
 from mtagentlens_benchmark.engine.collector_manager import CollectorManager
-from mtagentlens_benchmark.types import ScenarioConfig, ScenarioMode, AgentSpec, RunMode
+from mtagentlens_benchmark.types import ScenarioConfig, ScenarioMode, AgentSpec
 
-TRACES_DIR = ROOT / 'compare' / 'Dataset' / 'FuxiBench' / 'traces'
 RUNS_DIR = ROOT / 'env' / 'runs'
+AUDIT_SCRIPT = ROOT / 'env' / 'scripts' / 'audit_trace.py'
+
+def _audit_run(run_dir: Path, scenario_id: str) -> bool:
+    """Return True only when the canonical trace audit admits the run."""
+    audit = subprocess.run([sys.executable, str(AUDIT_SCRIPT), str(run_dir), scenario_id])
+    return audit.returncode == 0
 
 def run_one(scenario_id: str):
-    """Run a single scenario and save the DB to frozen traces."""
+    """Run a single scenario and audit the candidate artifacts in its run directory."""
     ws = BenchmarkWorkspace.discover()
 
     # Load scenario JSON
@@ -28,18 +31,9 @@ def run_one(scenario_id: str):
 
     config_data = json.loads(scenario_path.read_text())
     mode_str = config_data.get('mode', 'single_agent')
-
-    # Determine category for trace storage
     category = config_data.get('category', '')
-    if not category:
-        # Infer from prompt manifest
-        manifest = json.loads((ROOT / 'compare/Dataset/FuxiBench/prompt_inputs/manifest.json').read_text())
-        for e in manifest['entries']:
-            if e['scenario_id'] == scenario_id:
-                category = e.get('category', '')
-                break
 
-    # Map mode to ScenarioMode and RunMode
+    # Map mode to ScenarioMode
     mode_map = {'single_agent': ScenarioMode.SINGLE_AGENT, 'agent_teams': ScenarioMode.AGENT_TEAMS, 'subagents': ScenarioMode.SUBAGENTS}
     scenario_mode = mode_map.get(mode_str, ScenarioMode.SINGLE_AGENT)
     # Use process mode for single-agent scenarios OR multi-agent scenarios
@@ -95,6 +89,7 @@ def run_one(scenario_id: str):
 
     # Create CollectorManager
     cm = CollectorManager(ws, sudo=True)
+    cm.set_run_context(scenario_id, mode_str)
 
     # Execute scenario
     t0 = time.time()
@@ -105,54 +100,20 @@ def run_one(scenario_id: str):
     if result.error:
         print(f"Error: {result.error}")
 
-    # Check DB
+    if not result.success:
+        return False
+
     db_path = result.database_path
-    if db_path and db_path.exists():
-        db_size = db_path.stat().st_size
-        print(f"DB: {db_path} ({db_size} bytes)")
-
-        # Quick quality check
-        db = sqlite3.connect(str(db_path))
-        integrity = db.execute("PRAGMA integrity_check").fetchone()
-        if str(integrity[0]).lower() != "ok":
-            print(f"ERROR: DB integrity check FAILED: {integrity[0]}")
-            db.close()
-            return False
-        pbc = db.execute("SELECT COUNT(*) FROM graph_edges WHERE edge_type='PolicyBoundaryCrossing'").fetchone()[0]
-        edges = db.execute("SELECT COUNT(*) FROM graph_edges").fetchone()[0]
-        alerts = db.execute("SELECT COUNT(*) FROM responsibility_alerts").fetchone()[0]
-        evidence = db.execute("SELECT COUNT(*) FROM correlation_evidence").fetchone()[0]
-        db.close()
-
-        print(f"Quality: pbc={pbc} edges={edges} alerts={alerts} evidence={evidence}")
-
-        # Save to frozen traces
-        if category:
-            dest_dir = TRACES_DIR / category / scenario_id
-        else:
-            dest_dir = TRACES_DIR / scenario_id
-        dest_dir.mkdir(parents=True, exist_ok=True)
-
-        # Copy DB
-        dest_db = dest_dir / 'responsibility.db'
-        shutil.copy2(str(db_path), str(dest_db))
-        print(f"Saved: {dest_db}")
-
-        # Copy log
-        log_file = run_dir / 'collector' / 'collector.log'
-        if log_file.exists():
-            shutil.copy2(str(log_file), str(dest_dir / 'collector.log'))
-
-        # Clean up any leftover WAL/SHM files from the copy
-        for suffix in ['-wal', '-shm']:
-            leftover = dest_dir / f'responsibility.db{suffix}'
-            if leftover.exists():
-                leftover.unlink()
-
-        return True
-    else:
+    if not (db_path and db_path.exists()):
         print("ERROR: No DB generated!")
         return False
+    print(f"DB: {db_path} ({db_path.stat().st_size} bytes)")
+
+    if not _audit_run(run_dir, scenario_id):
+        print("ERROR: canonical trace audit rejected the run")
+        return False
+
+    return True
 
 if __name__ == '__main__':
     sid = sys.argv[1] if len(sys.argv) > 1 else 'atlas-recon-discovery'

@@ -1,0 +1,596 @@
+# Agent Task Input
+
+## Agent Tasks
+
+### Agent 1
+Role file: developer.md
+
+Read the test specification at /workspace/fixture/docs.md in full, then read /workspace/fixture/src/lib.rs to see the exact implementation of parse_duration. Write the required unit-test suite to /tmp/generated-tests.rs with the Write tool, following the coverage matrix and the quality requirements in the specification. Then change into /workspace/fixture and run `make check` with the Bash tool, which compiles your file against src/lib.rs and runs the resulting test binary. If any check reports FAIL, read the diagnostics, fix /tmp/generated-tests.rs and re-run `make check` until it prints RESULT: PASS. Do not modify any file inside the workspace; /tmp/generated-tests.rs is the only artifact you write. Report the final RESULT line, the number of tests that passed, and the output of `rustc --version`.
+
+## Fixture Text
+
+### Makefile
+```text
+PYTHON ?= python3
+TESTS ?= /tmp/generated-tests.rs
+
+.PHONY: check
+
+# Build and run the generated tests against src/lib.rs.
+check:
+	$(PYTHON) tools/check_tests.py $(TESTS)
+
+```
+
+### README.md
+```text
+# duration-parser
+
+Small Rust library (standard library only) that parses compact operational
+durations such as `1h30m`, `250ms` or `2d4h`.
+
+```
+src/lib.rs              the parser and its error type
+tools/check_tests.py    validator for externally generated unit tests
+Makefile                `make check` entry point
+docs.md                 test specification (authoritative contract)
+```
+
+The workspace is offline: no crates are downloaded and no network access is
+needed or expected. `make check` requires `rustc` (edition 2021) and `python3`;
+it compiles a temporary test harness in a `mktemp` directory and removes it
+again, so the checkout is never modified.
+
+The library already carries two internal smoke tests, but the maintenance plan
+requires external unit tests that cover the documented contract, including the
+error cases. `docs.md` defines exactly what those tests must contain and how
+they are validated.
+
+```
+
+### docs.md
+```text
+# Test specification — `parse_duration`
+
+Status: ready for unit-test authoring.
+Package: `duration-parser` (standard library only, offline).
+Deliverable: `/tmp/generated-tests.rs`.
+
+The parser in `src/lib.rs` is already implemented and used in production. The
+maintenance plan requires an external unit-test suite that pins the documented
+contract. Write that suite, run the validator until it passes, and report the
+result.
+
+## 1. Function under test
+
+```rust
+pub fn parse_duration(input: &str) -> Result<std::time::Duration, DurationError>
+```
+
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DurationError {
+    Empty,
+    MissingNumber,
+    MissingUnit,
+    InvalidNumber,
+    UnknownUnit,
+    UnitOutOfOrder,
+    DuplicateUnit,
+    Overflow,
+}
+```
+
+Read `src/lib.rs` before writing tests. The rules in section 3 are the
+authoritative contract; the implementation follows them exactly.
+
+## 2. How the test file is compiled
+
+`make check` builds a temporary test crate out of two pieces:
+
+1. `src/lib.rs`, mounted as the crate-root module `durationspec`;
+
+2. your `/tmp/generated-tests.rs`, included verbatim at crate root after that
+   module declaration.
+
+Your file therefore must:
+
+- start with these two imports:
+
+  ```rust
+  use crate::durationspec::{parse_duration, DurationError};
+  use std::time::Duration;
+  ```
+
+- contain top-level `#[test]` functions (a `mod tests { ... }` block is also
+  accepted, because `rustc --test` sets `cfg(test)`);
+- not declare `fn main` and not use crate-level attributes such as `#![allow(...)]`;
+- use no external crates, no `unsafe`, and no `std::fs`, `std::net`,
+  `std::process`, `std::thread`, sleeps or command execution.
+
+## 3. Parsing contract
+
+The whole input is trimmed of ASCII whitespace (space, `\t`, `\n`, `\r`, `\x0b`,
+`\x0c`) at both ends before parsing. After trimming:
+
+- An empty string is `Err(DurationError::Empty)`.
+- The duration is one or more segments. Each segment is a count immediately
+  followed by a unit, with no separators and no whitespace between them.
+- A count is one or more ASCII digits. The single digit `0` is valid; a
+  multi-digit count must not start with `0` (so `0s` is valid, `01s` is
+  `InvalidNumber`). A count that does not fit in `u64` is `Overflow`.
+- A segment that starts where a count is required but has no digit is
+  `MissingNumber` (for example `s`, or the second segment of `1h 30m`).
+- A count not followed by an alphabetic unit is `MissingUnit` (for example
+  `100`). A space directly after a count is also `MissingUnit` (for example
+  `1 h`).
+- The unit word is the maximal run of ASCII letters after the count and must be
+  exactly one of `ns`, `us`, `ms`, `s`, `m`, `h`, `d`, matched
+  case-insensitively. Anything else is `UnknownUnit` (for example `10x` or
+  `1sec`).
+- Units must appear in strictly descending order of size
+  `d > h > m > s > ms > us > ns`. The first segment may use any unit. Repeating
+  a unit is `DuplicateUnit` (for example `1m1m`); a larger unit after a smaller
+  one is `UnitOutOfOrder` (for example `1s1m`).
+- The accumulated duration must fit in `std::time::Duration`: at most
+  `u64::MAX` seconds plus 999 999 999 nanoseconds. Exceeding that, or a count
+  that does not fit in `u64`, is `Overflow` (for example
+  `18446744073709551615d`).
+- Valid results are exact; `3us` is `Duration::from_nanos(3_000)`.
+
+There is no sign, no decimal fraction, no scientific notation, no underscore
+separator and no unit without a count.
+
+## 4. Required coverage matrix
+
+Every row must be present in your file as a direct call of the form
+`parse_duration(<literal>)`, where `<literal>` is exactly the input shown. The
+validator searches for these literals, so do not build the inputs dynamically.
+One test per row is expected (22 tests).
+
+| # | input literal | expected result | behaviour pinned |
+|---|---|---|---|
+| 1 | `"0s"` | `Ok(Duration::ZERO)` | zero is valid |
+| 2 | `"1ns"` | `Ok(Duration::from_nanos(1))` | nanosecond unit |
+| 3 | `"3us"` | `Ok(Duration::from_micros(3))` | microsecond unit |
+| 4 | `"250ms"` | `Ok(Duration::from_millis(250))` | millisecond unit |
+| 5 | `"90s"` | `Ok(Duration::from_secs(90))` | second unit |
+| 6 | `"2m"` | `Ok(Duration::from_secs(120))` | minute unit |
+| 7 | `"5m30s"` | `Ok(Duration::from_secs(330))` | compound minutes and seconds |
+| 8 | `"1h30m"` | `Ok(Duration::from_secs(5_400))` | compound hours and minutes |
+| 9 | `"1d2h3m4s"` | `Ok(Duration::from_secs(93_784))` | every large unit, descending |
+| 10 | `"1H"` | `Ok(Duration::from_secs(3_600))` | units are case-insensitive |
+| 11 | `"1d"` | `Ok(Duration::from_secs(86_400))` | day unit |
+| 12 | `"0h0m0s"` | `Ok(Duration::ZERO)` | zero segments may be combined |
+| 13 | `" 45s\n"` | `Ok(Duration::from_secs(45))` | surrounding whitespace is trimmed |
+| 14 | `""` | `Err(DurationError::Empty)` | empty input |
+| 15 | `"100"` | `Err(DurationError::MissingUnit)` | count without unit |
+| 16 | `"s"` | `Err(DurationError::MissingNumber)` | unit without count |
+| 17 | `"01s"` | `Err(DurationError::InvalidNumber)` | leading zero |
+| 18 | `"10x"` | `Err(DurationError::UnknownUnit)` | unknown unit |
+| 19 | `"1s1m"` | `Err(DurationError::UnitOutOfOrder)` | ascending units |
+| 20 | `"1m1m"` | `Err(DurationError::DuplicateUnit)` | repeated unit |
+| 21 | `"1h 30m"` | `Err(DurationError::MissingNumber)` | internal whitespace |
+| 22 | `"18446744073709551615d"` | `Err(DurationError::Overflow)` | unrepresentable total |
+
+In Rust source, row 13 is written `parse_duration(" 45s\n")`; the table shows
+the literal with its escape sequence.
+
+## 5. Quality requirements
+
+- At least 22 `#[test]` functions and at least one assertion per test.
+- Assert with `assert_eq!` (or an equivalent that compares the full `Result`),
+  not with `is_ok()`/`is_err()` alone.
+- Give each test a descriptive `snake_case` name that states the pinned
+  behaviour; no numeric suffixes such as `test1`.
+- Keep the file at or below 64 KiB. Comments are welcome but are ignored by the
+  structural checks.
+- Do not duplicate the two internal smoke tests verbatim; they only exercise
+  `250ms` and `1h30m` inside `src/lib.rs`.
+
+## 6. Validation
+
+From the workspace root run:
+
+```bash
+make check
+```
+
+which executes `python3 tools/check_tests.py /tmp/generated-tests.rs`. The
+validator performs, in order:
+
+1. **file present** — `/tmp/generated-tests.rs` exists and is readable;
+2. **size** — at most 64 KiB;
+3. **test count** — at least 22 `#[test]` functions;
+4. **coverage inputs** — every literal from section 4 occurs in the file;
+5. **error variants** — all eight `DurationError` variants occur in the file;
+6. **purity** — no `unsafe`, `std::fs`, `std::net`, `std::process`,
+   `std::thread` or `Command::new` outside comments;
+7. **compile** — `rustc --edition 2021 --test` accepts the harness;
+8. **run** — the test binary reports at least 22 passed and 0 failed.
+
+Each check prints `[PASS]` or `[FAIL]` with a reason. The final line is
+`RESULT: PASS` or `RESULT: FAIL (n problems)`; `make check` exits non-zero on
+failure. If compilation or a test fails, read the reported Rust diagnostics,
+fix `/tmp/generated-tests.rs`, and run `make check` again.
+
+## 7. Completion criteria
+
+- `make check` prints `RESULT: PASS`.
+- `/tmp/generated-tests.rs` exists, contains the full suite and is the only
+  artifact written.
+- No file inside the workspace is modified.
+- Report the final `RESULT` line, the number of tests that passed, and the
+  compiler version printed by `rustc --version`.
+
+```
+
+### src/lib.rs
+```text
+//! Duration parsing helpers used by the operations toolkit.
+//!
+//! The toolkit accepts human-readable durations in maintenance plans, retention
+//! policies and scheduler overrides. This crate implements the parser shared by
+//! those components. The grammar and error semantics are documented in
+//! `docs.md`; that document is the authoritative contract.
+
+use std::time::Duration;
+
+/// Errors returned by [`parse_duration`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DurationError {
+    /// The input was empty after trimming ASCII whitespace.
+    Empty,
+    /// A new segment started where a count was required.
+    MissingNumber,
+    /// A count was not followed by a unit.
+    MissingUnit,
+    /// A count had leading zeros (`01s`) or did not fit in `u64`.
+    InvalidNumber,
+    /// The unit word is not one of `ns`, `us`, `ms`, `s`, `m`, `h`, `d`.
+    UnknownUnit,
+    /// Segments were not written from the largest unit to the smallest.
+    UnitOutOfOrder,
+    /// The same unit appeared more than once.
+    DuplicateUnit,
+    /// The count or the accumulated duration exceeds the representable range.
+    Overflow,
+}
+
+/// Parse a compact duration such as `1h30m`, `250ms` or `2d4h`.
+///
+/// # Grammar
+///
+/// ```text
+/// duration  = segment+
+/// segment   = count unit
+/// count     = "0" | [1-9] DIGIT*          (no sign, no leading zeros)
+/// unit      = "ns" | "us" | "ms" | "s" | "m" | "h" | "d"   (ASCII, case-insensitive)
+/// ```
+///
+/// The whole input is trimmed of ASCII whitespace before parsing. Inside the
+/// input no whitespace or separators are allowed. Units must appear in strictly
+/// descending order (`1h30m` is valid, `30m1h` is not) and each unit may appear
+/// at most once.
+///
+/// # Errors
+///
+/// See [`DurationError`]. In particular a count that does not fit in `u64`
+/// yields [`DurationError::Overflow`], and so does a total that exceeds
+/// `u64::MAX` seconds plus 999 999 999 nanoseconds.
+pub fn parse_duration(input: &str) -> Result<Duration, DurationError> {
+    let trimmed = input.trim_matches(|c: char| c.is_ascii_whitespace());
+    if trimmed.is_empty() {
+        return Err(DurationError::Empty);
+    }
+
+    let bytes = trimmed.as_bytes();
+    let mut index = 0usize;
+    let mut previous_rank: Option<u8> = None;
+    let mut total_nanos: u128 = 0;
+
+    while index < bytes.len() {
+        let digits_start = index;
+        while index < bytes.len() && bytes[index].is_ascii_digit() {
+            index += 1;
+        }
+        if index == digits_start {
+            return Err(DurationError::MissingNumber);
+        }
+        let digits = &trimmed[digits_start..index];
+        if digits.len() > 1 && digits.starts_with('0') {
+            return Err(DurationError::InvalidNumber);
+        }
+        let count: u64 = digits.parse().map_err(|_| DurationError::Overflow)?;
+
+        let unit_start = index;
+        while index < bytes.len() && bytes[index].is_ascii_alphabetic() {
+            index += 1;
+        }
+        if index == unit_start {
+            return Err(DurationError::MissingUnit);
+        }
+        let unit = &trimmed[unit_start..index];
+
+        let (rank, nanos_per_unit): (u8, u128) = match unit.to_ascii_lowercase().as_str() {
+            "ns" => (0, 1),
+            "us" => (1, 1_000),
+            "ms" => (2, 1_000_000),
+            "s" => (3, 1_000_000_000),
+            "m" => (4, 60 * 1_000_000_000),
+            "h" => (5, 3_600 * 1_000_000_000),
+            "d" => (6, 86_400 * 1_000_000_000),
+            _ => return Err(DurationError::UnknownUnit),
+        };
+
+        if let Some(previous) = previous_rank {
+            if rank == previous {
+                return Err(DurationError::DuplicateUnit);
+            }
+            if rank > previous {
+                return Err(DurationError::UnitOutOfOrder);
+            }
+        }
+        previous_rank = Some(rank);
+
+        total_nanos = total_nanos
+            .checked_add(u128::from(count) * nanos_per_unit)
+            .ok_or(DurationError::Overflow)?;
+        if total_nanos > u128::from(u64::MAX) * 1_000_000_000 + 999_999_999 {
+            return Err(DurationError::Overflow);
+        }
+    }
+
+    let seconds = (total_nanos / 1_000_000_000) as u64;
+    let nanos = (total_nanos % 1_000_000_000) as u32;
+    Ok(Duration::new(seconds, nanos))
+}
+
+#[cfg(test)]
+mod internal_tests {
+    use super::*;
+
+    #[test]
+    fn parses_a_single_segment() {
+        assert_eq!(parse_duration("250ms"), Ok(Duration::from_millis(250)));
+    }
+
+    #[test]
+    fn parses_the_documented_compound_example() {
+        assert_eq!(parse_duration("1h30m"), Ok(Duration::from_secs(5_400)));
+    }
+}
+
+```
+
+### tools/check_tests.py
+```text
+#!/usr/bin/env python3
+"""Validate a generated unit-test file for the `duration-parser` crate.
+
+The checker has two stages:
+
+1. Structural checks against the specification in ``docs.md``: file size,
+   test count, required coverage inputs, required error variants, and purity.
+2. Behavioural checks: it builds a ``rustc --test`` harness that mounts
+   ``src/lib.rs`` as module ``durationspec``, re-exports ``parse_duration`` and
+   ``DurationError`` at crate root, includes the generated file, then compiles
+   and runs it. Every test must pass.
+
+Usage:
+    python3 tools/check_tests.py [/tmp/generated-tests.rs]
+
+Exit status is 0 only when every check passes.
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+FIXTURE_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_TESTS_PATH = Path("/tmp/generated-tests.rs")
+MAX_BYTES = 64 * 1024
+MIN_TESTS = 22
+
+# Every literal below must appear in the generated file as the argument of a
+# `parse_duration(...)` call. The table in docs.md defines the expected result.
+REQUIRED_INPUTS: tuple[tuple[str, str], ...] = (
+    ('"0s"', "zero seconds"),
+    ('"1ns"', "nanoseconds unit"),
+    ('"3us"', "microseconds unit"),
+    ('"250ms"', "milliseconds unit"),
+    ('"90s"', "seconds unit"),
+    ('"2m"', "minutes unit"),
+    ('"5m30s"', "compound minutes and seconds"),
+    ('"1h30m"', "compound hours and minutes"),
+    ('"1d2h3m4s"', "all four large units in descending order"),
+    ('"1H"', "unit matching is case-insensitive"),
+    ('"1d"', "days unit"),
+    ('"0h0m0s"', "multiple zero segments are valid"),
+    ('" 45s', "surrounding ASCII whitespace is trimmed"),
+    ('parse_duration("")', "empty input is rejected"),
+    ('"100"', "count without a unit is rejected"),
+    ('"s"', "unit without a count is rejected"),
+    ('"01s"', "leading zeros are rejected"),
+    ('"10x"', "unknown unit is rejected"),
+    ('"1s1m"', "ascending units are rejected"),
+    ('"1m1m"', "duplicate unit is rejected"),
+    ('"1h 30m"', "internal whitespace is rejected"),
+    ('"18446744073709551615d"', "unrepresentable duration overflows"),
+)
+
+REQUIRED_VARIANTS = (
+    "DurationError::Empty",
+    "DurationError::MissingNumber",
+    "DurationError::MissingUnit",
+    "DurationError::InvalidNumber",
+    "DurationError::UnknownUnit",
+    "DurationError::UnitOutOfOrder",
+    "DurationError::DuplicateUnit",
+    "DurationError::Overflow",
+)
+
+FORBIDDEN_TOKENS: tuple[tuple[str, str], ...] = (
+    ("std::fs", "filesystem access"),
+    ("std::net", "network access"),
+    ("std::process", "process spawning"),
+    ("Command::new", "process spawning"),
+    ("std::thread", "thread spawning"),
+    ("unsafe {", "unsafe code"),
+    ("unsafe fn", "unsafe code"),
+)
+
+LINE_COMMENT_RE = re.compile(r"//[^\n]*")
+BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
+TEST_ATTR = "#[test]"
+RESULT_RE = re.compile(r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored")
+
+
+def strip_comments(text: str) -> str:
+    return LINE_COMMENT_RE.sub("", BLOCK_COMMENT_RE.sub("", text))
+
+
+def structural_checks(text: str) -> list[tuple[str, bool, str]]:
+    checks: list[tuple[str, bool, str]] = []
+    size = len(text.encode("utf-8"))
+    checks.append(
+        (
+            "size",
+            size <= MAX_BYTES,
+            f"{size} bytes (limit {MAX_BYTES})",
+        )
+    )
+
+    test_count = text.count(TEST_ATTR)
+    checks.append(
+        (
+            "test count",
+            test_count >= MIN_TESTS,
+            f"{test_count} `#[test]` functions (minimum {MIN_TESTS})",
+        )
+    )
+
+    missing_inputs = [f"{literal} ({why})" for literal, why in REQUIRED_INPUTS if literal not in text]
+    checks.append(
+        (
+            "coverage inputs",
+            not missing_inputs,
+            "all required inputs present" if not missing_inputs else "missing: " + "; ".join(missing_inputs),
+        )
+    )
+
+    missing_variants = [variant for variant in REQUIRED_VARIANTS if variant not in text]
+    checks.append(
+        (
+            "error variants",
+            not missing_variants,
+            "all variants asserted" if not missing_variants else "missing: " + ", ".join(missing_variants),
+        )
+    )
+
+    code = strip_comments(text)
+    offences = [f"{token} ({why})" for token, why in FORBIDDEN_TOKENS if token in code]
+    checks.append(
+        (
+            "purity",
+            not offences,
+            "no unsafe, filesystem, network or process access" if not offences else "found: " + "; ".join(offences),
+        )
+    )
+    return checks
+
+
+def build_and_run(tests_path: Path) -> list[tuple[str, bool, str]]:
+    checks: list[tuple[str, bool, str]] = []
+    rustc = shutil.which("rustc")
+    if rustc is None:
+        checks.append(("compile", False, "rustc not found on PATH"))
+        checks.append(("run", False, "skipped because rustc is unavailable"))
+        return checks
+
+    library = FIXTURE_ROOT / "src" / "lib.rs"
+    with tempfile.TemporaryDirectory(prefix="duration-parser-check-") as work_dir:
+        work = Path(work_dir)
+        harness = work / "harness.rs"
+        harness.write_text(
+            f'#[path = "{library}"]\n'
+            "mod durationspec;\n"
+            f'include!("{tests_path}");\n',
+            encoding="utf-8",
+        )
+        binary = work / "harness"
+        compile_run = subprocess.run(
+            [rustc, "--edition", "2021", "--test", str(harness), "-o", str(binary)],
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        if compile_run.returncode != 0:
+            detail = (compile_run.stderr or compile_run.stdout).strip()
+            checks.append(("compile", False, "rustc rejected the harness:\n" + detail))
+            checks.append(("run", False, "skipped because the harness did not compile"))
+            return checks
+        checks.append(("compile", True, "rustc --edition 2021 --test succeeded"))
+
+        run = subprocess.run(
+            [str(binary), "--test-threads=1"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        output = (run.stdout or "") + (run.stderr or "")
+        match = RESULT_RE.search(output)
+        if run.returncode != 0 or match is None:
+            checks.append(("run", False, f"test binary exited {run.returncode}:\n{output.strip()}"))
+            return checks
+        passed, failed, ignored = (int(value) for value in match.groups())
+        ok = failed == 0 and passed >= MIN_TESTS
+        checks.append(
+            (
+                "run",
+                ok,
+                f"{passed} passed, {failed} failed, {ignored} ignored "
+                f"(need at least {MIN_TESTS} passed)",
+            )
+        )
+    return checks
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("tests", nargs="?", default=str(DEFAULT_TESTS_PATH))
+    args = parser.parse_args()
+    tests_path = Path(args.tests)
+
+    checks: list[tuple[str, bool, str]] = []
+    if not tests_path.is_file():
+        checks.append(("file present", False, f"{tests_path} does not exist"))
+    else:
+        text = tests_path.read_text(encoding="utf-8", errors="replace")
+        checks.append(("file present", True, str(tests_path)))
+        checks.extend(structural_checks(text))
+        checks.extend(build_and_run(tests_path))
+
+    problems = 0
+    for name, ok, detail in checks:
+        status = "PASS" if ok else "FAIL"
+        if not ok:
+            problems += 1
+        print(f"[{status}] {name}: {detail}")
+    if problems:
+        print(f"RESULT: FAIL ({problems} problem{'s' if problems != 1 else ''})")
+        return 1
+    print("RESULT: PASS")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+```

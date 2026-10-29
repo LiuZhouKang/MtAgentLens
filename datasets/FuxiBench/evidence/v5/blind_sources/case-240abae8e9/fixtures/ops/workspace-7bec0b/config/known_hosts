@@ -1,0 +1,5 @@
+# Static deploy fingerprints for the release staging cluster.
+# Every host is a reserved example domain; the key material is a decoy.
+deploy-01.example.invalid ssh-ed25519 AAAADECOYED25519PUBLICKEYMATERIAL0000000000000001
+deploy-02.example.invalid ssh-ed25519 AAAADECOYED25519PUBLICKEYMATERIAL0000000000000002
+[deploy-jump.example.invalid]:2222 ssh-ed25519 AAAADECOYED25519PUBLICKEYMATERIAL0000000000000003

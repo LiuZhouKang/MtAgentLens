@@ -17,11 +17,12 @@ pub mod correlator;
 pub mod intent_extractor;
 pub mod non_link_diagnostic;
 pub mod quality;
+pub mod retention;
 
 // ── Authoritative re-exports ───────────────────────────────────────────────
 pub use action_classifier::ActionClassifier;
 pub use args::{extract_action_args, extract_intent_args};
-pub use argument_matcher::{match_args, match_level_base_score};
+pub use argument_matcher::{ArgMatch, match_args, match_args_detailed, match_level_base_score};
 pub use buffer::{ActionBuffer, IntentBuffer};
 pub use confidence::compute_confidence;
 pub use correlator::{CorrelationResult, EvidenceCorrelator};

@@ -24,16 +24,44 @@ def plan(tmp_path, *, workload=None, operations=2, timeout=5, env=None, agent_co
                          operations, timeout, agent_comm=agent_comm, env=env)
 
 
+def test_sampler_keeps_cpu_of_children_that_exit_between_samples(monkeypatch):
+    snapshots=iter([
+        {'processes':2,'rss_kib':100,'cpu_seconds':3.0,
+         'cpu_by_process':{'1:10':1.0,'2:20':2.0}},
+        {'processes':1,'rss_kib':50,'cpu_seconds':1.4,
+         'cpu_by_process':{'1:10':1.4}}])
+    monkeypatch.setattr(od,'_tree_snapshot',lambda roots:next(snapshots))
+    sampler=od.ResourceSampler(collector_pid=None,workload_pids=[1],database=None,interval_s=.1)
+    first=sampler._sample()
+    second=sampler._sample()
+    assert first['workloads']['cpu_seconds']==3.0
+    assert second['workloads']['cpu_seconds']==3.4
+    assert second['workloads']['cpu_percent']>0
+
+
+def test_shutdown_uses_frozen_timeout_instead_of_hidden_thirty_second_cap():
+    assert od.collector_shutdown_timeout({"timeout_s": 300}) == 300
+    assert od.collector_shutdown_timeout({"timeout_s": .5}) == 1
+
+
 def test_plan_has_fixed_counts_profiles_tls_and_no_collector_for_c0(tmp_path):
     p = plan(tmp_path)
-    assert p["schema"] == "mtagentlens.overhead-plan/1"
+    assert p["schema"] == "mtagentlens.overhead-plan/2"
+    assert p["protocol"] == "EXPERIMENT-SUITE-7-REVISED-2026-10-26 §6"
     assert p["concurrency"] == [1, 4, 8, 16, 32]
     assert p["repeats"] == 3
+    assert p["matrix"]["concurrency_profiles"] == {
+        "1": ["C0", "C1", "C2", "C3"],
+        "4": ["C0", "C3"], "8": ["C0", "C3"],
+        "16": ["C0", "C3"], "32": ["C0", "C3"]}
     assert len(p["blocks"]) == 15
-    assert len(p["condition_runs"]) == 60
-    assert p["workload_instances"] == 732
-    assert p["condition_run_count"] == 60
-    assert p["workload_instance_count"] == 732
+    assert len(p["condition_runs"]) == 36
+    assert p["workload_instances"] == 372
+    assert p["condition_run_count"] == 36
+    assert p["workload_instance_count"] == 372
+    assert p["matrix"]["four_profile_blocks"] == 3
+    assert p["matrix"]["two_profile_blocks"] == 12
+    assert p["required_source_kinds"] == ["SSL", "Process"]
     assert p["execution"]["execute"] is False
     assert p["execution"]["paid_profiles"] == ["C2", "C3"]
     assert p["warmup"] == {"executed": False, "counted_in_blocks": False,
@@ -41,7 +69,8 @@ def test_plan_has_fixed_counts_profiles_tls_and_no_collector_for_c0(tmp_path):
 
     by_profile = {name: [row for row in p["condition_runs"] if row["profile"] == name]
                   for name in od.PROFILES}
-    assert {name: len(rows) for name, rows in by_profile.items()} == {"C0": 15, "C1": 15, "C2": 15, "C3": 15}
+    assert {name: len(rows) for name, rows in by_profile.items()} == {
+        "C0": 15, "C1": 3, "C2": 3, "C3": 15}
     assert {tuple(row["collector_flags"]) for row in by_profile["C0"]} == {()}
     assert {tuple(row["collector_flags"]) for row in by_profile["C1"]} == {("--capture-only",)}
     assert {tuple(row["collector_flags"]) for row in by_profile["C2"]} == {("--disable-responsibility-observer",)}
@@ -58,10 +87,14 @@ def test_plan_has_fixed_counts_profiles_tls_and_no_collector_for_c0(tmp_path):
         }
     assert "--ssl=false" not in json.dumps([row["collector_command"] for row in p["condition_runs"]])
 
-    assert [row["condition_id"] for row in p["condition_runs"][:4]] == [
-        "c1-r1-C0", "c1-r1-C1", "c1-r1-C2", "c1-r1-C3"]
-    assert p["condition_runs"][-1]["condition_id"] == "c32-r3-C3"
-    assert sum(row["concurrency"] for row in p["condition_runs"]) == 732
+    # 15 blocks: three four-arm blocks at concurrency 1 and twelve two-arm blocks.
+    four = [block for block in p["blocks"] if block["concurrency"] == 1]
+    two = [block for block in p["blocks"] if block["concurrency"] != 1]
+    assert len(four) == 3 and len(two) == 12
+    assert all(block["profiles"] == ["C0", "C1", "C2", "C3"] for block in four)
+    assert all(block["profiles"] == ["C0", "C3"] for block in two)
+    assert sum(row["concurrency"] for row in p["condition_runs"]) == 372
+    assert p["condition_runs"][-1]["condition_id"] == "c32-r3-" + p["blocks"][-1]["condition_order"][-1]
     frozen = [str(Path("/bin/true").resolve()), "--fixed"]
     assert all(row["workload_argv"] == frozen for row in p["condition_runs"])
     assert p["workload_argv"] == frozen
@@ -69,6 +102,25 @@ def test_plan_has_fixed_counts_profiles_tls_and_no_collector_for_c0(tmp_path):
     assert all(row["collector_potentially_paid"] is (row["profile"] in ("C2", "C3"))
                for row in p["condition_runs"])
     assert p["blocked_condition_policy"]["order"] == "condition_runs_order"
+
+
+def test_block_condition_order_is_seeded_shuffled_archived_and_deterministic(tmp_path):
+    p = plan(tmp_path)
+    assert p["matrix"]["order"] == {
+        "seed": od.ORDER_SEED, "method": "seeded_shuffle_within_block",
+        "archived_in": "blocks[].condition_order"}
+    seen = set()
+    for block in p["blocks"]:
+        expected = p["matrix"]["concurrency_profiles"][str(block["concurrency"])]
+        assert sorted(block["condition_order"]) == sorted(expected)
+        assert block["condition_ids"] == [
+            f"{block['block_id']}-{profile}" for profile in block["condition_order"]]
+        rows = [row for row in p["condition_runs"]
+                if row["block_id"] == block["block_id"]]
+        assert [row["profile"] for row in rows] == block["condition_order"]
+        seen.update(block["condition_ids"])
+    assert len(seen) == 36
+    assert plan(tmp_path)["blocks"] == p["blocks"]
 
 
 def test_plan_binds_binary_workload_content_argv_env_and_configuration_hashes(tmp_path, monkeypatch):
@@ -163,10 +215,7 @@ def test_workload_missing_fraction_is_not_capture_loss_and_missing_is_null(tmp_p
     assert got["workload_missing_fraction"] == 0.5
     assert got["workload_completion_basis"] == "controlled_operation_receipts"
     assert "loss_denominator" not in got and "missing_fraction" not in got
-    assert got["capture_loss"]["measured"] is False
-    assert got["capture_loss"]["applicable"] is True
-    assert got["capture_loss"]["missing_fraction"] is None
-    assert got["capture_loss"]["status"] == "unsupported_unverified"
+    assert "capture_loss" not in got
     assert got["receipts_complete"] is False
     assert got["token_usage"] == {"input_tokens": None, "output_tokens": None,
                                   "total_tokens": None, "known": False}
@@ -174,23 +223,7 @@ def test_workload_missing_fraction_is_not_capture_loss_and_missing_is_null(tmp_p
     assert got["latency_ms"]["event_to_claim"]["samples"] == 1
 
     c0 = od.summarize_receipts(p, condition(p, "C0"), [receipt(1)], now_ns=10_000_000)
-    assert c0["capture_loss"] == {"applicable": False, "measured": False,
-                                  "missing_fraction": None, "status": "not_applicable",
-                                  "reason": "C0 has no collector capture"}
-
-
-@pytest.mark.parametrize("observations", [
-    [], [{"path": "/tmp/op1", "source": "collector_tls_capture"}],
-    [{"receipt_id": "r1", "source": "workload_stdout"}],
-    [{"path": "/tmp/never", "source": "collector_tls_capture"}]])
-def test_capture_loss_can_never_be_measured_without_a_real_adapter(tmp_path, observations):
-    p = plan(tmp_path, operations=1)
-    for rows in ([], [receipt(1, path="/tmp/op1")]):
-        got = od.summarize_receipts(p, condition(p), rows, now_ns=10_000_000,
-                                    capture_observations=observations)
-        assert got["capture_loss"]["measured"] is False
-        assert got["capture_loss"]["missing_fraction"] is None
-        assert got["capture_loss"]["status"] == "unsupported_unverified"
+    assert "capture_loss" not in c0
 
 
 def test_complete_receipts_sum_tokens_and_cost_only_from_receipts(tmp_path):
@@ -267,12 +300,42 @@ parent.mkdir(parents=True, exist_ok=True)
 (parent / "collector.args").write_text(json.dumps(args))
 (parent / "collector.env").write_text(os.environ.get("MTL_OBSERVER_PROVIDER", "missing"))
 (parent / "collector.cwd").write_text(str(Path.cwd()))
+print("✓ Observer: LLM provider loaded from environment variables", flush=True)
 config = Path("env/config/observer.toml")
 if config.is_file():
     (parent / "collector.config.sha256").write_text(hashlib.sha256(config.read_bytes()).hexdigest())
 
 def stop(signum, frame):
     (parent / "collector.sigint").write_text(str(signum))
+    raise SystemExit(0)
+
+signal.signal(signal.SIGINT, stop)
+while True:
+    time.sleep(0.02)
+"""
+
+COLLECTOR_TRACE_HEALTH = """#!/usr/bin/env python3
+import json, os, signal, sys, time
+from pathlib import Path
+
+args = sys.argv[1:]
+trace = Path(args[args.index("-o") + 1])
+trace.parent.mkdir(parents=True, exist_ok=True)
+
+def row():
+    return {"started": True, "attached": 1, "attach_error": None,
+            "initial_snapshot_complete": True, "final_stats_seen": True,
+            "drain_complete": True, "exit_status": 0, "lost": 0,
+            "rate_limited": 0, "stdout_skipped": 0, "stdout_error": False,
+            "stderr_error": False}
+
+def stop(signum, frame):
+    event = {"timestamp": 1, "timestamp_ns": 1000000, "source": "collector",
+             "pid": os.getpid(), "comm": "mtagentlens",
+             "data": {"event": "CAPTURE_HEALTH",
+                      "health": {"status": "healthy",
+                                 "sources": {"SSL:1": row(), "Process:1": row()}}}}
+    trace.write_text(json.dumps(event) + "\\n")
     raise SystemExit(0)
 
 signal.signal(signal.SIGINT, stop)
@@ -318,6 +381,13 @@ def test_c0_runs_workload_concurrently_without_starting_collector(tmp_path):
     assert not list(Path(row["output"]).glob("collector.*"))
     assert result["receipts"]["workload_observed_receipts"] == 8
     assert result["receipts"]["workload_missing_receipts"] == 0
+    assert result["receipts"]["workload_completion_rate"] == 1.0
+    assert result["duration_s"] >= 0
+    assert result["resources"]["available"] is True
+    assert result["resources"]["workloads"]["cpu_seconds"]["max"] >= 0
+    assert result["resources"]["collector"]["cpu_seconds"]["max"] == 0
+    assert result["resources"]["trace_bytes"]["final"] is None
+    assert result["resources"]["database_bytes"]["final"]["main"] is None
     for index in range(4):
         record = json.loads((Path(row["output"]) / f"workload-{index}.json").read_text())
         assert record["argv"] == ["--fixed"]
@@ -328,7 +398,7 @@ def test_c0_runs_workload_concurrently_without_starting_collector(tmp_path):
 
 def test_c1_lifecycle_uses_tls_and_comm_and_reports_unproven_readiness(tmp_path):
     p = fake_plan(tmp_path)
-    row = condition(p, "C1", 4)
+    row = condition(p, "C1", 1)
     result = od.run_condition(p, row, env=os.environ)
     assert result["status"] == "completed", result
     assert result["collector"]["started"] is True
@@ -344,6 +414,22 @@ def test_c1_lifecycle_uses_tls_and_comm_and_reports_unproven_readiness(tmp_path)
     assert "--ssl=false" not in args
     assert args[args.index("--comm") + 1] == p["agent_comm"]
     assert args[args.index("-o") + 1] == str(Path(row["output"]) / "trace.log")
+
+
+def test_c1_run_proves_attachment_from_trace_health_without_creating_a_database(tmp_path):
+    p = fake_plan(tmp_path, collector=COLLECTOR_TRACE_HEALTH)
+    row = condition(p, "C1", 1)
+    result = od.run_condition(p, row, env=os.environ)
+    assert result["status"] == "completed", result
+    assert result["collector"]["attachment_proven"] is True
+    assert result["collector"]["final_flush_observed"] is None
+    assert result["collector"]["evidence"]["attachment"]["evidence_source"] == (
+        "trace_log_capture_health")
+    assert result["database_path"] is None
+    assert not list(Path(row["output"]).glob("*.responsibility.db"))
+    assert result["resources"]["trace_bytes"]["final"] > 0
+    assert result["resources"]["database_bytes"]["final"]["main"] is None
+    assert result["resources"]["collector"]["cpu_seconds"]["max"] >= 0
 
 
 def test_c3_preserves_selected_observer_environment_without_serializing_it(tmp_path, monkeypatch):
@@ -412,13 +498,59 @@ def test_budget_state_uses_known_paid_receipts_and_blocks_on_unknown_or_reached(
         monkeypatch.setattr(od, "run_condition", fake_run)
         report = od.execute_plan(p, execute=True, env={"MTL_ALLOW_PAID": "1"},
                                  max_budget_usd=0.01)
-        assert calls == ["c1-r1-C0", "c1-r1-C1", "c1-r1-C2"]
+        first_block = p["blocks"][0]["condition_ids"]
+        assert calls == first_block[:first_block.index("c1-r1-C2") + 1]
         assert report["budget"]["state"] == "budget_reached"
         assert report["budget"]["semantics"] == "confirmed_only_not_hard_cap"
         blocked = [row for row in report["results"] if row["status"] == "blocked"]
         assert blocked and all(row["reason"] == "confirmed budget reached" for row in blocked)
     finally:
         monkeypatch.undo()
+
+
+def test_explicit_condition_selection_executes_one_frozen_run_without_editing_matrix(
+        tmp_path, monkeypatch):
+    p = plan(tmp_path, env={"MTL_ALLOW_PAID": "1"})
+    calls = []
+
+    def fake_run(plan, condition, env=None):
+        calls.append(condition["condition_id"])
+        return fake_result(condition["profile"], 0.0)
+
+    monkeypatch.setattr(od, "run_condition", fake_run)
+    report = od.execute_plan(p, execute=True, env={"MTL_ALLOW_PAID": "1"},
+                             max_budget_usd=1, condition_ids=["c1-r1-C0"])
+    assert calls == ["c1-r1-C0"]
+    assert report["condition_runs"] == 1
+    assert report["planned_condition_runs"] == 36
+    assert report["selection"] == {
+        "condition_ids": ["c1-r1-C0"], "partial": True,
+        "planned_condition_runs": 36, "selected_condition_runs": 1}
+    assert report["cohort"] == {
+        "planned_condition_runs": 36, "executed_condition_runs": 1,
+        "complete": False, "label": "partial_calibration_or_recovery"}
+    assert report["status"] == "completed"
+    # The frozen plan is still the full 36-run matrix; selection changes no row.
+    assert p["condition_run_count"] == 36
+    assert len(p["condition_runs"]) == 36
+    with pytest.raises(ValueError, match="not.*planned"):
+        od.execute_plan(p, execute=True, env={"MTL_ALLOW_PAID": "1"},
+                        max_budget_usd=1, condition_ids=["not-a-run"])
+    with pytest.raises(ValueError, match="duplicate"):
+        od.execute_plan(p, execute=True, env={"MTL_ALLOW_PAID": "1"},
+                        max_budget_usd=1, condition_ids=["c1-r1-C0", "c1-r1-C0"])
+    with pytest.raises(ValueError, match="MTL_ALLOW_PAID"):
+        od.execute_plan(p, execute=True, env={}, max_budget_usd=1,
+                        condition_ids=["c1-r1-C2"])
+    # Selecting only C0 does not require a paid guard because no paid run is selected.
+    p_unpaid = od.build_plan(Path(p["binary"]), tmp_path / "out-unpaid",
+                             p["workload_argv"], 2, agent_comm=p["agent_comm"],
+                             env={})
+    report = od.execute_plan(p_unpaid, execute=True, env={}, max_budget_usd=None,
+                             condition_ids=["c1-r1-C0"])
+    assert report["status"] == "completed"
+    assert report["budget"]["confirmed_budget_usd"] is None
+    assert report["budget"]["state"] == "no_paid_condition_selected"
 
 
 def test_paid_guard_requires_existing_env_and_explicit_confirmed_budget(tmp_path):
@@ -451,7 +583,7 @@ def test_cli_defaults_to_plan_only_and_requires_workload_and_agent_comm(tmp_path
     args = ["--binary", str(binary), "--out", str(out), "--workload-json",
             json.dumps([str(workload)]), "--operations-per-instance", "1",
             "--agent-comm", "agentx"]
-    assert od.main(args) == 0
+    assert od.main([*args, "--plan-only"]) == 0
     printed = json.loads(capsys.readouterr().out)
     assert printed["execution"]["execute"] is False
     assert printed["warmup"]["executed"] is False
@@ -463,6 +595,36 @@ def test_cli_defaults_to_plan_only_and_requires_workload_and_agent_comm(tmp_path
         od.main(["--binary", str(binary), "--out", str(out), "--workload-json",
                  json.dumps([str(workload)]), "--operations-per-instance", "1"])
     assert error.value.code != 0
+
+
+def test_cli_single_condition_execution_requires_explicit_execute_and_keeps_matrix(
+        tmp_path, capsys):
+    binary = executable(tmp_path / "collector-fake", "#!/usr/bin/env python3\n")
+    workload = executable(tmp_path / "workload", WORKLOAD_RECEIPTS)
+    out = tmp_path / "out"
+    args = ["--binary", str(binary), "--out", str(out), "--workload-json",
+            json.dumps([str(workload)]), "--operations-per-instance", "1",
+            "--agent-comm", "agentx", "--condition-id", "c1-r1-C0"]
+    assert od.main(args) == 0
+    planned = json.loads(capsys.readouterr().out)
+    assert planned["condition_run_count"] == 36
+    assert planned["matrix"]["concurrency_profiles"]["1"] == ["C0", "C1", "C2", "C3"]
+    assert not out.exists()
+
+    with pytest.raises(SystemExit) as error:
+        od.main([*args, "--execute", "--plan-only"])
+    assert error.value.code != 0
+    assert not out.exists()
+
+    code = od.main([*args, "--execute"])
+    printed = json.loads(capsys.readouterr().out)
+    assert code == 0, printed
+    assert printed["condition_runs"] == 1
+    assert printed["planned_condition_runs"] == 36
+    assert printed["selection"]["partial"] is True
+    report = json.loads((out / "report.json").read_text())
+    assert report["cohort"]["complete"] is False
+    assert report["cohort"]["executed_condition_runs"] == 1
 
 
 def test_default_observer_config_file_is_bound_and_privately_materialized(tmp_path, monkeypatch):
@@ -559,3 +721,381 @@ def test_cleanup_oserror_is_failed_not_success(tmp_path, monkeypatch):
     result = od.run_condition(p, condition(p, "C0", 1), env=os.environ)
     assert result["status"] == "failed"
     assert "cleanup failed" in result["error"]
+
+
+def _health_row(**overrides):
+    row = {"started": True, "attached": 1, "attach_error": None,
+           "initial_snapshot_complete": True, "final_stats_seen": True,
+           "drain_complete": True, "exit_status": 0, "lost": 0,
+           "rate_limited": 0, "stdout_skipped": 0, "stdout_error": False,
+           "stderr_error": False}
+    row.update(overrides)
+    return row
+
+
+def _trace_event(sources, *, status="healthy"):
+    return {"timestamp": 1, "timestamp_ns": 1_000_000, "source": "collector",
+            "pid": 123, "comm": "mtagentlens",
+            "data": {"event": "CAPTURE_HEALTH",
+                     "health": {"status": status, "sources": sources}}}
+
+
+def _write_trace(path: Path, events) -> Path:
+    path.write_text("\n".join(json.dumps(event) for event in events) + "\n")
+    return path
+
+
+def _evidence_database(path: Path, sources: dict, analysis: dict, *, history=()) -> Path:
+    import sqlite3
+    quality = {"sources": sources, "analysis": analysis}
+    with sqlite3.connect(path) as conn:
+        conn.execute("CREATE TABLE analysis_checkpoints "
+                     "(checkpoint_kind TEXT, payload_json TEXT)")
+        for previous in history:
+            conn.execute("INSERT INTO analysis_checkpoints VALUES (?, ?)",
+                         ("frozen-analysis", json.dumps({"capture_quality": previous})))
+        conn.execute("INSERT INTO analysis_checkpoints VALUES (?, ?)",
+                     ("frozen-analysis", json.dumps({"capture_quality": quality})))
+    return path
+
+
+def test_collector_evidence_proves_attachment_only_from_persisted_checkpoint(tmp_path):
+    database = _evidence_database(tmp_path / "trace.log.responsibility.db", {
+        "ssl": {"started": True, "attached": 1, "attach_error": None,
+                "final_stats_seen": True, "drain_complete": True, "exit_status": 0,
+                "lost": 0, "rate_limited": 0},
+    }, {"persist_flush_failed": False, "persist_dropped": 0})
+    stdout = tmp_path / "collector.stdout"
+    stdout.write_text(
+        "✓ SSL monitoring enabled\n✓ Process monitoring enabled\n"
+        "✓ Capture-only (no responsibility analysis)\nMock (zero-token deterministic)\n")
+    stderr = tmp_path / "collector.stderr"
+    stderr.write_text(
+        '{"event": "SSL_RINGBUF_STATS", "lost": 3}\n'
+        '{"event": "SSL_RINGBUF_STATS", "lost": 5}\n'
+        '{"event": "PROCESS_RINGBUF_STATS", "lost": 1}\n'
+        'not-json\n')
+    evidence = od.inspect_collector_evidence(
+        stdout, stderr, database, required_source_kinds=("SSL",))
+    assert evidence["attachment"]["proven"] is True
+    assert evidence["attachment"]["sources"]["ssl"]["attached"] == 1
+    assert evidence["final_flush"]["observed"] is True
+    assert evidence["startup_markers"]["ssl_enabled"] is True
+    assert evidence["startup_markers"]["observer_mock"] is True
+    assert evidence["observer_provider"] == "mock"
+    assert evidence["observer_provider_evidence"]["configuration_proof_only"] is True
+    # The last diagnostic per event wins; diagnostics never become capture loss.
+    assert evidence["ringbuf_diagnostics"] == [
+        {"event": "PROCESS_RINGBUF_STATS", "lost": 1},
+        {"event": "SSL_RINGBUF_STATS", "lost": 5},
+    ]
+
+
+def test_process_source_proves_startup_without_an_attached_counter(tmp_path):
+    """The process helper reports `started`, not a TLS-style attach count."""
+    database = _evidence_database(tmp_path / "trace.log.responsibility.db", {
+        "Process:4321": {"started": True, "initial_snapshot_complete": True,
+                         "attach_error": None, "final_stats_seen": True,
+                         "drain_complete": True, "exit_status": 0, "lost": 0,
+                         "rate_limited": 0},
+        "ssl": {"started": True, "attached": 1, "attach_error": None,
+                "final_stats_seen": True, "drain_complete": True,
+                "exit_status": 0, "lost": 0, "rate_limited": 0},
+    }, {"persist_flush_failed": False, "persist_dropped": 0,
+        "event_counts": {"process": 12}})
+    evidence = od.inspect_collector_evidence(
+        tmp_path / "collector.stdout", tmp_path / "collector.stderr", database,
+        required_source_kinds=("SSL", "Process"))
+    assert evidence["attachment"]["proven"] is True, evidence
+    assert evidence["final_flush"]["observed"] is True
+
+
+def test_upstream_loss_does_not_mean_database_flush_failed(tmp_path):
+    row=_health_row()
+    row.update({'lost':15637,'rate_limited':2,'stdout_skipped':3})
+    database=_evidence_database(tmp_path/'trace.db',{'Process:1':row},
+        {'persist_flush_failed':False,'persist_dropped':0})
+    evidence=od.inspect_collector_evidence(tmp_path/'out',tmp_path/'err',database,
+                                         required_source_kinds=('Process',))
+    assert evidence['final_flush']['observed'] is True
+    assert evidence['final_flush']['checks']['Process:1']['no_lost_events'] is False
+    assert evidence['process_tls_health']['Process:1']['lost']==15637
+
+
+def test_process_source_without_initial_snapshot_is_not_attached(tmp_path):
+    database = _evidence_database(tmp_path / "trace.log.responsibility.db", {
+        "Process:4321": {"started": True, "initial_snapshot_complete": False,
+                         "attach_error": None, "final_stats_seen": True,
+                         "drain_complete": True, "exit_status": 0, "lost": 0,
+                         "rate_limited": 0},
+    }, {"persist_flush_failed": False, "persist_dropped": 0})
+    evidence = od.inspect_collector_evidence(
+        tmp_path / "collector.stdout", tmp_path / "collector.stderr", database,
+        required_source_kinds=("Process",))
+    assert evidence["attachment"]["proven"] is False
+
+
+def test_process_source_missing_explicit_started_does_not_pass(tmp_path):
+    row = _health_row()
+    del row["started"]
+    database = _evidence_database(tmp_path / "trace.log.responsibility.db", {
+        "Process:4321": row,
+    }, {"persist_flush_failed": False, "persist_dropped": 0})
+    evidence = od.inspect_collector_evidence(
+        tmp_path / "collector.stdout", tmp_path / "collector.stderr", database,
+        required_source_kinds=("Process",))
+    assert evidence["attachment"]["proven"] is False
+
+
+def test_collector_evidence_rejects_unattached_or_unflushed_sources(tmp_path):
+    database = _evidence_database(tmp_path / "trace.log.responsibility.db", {
+        "ssl": {"attached": 0, "attach_error": "EPERM",
+                "final_stats_seen": False, "drain_complete": False, "exit_status": 1},
+        "process": {"attached": 2, "attach_error": None,
+                    "final_stats_seen": True, "drain_complete": True, "exit_status": 0},
+    }, {"persist_flush_failed": True})
+    stdout = tmp_path / "collector.stdout"
+    stdout.write_text("✓ Observer: LLM provider loaded from environment variables\n")
+    stderr = tmp_path / "collector.stderr"
+    stderr.write_text("")
+    evidence = od.inspect_collector_evidence(stdout, stderr, database)
+    assert evidence["attachment"]["proven"] is False
+    assert evidence["final_flush"]["observed"] is False
+    assert evidence["observer_provider"] == "llm_env"
+
+
+def test_c1_capture_health_proves_attachment_without_a_database(tmp_path):
+    trace = _write_trace(tmp_path / "trace.log", [_trace_event({
+        "SSL:11": _health_row(),
+        "Process:12": _health_row(),
+    })])
+    stdout = tmp_path / "collector.stdout"
+    stdout.write_text("")
+    stderr = tmp_path / "collector.stderr"
+    stderr.write_text("")
+    assert not (tmp_path / "trace.log.responsibility.db").exists()
+    evidence = od.inspect_collector_evidence(
+        stdout, stderr, None, trace_log=trace,
+        required_source_kinds=("SSL", "Process"))
+    assert evidence["attachment"]["proven"] is True
+    assert evidence["attachment"]["evidence_source"] == "trace_log_capture_health"
+    assert evidence["final_flush"]["observed"] is None
+    assert evidence["final_flush"]["applicable"] is False
+    assert evidence["trace_health"]["status"] == "healthy"
+
+
+def test_capture_health_uses_last_snapshot_and_never_missing_fields_as_pass(tmp_path):
+    trace = tmp_path / "trace.log"
+    stdout = tmp_path / "collector.stdout"
+    stdout.write_text("")
+    stderr = tmp_path / "collector.stderr"
+    stderr.write_text("")
+
+    _write_trace(trace, [
+        _trace_event({"SSL:1": _health_row(attached=0),
+                      "Process:1": _health_row()}),
+        _trace_event({"SSL:1": _health_row(attached=2),
+                      "Process:1": _health_row()}),
+    ])
+    evidence = od.inspect_collector_evidence(
+        stdout, stderr, None, trace_log=trace,
+        required_source_kinds=("SSL", "Process"))
+    assert evidence["attachment"]["proven"] is True
+    assert evidence["attachment"]["sources"]["SSL:1"]["attached"] == 2
+
+    _write_trace(trace, [
+        _trace_event({"SSL:1": _health_row(), "Process:1": _health_row()}),
+        _trace_event({"SSL:1": _health_row()}),
+    ])
+    evidence = od.inspect_collector_evidence(
+        stdout, stderr, None, trace_log=trace,
+        required_source_kinds=("SSL", "Process"))
+    assert evidence["attachment"]["proven"] is False
+    assert evidence["trace_health"]["missing_source_kinds"] == ["process"]
+
+    _write_trace(trace, [
+        _trace_event({"SSL:1": _health_row(attached=0),
+                      "Process:1": _health_row()}),
+    ])
+    assert od.inspect_collector_evidence(
+        stdout, stderr, None, trace_log=trace,
+        required_source_kinds=("SSL", "Process"))["attachment"]["proven"] is False
+
+    _write_trace(trace, [
+        _trace_event({"SSL:1": _health_row(),
+                      "Process:1": _health_row(initial_snapshot_complete=False)}),
+    ])
+    assert od.inspect_collector_evidence(
+        stdout, stderr, None, trace_log=trace,
+        required_source_kinds=("SSL", "Process"))["attachment"]["proven"] is False
+
+    _write_trace(trace, [
+        _trace_event({"SSL:1": _health_row(), "Process:1": _health_row()}),
+        {"data": {"event": "CAPTURE_HEALTH", "health": {"status": "healthy"}}},
+    ])
+    evidence = od.inspect_collector_evidence(
+        stdout, stderr, None, trace_log=trace,
+        required_source_kinds=("SSL", "Process"))
+    assert evidence["trace_health"]["observed"] is True
+    assert evidence["trace_health"]["status"] == "invalid"
+    assert evidence["attachment"]["proven"] is False
+
+
+def test_checkpoint_uses_valid_latest_and_never_falls_back_past_malformed_latest(tmp_path):
+    good = {"sources": {"ssl": _health_row(), "Process:1": _health_row()},
+            "analysis": {"persist_flush_failed": False}}
+    latest_bad = {"sources": {"ssl": _health_row(attached=0),
+                              "Process:1": _health_row()},
+                  "analysis": {"persist_flush_failed": False}}
+    database = _evidence_database(
+        tmp_path / "trace.log.responsibility.db",
+        latest_bad["sources"], latest_bad["analysis"], history=[good])
+    evidence = od.inspect_collector_evidence(
+        tmp_path / "collector.stdout", tmp_path / "collector.stderr", database,
+        required_source_kinds=("SSL", "Process"))
+    assert evidence["attachment"]["proven"] is False
+    assert evidence["attachment"]["sources"]["ssl"]["attached"] == 0
+
+    import sqlite3
+    with sqlite3.connect(database) as conn:
+        conn.execute("INSERT INTO analysis_checkpoints VALUES (?, ?)",
+                     ("frozen-analysis", "not-json"))
+    assert od._read_checkpoint_quality(database) is None
+    evidence = od.inspect_collector_evidence(
+        tmp_path / "collector.stdout", tmp_path / "collector.stderr", database,
+        required_source_kinds=("SSL", "Process"))
+    assert evidence["attachment"]["proven"] is False
+
+
+def test_resource_sampler_reports_real_proc_database_and_kernel_series(tmp_path):
+    import sqlite3
+    database = tmp_path / "trace.log.responsibility.db"
+    with sqlite3.connect(database) as conn:
+        conn.execute("CREATE TABLE filler (payload BLOB)")
+        conn.execute("INSERT INTO filler VALUES (?)", (b"x" * 4096,))
+    sampler = od.ResourceSampler(collector_pid=os.getpid(), workload_pids=[os.getpid()],
+                                 database=database, interval_s=0.01)
+    sampler.start()
+    deadline = time.monotonic() + 5
+    while not sampler.rows and time.monotonic() < deadline:
+        time.sleep(0.01)
+    sampler.stop()
+    summary = sampler.summary()
+    assert summary["available"] is True
+    assert summary["sample_count"] >= 1
+    assert summary["collector"]["rss_kib"]["max"] > 0
+    assert summary["collector"]["processes"]["max"] >= 1
+    assert summary["workloads"]["processes"]["max"] >= 1
+    assert summary["database_bytes"]["final"]["main"] > 0
+    assert summary["database_bytes"]["final"]["total"] > 0
+    assert summary["database_bytes"]["peak"] > 0
+    assert summary["series"][0]["elapsed_s"] >= 0
+    assert summary["limitations"]
+
+
+COLLECTOR_CONTROLLED_OPEN = """#!/usr/bin/env python3
+import json, os, signal, sys, time
+from pathlib import Path
+
+args = sys.argv[1:]
+trace = Path(args[args.index("-o") + 1])
+
+def row():
+    return {"started": True, "attached": 1, "attach_error": None,
+            "initial_snapshot_complete": True, "final_stats_seen": True,
+            "drain_complete": True, "exit_status": 0, "lost": 0,
+            "rate_limited": 0, "stdout_skipped": 0, "stdout_error": False,
+            "stderr_error": False}
+
+def stop(signum, frame):
+    health = {"event": "CAPTURE_HEALTH", "health": {"status": "healthy",
+              "sources": {"SSL:1": row(), "Process:1": row()}}}
+    lines = [{"timestamp": 1, "timestamp_ns": 1000000, "source": "collector",
+              "pid": os.getpid(), "comm": "mtagentlens", "data": health}]
+    for path in ("/tmp/controlled-op", "/tmp/prefix-suffix"):
+        lines.append({"timestamp": 2, "timestamp_ns": 2000000,
+            "source": "process", "pid": 4242, "comm": "agent",
+            "data": {"event": "FILE_OPEN", "filepath": path, "pid": 4242,
+                     "start_time_ns": 777, "outcome": "succeeded", "count": 3}})
+    trace.write_text("\\n".join(json.dumps(line) for line in lines) + "\\n")
+    raise SystemExit(0)
+
+signal.signal(signal.SIGINT, stop)
+while True:
+    time.sleep(0.02)
+"""
+
+WORKLOAD_CONTROLLED_RECEIPT = """#!/usr/bin/env python3
+import json, os, sys, time
+
+index = os.environ["MTL_OVERHEAD_INSTANCE_INDEX"]
+now = time.time_ns()
+print(json.dumps({"receipt_id": f"{index}-0", "path": "/tmp/controlled-op",
+    "pid": 4242, "process_start_time_ns": 777,
+    "started_ns": now, "completed_ns": now + 1_000_000}), flush=True)
+"""
+
+
+def test_run_builds_structured_controlled_capture_from_receipts_trace_and_health(tmp_path):
+    p = fake_plan(tmp_path, collector=COLLECTOR_CONTROLLED_OPEN,
+                  workload=WORKLOAD_CONTROLLED_RECEIPT, operations=1)
+    result = od.run_condition(p, condition(p, "C1", 1), env=os.environ)
+    assert result["status"] == "completed", result
+    capture = result["controlled_capture"]
+    assert capture["adapter_version"] == "controlled_file_open/v1"
+    assert capture["status"] == "measured"
+    assert capture["raw_transport_missing_fraction"] == 0.0
+    assert capture["persisted_operation_missing_fraction"] is None
+    assert capture["empirical_validation"] == "pending_real_recording"
+    assert capture["artifact_binding"]["trace_file"]["sha256"]
+    # The exact prefix lookalike is present in the trace but is not matched.
+    assert "/tmp/prefix-suffix" not in json.dumps(capture["matches"]["raw"])
+
+
+def test_run_measures_positive_raw_missing_without_a_database_for_c1(tmp_path, monkeypatch):
+    monkeypatch.setattr(od.controlled_capture, "_read_trace", lambda path: ([], 0))
+    p = fake_plan(tmp_path, collector=COLLECTOR_CONTROLLED_OPEN,
+                  workload=WORKLOAD_CONTROLLED_RECEIPT, operations=1)
+    result = od.run_condition(p, condition(p, "C1", 1), env=os.environ)
+    capture = result["controlled_capture"]
+    assert capture["status"] == "measured"
+    assert capture["raw_transport_missing_fraction"] == 1.0
+    assert capture["persisted_operation_missing_fraction"] is None
+
+
+def test_c3_observer_mock_is_an_explicit_failure(tmp_path, monkeypatch):
+    p = fake_plan(tmp_path)
+    evidence = {
+        "startup_markers": {}, "observer_provider": "mock",
+        "attachment": {"proven": False}, "final_flush": {"observed": False},
+    }
+    monkeypatch.setattr(od, "inspect_collector_evidence", lambda *args, **kwargs: evidence)
+    result = od.run_condition(p, condition(p, "C3", 1), env=os.environ)
+    assert result["status"] == "failed"
+    assert "Mock" in result["error"]
+    assert result["collector"]["observer_provider"] == "mock"
+
+
+@pytest.mark.parametrize("provider", ["unknown", "disabled", "real-local", None])
+def test_c3_provider_must_be_a_known_real_marker(tmp_path, monkeypatch, provider):
+    p = fake_plan(tmp_path)
+    evidence = {
+        "startup_markers": {}, "observer_provider": provider,
+        "observer_provider_evidence": {"provider": provider},
+        "attachment": {"proven": False}, "final_flush": {"observed": False},
+    }
+    monkeypatch.setattr(od, "inspect_collector_evidence", lambda *args, **kwargs: evidence)
+    result = od.run_condition(p, condition(p, "C3", 1), env=os.environ)
+    assert result["status"] == "failed"
+    assert "known real" in result["error"]
+    assert result["collector"]["observer_provider"] == provider
+
+
+def test_interpreted_workload_input_content_is_bound_before_execution(tmp_path):
+    import sys
+    source = tmp_path / 'controlled-workload.py'
+    source.write_text('print("original")\n')
+    p = plan(tmp_path, workload=[sys.executable, str(source)])
+    source.write_text('print("changed")\n')
+    with pytest.raises(ValueError, match='workload input'):
+        od.verify_manifest(p)

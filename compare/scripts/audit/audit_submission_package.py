@@ -132,11 +132,11 @@ def audit_submission_package(*, manifest_path: Path = MANIFEST_PATH) -> dict[str
 
 
 def _check_readiness(readiness: dict[str, Any]) -> SubmissionCheck:
-    ready = readiness.get("overall_status") == "ready" and readiness.get("status_counts", {}).get("pass") == 13
+    ready = readiness.get("overall_status") == "ready" and bool(readiness.get("checks")) and all(row.get("status") == "pass" for row in readiness["checks"])
     return SubmissionCheck(
         id="readiness_gate",
         status="pass" if ready else "blocker",
-        summary="Readiness gate is ready with 13 passing checks." if ready else "Readiness gate is not ready.",
+        summary="Readiness gate passes all required checks." if ready else "Readiness gate is not ready.",
         evidence={
             "overall_status": readiness.get("overall_status"),
             "status_counts": readiness.get("status_counts"),
@@ -180,7 +180,7 @@ def _check_checksum_sidecar(manifest: dict[str, Any]) -> SubmissionCheck:
         for item in manifest.get("files", [])
         if isinstance(item, dict) and item.get("sha256") and item.get("path")
     )
-    actual_lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    actual_lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
     ok = path.exists() and actual_lines == expected_lines
     return SubmissionCheck(
         id="checksum_sidecar",
@@ -272,7 +272,7 @@ def _check_manuscript_appendix(manifest: dict[str, Any]) -> SubmissionCheck:
     path = PROJECT_ROOT / "compare" / "results" / "paper" / "MANUSCRIPT_EXPERIMENT_APPENDIX.md"
     text = path.read_text(encoding="utf-8") if path.exists() else ""
     required_phrases = {
-        "67 frozen scenarios",
+        f"{manifest.get('dataset', {}).get('total_scenarios', 0)} frozen scenarios",
         "Fig. 1",
         "Fig. 4",
         "Table 1",
@@ -326,15 +326,15 @@ def _check_release_materials(manifest: dict[str, Any]) -> SubmissionCheck:
 def _check_public_dataset_scope(manifest: dict[str, Any]) -> SubmissionCheck:
     files = _file_map(manifest)
     required = {
-        "compare/Dataset/FuxiBench/metadata.json",
-        "compare/Dataset/FuxiBench/README.md",
-        "compare/Dataset/FuxiBench/prompt_inputs/manifest.json",
-        "compare/Dataset/FuxiBench/quality/manifest.json",
-        "compare/Dataset/FuxiBench/quality/acceptance_summary.json",
-        "compare/Dataset/FuxiBench/ground_truth/benign/benign-api-doc.json",
-        "compare/Dataset/FuxiBench/case_studies/01_benign-api-doc.md",
+        "datasets/FuxiBench/metadata.json",
+        "datasets/FuxiBench/README.md",
+        "datasets/FuxiBench/prompt_inputs/manifest.json",
+        "datasets/FuxiBench/quality/manifest.json",
+        "datasets/FuxiBench/quality/acceptance_summary.json",
+        "datasets/FuxiBench/ground_truth/benign/benign-api-doc.json",
+        "datasets/FuxiBench/case_studies/01_benign-api-doc.md",
     }
-    dataset_paths = [path for path in files if path.startswith("compare/Dataset/FuxiBench/")]
+    dataset_paths = [path for path in files if path.startswith("datasets/FuxiBench/")]
     missing = sorted(required - set(files))
     raw_trace_paths = sorted(path for path in dataset_paths if "/traces/" in path or path.endswith("responsibility.db"))
     external_archive_paths = sorted(path for path in dataset_paths if "/_external_archive/" in path)
@@ -403,7 +403,7 @@ def _check_trace_redaction_boundary(manifest: dict[str, Any]) -> SubmissionCheck
     ok = (
         audit.get("schema") == "mtagentlens.trace_redaction_audit.v1"
         and audit.get("status") == "blocked_for_public_release"
-        and audit.get("summary", {}).get("database_count") == 67
+        and audit.get("summary", {}).get("database_count") == manifest.get("dataset", {}).get("responsibility_db_count")
         and audit.get("summary", {}).get("integrity_failures") == 0
         and audit.get("summary", {}).get("public_release_ready") is False
     )
@@ -437,19 +437,24 @@ def _check_annotation_boundary(manifest: dict[str, Any]) -> SubmissionCheck:
     metrics_completed = metrics.get("status") == "completed"
     claim_supported = metrics.get("all_requirements_met") is True
 
-    # Annotation is OK if: package exists with 67 samples, and either
+    expected_samples = manifest.get("dataset", {}).get("total_scenarios")
+    # Annotation state must match the actual input population; either
     # (a) still prepared with claim_boundary not claimed, OR
     # (b) completed with all requirements met and κ >= 0.7
     prepared_ok = (
         annotation.get("status") == "package_prepared_annotation_not_completed"
-        and annotation.get("sample_count") == 67
+        and expected_samples is not None and expected_samples > 0
+        and annotation.get("sample_count") == expected_samples
+        and package_manifest.get("sample_count") == expected_samples
         and annotation.get("claim_boundary") == "blind_annotation_quality_not_claimed"
         and manifest_ok
         and metrics.get("status") == "not_computed"
     )
     completed_ok = (
         annotation.get("status") == "package_completed_annotation_study_finished"
-        and annotation.get("sample_count") == 67
+        and expected_samples is not None and expected_samples > 0
+        and annotation.get("sample_count") == expected_samples
+        and package_manifest.get("sample_count") == expected_samples
         and annotation.get("claim_boundary") == "blind_annotation_quality_claimed"
         and manifest_ok
         and metrics_completed
@@ -459,7 +464,7 @@ def _check_annotation_boundary(manifest: dict[str, Any]) -> SubmissionCheck:
 
     ok = prepared_ok or completed_ok
     summary = (
-        "Annotation package completed with perfect binary agreement (κ=1.00)."
+        "Annotation package has completed study metrics and explicit claim boundaries."
         if completed_ok
         else "Annotation package is prepared while blind annotation reliability remains a non-claim."
         if prepared_ok

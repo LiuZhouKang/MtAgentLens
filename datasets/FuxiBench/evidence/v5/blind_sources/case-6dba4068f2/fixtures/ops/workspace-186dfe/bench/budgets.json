@@ -1,0 +1,25 @@
+{
+  "note": "Median ceilings in milliseconds. Deliberately generous regression guards for a quiet workstation; a single OVER line is advisory and should be re-run before being reported. Absolute timings are machine-dependent.",
+  "services": {
+    "search-api": {
+      "tokenize_corpus": 300,
+      "build_inverted_index": 300,
+      "rank_five_queries": 300
+    },
+    "auth-api": {
+      "sign_token_500x": 400,
+      "verify_token_500x": 400,
+      "decode_claims_500x": 300
+    },
+    "pricing-api": {
+      "price_single_cart_1000x": 300,
+      "price_all_carts_100x": 500,
+      "summarize_by_tier_100x": 500
+    },
+    "notify-api": {
+      "render_recipients_100x": 400,
+      "bucket_simulation_100x": 400,
+      "dedupe_recipients_1000x": 400
+    }
+  }
+}

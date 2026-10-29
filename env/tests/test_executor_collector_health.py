@@ -335,7 +335,9 @@ def test_collector_manager_does_not_preserve_observer_env_by_default(
     manager.start(tmp_path)
 
     collector_cmd = commands[1]
-    assert "--preserve-env=ANTHROPIC_BASE_URL,ANTHROPIC_AUTH_TOKEN,MODEL" not in collector_cmd
+    preserved = next(arg for arg in collector_cmd if arg.startswith("--preserve-env=")).split("=", 1)[1].split(",")
+    assert not {"ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "MODEL"}.intersection(preserved)
+    assert "MTAGENTLENS_HARD_SENSITIVE_EGRESS" in preserved
 
 
 def test_collector_manager_preserves_observer_env_when_explicit(
@@ -393,7 +395,8 @@ def test_collector_manager_preserves_observer_env_when_explicit(
     manager.start(tmp_path)
 
     collector_cmd = commands[1]
-    assert "--preserve-env=ANTHROPIC_BASE_URL,ANTHROPIC_AUTH_TOKEN,MODEL" in collector_cmd
+    preserved = next(arg for arg in collector_cmd if arg.startswith("--preserve-env=")).split("=", 1)[1].split(",")
+    assert {"ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "MODEL"}.issubset(preserved)
 
 
 def test_runtime_health_uses_responsibility_db_component_evidence(tmp_path: Path) -> None:
@@ -537,3 +540,93 @@ def test_observer_call_count_prefers_summary_line() -> None:
     ])
 
     assert _count_observer_calls(log_text) == 7
+
+
+def test_runtime_metrics_read_the_trace_file_and_diagnostics_once(tmp_path, monkeypatch):
+    workspace = BenchmarkWorkspace.discover(Path("env"))
+    manager = CollectorManager(workspace, sudo=False, log_file="capture")
+    manager._output_dir = tmp_path
+    (tmp_path / "capture").write_text(
+        '{"source":"ssl"}\n{"source":"http_parser"}\n{"source":"sse_processor"}\n'
+    )
+    # The manager is configured with --ssl=true and --process=true, so both
+    # helpers must report their final counters for the run to be complete.
+    (tmp_path / "capture.log").write_text(
+        '{"event":"TLS_RINGBUF_STATS","dropped_events":0}\n'
+        '{"event":"PROCESS_RINGBUF_STATS","dropped_events":0}\n'
+    )
+    monkeypatch.setattr(
+        "mtagentlens_benchmark.engine.collector_manager._read_stable_responsibility_db_metrics",
+        lambda _path: {"process_events": 1, "graph_edges": 1},
+    )
+    manager._collect_runtime_metrics()
+    metrics = manager.health_snapshot["runtime_metrics"]
+    assert metrics["ssl_events"] == 1
+    assert metrics["http_events"] == 1
+    assert metrics["overall_healthy"] is True
+    assert metrics["configured_capture_sources"] == ["process", "tls"]
+
+
+def test_collector_health_snapshot_persists_capture_source_configuration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = BenchmarkWorkspace.discover(Path("env"))
+
+    class FakeProcess:
+        pid = 12345
+        stdin = None
+
+        def poll(self) -> int | None:
+            return None
+
+        def terminate(self) -> None:
+            pass
+
+        def wait(self, timeout: int | None = None) -> int:
+            return 0
+
+        def kill(self) -> None:
+            pass
+
+        def send_signal(self, signum: int) -> None:
+            pass
+
+    monkeypatch.setattr(
+        "mtagentlens_benchmark.engine.collector_manager.subprocess.Popen",
+        lambda *args, **kwargs: FakeProcess(),
+    )
+    monkeypatch.setattr(
+        "mtagentlens_benchmark.engine.collector_manager._find_claude_binary_with_diagnostics",
+        lambda: (None, {"found": False}),
+    )
+
+    manager = CollectorManager(
+        workspace,
+        binary="collector/build/release/mtagentlens",
+        sudo=False,
+        startup_check_seconds=0.0,
+        verify_uprobes=False,
+        canary_test=False,
+        trace_args=["--ssl=false", "--process=true", "--stdio"],
+    )
+    manager.start(tmp_path)
+
+    health = json.loads(
+        (tmp_path / "collector_health.json").read_text(encoding="utf-8")
+    )
+    assert health["trace_args"] == ["--ssl=false", "--process=true", "--stdio"]
+    assert set(health["configured_capture_sources"]) == {"process", "stdio"}
+
+
+def test_collector_workspace_root_is_the_run_directory(tmp_path):
+    """The harness starts the collector outside the agent's workspace.
+
+    Reporting the collector's own cwd as the workspace made every in-workspace
+    write look like a capability expansion (RC 2026-10-25: benign runs could not
+    be cleared). The run directory is the agent's working directory.
+    """
+    from mtagentlens_benchmark.engine.collector_manager import collector_workspace_root
+
+    run_dir = tmp_path / "20261025-000000-run"
+    assert collector_workspace_root(run_dir / "collector") == run_dir.resolve()

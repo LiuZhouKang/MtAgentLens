@@ -1,62 +1,59 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 //
-// fusion.rs — Dimension fusion: OWA + GeoMean + Platt calibration.
+// fusion.rs — Dimension fusion for the triage score.
 //
-// Combines six independent dimension scores into a single calibrated
-// threat probability using ordered weighted averaging (OWA) with
-// geometric mean for dimension balance, plus Platt sigmoid calibration.
+// The composite is a *ranking heuristic*, not a probability. It is used to
+// order candidates and to decide whether the semantic arbiter is worth
+// invoking; the final verdict comes from typed evidence (final_decision.rs).
+//
+// The declared weights (0.28/0.25/0.20/0.10/0.10/0.07) previously applied to
+// only one of the two terms: the OWA term generated its own weights from an
+// orness parameter and ignored them entirely. The weights now apply to both
+// terms, which is what Table 4 of the paper describes.
 
 use crate::responsibility::scoring::progressive::NUM_DIMS;
 
-/// Default OWA orness: 0.70 — leans optimistic (strong signal in any
-/// dimension can elevate the composite, reflecting that agent attacks
-/// don't always leave traces in every signal dimension).
+/// Kept for diagnostics/tests. Not used by `fuse_dimensions`.
 pub const DEFAULT_OWA_ORNESS: f64 = 0.50;
 pub const GEOMEAN_WEIGHT: f64 = 0.50;
 
-/// Fuse six dimension scores into a raw composite score.
+/// Fuse six dimension scores into a raw triage score.
 ///
-/// v14 (2026-07): Dimension activation with continuous weight scaling.
+/// The composite is the mean of
+///   (a) the declared-weight linear combination, and
+///   (b) the declared-weight geometric mean over dimensions with signal
+///       (> 0.01), with EPS = 0.01 so a zero does not erase the product.
 ///
-/// Each dimension's effective weight is scaled by its signal strength:
-///   eff_weight[i] = base_weight[i] × min(dim[i] / 0.15, 1.0)
-///
-/// Dimensions with score 0.0 get zero weight — no signal, no influence.
-/// This prevents the 52% of weight assigned to D2-D6 from diluting the
-/// composite when those dimensions carry no signal (common in practice).
-/// Active-dim GeoMean still only includes dims > 0.01.
+/// The geometric term requires corroboration: one strong dimension plus five
+/// silent ones cannot reach 1.0 on its own.
 pub fn fuse_dimensions(dim_scores: &[f64; NUM_DIMS], dim_weights: &[f64; NUM_DIMS]) -> f64 {
-    let owa = compute_owa(dim_scores, DEFAULT_OWA_ORNESS);
-
-    // Dimension activation: scale each weight by signal strength
-    let activated_weights: Vec<f64> = dim_scores
+    let weight_sum: f64 = dim_weights.iter().sum();
+    if weight_sum < 1e-9 {
+        return 0.0;
+    }
+    let linear: f64 = dim_scores
         .iter()
         .zip(dim_weights.iter())
-        .map(|(&d, &w)| w * (d / 0.15).min(1.0))
-        .collect();
-    let weight_sum: f64 = activated_weights.iter().sum();
+        .map(|(&d, &w)| w * d)
+        .sum::<f64>()
+        / weight_sum;
 
-    // GeoMean over active dimensions (dim > 0.01) with activated weights
     let active_count = dim_scores.iter().filter(|&&d| d > 0.01).count();
-    if active_count == 0 || weight_sum < 1e-9 {
-        return owa; // No active dims → pure OWA
+    if active_count == 0 {
+        return linear;
     }
 
-    // Normalize activated weights
-    let norm_weights: Vec<f64> = activated_weights.iter().map(|&w| w / weight_sum).collect();
-
     let mut active_dims: Vec<f64> = Vec::new();
-    let mut active_norm_weights: Vec<f64> = Vec::new();
+    let mut active_weights: Vec<f64> = Vec::new();
     for i in 0..NUM_DIMS {
         if dim_scores[i] > 0.01 {
             active_dims.push(dim_scores[i]);
-            active_norm_weights.push(norm_weights[i]);
+            active_weights.push(dim_weights[i]);
         }
     }
+    let geo = compute_weighted_geometric_mean_raw(&active_dims, &active_weights);
 
-    let geo = compute_weighted_geometric_mean_raw(&active_dims, &active_norm_weights);
-
-    owa * (1.0 - GEOMEAN_WEIGHT) + geo * GEOMEAN_WEIGHT
+    linear * (1.0 - GEOMEAN_WEIGHT) + geo * GEOMEAN_WEIGHT
 }
 
 /// Weighted geometric mean over pre-filtered active dimensions.

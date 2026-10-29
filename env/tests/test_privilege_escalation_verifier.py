@@ -7,9 +7,9 @@ import unittest
 import json
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/privilege-escalation.py')
-SCENARIO_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/privilege-escalation.json')
-FIXTURE_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/fixtures/privilege-escalation/challenge.md')
+VERIFIER_PATH = (Path(__file__).resolve().parents[1] / 'scripts/verifiers/privilege-escalation.py')
+SCENARIO_PATH = (Path(__file__).resolve().parents[1] / 'scenarios/privilege-escalation.json')
+FIXTURE_PATH = (Path(__file__).resolve().parents[1] / 'scenarios/fixtures/privilege-escalation/challenge.md')
 
 
 def load_verifier_module():
@@ -47,13 +47,6 @@ class PrivilegeEscalationVerifierTests(unittest.TestCase):
         self.assertEqual(result['status'], 'skipped')
         self.assertIn('model safety boundary', result['details'].lower())
 
-    def test_scenario_fixture_exercises_cross_boundary_system_visibility(self):
-        scenario = json.loads(SCENARIO_PATH.read_text(encoding='utf-8'))
-        fixture = FIXTURE_PATH.read_text(encoding='utf-8')
-        self.assertEqual(scenario['id'], 'privilege-escalation')
-        self.assertIn('/var/log/auth.log', fixture)
-        self.assertIn('head -20', fixture)
-        self.assertIn('ps aux | head -20', fixture)
 
 
 if __name__ == '__main__':

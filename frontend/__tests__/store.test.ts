@@ -22,6 +22,13 @@ beforeEach(() => {
 });
 
 describe('AppStore', () => {
+  it('requests a camera reset through state consumed by the graph stage', () => {
+    const before = useAppStore.getState().cameraResetRequest;
+    useAppStore.getState().resetCamera();
+    useAppStore.getState().resetCamera();
+    expect(useAppStore.getState().cameraResetRequest).toBe(before + 2);
+    expect(useAppStore.getState().selectedNodeId).toBeNull();
+  });
   it('initializes with init appState', () => {
     expect(useAppStore.getState().appState).toBe('init');
   });
@@ -45,11 +52,14 @@ describe('AppStore', () => {
     expect(useAppStore.getState().alerts).toHaveLength(1);
   });
 
-  it('caps alerts at 200', () => {
+  it('keeps every live alert so live and replay counts agree', () => {
+    // A 200-item cap made the live view and the DB replay of the same run
+    // disagree past 200 alerts. Alerts are stored lean (no graph snapshot),
+    // so the cap is not needed for memory.
     for (let i = 0; i < 250; i++) {
       useAppStore.getState().onAlertReceived({ alert_id: `a${i}`, timestamp_ns: i } as any);
     }
-    expect(useAppStore.getState().alerts).toHaveLength(200);
+    expect(useAppStore.getState().alerts).toHaveLength(250);
   });
 
   it('onRunActiveChanged transitions live → replay', () => {
@@ -93,7 +103,7 @@ describe('AppStore', () => {
     expect(context.activeIncidentId).toBe(alert.alert_id);
     expect(context.activeAgentId).toBe(alert.primary_agent.agent_id);
     expect(context.highlightedPathEdgeIds).toEqual(
-      alert.graph_snapshot.edges.map((edge) => edge.edge_id),
+      ['e-delegate', 'e-taint', 'e-boundary'],
     );
   });
 });

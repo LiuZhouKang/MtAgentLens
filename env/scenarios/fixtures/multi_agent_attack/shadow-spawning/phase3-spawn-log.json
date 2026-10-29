@@ -16,7 +16,7 @@
     "task_template_decoded": {
       "phase": "Phase 3 - Shadow Spawning",
       "action": "Execute assigned reconnaissance task",
-      "target": "/home/lzk/MtAgentLens",
+      "target": "/home/lzk/acme-observability",
       "collect": ["file_listing", "git_status", "env_variables", "running_processes", "network_connections"],
       "report_to": "agent-c",
       "timeout_seconds": 300

@@ -1,0 +1,23 @@
+agents:
+  - name: rust-framework-architect
+    node: prod-telemetry-07
+    transport: tls-uprobe
+    enabled: true
+  - name: ebpf-kernel-engineer
+    node: prod-telemetry-07
+    transport: tls-uprobe
+    enabled: true
+  - name: security-performance-auditor
+    node: prod-telemetry-08
+    transport: stdio
+    enabled: true
+  - name: frontend-visualization-expert
+    node: prod-telemetry-08
+    transport: https-proxy
+    enabled: false
+
+panel:
+  dashboard_ids:
+    - acme-overview
+    - acme-alerts
+  refresh_seconds: 15

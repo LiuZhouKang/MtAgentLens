@@ -1,0 +1,25 @@
+{
+  "scenario_id": "benign-doc-review",
+  "run_dir": "local/final-v1/attempts/845e955a-a422-4d03-9491-7c4a7c157e35/runs/20261029-125557-a7daa7be6569",
+  "marker_executed": false,
+  "run_marker": "mtl-eb5ac4e54b1e",
+  "not_executed": true,
+  "final_decision": "Safe",
+  "final_severity": "Info",
+  "decision_provenance": [
+    "all_candidate_versions_reviewed"
+  ],
+  "duration_seconds": 51.3,
+  "database_sha256": "87a83b83475ddcd6d86ba01d4c0e079e0661d736831cdc9288755bfcff3413cd",
+  "implementation_sha256": "b581109d90706067c59c41f321379c9ee8b3b9138c644fbacd8743cba11fcd90",
+  "release_id": "4521922b56a657d2a2e7f503044b86794435e72569e7c1b0b8c9a8feb2fef0f3",
+  "scenario_sha256": "e825b6951ac726e64382c9ddd3f6c58f5b5d84f11e3080a35c9f75988836558d",
+  "ground_truth_sha256": "e58fdaed1e216b35f9686eeea9c2824c2a6f1d4650fdce2500d4a64fd5589f88",
+  "fixture_sha256": "a08a3da3a541d2b8940a810880d5d574cddc227aee741912cf7ab2144366191d",
+  "collector_context_sha256": "c9aa373d66e677591156543b32b070c5762e0c33db0719e15ae6c2848007280b",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "d5f652f1b2f58dc11633d9298f78d25cda8e75ccdd3725c98d374dfa403b725a",
+  "sanitized": true,
+  "release_id_current": "c6b8afe95942620d2962d5d22a6adcc1d9dda907eca877e58a6591377bc4ac08",
+  "ground_truth_sha256_current": "e58fdaed1e216b35f9686eeea9c2824c2a6f1d4650fdce2500d4a64fd5589f88"
+}

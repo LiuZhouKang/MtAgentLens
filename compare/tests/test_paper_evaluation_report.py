@@ -7,44 +7,31 @@ from pathlib import Path
 from compare.scripts.build.build_paper_evaluation_report import _validated_prompt_contract, build_report
 
 
-def test_build_paper_evaluation_report_from_completed_artifacts(tmp_path: Path) -> None:
-    output = tmp_path / "evaluation_report.json"
+def test_paper_report_accepts_the_bound_fuxibench_package() -> None:
+    contract = _validated_prompt_contract(Path("datasets/FuxiBench"))
+    assert contract["status"] == "label_leak_free"
 
-    report = build_report(output_path=output)
 
-    assert output.exists()
-    assert report["schema"] == "mtagentlens.paper_evaluation_report.v1"
-    metrics = {row["tool_id"]: row for row in report["main_metrics"]}
-    assert set(metrics) >= {"mtagentlens", "llm-guard", "meta-prompt-guard", "vigil"}
-    assert metrics["mtagentlens"]["f1"] == 1.0
-    assert metrics["mtagentlens"]["claim_coverage"] == 1.0
-    assert metrics["llm-guard"]["supported_scenarios"] == 67
-    assert metrics["meta-prompt-guard"]["supported_scenarios"] == 67
-    assert metrics["vigil"]["supported_scenarios"] == 67
-    assert report["_metadata"]["controlled_ablation_status"] == "completed"
-    assert report["_metadata"]["controlled_ablation_artifact"] == "compare/results/paper/controlled_ablation_results.json"
-    assert report["_metadata"]["performance_status"] == "completed"
-    assert report["_metadata"]["backend_capture_health_status"] == "completed"
-    assert report["_metadata"]["external_benchmark_status"] == "deferred_from_main_claims"
-    assert report["_metadata"]["statistics_scope"] == (
-        "completed_artifacts_only:"
-        "frozen_main_prompt_baseline,"
-        "controlled_ablation,"
-        "backend_capture_health_canary,"
-        "local_performance_microbenchmarks"
-    )
-    assert "Local process/file performance microbenchmarks" in " ".join(report["claim_boundaries"]["supported_claims"])
-    assert "external benchmark validation" in report["claim_boundaries"]["unsupported_claims"]
-    assert "runtime overhead and time-to-detect" not in report["claim_boundaries"]["unsupported_claims"]
-    assert "468-benchmark external validation" not in report["claim_boundaries"]["unsupported_claims"]
-    assert "mcnemar" in report
-    assert "pr_curves" in report
-    assert report["mcnemar"]["llm-guard"]["paired_unit"] == "scenario"
-    assert report["mcnemar"]["llm-guard"]["b_mtap_correct_prompt_wrong"] == metrics["llm-guard"]["fn"]
-    assert report["mcnemar"]["llm-guard"]["c_prompt_correct_mtap_wrong"] == 0
-
-    loaded = json.loads(output.read_text(encoding="utf-8"))
-    assert loaded["main_metrics"][0]["tool_id"] == "mtagentlens"
+def test_paper_report_preserves_synthetic_metrics_and_unknown_quality(tmp_path: Path, synthetic_dataset: Path, monkeypatch) -> None:
+    from env.scripts.evaluate_frozen import evaluate_dataset
+    from compare.scripts.build.build_prompt_input_bundle import build_prompt_input_bundle
+    import compare.scripts.build.build_paper_evaluation_report as builder
+    build_prompt_input_bundle(dataset_dir=synthetic_dataset, scenarios_root=synthetic_dataset / "scenarios")
+    results = tmp_path / "baseline"
+    results.mkdir()
+    (results / "metrics.csv").write_text("tool_id,tool_name,f1,scenario_recall\nlocal-test,Local test,0.5,0.5\n")
+    (results / "tool_status.csv").write_text("tool_id,status\nlocal-test,no_findings\n")
+    (results / "findings.jsonl").write_text("")
+    for attr in ("DEFAULT_CONTROLLED_ABLATION", "DEFAULT_PERFORMANCE", "DEFAULT_BACKEND_HEALTH"):
+        monkeypatch.setattr(builder, attr, tmp_path / (attr + ".json"))
+    output = tmp_path / "report.json"
+    report = build_report(dataset_dir=synthetic_dataset, prompt_results_dir=results, output_path=output)
+    assert report["dataset_summary"]["total_cases"] == 2
+    assert report["dataset_summary"]["paper_metrics_available"] is False
+    assert "2-scenario" in report["claim_boundaries"]["supported_claims"][0]
+    assert report["_metadata"]["controlled_ablation_status"] == "planned_missing_artifact"
+    assert report["main_metrics"][1]["f1"] == 0.5
+    assert json.loads(output.read_text())["main_metrics"][0]["tp"] == 1
 
 
 def test_paper_report_rejects_prompt_label_leak(tmp_path: Path) -> None:

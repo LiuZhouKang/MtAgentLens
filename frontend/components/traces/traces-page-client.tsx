@@ -4,7 +4,6 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import { useSearchParams } from 'next/navigation';
-import LoadingIndicator from '@/components/ui/loading-indicator';
 import { LiveEventTail } from '@/components/live/live-event-tail';
 import { LiveRunningBadge } from '@/components/live/live-running-badge';
 import {
@@ -28,7 +27,6 @@ import AgentAvatar from '@/components/ui/agent-avatar';
 import VirtualList from '@/components/ui/virtual-list';
 import { decisionLabel, matchLevelLabel } from '@/lib/investigation-labels';
 import { agentColor, shortAgentId } from '@/lib/agent-identity';
-import { demoAlerts } from '@/lib/demo-data';
 import { useAppStore } from '@/lib/store';
 import { buildTraceHref, parseTraceAlertId } from '@/lib/trace-route';
 import {
@@ -39,9 +37,13 @@ import {
   type TraceRunModel,
 } from '@/lib/trace-workbench';
 import { useRunEvidence } from '@/lib/use-run-evidence';
+import EvidenceNotice from '@/components/investigation/evidence-notice';
 import { useHashRouteState } from '@/lib/use-hash-route-state';
 
 // ── tokens ──
+// Stable empty list: a fresh `[]` each render would invalidate every memo.
+const NO_EVENTS: TraceEventModel[] = [];
+
 const T = { xs: 9.5, sm: 10.5, md: 12, lg: 14, xl: 16, h: 20 };
 const S = { xs: 2, sm: 4, md: 8, lg: 12, xl: 16 };
 
@@ -330,9 +332,11 @@ export default function TracesPageClient() {
   // Deferred — big runs keep the first paint free; trace models fill in as a
   // low-priority update behind the skeleton.
   const deferredAlerts = useDeferredValue(storeAlerts);
-  const alerts = deferredAlerts.length ? deferredAlerts : demoAlerts;
+  // Never substitute demo alerts for a real run with no findings: a
+  // fabricated trace is worse than an empty state.
+  const alerts = deferredAlerts;
   const currentRunId = useAppStore((s) => s.activeRunId);
-  const { evidenceItems } = useRunEvidence(currentRunId);
+  const { evidenceItems, evidenceLoading, evidenceError } = useRunEvidence(currentRunId);
   const dbAssets = useAppStore((s) => s.dbAssets);
   const storeActions = useAppStore((s) => s.actions);
   const storeIntents = useAppStore((s) => s.intents);
@@ -379,12 +383,16 @@ export default function TracesPageClient() {
     setSel(null);
   }, [active?.id]);
 
+  // `active` is undefined until a run with a timeline exists (e.g. a run that
+  // produced zero alerts). Reading `active.timeline` here crashed the page on
+  // those runs; the null guard below runs after these hooks.
+  const timeline = active?.timeline ?? NO_EVENTS;
   const tl = useMemo(
-    () => (filter === 'all' ? active.timeline : active.timeline.filter((e) => e.kind === filter)),
-    [filter, active.timeline],
+    () => (filter === 'all' ? timeline : timeline.filter((e) => e.kind === filter)),
+    [filter, timeline],
   );
-  const maxOff = Math.max(...active.timeline.map((e) => e.offsetMs), 1);
-  const maxDur = Math.max(...active.timeline.map((e) => Math.max(e.durationMs, 1)), 1);
+  const maxOff = Math.max(...timeline.map((e) => e.offsetMs), 1);
+  const maxDur = Math.max(...timeline.map((e) => Math.max(e.durationMs, 1)), 1);
 
   // precompute actor groups (once, not per render) for tree + waterfall
   const actorGroups = useMemo(() => {
@@ -446,7 +454,7 @@ export default function TracesPageClient() {
     return m;
   }, [actorGroups]);
 
-  const evidenceEvents = active.timeline.filter((e) => e.evidenceRef);
+  const evidenceEvents = timeline.filter((e) => e.evidenceRef);
   const waterfallHeight = 'calc(100dvh - 340px)';
 
   const pageRef = useRef<HTMLDivElement>(null);
@@ -479,17 +487,28 @@ export default function TracesPageClient() {
   );
 
   if (!active) {
+    // Data loading is covered by the layout's data-loading overlay. Reaching
+    // this branch means loading finished with nothing to show; an endless
+    // spinner would claim work is still happening.
     return (
       <div className="ln-page__inner" style={{ maxWidth: 1500, margin: '0 auto' }}>
+        <EvidenceNotice loading={evidenceLoading} error={evidenceError} />
         <div
           style={{
             display: 'flex',
+            flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
+            gap: 8,
             minHeight: '60vh',
+            textAlign: 'center',
           }}
         >
-          <LoadingIndicator size={44} label="正在构建追踪模型…" />
+          <h2 style={{ fontSize: 16, fontWeight: 600 }}>暂无追踪数据</h2>
+          <p className="ln-panel__meta" style={{ maxWidth: 460 }}>
+            当前数据源没有可解析的告警与证据。导入 responsibility.db，或连接一个实时 run 后，
+            责任链会显示在这里。
+          </p>
         </div>
       </div>
     );

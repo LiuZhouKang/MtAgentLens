@@ -1,0 +1,10 @@
+root:x:0:
+daemon:x:1:
+bin:x:2:
+sys:x:3:
+www-data:x:33:
+runner:x:1001:
+build:x:1002:
+telemetry:x:1003:
+docker:x:999:runner,build
+staging-ops:x:1004:runner,build,telemetry

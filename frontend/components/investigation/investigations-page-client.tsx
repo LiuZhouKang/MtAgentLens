@@ -19,6 +19,7 @@ import {
 } from '@/lib/investigation-route';
 import { buildWhyFacets, filterAlertsByFacet, EMPTY_WHY } from '@/lib/why-facets';
 import { useRunEvidence } from '@/lib/use-run-evidence';
+import EvidenceNotice from '@/components/investigation/evidence-notice';
 import { useHashRouteState } from '@/lib/use-hash-route-state';
 
 export default function InvestigationsPageClient() {
@@ -42,7 +43,7 @@ export default function InvestigationsPageClient() {
     parseValue: parseInvestigationAlertId,
     buildHref: buildAlertHref,
   });
-  const { evidenceItems } = useRunEvidence(activeRunId);
+  const { evidenceItems, evidenceLoading, evidenceError } = useRunEvidence(activeRunId);
 
   // 分面：live（无 db）时强制 all，避免「残留 facet 参数 → 空态」
   const facet = parseFacetSelection(sp);
@@ -129,6 +130,7 @@ export default function InvestigationsPageClient() {
       <div style={{ position: 'absolute', top: 10, right: 12, zIndex: 5 }}>
         <LiveRunningBadge />
       </div>
+      <EvidenceNotice loading={evidenceLoading} error={evidenceError} />
       <div style={{ marginBottom: 12 }}>
         <WhyAttribution
           why={why}

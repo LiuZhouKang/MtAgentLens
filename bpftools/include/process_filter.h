@@ -14,8 +14,14 @@
 struct tracked_pid_entry {
 	pid_t pid;
 	pid_t ppid;
+	unsigned long long start_time_ns;
 	bool is_tracked;
 	bool is_active;  /* false = empty slot */
+	/* A removed entry is a tombstone, not an empty slot. Linear probing
+	 * must continue past it: clearing `is_active` alone made every entry
+	 * that probed past the hole permanently unreachable, so a long run
+	 * silently stopped tracking files and network events for those PIDs. */
+	bool is_deleted;
 };
 
 struct pid_tracker {
@@ -58,7 +64,9 @@ static inline struct tracked_pid_entry *pid_tracker_find(struct pid_tracker *tra
 		struct tracked_pid_entry *entry = &tracker->entries[idx];
 
 		if (!entry->is_active) {
-			return NULL;  /* Empty slot, not found */
+			if (!entry->is_deleted)
+				return NULL;  /* Empty slot, not found */
+			continue;         /* Tombstone: keep probing */
 		}
 
 		if (entry->pid == pid) {
@@ -89,8 +97,10 @@ static inline bool pid_tracker_add(struct pid_tracker *tracker, pid_t pid, pid_t
 		if (!entry->is_active) {
 			entry->pid = pid;
 			entry->ppid = ppid;
+			entry->start_time_ns = 0;
 			entry->is_tracked = true;
 			entry->is_active = true;
+			entry->is_deleted = false;
 			return true;
 		}
 	}
@@ -101,9 +111,13 @@ static inline bool pid_tracker_add(struct pid_tracker *tracker, pid_t pid, pid_t
 /* Remove a PID from the tracker */
 static inline void pid_tracker_remove(struct pid_tracker *tracker, pid_t pid)
 {
+	if (pid == tracker->target_pid)
+		tracker->target_pid = 0;
+
 	struct tracked_pid_entry *entry = pid_tracker_find(tracker, pid);
 	if (entry) {
 		entry->is_active = false;
+		entry->is_deleted = true;
 	}
 }
 
@@ -112,6 +126,27 @@ static inline bool pid_tracker_is_tracked(struct pid_tracker *tracker, pid_t pid
 {
 	struct tracked_pid_entry *entry = pid_tracker_find(tracker, pid);
 	return entry && entry->is_tracked;
+}
+
+/* Forget stale numeric PIDs before accepting another generation's actions. */
+static inline void pid_tracker_observe_identity(struct pid_tracker *tracker,
+                                                pid_t pid, unsigned long long start)
+{
+    struct tracked_pid_entry *entry = pid_tracker_find(tracker, pid);
+    if (entry && entry->start_time_ns && start && entry->start_time_ns != start) {
+        pid_tracker_remove(tracker, pid);
+        return;
+    }
+    if (entry && start)
+        entry->start_time_ns = start;
+}
+
+static inline bool pid_tracker_parent_matches(struct pid_tracker *tracker,
+                                               pid_t ppid, unsigned long long start)
+{
+    struct tracked_pid_entry *entry = pid_tracker_find(tracker, ppid);
+    return entry && entry->is_tracked &&
+        (!start || !entry->start_time_ns || entry->start_time_ns == start);
 }
 
 /* Check if a command matches any filter */

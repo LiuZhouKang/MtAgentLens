@@ -124,7 +124,15 @@ pub fn evaluate_content_boundary(intent: &Intent) -> Option<PolicyEvaluationResu
                 "-----begin ec",
             ];
             for n in cred_needles {
-                if lower.contains(n) {
+                // A key *name* is not a leak: `.env.example` legitimately
+                // contains `API_KEY=changeme`. Require a secret-shaped value,
+                // or a PEM header.
+                let matched = if n.starts_with("-----begin") {
+                    lower.contains(n)
+                } else {
+                    credential_value_after(&lower, n)
+                };
+                if matched {
                     return Some(PolicyEvaluationResult {
                         policy_id: Some(PolicyId::from("policy.content.credential")),
                         boundary_id: Some(BoundaryId::from("boundary.content.credential_leak")),
@@ -141,6 +149,48 @@ pub fn evaluate_content_boundary(intent: &Intent) -> Option<PolicyEvaluationResu
     }
 
     None
+}
+
+/// Whether `needle` is followed by a secret-shaped value.
+///
+/// Rejects placeholders (`changeme`, `example`, `your_`, `xxx`, ...) and short
+/// values. This keeps `.env.example`/guide text from minting credential-leak
+/// claims while still catching real high-entropy secrets.
+fn credential_value_after(lower: &str, needle: &str) -> bool {
+    const PLACEHOLDERS: &[&str] = &[
+        "changeme",
+        "change_me",
+        "example",
+        "placeholder",
+        "your_",
+        "your-",
+        "xxx",
+        "redacted",
+        "dummy",
+        "sample",
+        "insert_",
+        "replace_",
+        "todo",
+    ];
+    for (index, _) in lower.match_indices(needle) {
+        let rest: String = lower[index + needle.len()..].chars().take(96).collect();
+        let Some(pos) = rest.find(['=', ':']) else {
+            continue;
+        };
+        let value = rest[pos + 1..].trim_start_matches([' ', '"', '\'', '\t']);
+        let token: String = value
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || "-_.+/".contains(*c))
+            .collect();
+        if token.chars().count() >= 16
+            && !PLACEHOLDERS
+                .iter()
+                .any(|placeholder| token.contains(placeholder))
+        {
+            return true;
+        }
+    }
+    false
 }
 
 /// Whether a shell command actually *uses* `needle` as a command.
@@ -212,6 +262,8 @@ mod tests {
             authority_source:
                 crate::responsibility::types::IntentAuthoritySource::SseResponseToolUse,
             timestamp_ns: 1000,
+            native_tool_call: None,
+            declared_conversation_id: None,
         }
     }
 
@@ -301,8 +353,24 @@ mod tests {
 
     #[test]
     fn test_detect_credential_leak_in_write() {
-        let intent = make_intent("Write", vec!["api_key=sk-abc123".into()]);
+        let intent = make_intent("Write", vec!["api_key=sk-abcdef0123456789abcdef".into()]);
         let result = evaluate_content_boundary(&intent);
         assert!(result.is_some());
+    }
+
+    #[test]
+    fn placeholder_credentials_are_not_leaks() {
+        for text in [
+            "API_KEY=changeme",
+            "client_secret=your_client_secret_here",
+            "private_key=<insert-private-key>",
+            "ssh_key_path=~/.ssh/id_ed25519",
+        ] {
+            let intent = make_intent("Write", vec![text.into()]);
+            assert!(
+                evaluate_content_boundary(&intent).is_none(),
+                "placeholder must not be a leak: {text}"
+            );
+        }
     }
 }

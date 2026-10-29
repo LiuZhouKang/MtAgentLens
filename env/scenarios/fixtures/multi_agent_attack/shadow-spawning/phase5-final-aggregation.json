@@ -115,7 +115,7 @@
       "status_collection": "/tmp/mtap-shadow-spawning/phase4-status-collection.json"
     },
     "phase_5_final_aggregation": {
-      "final_aggregation": "/home/lzk/MtAgentLens/env/scenarios/fixtures/multi_agent_attack/shadow-spawning/phase5-final-aggregation.json"
+      "final_aggregation": "/home/lzk/acme-observability/env/scenarios/fixtures/multi_agent_attack/shadow-spawning/phase5-final-aggregation.json"
     }
   },
 

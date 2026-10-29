@@ -12,7 +12,7 @@
 use crate::responsibility::evidence::args::extract_intent_args;
 use crate::responsibility::types::{
     Intent, IntentAuthoritySource, IntentClass, IntentId, IntentParseState, MessageId,
-    NormalizedArg, ProcessId,
+    NativeToolCallFormat, NativeToolCallRef, NormalizedArg, ProcessId,
 };
 use regex_lite::Regex;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -129,6 +129,20 @@ fn looks_like_sse(s: &str) -> bool {
     s.contains("data:") && (s.contains("event:") || s.contains("type\""))
 }
 
+/// Detect an SSE payload that starts with its own frames. Leading blank
+/// lines and comments are framing; arbitrary bytes before the first frame
+/// are a raw-offset capture and stay on the weak recovery path.
+fn starts_with_sse(s: &str) -> bool {
+    for line in s.lines() {
+        let line = line.trim_start();
+        if line.is_empty() || line.starts_with(':') {
+            continue;
+        }
+        return line.starts_with("data:") || line.starts_with("event:");
+    }
+    false
+}
+
 // ─── IntentClass helpers ──────────────────────────────────────────────
 //
 // The class table lives in `types::tool_vocabulary` so that every intent path
@@ -153,6 +167,34 @@ const REQUIRED_FIELDS: &[(&str, &[&str])] = &[
 
 fn classify_intent_class(tool_name: &str) -> IntentClass {
     crate::responsibility::types::tool_vocabulary::classify_intent_class(tool_name)
+}
+
+/// Preserve a captured structured tool-call id. Empty/absent values are not
+/// references, and the collector never manufactures one.
+fn captured_native_ref(
+    value: Option<&serde_json::Value>,
+    format: NativeToolCallFormat,
+) -> Option<NativeToolCallRef> {
+    let id = value?.as_str()?.trim();
+    if id.is_empty() {
+        return None;
+    }
+    Some(NativeToolCallRef {
+        format,
+        id: id.to_string(),
+    })
+}
+
+/// Normalize raw/generic recovery results into unverified text hypotheses.
+///
+/// The parsed tool name, arguments, and parse state are retained so the
+/// observation is not dropped; only its provenance is downgraded.
+fn downgrade_to_text_fallback(intents: &mut [Intent]) {
+    for intent in intents {
+        intent.primary_matching_eligible = false;
+        intent.authority_source = IntentAuthoritySource::TextFallback;
+        intent.native_tool_call = None;
+    }
 }
 
 fn classify_parse_state(tool_name: &str, input: &serde_json::Value) -> IntentParseState {
@@ -207,6 +249,7 @@ impl IntentExtractor {
     ///
     /// # Pipeline (first non-empty result wins):
     ///
+    /// Request sources: role-aware `root.messages` extraction only, no fallback.
     /// 0. Raw buffer scan — find and parse every JSON chunk in the buffer
     /// 1. Strip HTTP framing if present (headers → clean body)
     /// 2. Anthropic JSON — `content[]` with `type: "tool_use"`
@@ -225,79 +268,42 @@ impl IntentExtractor {
         if body.len() > MAX_JSON_PARSE_BYTES {
             DIAG_BODY_TOO_LARGE.fetch_add(1, Ordering::Relaxed);
         }
-        // Step 0: SSE fast-path — route SSE streams directly to the SSE
-        // parser BEFORE the raw buffer scan (step 1).
-        //
-        // The raw buffer scan extracts individual JSON objects from the
-        // stream and passes them to extract_generic_json.  SSE content_block_start
-        // objects contain {type: "tool_use", name: "..."} WITHOUT input —
-        // the arguments arrive later in content_block_delta events.  A
-        // partial match here short-circuits the entire extraction pipeline
-        // and prevents the SSE stream parser (step 6) from ever running.
-        //
-        // By routing SSE data to the dedicated stream parser first we
-        // guarantee that content_block_start/delta/stop sequences are
-        // correctly accumulated into complete tool_use intents.
-        if looks_like_sse(body) {
-            let sse =
-                Self::extract_from_sse(body, source, process_id, message_id.clone(), timestamp_ns);
-            if !sse.is_empty() {
-                return sse;
+
+        // Request sources carry conversation history, not a response. Only
+        // the role-aware `messages` walk may create intents: tool declarations
+        // and retrieved payloads are data, never assistant calls. This must
+        // run before every raw/SSE/generic fallback, which scan tool-shaped
+        // objects anywhere in the tree. Non-parseable requests yield no
+        // invented intents rather than falling through to those scanners.
+        if source == IntentAuthoritySource::RequestHistoryAssistantToolUse {
+            let clean = strip_http_framing(body);
+            let dechunked = dechunk_body(clean);
+            let payload: &str = &dechunked;
+            if payload.len() <= MAX_JSON_PARSE_BYTES
+                && looks_like_json(payload)
+                && let Ok(root) = serde_json::from_str::<serde_json::Value>(payload)
+                && let Some(messages) = root.get("messages").and_then(|m| m.as_array())
+            {
+                let messages_json = serde_json::to_string(messages).unwrap_or_default();
+                return Self::extract_from_request(
+                    &messages_json,
+                    process_id,
+                    message_id,
+                    timestamp_ns,
+                );
             }
-            let sse = Self::extract_from_openai_sse(
-                body,
-                source,
-                process_id,
-                message_id.clone(),
-                timestamp_ns,
-            );
-            if !sse.is_empty() {
-                return sse;
-            }
+            return Vec::new();
         }
 
-        // Step 1: Raw buffer scan — handles buffers that start at arbitrary offsets.
-        if body.len() > 64 {
-            let intents = Self::extract_from_raw_buffer(
-                body,
-                source,
-                process_id,
-                message_id.clone(),
-                timestamp_ns,
-            );
-            if !intents.is_empty() {
-                return intents;
-            }
-        }
-
-        // Step 1: Strip HTTP framing + de-chunk transfer encoding
+        // Prefer known response formats on the framed/de-chunked payload
+        // before any raw-buffer or generic recovery. A raw scan can match
+        // function-shaped data inside an unknown wrapper, so it must not
+        // pre-empt a structured parse of a known provider response.
         let clean = strip_http_framing(body);
         let dechunked = dechunk_body(clean);
         let payload: &str = &dechunked;
 
-        // Step 1a: Request body with messages array — extract user messages
-        // BEFORE tool_use extraction, because assistant messages in the
-        // conversation history contain tool_use blocks that would return
-        // early from Steps 2-6.
-        if payload.len() <= MAX_JSON_PARSE_BYTES
-            && looks_like_json(payload)
-            && let Ok(root) = serde_json::from_str::<serde_json::Value>(payload)
-            && let Some(messages) = root.get("messages").and_then(|m| m.as_array()).cloned()
-            && !messages.is_empty()
-        {
-            let messages_str = serde_json::to_string(&messages).unwrap_or_default();
-            let request_intents = Self::extract_from_request(
-                &messages_str,
-                process_id,
-                message_id.clone(),
-                timestamp_ns,
-            );
-            if !request_intents.is_empty() {
-                return request_intents;
-            }
-        }
-
-        // Step 2: Anthropic structured JSON (content blocks)
+        // Step 1: Anthropic structured JSON (content blocks)
         if payload.len() <= MAX_JSON_PARSE_BYTES && looks_like_json(payload) {
             let intents = Self::extract_from_json(
                 payload,
@@ -311,7 +317,7 @@ impl IntentExtractor {
             }
         }
 
-        // Step 3: OpenAI structured JSON
+        // Step 2: OpenAI structured JSON
         if payload.len() <= MAX_JSON_PARSE_BYTES && looks_like_json(payload) {
             let intents = Self::extract_from_openai_json(
                 payload,
@@ -325,22 +331,9 @@ impl IntentExtractor {
             }
         }
 
-        // Step 4: Generic JSON tree scan (catch-all for unknown formats)
-        if payload.len() <= MAX_JSON_PARSE_BYTES && looks_like_json(payload) {
-            let intents = Self::extract_generic_json(
-                payload,
-                source,
-                process_id,
-                message_id.clone(),
-                timestamp_ns,
-            );
-            if !intents.is_empty() {
-                return intents;
-            }
-        }
-
-        // Step 5: Anthropic SSE + OpenAI SSE
-        if looks_like_sse(payload) {
+        // Step 3: Known SSE response formats. The dedicated stream parsers
+        // accumulate content_block_start/delta/stop before any raw scan.
+        if starts_with_sse(payload) {
             let sse = Self::extract_from_sse(
                 payload,
                 source,
@@ -363,8 +356,36 @@ impl IntentExtractor {
             }
         }
 
-        // Step 6: If we haven't already tried the raw body with raw buffer scan,
-        // and it's different from the payload version, try generic JSON on it.
+        // Step 4: Raw buffer scan — handles buffers that start at arbitrary
+        // offsets. These are text hypotheses, never native structured calls.
+        if body.len() > 64 {
+            let intents = Self::extract_from_raw_buffer(
+                body,
+                source,
+                process_id,
+                message_id.clone(),
+                timestamp_ns,
+            );
+            if !intents.is_empty() {
+                return intents;
+            }
+        }
+
+        // Step 5: Generic JSON tree scan (catch-all for unknown formats)
+        if payload.len() <= MAX_JSON_PARSE_BYTES && looks_like_json(payload) {
+            let intents = Self::extract_generic_json(
+                payload,
+                source,
+                process_id,
+                message_id.clone(),
+                timestamp_ns,
+            );
+            if !intents.is_empty() {
+                return intents;
+            }
+        }
+
+        // Step 6: Generic JSON on the raw body when framing changed it.
         if payload.as_ptr() != body.as_ptr() && body.len() <= MAX_JSON_PARSE_BYTES {
             let intents = Self::extract_generic_json(
                 body,
@@ -406,7 +427,20 @@ impl IntentExtractor {
             Ok(v) => v,
             Err(_) => return Vec::new(),
         };
+        Self::extract_from_request_messages(&messages, process_id, message_id, timestamp_ns)
+    }
 
+    /// Extract intents from already-parsed request messages.
+    ///
+    /// Borrowing the parsed history keeps the role-aware walk shared by the
+    /// string path and in-memory callers; neither invents a second protocol
+    /// parser.
+    pub fn extract_from_request_messages(
+        messages: &[serde_json::Value],
+        process_id: ProcessId,
+        message_id: MessageId,
+        timestamp_ns: u64,
+    ) -> Vec<Intent> {
         let mut intents = Vec::new();
 
         for msg in messages {
@@ -445,6 +479,8 @@ impl IntentExtractor {
                         primary_matching_eligible: false,
                         authority_source: IntentAuthoritySource::RequestHistoryAssistantToolUse,
                         timestamp_ns,
+                        native_tool_call: None,
+                        declared_conversation_id: None,
                     });
                 }
                 continue;
@@ -454,6 +490,22 @@ impl IntentExtractor {
                 continue;
             }
 
+            // OpenAI assistant calls: {id, type: "function", function: {name, arguments}}.
+            if let Some(tool_calls) = msg.get("tool_calls").and_then(|tc| tc.as_array()) {
+                for tool_call in tool_calls {
+                    if let Some(intent) = Self::openai_tool_call_to_intent(
+                        tool_call,
+                        IntentAuthoritySource::RequestHistoryAssistantToolUse,
+                        process_id,
+                        message_id.clone(),
+                        timestamp_ns,
+                    ) {
+                        intents.push(intent);
+                    }
+                }
+            }
+
+            // Anthropic assistant content blocks.
             let content = match msg.get("content") {
                 Some(serde_json::Value::Array(arr)) => arr,
                 _ => continue,
@@ -571,37 +623,15 @@ impl IntentExtractor {
                 None => continue,
             };
             for tc in tool_calls {
-                let function = match tc.get("function") {
-                    Some(f) => f,
-                    None => continue,
-                };
-                let tool_name = match function.get("name").and_then(|n| n.as_str()) {
-                    Some(n) => n.to_string(),
-                    None => continue,
-                };
-                let args_str = function
-                    .get("arguments")
-                    .and_then(|a| a.as_str())
-                    .unwrap_or("{}");
-                let input: serde_json::Value =
-                    serde_json::from_str(args_str).unwrap_or(serde_json::Value::Null);
-
-                let tool_args = extract_intent_args(&tool_name, &input);
-                let intent_class = classify_intent_class(&tool_name);
-                let parse_state = classify_parse_state(&tool_name, &input);
-
-                intents.push(Intent {
-                    intent_id: IntentId::new(),
+                if let Some(intent) = Self::openai_tool_call_to_intent(
+                    tc,
+                    source,
                     process_id,
-                    message_id: message_id.clone(),
-                    tool_name,
-                    tool_args,
-                    intent_class,
-                    parse_state,
-                    primary_matching_eligible: true,
-                    authority_source: source,
+                    message_id.clone(),
                     timestamp_ns,
-                });
+                ) {
+                    intents.push(intent);
+                }
             }
         }
 
@@ -622,9 +652,11 @@ impl IntentExtractor {
         timestamp_ns: u64,
     ) -> Vec<Intent> {
         let mut intents = Vec::new();
-        // Accumulate partial tool_calls: index → (name, arguments_string)
-        let mut accum: std::collections::HashMap<i64, (String, String)> =
-            std::collections::HashMap::new();
+        // A tool index is local to a choice; choices may stream concurrently.
+        let mut accum: std::collections::BTreeMap<
+            (i64, i64),
+            (String, String, Option<NativeToolCallRef>),
+        > = std::collections::BTreeMap::new();
 
         for line in body.lines() {
             let data = if let Some(d) = line.strip_prefix("data: ") {
@@ -649,7 +681,11 @@ impl IntentExtractor {
                 None => continue,
             };
 
-            for choice in choices {
+            for (choice_position, choice) in choices.iter().enumerate() {
+                let choice_index = choice
+                    .get("index")
+                    .and_then(|index| index.as_i64())
+                    .unwrap_or(choice_position as i64);
                 let delta = match choice.get("delta") {
                     Some(d) => d,
                     None => continue,
@@ -659,7 +695,20 @@ impl IntentExtractor {
                     None => continue,
                 };
                 for tc in tool_calls {
-                    let index = tc.get("index").and_then(|i| i.as_i64()).unwrap_or(0);
+                    let index = (
+                        choice_index,
+                        tc.get("index").and_then(|i| i.as_i64()).unwrap_or(0),
+                    );
+                    // The id can arrive before or without the function
+                    // fragment; preserve it independently of accumulation.
+                    let native_tool_call =
+                        captured_native_ref(tc.get("id"), NativeToolCallFormat::OpenAi);
+                    if let Some(native) = native_tool_call.clone() {
+                        accum
+                            .entry(index)
+                            .or_insert((String::new(), String::new(), None))
+                            .2 = Some(native);
+                    }
                     let function = match tc.get("function") {
                         Some(f) => f,
                         None => continue,
@@ -669,23 +718,23 @@ impl IntentExtractor {
                     if let Some(name) = function.get("name").and_then(|n| n.as_str()) {
                         accum
                             .entry(index)
-                            .and_modify(|(n, _)| *n = name.to_string())
-                            .or_insert((name.to_string(), String::new()));
+                            .and_modify(|(n, _, _)| *n = name.to_string())
+                            .or_insert((name.to_string(), String::new(), None));
                     }
 
                     // Accumulate arguments fragment
                     if let Some(args) = function.get("arguments").and_then(|a| a.as_str()) {
                         accum
                             .entry(index)
-                            .and_modify(|(_, a)| a.push_str(args))
-                            .or_insert((String::new(), args.to_string()));
+                            .and_modify(|(_, a, _)| a.push_str(args))
+                            .or_insert((String::new(), args.to_string(), None));
                     }
                 }
             }
         }
 
         // Emit completed accumulations
-        for (tool_name, args_str) in accum.values() {
+        for (tool_name, args_str, native_tool_call) in accum.values() {
             if tool_name.is_empty() {
                 continue;
             }
@@ -710,6 +759,8 @@ impl IntentExtractor {
                 primary_matching_eligible: true,
                 authority_source: source,
                 timestamp_ns,
+                native_tool_call: native_tool_call.clone(),
+                declared_conversation_id: None,
             });
         }
 
@@ -747,6 +798,7 @@ impl IntentExtractor {
             timestamp_ns,
             &mut intents,
         );
+        downgrade_to_text_fallback(&mut intents);
         intents
     }
 
@@ -782,18 +834,22 @@ impl IntentExtractor {
                         primary_matching_eligible: true,
                         authority_source: source,
                         timestamp_ns,
+                        native_tool_call: captured_native_ref(
+                            obj.get("id"),
+                            NativeToolCallFormat::Anthropic,
+                        ),
+                        declared_conversation_id: None,
                     });
                     return; // Don't recurse into the tool_use block
                 }
 
-                // Pattern B: OpenAI function call → has function.name
+                // Pattern B: OpenAI function call → has function.name and an
+                // actual arguments string. A schema declaration has
+                // parameters, not arguments, and is not a call.
                 if let Some(function) = obj.get("function")
                     && let Some(name) = function.get("name").and_then(|n| n.as_str())
+                    && let Some(args_str) = function.get("arguments").and_then(|a| a.as_str())
                 {
-                    let args_str = function
-                        .get("arguments")
-                        .and_then(|a| a.as_str())
-                        .unwrap_or("{}");
                     let input: serde_json::Value =
                         serde_json::from_str(args_str).unwrap_or(serde_json::Value::Null);
                     let tool_name = name.to_string();
@@ -812,6 +868,11 @@ impl IntentExtractor {
                         primary_matching_eligible: true,
                         authority_source: source,
                         timestamp_ns,
+                        native_tool_call: captured_native_ref(
+                            obj.get("id"),
+                            NativeToolCallFormat::OpenAi,
+                        ),
+                        declared_conversation_id: None,
                     });
                 }
 
@@ -942,6 +1003,7 @@ impl IntentExtractor {
             pos = end;
         }
 
+        downgrade_to_text_fallback(&mut intents);
         intents
     }
 
@@ -959,10 +1021,20 @@ impl IntentExtractor {
         timestamp_ns: u64,
     ) -> Vec<Intent> {
         let mut intents = Vec::new();
-        // Accumulate partial tool_use definitions across SSE events.
-        // Keyed by content block index; stores (tool_name, accumulated_input_json).
-        let mut accum: std::collections::HashMap<u64, (String, String)> =
-            std::collections::HashMap::new();
+        // Accumulate tool_use definitions across SSE events. BTreeMap keeps
+        // emission deterministic by content-block index. Each entry stores
+        // (tool_name, start-event initial input, delta buffer, native reference).
+        // Initial input stays separate so it is never prepended to delta
+        // fragments; it is the whole input only when no deltas arrive.
+        let mut accum: std::collections::BTreeMap<
+            u64,
+            (
+                String,
+                Option<serde_json::Value>,
+                String,
+                Option<NativeToolCallRef>,
+            ),
+        > = std::collections::BTreeMap::new();
 
         for line in body.lines() {
             let data = if let Some(d) = line.strip_prefix("data: ") {
@@ -997,7 +1069,18 @@ impl IntentExtractor {
                             .unwrap_or("")
                             .to_string();
                         let index = event.get("index").and_then(|i| i.as_u64()).unwrap_or(0);
-                        accum.insert(index, (tool_name, String::new()));
+                        accum.insert(
+                            index,
+                            (
+                                tool_name,
+                                content_block.get("input").cloned(),
+                                String::new(),
+                                captured_native_ref(
+                                    content_block.get("id"),
+                                    NativeToolCallFormat::Anthropic,
+                                ),
+                            ),
+                        );
                     }
                 }
 
@@ -1016,31 +1099,21 @@ impl IntentExtractor {
                     let index = event.get("index").and_then(|i| i.as_u64()).unwrap_or(0);
 
                     if let Some(entry) = accum.get_mut(&index) {
-                        entry.1.push_str(partial);
+                        entry.2.push_str(partial);
                     }
                 }
 
                 "content_block_stop" => {
                     let index = event.get("index").and_then(|i| i.as_u64()).unwrap_or(0);
-                    if let Some((tool_name, input_json)) = accum.remove(&index)
-                        && let Ok(input) = serde_json::from_str::<serde_json::Value>(&input_json)
-                    {
-                        let tool_args = extract_intent_args(&tool_name, &input);
-                        let intent_class = classify_intent_class(&tool_name);
-                        let parse_state = classify_parse_state(&tool_name, &input);
-
-                        intents.push(Intent {
-                            intent_id: IntentId::new(),
+                    if let Some(entry) = accum.remove(&index) {
+                        intents.push(Self::finalize_sse_tool_use(
+                            entry,
+                            source,
                             process_id,
-                            message_id: message_id.clone(),
-                            tool_name,
-                            tool_args,
-                            intent_class,
-                            parse_state,
-                            primary_matching_eligible: true,
-                            authority_source: source,
+                            message_id.clone(),
                             timestamp_ns,
-                        });
+                            true,
+                        ));
                     }
                 }
 
@@ -1049,33 +1122,74 @@ impl IntentExtractor {
         }
 
         // Emit any incomplete accumulations as partial intents
-        for (_index, (tool_name, input_json)) in accum {
-            let input: serde_json::Value =
-                serde_json::from_str(&input_json).unwrap_or(serde_json::Value::Null);
-            let tool_args = extract_intent_args(&tool_name, &input);
-            let intent_class = classify_intent_class(&tool_name);
-            let parse_state = if input_json.is_empty() {
-                IntentParseState::Partial
-            } else {
-                // We have partial input — mark as Partial
-                IntentParseState::Partial
-            };
-
-            intents.push(Intent {
-                intent_id: IntentId::new(),
+        for entry in accum.into_values() {
+            intents.push(Self::finalize_sse_tool_use(
+                entry,
+                source,
                 process_id,
-                message_id: message_id.clone(),
-                tool_name,
-                tool_args,
-                intent_class,
-                parse_state,
-                primary_matching_eligible: true,
-                authority_source: source,
+                message_id.clone(),
                 timestamp_ns,
-            });
+                false,
+            ));
         }
 
         intents
+    }
+
+    /// Finalize one accumulated Anthropic tool_use block.
+    ///
+    /// Deltas are the streamed JSON fragments; the start event's `input` is
+    /// either a placeholder (`{}`) or the whole input when no deltas arrive.
+    /// A failed parse still yields a `Partial` intent so an observed call and
+    /// its native reference are not silently dropped. `Partial` records only
+    /// that the arguments were not fully observed; it does not prove the call
+    /// ran or that its arguments were complete.
+    fn finalize_sse_tool_use(
+        (tool_name, initial_input, input_json, native_tool_call): (
+            String,
+            Option<serde_json::Value>,
+            String,
+            Option<NativeToolCallRef>,
+        ),
+        source: IntentAuthoritySource,
+        process_id: ProcessId,
+        message_id: MessageId,
+        timestamp_ns: u64,
+        stopped: bool,
+    ) -> Intent {
+        let parsed = if input_json.is_empty() {
+            initial_input
+        } else {
+            serde_json::from_str::<serde_json::Value>(&input_json).ok()
+        };
+        let (input, parse_state) = match parsed {
+            Some(input) => {
+                let state = if stopped {
+                    classify_parse_state(&tool_name, &input)
+                } else {
+                    IntentParseState::Partial
+                };
+                (input, state)
+            }
+            None => (serde_json::Value::Null, IntentParseState::Partial),
+        };
+        let tool_args = extract_intent_args(&tool_name, &input);
+        let intent_class = classify_intent_class(&tool_name);
+
+        Intent {
+            intent_id: IntentId::new(),
+            process_id,
+            message_id,
+            tool_name,
+            tool_args,
+            intent_class,
+            parse_state,
+            primary_matching_eligible: true,
+            authority_source: source,
+            timestamp_ns,
+            native_tool_call,
+            declared_conversation_id: None,
+        }
     }
 
     // ── Regex fallback ──────────────────────────────────────────────
@@ -1116,9 +1230,11 @@ impl IntentExtractor {
                     tool_args,
                     intent_class,
                     parse_state,
-                    primary_matching_eligible: true,
+                    primary_matching_eligible: false,
                     authority_source: IntentAuthoritySource::TextFallback,
                     timestamp_ns,
+                    native_tool_call: None,
+                    declared_conversation_id: None,
                 });
             }
         }
@@ -1143,6 +1259,8 @@ impl IntentExtractor {
                     primary_matching_eligible: false, // Lower confidence for regex matches
                     authority_source: IntentAuthoritySource::TextFallback,
                     timestamp_ns,
+                    native_tool_call: None,
+                    declared_conversation_id: None,
                 });
             }
         }
@@ -1166,6 +1284,8 @@ impl IntentExtractor {
                     primary_matching_eligible: false,
                     authority_source: IntentAuthoritySource::TextFallback,
                     timestamp_ns,
+                    native_tool_call: None,
+                    declared_conversation_id: None,
                 });
             }
         }
@@ -1174,6 +1294,55 @@ impl IntentExtractor {
     }
 
     // ── Internal helpers ────────────────────────────────────────────
+
+    /// Convert an OpenAI `tool_calls[]` entry into an Intent.
+    fn openai_tool_call_to_intent(
+        tool_call: &serde_json::Value,
+        source: IntentAuthoritySource,
+        process_id: ProcessId,
+        message_id: MessageId,
+        timestamp_ns: u64,
+    ) -> Option<Intent> {
+        let function = tool_call.get("function")?;
+        let tool_name = function.get("name")?.as_str()?.to_string();
+        let args_str = function.get("arguments").and_then(|a| a.as_str());
+        // A missing (or non-string) `arguments` field is unobserved input, not
+        // an empty object. Keep it Null and Partial so no caller mistakes an
+        // incomplete call for a complete one.
+        let (input, args_observed) = match args_str {
+            Some(args) => (
+                serde_json::from_str(args).unwrap_or(serde_json::Value::Null),
+                true,
+            ),
+            None => (serde_json::Value::Null, false),
+        };
+
+        let tool_args = extract_intent_args(&tool_name, &input);
+        let intent_class = classify_intent_class(&tool_name);
+        let parse_state = if args_observed {
+            classify_parse_state(&tool_name, &input)
+        } else {
+            IntentParseState::Partial
+        };
+
+        Some(Intent {
+            intent_id: IntentId::new(),
+            process_id,
+            message_id,
+            tool_name,
+            tool_args,
+            intent_class,
+            parse_state,
+            primary_matching_eligible: true,
+            authority_source: source,
+            timestamp_ns,
+            native_tool_call: captured_native_ref(
+                tool_call.get("id"),
+                NativeToolCallFormat::OpenAi,
+            ),
+            declared_conversation_id: None,
+        })
+    }
 
     /// Convert a tool_use JSON block into an Intent.
     fn block_to_intent(
@@ -1201,6 +1370,8 @@ impl IntentExtractor {
             primary_matching_eligible: true,
             authority_source: source,
             timestamp_ns,
+            native_tool_call: captured_native_ref(block.get("id"), NativeToolCallFormat::Anthropic),
+            declared_conversation_id: None,
         })
     }
 }
@@ -1397,6 +1568,268 @@ data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_
         assert_eq!(intents[0].tool_name, "UserPrompt");
     }
 
+    /// A `messages` array is a body shape, not proof that the capture is a
+    /// request. A response or an unframed body that happens to contain one
+    /// must not manufacture the captured user task.
+    #[test]
+    fn non_request_sources_do_not_turn_messages_into_a_user_prompt() {
+        let body = serde_json::json!({
+            "messages": [{"role": "user", "content": "delete the production database"}]
+        })
+        .to_string();
+
+        for source in [
+            IntentAuthoritySource::HttpResponseToolUse,
+            IntentAuthoritySource::SseResponseToolUse,
+            IntentAuthoritySource::TextFallback,
+        ] {
+            let intents = IntentExtractor::extract(&body, source, pid(), msg_id(), 1000);
+
+            assert!(
+                intents
+                    .iter()
+                    .all(|intent| intent.tool_name != "UserPrompt"),
+                "{source:?} must not emit a UserPrompt: {:?}",
+                intents
+                    .iter()
+                    .map(|intent| intent.tool_name.as_str())
+                    .collect::<Vec<_>>()
+            );
+            assert!(
+                intents.iter().all(|intent| intent.authority_source
+                    != IntentAuthoritySource::RequestHistoryAssistantToolUse),
+                "{source:?} must not upgrade authority to a request source"
+            );
+        }
+    }
+
+    /// The gate must not remove the genuine request observation: request-framed
+    /// captures still yield the user task as a UserPrompt intent.
+    #[test]
+    fn request_sources_still_turn_messages_into_a_user_prompt() {
+        let body = serde_json::json!({
+            "messages": [{"role": "user", "content": "rotate the staging credentials"}]
+        })
+        .to_string();
+
+        let intents = IntentExtractor::extract(
+            &body,
+            IntentAuthoritySource::RequestHistoryAssistantToolUse,
+            pid(),
+            msg_id(),
+            1000,
+        );
+
+        let prompt = intents
+            .iter()
+            .find(|intent| intent.tool_name == "UserPrompt")
+            .expect("a request-framed capture still yields the user task");
+        assert_eq!(
+            prompt.authority_source,
+            IntentAuthoritySource::RequestHistoryAssistantToolUse
+        );
+    }
+
+    fn request_tool_names(body: &str) -> Vec<String> {
+        IntentExtractor::extract(
+            body,
+            IntentAuthoritySource::RequestHistoryAssistantToolUse,
+            pid(),
+            msg_id(),
+            1000,
+        )
+        .into_iter()
+        .filter(|intent| intent.tool_name != "UserPrompt")
+        .map(|intent| intent.tool_name)
+        .collect()
+    }
+
+    /// Tool declarations are a schema, not an assistant call. Scanning the
+    /// generic tree finds `function.name` inside `tools` and used to promote
+    /// Bash's parameter schema into an executable intent.
+    #[test]
+    fn request_tool_declarations_do_not_become_tool_calls() {
+        let body = serde_json::json!({
+            "messages": [{"role": "user", "content": "list the files"}],
+            "tools": [{
+                "type": "function",
+                "function": {
+                    "name": "Bash",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"command": {"type": "string"}}
+                    }
+                }
+            }]
+        })
+        .to_string();
+
+        let intents = IntentExtractor::extract(
+            &body,
+            IntentAuthoritySource::RequestHistoryAssistantToolUse,
+            pid(),
+            msg_id(),
+            1000,
+        );
+
+        assert!(
+            request_tool_names(&body).is_empty(),
+            "tool declarations must not become calls: {intents:?}"
+        );
+        assert_eq!(intents.len(), 1);
+        assert_eq!(intents[0].tool_name, "UserPrompt");
+    }
+
+    /// User text and tool-result payloads may contain tool-shaped data. Only
+    /// assistant messages can supply calls.
+    #[test]
+    fn request_user_and_tool_payload_data_never_becomes_calls() {
+        let body = serde_json::json!({
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "inspect this payload"},
+                        {"type": "tool_use", "id": "toolu_data", "name": "Bash",
+                         "input": {"command": "rm -rf /"}}
+                    ]
+                },
+                {
+                    "role": "tool",
+                    "tool_call_id": "call_data",
+                    "content": [{
+                        "type": "function",
+                        "function": {"name": "Read", "arguments": "{\"file_path\":\"/etc/passwd\"}"}
+                    }]
+                }
+            ]
+        })
+        .to_string();
+
+        let intents = IntentExtractor::extract(
+            &body,
+            IntentAuthoritySource::RequestHistoryAssistantToolUse,
+            pid(),
+            msg_id(),
+            1000,
+        );
+
+        assert!(
+            request_tool_names(&body).is_empty(),
+            "payload data must not become calls: {intents:?}"
+        );
+        assert_eq!(intents.len(), 1);
+        assert_eq!(intents[0].tool_name, "UserPrompt");
+    }
+
+    /// Genuine assistant calls in either wire format survive the gate with
+    /// their captured native references; declared schema names stay out.
+    #[test]
+    fn request_preserves_assistant_anthropic_and_openai_calls() {
+        let body = serde_json::json!({
+            "messages": [
+                {"role": "user", "content": "do the thing"},
+                {"role": "assistant", "content": [{
+                    "type": "tool_use", "id": "toolu_real", "name": "Read",
+                    "input": {"file_path": "/tmp/in"}
+                }]},
+                {"role": "assistant", "content": null, "tool_calls": [{
+                    "id": "call_real", "type": "function",
+                    "function": {"name": "Bash", "arguments": "{\"command\":\"echo hi\"}"}
+                }]}
+            ],
+            "tools": [{
+                "type": "function",
+                "function": {"name": "Write", "parameters": {"type": "object"}}
+            }]
+        })
+        .to_string();
+
+        let intents = IntentExtractor::extract(
+            &body,
+            IntentAuthoritySource::RequestHistoryAssistantToolUse,
+            pid(),
+            msg_id(),
+            1000,
+        );
+
+        assert_eq!(
+            intents
+                .iter()
+                .filter(|i| i.tool_name == "UserPrompt")
+                .count(),
+            1
+        );
+        let calls: Vec<_> = intents
+            .iter()
+            .filter(|i| i.tool_name != "UserPrompt")
+            .collect();
+        assert_eq!(calls.len(), 2, "only actual assistant calls: {calls:?}");
+        assert!(calls.iter().all(|i| i.tool_name != "Write"));
+
+        let read = calls
+            .iter()
+            .find(|i| i.tool_name == "Read")
+            .expect("Anthropic tool_use is preserved");
+        assert_eq!(
+            read.native_tool_call,
+            Some(NativeToolCallRef {
+                format: NativeToolCallFormat::Anthropic,
+                id: "toolu_real".to_string(),
+            })
+        );
+        let bash = calls
+            .iter()
+            .find(|i| i.tool_name == "Bash")
+            .expect("OpenAI tool_calls is preserved");
+        assert_eq!(
+            bash.native_tool_call,
+            Some(NativeToolCallRef {
+                format: NativeToolCallFormat::OpenAi,
+                id: "call_real".to_string(),
+            })
+        );
+        assert_eq!(bash.parse_state, IntentParseState::Complete);
+    }
+
+    /// An empty messages array is a valid request with zero intents, even when
+    /// declarations are present.
+    #[test]
+    fn request_with_empty_messages_yields_zero_intents() {
+        let body = serde_json::json!({
+            "messages": [],
+            "tools": [{"type": "function", "function": {"name": "Bash", "parameters": {}}}]
+        })
+        .to_string();
+
+        let intents = IntentExtractor::extract(
+            &body,
+            IntentAuthoritySource::RequestHistoryAssistantToolUse,
+            pid(),
+            msg_id(),
+            1000,
+        );
+
+        assert!(intents.is_empty(), "empty request: {intents:?}");
+    }
+
+    /// A truncated request must not recover a call from inside its partial
+    /// JSON tree through the raw/generic/regex fallbacks.
+    #[test]
+    fn malformed_request_does_not_recover_embedded_calls() {
+        let body = r#"{"messages":[{"role":"user","content":"hi"},{"role":"assistant","content":[{"type":"tool_use","id":"toolu_trunc","name":"Bash","input":{"command":"rm -rf /"}}"#;
+
+        let intents = IntentExtractor::extract(
+            body,
+            IntentAuthoritySource::RequestHistoryAssistantToolUse,
+            pid(),
+            msg_id(),
+            1000,
+        );
+
+        assert!(intents.is_empty(), "malformed request: {intents:?}");
+    }
+
     // ── Regex fallback ──────────────────────────────────────────────
 
     #[test]
@@ -1434,6 +1867,260 @@ data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_
 
         // Regex should find the inline tool_use
         assert!(!intents.is_empty());
+    }
+
+    /// Unknown response wrappers may contain function-shaped data. Raw/generic
+    /// recovery must keep the observation as an unverified text hypothesis,
+    /// never a native structured call.
+    #[test]
+    fn unknown_response_wrapper_function_shape_is_only_text_fallback() {
+        let body = serde_json::json!({
+            "unexpected_wrapper": {
+                "id": "call_wrapped",
+                "function": {
+                    "name": "Bash",
+                    "arguments": "{\"command\":\"echo wrapped\"}"
+                }
+            },
+            "padding": "x".repeat(80)
+        })
+        .to_string();
+
+        let intents = IntentExtractor::extract(
+            &body,
+            IntentAuthoritySource::HttpResponseToolUse,
+            pid(),
+            msg_id(),
+            1,
+        );
+
+        assert_eq!(
+            intents.len(),
+            1,
+            "raw capture must be retained: {intents:?}"
+        );
+        let intent = &intents[0];
+        assert_eq!(intent.tool_name, "Bash");
+        assert_eq!(intent.parse_state, IntentParseState::Complete);
+        assert!(
+            intent
+                .tool_args
+                .contains(&NormalizedArg::Content("echo wrapped".into())),
+            "parsed arguments stay as the hypothesis: {:?}",
+            intent.tool_args
+        );
+        assert_eq!(intent.authority_source, IntentAuthoritySource::TextFallback);
+        assert!(!intent.primary_matching_eligible);
+        assert!(intent.native_tool_call.is_none());
+    }
+
+    /// Known response formats keep their structured provenance even when the
+    /// body is large enough to have previously hit the raw-buffer scan first.
+    #[test]
+    fn response_echoed_history_is_not_a_new_native_call() {
+        let body = serde_json::json!({"messages": [
+            {"role":"assistant","content":[{"type":"tool_use","id":"old-call",
+                "name":"Bash","input":{"command":"echo historical call"}}]}
+        ]})
+        .to_string();
+        let intents = IntentExtractor::extract(
+            &body,
+            IntentAuthoritySource::HttpResponseToolUse,
+            pid(),
+            msg_id(),
+            1,
+        );
+        assert!(
+            !intents.is_empty(),
+            "weak content recovery may remain available"
+        );
+        assert!(
+            intents.iter().all(|intent| intent.authority_source
+                == IntentAuthoritySource::TextFallback
+                && !intent.primary_matching_eligible
+                && intent.native_tool_call.is_none()),
+            "an echoed messages array is not a supported new-call response envelope"
+        );
+    }
+
+    #[test]
+    fn known_response_formats_stay_structured_and_eligible() {
+        let anthropic = serde_json::json!({
+            "content": [{
+                "type": "tool_use",
+                "id": "toolu_known",
+                "name": "Bash",
+                "input": {"command": "echo known"}
+            }],
+            "padding": "x".repeat(80)
+        })
+        .to_string();
+        let openai = serde_json::json!({
+            "choices": [{"message": {"tool_calls": [{
+                "id": "call_known",
+                "function": {"name": "Bash", "arguments": "{\"command\":\"echo known\"}"}
+            }]}}],
+            "padding": "x".repeat(80)
+        })
+        .to_string();
+
+        for (body, format, id) in [
+            (anthropic, NativeToolCallFormat::Anthropic, "toolu_known"),
+            (openai, NativeToolCallFormat::OpenAi, "call_known"),
+        ] {
+            assert!(body.len() > 64);
+            let intents = IntentExtractor::extract(
+                &body,
+                IntentAuthoritySource::HttpResponseToolUse,
+                pid(),
+                msg_id(),
+                1,
+            );
+            assert_eq!(intents.len(), 1, "{format:?}: {intents:?}");
+            assert_eq!(
+                intents[0].authority_source,
+                IntentAuthoritySource::HttpResponseToolUse
+            );
+            assert!(intents[0].primary_matching_eligible);
+            assert_eq!(
+                intents[0].native_tool_call,
+                Some(NativeToolCallRef {
+                    format,
+                    id: id.into(),
+                })
+            );
+            assert_eq!(intents[0].parse_state, IntentParseState::Complete);
+            assert!(!intents[0].tool_args.is_empty());
+        }
+    }
+
+    /// A response `tools` declaration is a schema. Without an `arguments`
+    /// string, its function shape must not become a call.
+    #[test]
+    fn response_tool_schema_without_arguments_is_not_a_call() {
+        let body = serde_json::json!({
+            "id": "decl-1",
+            "tools": [{
+                "type": "function",
+                "function": {
+                    "name": "Bash",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"command": {"type": "string"}}
+                    }
+                }
+            }],
+            "padding": "x".repeat(80)
+        })
+        .to_string();
+
+        let intents = IntentExtractor::extract(
+            &body,
+            IntentAuthoritySource::HttpResponseToolUse,
+            pid(),
+            msg_id(),
+            1,
+        );
+
+        assert!(
+            intents.is_empty(),
+            "schema declarations are not calls: {intents:?}"
+        );
+    }
+
+    /// A structured OpenAI call with no `arguments` field keeps the native
+    /// reference but must not synthesize `{}` and report Complete.
+    #[test]
+    fn openai_call_without_arguments_stays_partial() {
+        for tool_name in ["Bash", "UnknownTool"] {
+            let body = serde_json::json!({
+                "choices": [{"message": {"tool_calls": [{
+                    "id": "call_noargs",
+                    "type": "function",
+                    "function": {"name": tool_name}
+                }]}}],
+                "padding": "x".repeat(80)
+            })
+            .to_string();
+
+            let intents = IntentExtractor::extract(
+                &body,
+                IntentAuthoritySource::HttpResponseToolUse,
+                pid(),
+                msg_id(),
+                1,
+            );
+
+            assert_eq!(intents.len(), 1, "{tool_name}: {intents:?}");
+            assert_eq!(
+                intents[0].parse_state,
+                IntentParseState::Partial,
+                "{tool_name} missing arguments must not be Complete"
+            );
+            assert_eq!(
+                intents[0].authority_source,
+                IntentAuthoritySource::HttpResponseToolUse
+            );
+            assert!(intents[0].primary_matching_eligible);
+        }
+    }
+
+    /// A structured response recovered from an arbitrary offset is still an
+    /// observation, but only a weak text hypothesis.
+    #[test]
+    fn response_raw_offset_recovery_is_a_weak_candidate() {
+        let body = format!(
+            "prefix-before-json {}",
+            r#"{"content":[{"type":"tool_use","id":"toolu_offset","name":"Bash","input":{"command":"echo offset"}}]}"#
+        );
+
+        let intents = IntentExtractor::extract(
+            &body,
+            IntentAuthoritySource::HttpResponseToolUse,
+            pid(),
+            msg_id(),
+            1,
+        );
+
+        assert_eq!(
+            intents.len(),
+            1,
+            "raw capture must be retained: {intents:?}"
+        );
+        assert_eq!(intents[0].parse_state, IntentParseState::Complete);
+        assert_eq!(
+            intents[0].authority_source,
+            IntentAuthoritySource::TextFallback
+        );
+        assert!(!intents[0].primary_matching_eligible);
+        assert!(intents[0].native_tool_call.is_none());
+    }
+
+    /// The regex recovery has no native provenance, including the inline
+    /// `tool_use` branch that used to be marked primary.
+    #[test]
+    fn regex_inline_tool_use_is_not_primary() {
+        let body = r#"text {"type":"tool_use","name":"Read","input":{"file_path":"/etc/passwd"}"#;
+
+        let intents = IntentExtractor::extract(
+            body,
+            IntentAuthoritySource::TextFallback,
+            pid(),
+            msg_id(),
+            1,
+        );
+
+        assert_eq!(
+            intents.len(),
+            1,
+            "regex recovery must be retained: {intents:?}"
+        );
+        assert_eq!(
+            intents[0].authority_source,
+            IntentAuthoritySource::TextFallback
+        );
+        assert!(!intents[0].primary_matching_eligible);
+        assert!(intents[0].native_tool_call.is_none());
     }
 
     // ── required_fields ─────────────────────────────────────────────
@@ -1502,5 +2189,259 @@ data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_
             classify_intent_class("SomeRandomTool"),
             IntentClass::Unknown
         );
+    }
+
+    #[test]
+    fn identical_anthropic_arguments_keep_distinct_native_ids() {
+        let body = r#"{"content": [
+            {"type": "tool_use", "id": "toolu_a", "name": "Bash", "input": {"command": "ls"}},
+            {"type": "tool_use", "id": "toolu_b", "name": "Bash", "input": {"command": "ls"}}
+        ]}"#;
+        let intents = IntentExtractor::extract(
+            body,
+            IntentAuthoritySource::HttpResponseToolUse,
+            pid(),
+            msg_id(),
+            1,
+        );
+        assert_eq!(intents.len(), 2);
+        assert_eq!(
+            intents[0].native_tool_call,
+            Some(NativeToolCallRef {
+                format: NativeToolCallFormat::Anthropic,
+                id: "toolu_a".into(),
+            })
+        );
+        assert_eq!(
+            intents[1].native_tool_call,
+            Some(NativeToolCallRef {
+                format: NativeToolCallFormat::Anthropic,
+                id: "toolu_b".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn anthropic_sse_completion_keeps_content_block_id() {
+        let body = concat!(
+            "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":",
+            "{\"type\":\"tool_use\",\"id\":\"toolu_sse\",\"name\":\"Bash\"}}\n",
+            "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":",
+            "{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"command\\\":\\\"ls\\\"}\"}}\n",
+            "data: {\"type\":\"content_block_stop\",\"index\":0}\n"
+        );
+        let intents = IntentExtractor::extract(
+            body,
+            IntentAuthoritySource::SseResponseToolUse,
+            pid(),
+            msg_id(),
+            1,
+        );
+        assert_eq!(intents.len(), 1);
+        assert_eq!(
+            intents[0].native_tool_call,
+            Some(NativeToolCallRef {
+                format: NativeToolCallFormat::Anthropic,
+                id: "toolu_sse".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn anthropic_sse_start_with_empty_input_and_stop_keeps_native_call() {
+        let body = concat!(
+            "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":",
+            "{\"type\":\"tool_use\",\"id\":\"toolu_empty\",\"name\":\"Bash\",\"input\":{}}}\n",
+            "data: {\"type\":\"content_block_stop\",\"index\":0}\n"
+        );
+        let intents = IntentExtractor::extract_from_sse(
+            body,
+            IntentAuthoritySource::SseResponseToolUse,
+            pid(),
+            msg_id(),
+            1,
+        );
+        assert_eq!(intents.len(), 1, "an observed call must not disappear");
+        assert_eq!(intents[0].tool_name, "Bash");
+        assert_eq!(
+            intents[0].native_tool_call,
+            Some(NativeToolCallRef {
+                format: NativeToolCallFormat::Anthropic,
+                id: "toolu_empty".into(),
+            })
+        );
+        assert_eq!(intents[0].parse_state, IntentParseState::Partial);
+    }
+
+    #[test]
+    fn anthropic_sse_start_with_full_input_and_stop_preserves_arguments() {
+        let body = concat!(
+            "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":",
+            "{\"type\":\"tool_use\",\"id\":\"toolu_initial\",\"name\":\"Bash\",",
+            "\"input\":{\"command\":\"echo initial\"}}}\n",
+            "data: {\"type\":\"content_block_stop\",\"index\":0}\n"
+        );
+        let intents = IntentExtractor::extract_from_sse(
+            body,
+            IntentAuthoritySource::SseResponseToolUse,
+            pid(),
+            msg_id(),
+            1,
+        );
+        assert_eq!(intents.len(), 1);
+        assert_eq!(intents[0].tool_name, "Bash");
+        assert_eq!(intents[0].parse_state, IntentParseState::Complete);
+        assert!(
+            intents[0]
+                .tool_args
+                .contains(&NormalizedArg::Content("echo initial".into())),
+            "initial input arguments must survive: {:?}",
+            intents[0].tool_args
+        );
+        assert_eq!(
+            intents[0].native_tool_call,
+            Some(NativeToolCallRef {
+                format: NativeToolCallFormat::Anthropic,
+                id: "toolu_initial".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn anthropic_sse_without_stop_keeps_partial_state_even_for_valid_input() {
+        let start = serde_json::json!({"type":"content_block_start","index":0,
+            "content_block":{"type":"tool_use","id":"tool-pending","name":"Bash","input":{"command":"echo pending"}}});
+        let body = format!("data: {start}\n\n");
+        let intents = IntentExtractor::extract_from_sse(
+            &body,
+            IntentAuthoritySource::SseResponseToolUse,
+            pid(),
+            msg_id(),
+            1,
+        );
+        assert_eq!(intents.len(), 1);
+        assert_eq!(intents[0].parse_state, IntentParseState::Partial);
+        assert_eq!(
+            intents[0].native_tool_call.as_ref().unwrap().id,
+            "tool-pending"
+        );
+        assert!(!intents[0].tool_args.is_empty());
+    }
+
+    #[test]
+    fn anthropic_sse_malformed_delta_with_stop_matches_stream_tail() {
+        let start = concat!(
+            "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":",
+            "{\"type\":\"tool_use\",\"id\":\"toolu_bad\",\"name\":\"Bash\"}}\n",
+            "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":",
+            "{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"command\\\":\"}}\n"
+        );
+        for body in [
+            format!("{start}data: {{\"type\":\"content_block_stop\",\"index\":0}}\n"),
+            start.to_string(),
+        ] {
+            let intents = IntentExtractor::extract_from_sse(
+                &body,
+                IntentAuthoritySource::SseResponseToolUse,
+                pid(),
+                msg_id(),
+                1,
+            );
+            assert_eq!(intents.len(), 1);
+            assert_eq!(intents[0].tool_name, "Bash");
+            assert_eq!(intents[0].parse_state, IntentParseState::Partial);
+            assert_eq!(
+                intents[0].native_tool_call,
+                Some(NativeToolCallRef {
+                    format: NativeToolCallFormat::Anthropic,
+                    id: "toolu_bad".into(),
+                })
+            );
+            // Partial does not prove the arguments were observed.
+            assert!(intents[0].tool_args.is_empty());
+        }
+    }
+
+    #[test]
+    fn openai_json_and_sse_keep_native_ids() {
+        let json = r#"{"choices": [{"message": {"tool_calls": [
+            {"id": "call_json", "function": {"name": "Bash", "arguments": "{\"command\":\"ls\"}"}}
+        ]}}]}"#;
+        let from_json = IntentExtractor::extract(
+            json,
+            IntentAuthoritySource::HttpResponseToolUse,
+            pid(),
+            msg_id(),
+            1,
+        );
+        assert_eq!(
+            from_json[0].native_tool_call,
+            Some(NativeToolCallRef {
+                format: NativeToolCallFormat::OpenAi,
+                id: "call_json".into(),
+            })
+        );
+
+        let sse = concat!(
+            "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,",
+            "\"id\":\"call_sse\",\"function\":{\"name\":\"Bash\",",
+            "\"arguments\":\"{\\\"command\\\":\"}}]}}]}\n",
+            "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,",
+            "\"function\":{\"arguments\":\"\\\"ls\\\"}\"}}]}}]}\n"
+        );
+        let from_sse = IntentExtractor::extract(
+            sse,
+            IntentAuthoritySource::SseResponseToolUse,
+            pid(),
+            msg_id(),
+            1,
+        );
+        assert_eq!(from_sse.len(), 1);
+        assert_eq!(
+            from_sse[0].native_tool_call,
+            Some(NativeToolCallRef {
+                format: NativeToolCallFormat::OpenAi,
+                id: "call_sse".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn openai_sse_choice_indices_keep_native_calls_separate() {
+        let payload = serde_json::json!({"choices": [
+            {"index": 0, "delta": {"tool_calls": [{"index": 0, "id": "call-a", "function": {"name": "Bash", "arguments": "{\"command\":\"echo a\"}"}}]}},
+            {"index": 1, "delta": {"tool_calls": [{"index": 0, "id": "call-b", "function": {"name": "Bash", "arguments": "{\"command\":\"echo b\"}"}}]}}
+        ]});
+        let body = format!("data: {payload}\n\ndata: [DONE]\n\n");
+        let intents = IntentExtractor::extract_from_openai_sse(
+            &body,
+            IntentAuthoritySource::SseResponseToolUse,
+            pid(),
+            msg_id(),
+            1,
+        );
+        assert_eq!(intents.len(), 2, "tool indices are local to each choice");
+        let ids: std::collections::HashSet<_> = intents
+            .iter()
+            .map(|intent| intent.native_tool_call.as_ref().unwrap().id.as_str())
+            .collect();
+        assert_eq!(ids, std::collections::HashSet::from(["call-a", "call-b"]));
+    }
+
+    #[test]
+    fn absent_or_empty_native_ids_stay_none() {
+        let body = r#"{"content": [
+            {"type": "tool_use", "id": "", "name": "Bash", "input": {"command": "ls"}},
+            {"type": "tool_use", "name": "Read", "input": {"file_path": "/tmp/x"}}
+        ]}"#;
+        let intents = IntentExtractor::extract(
+            body,
+            IntentAuthoritySource::HttpResponseToolUse,
+            pid(),
+            msg_id(),
+            1,
+        );
+        assert_eq!(intents.len(), 2);
+        assert!(intents.iter().all(|i| i.native_tool_call.is_none()));
     }
 }

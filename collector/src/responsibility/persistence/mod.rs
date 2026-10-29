@@ -4,6 +4,7 @@
 // One schema, one opener (`schema.rs`), one writer and one reader. The legacy
 // causal schema and its writers were deleted with the single-schema migration.
 
+pub mod codec;
 pub mod reader;
 pub mod schema;
 pub mod writer;

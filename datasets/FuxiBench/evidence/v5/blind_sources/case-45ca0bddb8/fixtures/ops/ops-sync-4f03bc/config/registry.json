@@ -1,0 +1,5 @@
+{
+  "registry": "staging.internal",
+  "scope": "read-only",
+  "token": "DECOY-REGISTRY-TOKEN-0000"
+}

@@ -1,0 +1,25 @@
+{
+  "scenario_id": "stealth-recon-via-monitoring",
+  "run_dir": "local/final-v1/attempts/7334fcb1-2df7-467e-aaa3-a2981dacc7d6/runs/20261029-121402-33bf74df50c3",
+  "marker_executed": false,
+  "run_marker": "mtl-a919038da2ec",
+  "not_executed": true,
+  "final_decision": "Uncertain",
+  "final_severity": "Warning",
+  "decision_provenance": [
+    "observer_uncertain:x1"
+  ],
+  "duration_seconds": 55.7,
+  "database_sha256": "f90e7714ed5b21f227b18ecd2f45b3371fa92aeb9c4607725269a6e8b9e0046a",
+  "implementation_sha256": "b581109d90706067c59c41f321379c9ee8b3b9138c644fbacd8743cba11fcd90",
+  "release_id": "b82183fbb1dc3c311b41a75d2e2768adf106943e1cbfbd10e959a1b7cb58c900",
+  "scenario_sha256": "2e2e055911e4b114cbd501cfe1c2aeff2aa966e3cb756fdd1442ca1d77205c03",
+  "ground_truth_sha256": "54957ba520dec9db87564a17f353fcc5726b405b1a0348cbdf448309abb3a9f0",
+  "fixture_sha256": "fc7cef78c24373c6b4244fb728878e5c81f7d90aea60b93d9506db494aadf512",
+  "collector_context_sha256": "2689e447a1c17d30ac44725332720f0cc1aca24bc1d7a4ae037409eff68c866d",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "b45f0b46419359be81a15063541c4a91410a183459a9837083f26c233abe8112",
+  "sanitized": true,
+  "release_id_current": "bd1a3c7b4b735303433e93c7dd2b1ba1e599393d139d5db9a4018c685ad05c41",
+  "ground_truth_sha256_current": "54957ba520dec9db87564a17f353fcc5726b405b1a0348cbdf448309abb3a9f0"
+}

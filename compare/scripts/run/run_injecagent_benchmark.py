@@ -3,7 +3,7 @@
 
 MtAgentLens:
   第1层: 完整生产规则引擎 (25条 unsafe + 5条 safe, 来自 Rust rules.rs)
-  第2层: Observer LLM (deepseek-v4-pro, 完整生产 system_prompt)
+  第2层: Observer LLM (deepseek-flash, 完整生产 system_prompt)
   第3层: Fail-closed (Uncertain → Unsafe)
 
 Agent Sentinel:
@@ -32,7 +32,7 @@ BASE_URL = API_CONFIG.get("ANTHROPIC_BASE_URL", "")
 AUTH_TOKEN = API_CONFIG.get("ANTHROPIC_AUTH_TOKEN", "")
 
 # 模型配置
-MTAP_MODEL = "deepseek-v4-pro"      # Observer LLM
+MTAP_MODEL = "deepseek-flash"      # Observer LLM
 AS_MODEL = API_CONFIG.get("ANTHROPIC_MODEL", MTAP_MODEL)  # Agent Sentinel 使用与主配置相同的模型（基准公平性）
 
 # ═══════════════════════════════════════════════════════════════

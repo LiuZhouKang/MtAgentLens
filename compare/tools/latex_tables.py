@@ -104,68 +104,48 @@ def _dfmt(x):
 # ── 1. Cross-tool comparison (reads main_evaluation.json + baselines) ──
 
 def comparison_table(project_root: Path):
-    """Read main_evaluation.json for MtAgentLens metrics. Baselines are
-    stored per-tool results — read from existing paper data or prompt_baselines."""
-    main = project_root / "compare/results/paper/main_evaluation.json"
-    if not main.exists():
+    """Canonical 93-scenario external baseline table (PP)."""
+    path = project_root / "compare/results/external/baselines/metrics/comparison.json"
+    if not path.exists():
         return None
-    m = json.loads(main.read_text())
-    fm = m.get("full_metrics", m.get("legacy_metrics", {}))
-    tpr = fm.get("TPR", 0)
-    fpr = fm.get("FPR", 0)
-    f1 = fm.get("F1", 0)
-    mcc = fm.get("MCC", 0)
-    pp_tpr = fm.get("PP_TPR", None)
-    # If PP-TPR not in JSON, compute: TP/(TP+FN) for executed attacks (PBC>0)
-    if pp_tpr is None:
-        per = m.get("per_scenario", [])
-        executed_attacks = [s for s in per if s.get("is_attack") and s.get("pbc", 0) > 0]
-        if executed_attacks:
-            detected = [s for s in executed_attacks
-                        if s["full_scores"].get("0", 0) > 0.15]
-            pp_tpr = len(detected) / len(executed_attacks)
-        else:
-            pp_tpr = tpr
-
-    cols = ["工具", "ITT-TPR", "PP-TPR", "FPR", "F1", "MCC", "检测机制"]
-    rows = [
-        ["MtAgentLens (eBPF)", _fmt4(tpr), _fmt4(pp_tpr), _fmt4(fpr),
-         _fmt4(f1), _fmt4(mcc), "eBPF + PBC门控 + Observer"],
-        ["Agent Sentinel",     "0.358", "—",    "0.316", "0.495", "0.053",  "LLM 文本分析"],
-        ["LLM Guard",          "0.687", "—",    "0.789", "0.719", "−0.110", "DeBERTa-v3 关键词"],
-        ["Meta Prompt Guard",  "0.149", "—",    "0.105", "0.253", "−0.128", "Prompt-Guard-86M"],
-    ]
-    return _tex_table(cols, rows, "检测性能对比 — frozen\\_v1.0.0 (86 场景)", highlight_col=1)
+    data = json.loads(path.read_text())
+    tools = data["tools"]
+    names = [("MtAgentLens", "MtAgentLens (eBPF)"),
+             ("Agent Sentinel-style", "Agent Sentinel-style"),
+             ("LLM Guard", "LLM Guard"),
+             ("Meta Prompt Guard", "Meta Prompt Guard"),
+             ("R-Judge A2", "R-Judge A2 (app trace)")]
+    rows = []
+    for key, label in names:
+        v = tools[key]
+        tp, na, fp = v["tp"], v["n_attack"], v["fp"]
+        precision = tp / (tp + fp) if tp + fp else 0.0
+        f1 = 2 * tp / (2 * tp + fp + (na - tp)) if tp else 0.0
+        rows.append([label, _fmt4(v["tpr"]), _fmt4(v["fpr"]), _fmt4(precision), _fmt4(f1)])
+    cols = ["方法（输入范围）", "TPR", "FPR", "Precision", "F1"]
+    return _tex_table(cols, rows, "检测性能对比 — 93 场景（PP）", highlight_col=1)
 
 
 # ── 2. Per-type TPR (from ablation per-type AUROC → converted to TPR) ──
 
 def comparison_per_type_table(layer_scores_list, y, meta):
-    """Read per-type TPR from the ablation L3 (full system) scores."""
-    from compare.tools.ablation_metrics import confusion_matrix
-    lid, scores = layer_scores_list[-1]  # L3 scores
-    cols = ["攻击类型", "MtAgentLens", "Agent Sentinel", "LLM Guard", "Meta Prompt Guard"]
+    """Canonical per-type TPR (A/B) from the 93-scenario comparison."""
+    path = Path(__file__).resolve().parents[2] / "compare/results/external/baselines/metrics/comparison.json"
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text())
+    names = [("MtAgentLens", "MtAgentLens"), ("Agent Sentinel-style", "Agent Sentinel-style"),
+             ("LLM Guard", "LLM Guard"), ("Meta Prompt Guard", "Meta Prompt Guard"),
+             ("R-Judge A2", "R-Judge A2")]
     rows = []
-    for at, aname in [("A", "A — 直接注入 (n=10)"), ("B", "B — 间接攻击 (n=34)"),
-                       ("C", "C — 多 Agent (n=23)")]:
-        idx = [i for i, m in enumerate(meta) if m["attack_type"] == at]
-        sub_s = scores[idx]; sub_l = y[idx]
-        tp, fp, fn, tn = confusion_matrix(sub_s, sub_l, 0.15)
-        tpr_val = tp / max(tp + fn, 1)
-        rows.append([aname, _fmt4(tpr_val), "0.900" if at == "A" else ("0.353" if at == "B" else "0.130"),
-                     "0.500" if at == "A" else ("0.853" if at == "B" else "0.522"),
-                     "0.000" if at == "A" else ("0.235" if at == "B" else "0.087")])
+    for typ, label in (("A", "A — 直接注入"), ("B", "B — 间接/多 agent")):
+        row = [label]
+        for key, _ in names:
+            row.append(_fmt4(data["tools"][key]["per_type"][typ]["tpr"]))
+        rows.append(row)
+    cols = ["攻击类型"] + [label for _, label in names]
+    return _tex_table(cols, rows, "分类型 TPR — 93 场景（PP）", highlight_col=1)
 
-    # Benign FPR
-    ben_idx = [i for i, m in enumerate(meta) if m["attack_type"] == "benign"]
-    ben_s = scores[ben_idx]; ben_l = y[ben_idx]
-    tp, fp, fn, tn = confusion_matrix(ben_s, ben_l, 0.15)
-    fpr_val = fp / max(fp + tn, 1)
-    rows.append(["良性 FPR (n=19)", _fmt4(fpr_val), "0.316", "0.789", "0.105"])
-    return _tex_table(cols, rows, "按攻击类型分解 — TPR / FPR", highlight_col=1)
-
-
-# ── 3–8. Ablation tables (all data from ablation report) ──
 
 def ablation_primary_metrics(layers, metrics):
     cols = ["层", "能力", "AUROC", "AUPRC", r"Cohen\_d", r"Brier$\downarrow$", r"ECE$\downarrow$"]
@@ -379,7 +359,7 @@ def generate_all_pdfs(output_dir, layers, report, layer_scores_list, y, meta):
     tables_dir.mkdir(parents=True, exist_ok=True)
 
     project_root = Path(output_dir).parents[2]
-    traces_dir = project_root / "compare/Dataset/FuxiBench/traces"
+    traces_dir = project_root / "datasets/FuxiBench/traces"
     metrics = report["layer_metrics"]
     comparisons = report["layer_comparisons"]
     layer_names = {l[0]: l[1] for l in layers}

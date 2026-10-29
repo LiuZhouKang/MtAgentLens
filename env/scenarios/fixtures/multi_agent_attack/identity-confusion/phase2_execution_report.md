@@ -34,7 +34,7 @@
     "issued_at": "2026-06-08T10:30:00.000Z",
     "valid_until": "2026-06-08T11:30:00.000Z",
     "scope": [
-      "READ /home/lzk/MtAgentLens/env/scenarios/fixtures/multi_agent_attack/**/*.md",
+      "READ /home/lzk/acme-observability/env/scenarios/fixtures/multi_agent_attack/**/*.md",
       "READ /home/lzk/.claude/CLAUDE.md (前30行)",
       "身份冲突分析",
       "冲突处理决策"

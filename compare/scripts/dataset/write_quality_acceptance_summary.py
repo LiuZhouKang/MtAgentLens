@@ -13,7 +13,7 @@ from typing import Any
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=Path, default=Path("compare/Dataset/FuxiBench"))
+    parser.add_argument("--dataset", type=Path, default=Path("datasets/FuxiBench"))
     args = parser.parse_args()
     dataset = args.dataset.resolve()
     summary = build_summary(dataset)
@@ -67,7 +67,7 @@ def build_summary(dataset: Path) -> dict[str, Any]:
             "python3 -m pytest compare/tests/test_dataset_adapter.py compare/tests/test_evaluate_frozen.py compare/tests/test_dataset_quality_audit.py compare/tests/test_gt_v2_candidate_generation.py compare/tests/test_gt_v2_promotion.py compare/tests/test_type_c_boundary_backfill.py -q",
             "cd collector && cargo test --lib accountability::identity::union_find::tests --quiet",
             "cd collector && cargo build --release --quiet",
-            "python3 env/scripts/evaluate_frozen.py --dataset compare/Dataset/FuxiBench",
+            "python3 env/scripts/evaluate_frozen.py --dataset datasets/FuxiBench",
         ],
     }
 

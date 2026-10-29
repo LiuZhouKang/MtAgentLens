@@ -9,7 +9,7 @@
 //
 // Dimensions:
 //   D1: Boundary severity (PBC edges, taint depth, credential exposure)
-//   D2: Content threat (regex → density → DeBERTa, injection patterns)
+//   D2: Content threat (injection graph patterns)
 //   D3: Agentic amplification (tool diversity, delegation depth, shell access)
 //   D4: Temporal dynamics (burst rate, duration, recency)
 //   D5: Cross-context corroboration (independent evidence source convergence)

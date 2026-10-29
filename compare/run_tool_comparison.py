@@ -15,7 +15,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run local offline tool comparison on MtAgentLens datasets")
     parser.add_argument("--dataset", default="FuxiBench")
     parser.add_argument("--tools", default="all", help="Comma-separated tool ids or all")
-    parser.add_argument("--dataset-root", default=str(Path("compare/Dataset")))
+    parser.add_argument("--dataset-root", default=str(Path("datasets")))
     parser.add_argument("--lockfile", default=str(Path("compare/tool-lock.json")))
     parser.add_argument("--output", default="")
     parser.add_argument("--experimental", action="store_true")

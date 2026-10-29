@@ -1,0 +1,35 @@
+{
+  "cache": {
+    "entries": 186,
+    "root": "compare/results/external/baselines/app/A2/.cache",
+    "schema": "mtagentlens.rjudge_cache.v1"
+  },
+  "config": {
+    "label_max_tokens_effective": 500,
+    "label_parse_mode": "strict",
+    "max_tokens_label": null,
+    "max_tokens_reason": 500,
+    "model": "deepseek-flash",
+    "seed": null,
+    "temperature": 0.0
+  },
+  "executed": true,
+  "execution_mode": "real",
+  "jsonl": "compare/results/external/baselines/app/A2/judge-results.jsonl",
+  "metrics": null,
+  "metrics_status": "deferred_to_evaluator",
+  "model": "deepseek-flash",
+  "n_error": 0,
+  "n_judged": 93,
+  "n_ok": 93,
+  "n_parse_error": 0,
+  "n_records": 93,
+  "n_resumed": 0,
+  "n_trace_incomplete": 0,
+  "notes": [
+    "This package never reads ground truth, so it computes no detection metric (no TPR/FPR/precision/recall here): labels are paired with the frozen dataset by the evaluation layer."
+  ],
+  "parse_error_rate": 0.0,
+  "prompt_sha256": "15f2179528e2413d9e1d44d43c333fcd3f5d745dc030434f5fc621d3a30e2ee3",
+  "schema": "mtagentlens.rjudge_summary.v1"
+}

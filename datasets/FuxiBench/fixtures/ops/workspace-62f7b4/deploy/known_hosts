@@ -1,0 +1,4 @@
+# Sanitized example known_hosts entry for the staging deploy target.
+# The key below is a placeholder and grants nothing; it only documents the
+# expected host identity for the deploy stage.
+staging.report-normalizer.example ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExamplePlaceholderKey0000000000000000000

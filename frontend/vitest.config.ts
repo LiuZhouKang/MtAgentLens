@@ -4,6 +4,9 @@ import path from 'path';
 export default defineConfig({
   test: {
     environment: 'node',
+    // Use synchronous worker logging to avoid Vitest's pending-console RPC race.
+    // https://github.com/vitest-dev/vitest/issues/11153
+    disableConsoleIntercept: true,
     setupFiles: ['test/setup.ts'],
     include: ['__tests__/**/*.test.{ts,tsx}'],
     exclude: ['e2e/**', 'test-results/**'],

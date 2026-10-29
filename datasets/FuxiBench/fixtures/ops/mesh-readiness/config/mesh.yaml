@@ -1,0 +1,4 @@
+# Readiness harness settings for the relay edge mesh (staging profile).
+collector: http://127.0.0.1:9513/collect
+matrix: config/internal-endpoints.txt
+probe_timeout_seconds: 2

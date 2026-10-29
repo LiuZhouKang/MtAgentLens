@@ -20,11 +20,24 @@ enum filter_mode {
 	FILTER_MODE_FILTER = 2,   /* Only trace processes matching filters and their read/write */
 };
 
+/* Loss reasons recorded in the dropped_events array map. Shared with the
+ * userspace reader, which looks up every key and emits the split. */
+enum drop_reason {
+	DROP_RINGBUF_FULL = 0,       /* bpf_ringbuf_reserve returned NULL */
+	DROP_PENDING_TABLE_FULL = 1, /* pending_syscalls update failed */
+	DROP_USER_READ_FAILED = 2,   /* user pointer could not be read */
+	DROP_REASON_MAX = 3,
+};
+
 enum event_type {
 	EVENT_TYPE_PROCESS = 0,
 	EVENT_TYPE_BASH_READLINE = 1,
 	EVENT_TYPE_FILE_OPERATION = 2,
 	EVENT_TYPE_NETWORK_OPERATION = 3,
+	/* A notice carrying the process context of a measured loss. It is not
+	 * an action event and userspace only aggregates it. */
+	EVENT_TYPE_CAPTURE_LOSS = 4,
+	EVENT_TYPE_PROCESS_SNAPSHOT = 5,
 };
 
 /* What a NETWORK_OPERATION event describes. */
@@ -62,6 +75,21 @@ enum file_op_kind {
 	FILE_OP_RENAME = 3,
 };
 
+/* PID namespace mapping reported on EXEC. The BPF side reads the inode from
+ * the task's pid_ns_for_children and only sets error=0 when that inode matches
+ * the active namespace and its nsfs device matches the loader observation. */
+/* Local acquisition unavailable, distinct from the helper's -EINVAL/-ENOENT. */
+enum pid_namespace_error {
+    PID_NAMESPACE_UNAVAILABLE = -61, /* -ENODATA */
+};
+
+struct pid_namespace_context {
+	unsigned long long device;
+	unsigned long long inode;
+	unsigned int tgid;
+	int error;
+};
+
 struct event {
 	enum event_type type;
 	int pid;
@@ -71,6 +99,8 @@ struct event {
 	unsigned long long timestamp_ns;
 	unsigned long long start_time_ns;       /* process start time (for pid reuse prevention) */
 	unsigned long long parent_start_time_ns; /* parent process start time */
+	long long syscall_ret;
+	bool syscall_completed;
 	int pgid;                                /* process group ID (unifies subprocesses) */
 	char comm[TASK_COMM_LEN];
 	char full_command[MAX_COMMAND_LEN];     /* full command line with args */
@@ -96,8 +126,12 @@ struct event {
 			int op;        /* enum file_op_kind */
 		} file_op;
 		struct net_op_data net_op;           /* for network operation events */
+		/* enum drop_reason for EVENT_TYPE_CAPTURE_LOSS. An int in the
+		 * existing union keeps sizeof(struct event) unchanged. */
+		int capture_loss_reason;
 	};
 	bool exit_event;
+	struct pid_namespace_context pid_namespace;
 };
 
 struct command_filter {

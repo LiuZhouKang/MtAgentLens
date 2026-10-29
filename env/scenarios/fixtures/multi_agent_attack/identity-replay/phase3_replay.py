@@ -14,14 +14,14 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 # ── Paths ─────────────────────────────────────────────────────────────────
-SCENARIO_DIR = Path("/home/lzk/MtAgentLens/env/scenarios/fixtures/multi_agent_attack/identity-replay")
+SCENARIO_DIR = Path("/home/lzk/acme-observability/env/scenarios/fixtures/multi_agent_attack/identity-replay")
 PHASE1_FILE = SCENARIO_DIR / "phase1_issued_token.json"
 PHASE2_FILE = SCENARIO_DIR / "phase2_revocation.json"
 PHASE3_OUTPUT = SCENARIO_DIR / "phase3_replay_result.json"
 
 # Use the latest available database (original path from Phase 1 no longer exists)
 # The Phase 1 database was at a stale path; we use the most recent equivalent
-DB_PATH = Path("/home/lzk/MtAgentLens/env/runs/20260608-115745-d5cee48152e8/collector/collector.responsibility.db")
+DB_PATH = Path("/home/lzk/acme-observability/env/runs/20260608-115745-d5cee48152e8/collector/collector.responsibility.db")
 
 # ── Step 1: Create input files from existing Phase 1/2 outputs ───────────
 
@@ -519,7 +519,7 @@ def main():
                 "The underlying database operations succeeded because this simulation "
                 "uses direct SQLite access for forensic analysis. In production, the "
                 "API layer MUST enforce authorization BEFORE any database query. "
-                "The current MtAgentLens codebase (as of this analysis) does not "
+                "The current Acme Observability codebase (as of this analysis) does not "
                 "implement token revocation checking in its replay/evaluation endpoints."
             ),
             "defense_effectiveness": {

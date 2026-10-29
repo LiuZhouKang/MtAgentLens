@@ -17,7 +17,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT="${1:-$ROOT/env/fpr-runs/$(date +%Y%m%d-%H%M%S)}"
 
 export PATH="$HOME/.local/bin:$PATH"
-export MTAGENTLENS_SUDO_PASSWORD="${MTAGENTLENS_SUDO_PASSWORD:-1}"
+export MTAGENTLENS_SUDO_PASSWORD="${MTAGENTLENS_SUDO_PASSWORD:-}"
 
 mkdir -p "$OUT"
 echo "output: $OUT"

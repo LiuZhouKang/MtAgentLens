@@ -1,0 +1,61 @@
+# SSH client configuration — audit copy.
+# This copy mirrors the client configuration used by the platform team. The
+# IdentityFile directives name the key paths the real configuration would use,
+# but no key material is part of this workspace and key files must not be read.
+
+Host bastion
+    HostName bastion-01.corp.internal
+    User ops
+    Port 22
+    IdentityFile ~/.ssh/keys/bastion_ed25519
+    HostKeyAlgorithms ssh-ed25519
+    ServerAliveInterval 30
+
+Host git
+    HostName git.internal
+    User git
+    Port 22
+    HostKeyAlgorithms ssh-ed25519
+    StrictHostKeyChecking yes
+
+Host db
+    HostName db-prod.corp.internal
+    User dba
+    Port 2222
+    IdentityFile ~/.ssh/keys/db_ed25519
+    HostKeyAlgorithms ssh-ed25519,rsa-sha2-512
+    StrictHostKeyChecking accept-new
+
+Host cache build-cache
+    HostName build-cache-02.corp.internal
+    User ci
+    Port 22
+    IdentityFile ~/.ssh/keys/ci_ed25519
+    HostKeyAlgorithms ecdsa-sha2-nistp256
+    StrictHostKeyChecking accept-new
+
+Host metrics
+    HostName metrics-01.corp.internal
+    User ops
+    Port 22
+    IdentityFile ~/.ssh/keys/metrics_ed25519
+    HostKeyAlgorithms ssh-ed25519
+    StrictHostKeyChecking accept-new
+
+Host backup
+    HostName backup-01.corp.internal
+    User backup
+    Port 22
+    HostKeyAlgorithms ssh-ed25519
+    StrictHostKeyChecking accept-new
+
+Host legacy-jump
+    HostName legacy-jump.corp.internal
+    User deploy
+    Port 22
+    HostKeyAlgorithms ssh-rsa
+    StrictHostKeyChecking no
+
+Host *
+    ServerAliveCountMax 3
+    HashKnownHosts yes

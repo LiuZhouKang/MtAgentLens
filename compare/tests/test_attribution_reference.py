@@ -681,3 +681,145 @@ def test_cli_is_read_only_and_reports_source_hashes(tmp_path, capsys):
     assert report["metrics"]["root_agent_at_3"] is None
     assert report["metrics"]["mrr"] is None
     assert before == {path: path.read_bytes() for path in paths}
+
+
+DB_SHA = "c" * 64
+FINGERPRINT = "fp-current"
+
+
+def experiment(*, results, current=FINGERPRINT, db_sha=DB_SHA, runs=None):
+    if runs is None:
+        runs = [{
+            "run_id": result["run_id"],
+            "source_fingerprint": current,
+            "current_fingerprint": current,
+            "attributions": result,
+        } for result in results]
+    return {
+        "schema": ar.EXPERIMENT_SCHEMA,
+        "current_fingerprint": current,
+        "source_database_sha256": db_sha,
+        "runs": runs,
+    }
+
+
+def bound_reference(*units):
+    return reference(*units, prov=provenance(source_database_sha256=DB_SHA))
+
+
+def test_experiment_wrapper_projects_existing_attribution_results(tmp_path):
+    reference_obj = bound_reference(unit(root=known_root("canonical:a")))
+    alignment_obj = alignment([mapping("canonical:a", "actor-a")])
+    result = predictions(claim(root_actors=("actor-a",), ranked=("actor-a",)))
+    report = evaluate(tmp_path, reference_obj, alignment_obj, experiment(results=[result]))
+    assert report["metrics"]["root_agent_at_1"] == 1.0
+    assert report["metrics"]["root_set_precision"] == 1.0
+    assert report["metrics"]["root_agent_at_3"] is None
+    assert report["metrics"]["mrr"] is None
+
+
+def test_experiment_wrapper_preserves_a_wrong_prediction(tmp_path):
+    reference_obj = bound_reference(unit(root=known_root("canonical:a")))
+    alignment_obj = alignment([mapping("canonical:a", "actor-a")])
+    result = predictions(claim(root_actors=("actor-b",), ranked=("actor-b",)))
+    report = evaluate(tmp_path, reference_obj, alignment_obj, experiment(results=[result]))
+    assert report["metrics"]["root_agent_at_1"] == 0.0
+    assert report["metrics"]["root_set_precision"] == 0.0
+    assert report["metrics"]["root_set_recall"] == 0.0
+
+
+@pytest.mark.parametrize("mutate, match", [
+    (lambda w: w["runs"][0].update(source_fingerprint="stale"), "fingerprint"),
+    (lambda w: w["runs"][0].update(current_fingerprint="other"), "fingerprint"),
+    (lambda w: w.pop("source_database_sha256"), "source_database_sha256"),
+    (lambda w: w.update(source_database_sha256="d" * 64), "source_database_sha256"),
+    (lambda w: w["runs"].append(dict(w["runs"][0])), "run_id"),
+    (lambda w: w["runs"][0].update(run_id="other"), "run_id"),
+    (lambda w: w["runs"][0]["attributions"].update(schema="other"), "schema"),
+])
+def test_experiment_wrapper_rejects_unbound_or_malformed_projection(
+        tmp_path, mutate, match):
+    reference_obj = bound_reference(unit(root=known_root("canonical:a")))
+    alignment_obj = alignment([mapping("canonical:a", "actor-a")])
+    wrapper = experiment(results=[
+        predictions(claim(root_actors=("actor-a",), ranked=("actor-a",))),
+    ])
+    mutate(wrapper)
+    with pytest.raises(ValueError, match=match):
+        evaluate(tmp_path, reference_obj, alignment_obj, wrapper)
+
+
+def test_experiment_wrapper_requires_reference_database_provenance(tmp_path):
+    reference_obj = reference(unit(root=known_root("canonical:a")))
+    alignment_obj = alignment([mapping("canonical:a", "actor-a")])
+    wrapper = experiment(results=[
+        predictions(claim(root_actors=("actor-a",), ranked=("actor-a",))),
+    ])
+    with pytest.raises(ValueError, match="source_database_sha256"):
+        evaluate(tmp_path, reference_obj, alignment_obj, wrapper)
+
+
+def test_experiment_wrapper_requires_a_nonempty_run_list(tmp_path):
+    reference_obj = bound_reference(unit(root=known_root("canonical:a")))
+    alignment_obj = alignment([mapping("canonical:a", "actor-a")])
+    wrapper = experiment(results=[], runs=[])
+    with pytest.raises(ValueError, match="run"):
+        evaluate(tmp_path, reference_obj, alignment_obj, wrapper)
+
+
+# --------------------------------------------------------------------------- #
+# Runtime reference v2 compatibility: per-run localisation, targetless runs.
+# --------------------------------------------------------------------------- #
+
+def reference_without_target(*runs_without):
+    value = reference()
+    value["runs_without_target"] = list(runs_without)
+    return value
+
+
+def test_known_root_step_ref_is_accepted_and_preserved():
+    root = known_root("canonical:a")
+    root["step_ref"] = "canonical:step"
+    parsed = ar.validate_reference(reference(unit(root=root)))
+    assert parsed["units"][0]["root"]["step_ref"] == "canonical:step"
+
+
+def test_reference_without_a_target_run_is_accepted_and_reported(tmp_path):
+    missing = {
+        "run_id": "run-1",
+        "attack_executed": "no",
+        "target_action": None,
+        "reason": "attack_executed_no",
+    }
+    reference_obj = reference_without_target(missing)
+    predictions_obj = {"schema": ar.PREDICTION_SCHEMA, "results": []}
+    report = evaluate(tmp_path, reference_obj, alignment([]), predictions_obj)
+    assert report["metrics"]["root_agent_at_1"] is None
+    assert report["evaluation"]["units_total"] == 0
+    assert report["reference"]["runs_without_target"] == [missing]
+    assert report["reference"]["coverage"] is None
+    parsed = ar.validate_reference(reference_obj)
+    assert parsed["units"] == []
+
+
+@pytest.mark.parametrize("runs_without, match", [
+    ([], "nonempty"),
+    ([{"run_id": "run-1", "attack_executed": "yes",
+       "target_action": "action-1"}], "target_action"),
+    ([{"run_id": "run-1", "attack_executed": "maybe",
+       "target_action": None}], "attack_executed"),
+    ([{"run_id": "", "attack_executed": "no", "target_action": None}], "run_id"),
+])
+def test_targetless_coverage_is_validated(runs_without, match):
+    value = reference()
+    value["runs_without_target"] = runs_without
+    with pytest.raises(ValueError, match=match):
+        ar.validate_reference(value)
+
+
+def test_targetless_reference_rejects_prediction_runs(tmp_path):
+    value = reference_without_target({
+        "run_id": "run-1", "attack_executed": "no",
+        "target_action": None, "reason": "attack_executed_no"})
+    with pytest.raises(ValueError, match="run"):
+        evaluate(tmp_path, value, alignment([]), predictions(claim()))

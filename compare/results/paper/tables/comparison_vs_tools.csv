@@ -1,6 +1,0 @@
-Tool,TPR,FPR,F1,Mechanism
-MtAgentLens (eBPF),0.896,0.0,0.945,eBPF + PBC Gate + Observer
-Agent Sentinel,0.358,0.316,0.495,LLM Text Analysis
-LLM Guard,0.687,0.789,0.719,DeBERTa-v3 Transformers
-Meta Prompt Guard,0.149,0.105,0.253,Prompt-Guard-86M
-InjecAgent TPR,0.861,—,0.013 (short),0.925,—,Rules + Observer (text mode)

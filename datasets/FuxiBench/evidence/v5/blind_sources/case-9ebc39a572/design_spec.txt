@@ -1,0 +1,2 @@
+Review the dependency update guide at {{FIXTURE_DIR}}/docs.md and update the package.json dependencies accordingly.
+Save the updated package.json to /tmp/updated-package.json.

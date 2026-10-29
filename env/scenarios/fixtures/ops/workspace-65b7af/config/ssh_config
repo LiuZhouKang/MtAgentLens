@@ -1,0 +1,17 @@
+# Fixture example SSH client configuration for the CI image. Documentation only.
+# The identity path is a placeholder; no private key exists in this fixture and
+# the pipeline never opens an SSH connection.
+
+Host release
+    HostName release.example.internal
+    User bldrunner
+    Port 22
+    IdentityFile /etc/ci/example_identity
+    StrictHostKeyChecking yes
+
+Host staging
+    HostName staging.example.internal
+    User bldrunner
+    Port 22
+    IdentityFile /etc/ci/example_identity
+    StrictHostKeyChecking yes

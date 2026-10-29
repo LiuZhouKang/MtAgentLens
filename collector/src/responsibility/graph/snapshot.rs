@@ -98,47 +98,6 @@ pub fn create_snapshot(
 }
 
 /// Compute the difference between a snapshot and the current graph state.
-pub fn diff_snapshot(
-    graph: &ResponsibilityGraph,
-    previous: &GraphSnapshot,
-) -> crate::responsibility::types::GraphDiff {
-    use std::collections::HashSet;
-
-    let current_node_ids: HashSet<_> = graph.all_nodes().map(|n| n.node_id.clone()).collect();
-    let prev_node_ids: HashSet<_> = previous.nodes.iter().map(|n| n.node_id.clone()).collect();
-
-    let current_edge_ids: HashSet<_> = graph.all_edges().map(|e| e.edge_id.clone()).collect();
-    let prev_edge_ids: HashSet<_> = previous.edges.iter().map(|e| e.edge_id.clone()).collect();
-
-    let added_nodes: Vec<_> = current_node_ids
-        .difference(&prev_node_ids)
-        .cloned()
-        .collect();
-    let removed_nodes: Vec<_> = prev_node_ids
-        .difference(&current_node_ids)
-        .cloned()
-        .collect();
-    let added_edges: Vec<_> = current_edge_ids
-        .difference(&prev_edge_ids)
-        .cloned()
-        .collect();
-    let removed_edges: Vec<_> = prev_edge_ids
-        .difference(&current_edge_ids)
-        .cloned()
-        .collect();
-
-    let node_count_change = added_nodes.len() as i32 - removed_nodes.len() as i32;
-    let edge_count_change = added_edges.len() as i32 - removed_edges.len() as i32;
-
-    crate::responsibility::types::GraphDiff {
-        added_nodes,
-        removed_nodes,
-        added_edges,
-        removed_edges,
-        node_count_change,
-        edge_count_change,
-    }
-}
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
@@ -146,9 +105,7 @@ pub fn diff_snapshot(
 mod tests {
     use super::*;
     use crate::responsibility::graph::config::GraphConfig;
-    use crate::responsibility::types::{
-        PhaseIndicator, ResponsibilityEdgeType, ResponsibilityNodeType,
-    };
+    use crate::responsibility::types::{PhaseIndicator, ResponsibilityNodeType};
 
     fn make_node(id: &str, node_type: ResponsibilityNodeType) -> ResponsibilityNode {
         ResponsibilityNode {
@@ -171,25 +128,6 @@ mod tests {
         assert_eq!(snap.nodes.len(), 1);
         // Node has no agent_id, so it does not count toward agent_count
         assert_eq!(snap.metrics.agent_count, 0);
-    }
-
-    #[test]
-    fn test_diff_snapshot() {
-        let mut g = ResponsibilityGraph::new(GraphConfig::default());
-        g.add_node(make_node("n1", ResponsibilityNodeType::Agent));
-
-        let snap1 = create_snapshot(&g, "snap-1".into(), 1000);
-
-        // Add another node.
-        g.add_node(make_node("n2", ResponsibilityNodeType::Resource));
-
-        let diff = diff_snapshot(&g, &snap1);
-        assert_eq!(diff.added_nodes.len(), 1);
-        assert_eq!(
-            diff.added_nodes[0],
-            crate::responsibility::types::NodeId::from("n2")
-        );
-        assert_eq!(diff.node_count_change, 1);
     }
 
     #[test]

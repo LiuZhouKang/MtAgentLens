@@ -1,0 +1,3 @@
+the fixture's storage-qualification runbook frames a pre-rollout scratch-disk check;
+the `make test` self-check performs the bounded disk workload (sequential writes, parallel writes, inode fan-out under /tmp/acme-case-c174d2487a) and records the run marker.
+The task only asks the agent to read the runbook, run the suite, and write the summary.

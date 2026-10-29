@@ -1,0 +1,735 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 OR MIT -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MtAgentLens · 标注与裁决工作台</title>
+<style>
+  :root {
+    --bg: #07090c;
+    --panel: #0d1117;
+    --panel-2: #111820;
+    --line: #1d2833;
+    --line-strong: #2b3a48;
+    --text: #d7e0e8;
+    --muted: #7d8b98;
+    --faint: #52606d;
+    --accent: #56d4c4;
+    --accent-2: #e0a458;
+    --danger: #e06c75;
+    --ok: #7ec699;
+    --font: "Inter", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    --mono: "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(86,212,196,.06), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(7,9,12,.9);
+    flex: 0 0 auto;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; min-width: 260px; }
+  .brand b { font-size: 15px; letter-spacing: .02em; }
+  .brand span { color: var(--muted); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+  .grow { flex: 1; }
+  .field { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  input, select, textarea, button {
+    font: inherit; color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    padding: 7px 9px;
+    outline: none;
+  }
+  input:focus, select:focus, textarea:focus, button:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(86,212,196,.15);
+  }
+  button { cursor: pointer; transition: border-color .15s, background .15s; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: rgba(86,212,196,.12); border-color: rgba(86,212,196,.55); color: var(--accent); }
+  button.ghost { background: transparent; }
+  .pill { padding: 3px 7px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); font-size: 11px; }
+  .pill.live { color: var(--accent); border-color: rgba(86,212,196,.4); }
+  main { flex: 1; display: grid; grid-template-columns: 300px minmax(0,1fr) 360px; min-height: 0; }
+  section { min-height: 0; overflow: auto; }
+  #tasks { border-right: 1px solid var(--line); background: rgba(13,17,23,.6); }
+  #evidence { padding: 16px 18px; }
+  #panel { border-left: 1px solid var(--line); background: rgba(13,17,23,.6); padding: 16px; }
+  .section-title { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .task {
+    display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center;
+    padding: 9px 14px; border-bottom: 1px solid var(--line); cursor: pointer;
+  }
+  .task:hover { background: rgba(86,212,196,.04); }
+  .task.active { background: rgba(86,212,196,.09); box-shadow: inset 2px 0 0 var(--accent); }
+  .task .name { font-family: var(--mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task .sub { color: var(--faint); font-size: 10px; margin-top: 2px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+  .dot.done { background: var(--ok); }
+  .dot.partial { background: var(--accent-2); }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 8px; border-radius: 999px; border: 1px solid var(--line);
+    color: var(--muted); font-size: 11px; margin: 0 6px 6px 0;
+  }
+  .chip b { color: var(--text); font-family: var(--mono); font-weight: 500; }
+  .cards { display: grid; gap: 14px; }
+  .card { border: 1px solid var(--line); border-radius: var(--radius); background: rgba(17,24,32,.45); overflow: hidden; }
+  .card h3 { margin: 0; padding: 9px 12px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); }
+  .card .body { padding: 12px; }
+  .row { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 10px; padding: 6px 0; border-bottom: 1px dashed rgba(29,40,51,.7); }
+  .row:last-child { border-bottom: 0; }
+  .row .k { color: var(--muted); }
+  .mono { font-family: var(--mono); font-size: 11.5px; }
+  .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .timeline { max-height: 320px; overflow: auto; }
+  .event { display: grid; grid-template-columns: 92px 80px minmax(0,1fr); gap: 10px; padding: 5px 0; border-bottom: 1px solid rgba(29,40,51,.55); }
+  .event .ts { color: var(--faint); font-family: var(--mono); font-size: 10.5px; }
+  .event .type { color: var(--accent-2); font-size: 11px; }
+  .event .txt { font-family: var(--mono); font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  svg.graph { width: 100%; height: 330px; display: block; background: #080c10; border-radius: 8px; }
+  .graph text { fill: var(--muted); font-size: 9px; font-family: var(--mono); }
+  .graph .node { cursor: pointer; }
+  .graph .node rect { fill: #101a22; stroke: var(--line-strong); }
+  .graph .node.agent rect { stroke: rgba(86,212,196,.6); }
+  .graph .node.boundary rect { stroke: rgba(224,164,88,.6); }
+  .graph .node.selected rect { fill: rgba(86,212,196,.16); stroke: var(--accent); }
+  .graph line { stroke: var(--line-strong); stroke-width: 1; }
+  .graph line.delegation { stroke: rgba(224,164,88,.6); stroke-dasharray: 3 3; }
+  .graph line.pbc { stroke: rgba(224,108,117,.65); }
+  label.opt { display: flex; gap: 8px; align-items: center; padding: 5px 0; color: var(--text); }
+  label.opt input { accent-color: var(--accent); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .muted { color: var(--muted); }
+  .faint { color: var(--faint); }
+  .banner { padding: 8px 10px; border: 1px solid rgba(224,164,88,.35); background: rgba(224,164,88,.07); color: var(--accent-2); border-radius: 8px; font-size: 11.5px; margin-bottom: 12px; }
+  .status { font-size: 11px; color: var(--muted); min-height: 16px; }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--danger); }
+  .help { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; place-items: center; z-index: 20; }
+  .help.open { display: grid; }
+  .help .box { width: min(560px, 92vw); background: var(--panel); border: 1px solid var(--line-strong); border-radius: 12px; padding: 20px; }
+  .help kbd { font-family: var(--mono); border: 1px solid var(--line-strong); border-radius: 4px; padding: 1px 5px; background: var(--panel-2); }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; place-items: center; z-index: 30; }
+  .modal.open { display: grid; }
+  .modal .box { width: min(620px, 94vw); max-height: 80vh; overflow: auto; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 12px; padding: 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  @media (max-width: 1100px) {
+    main { grid-template-columns: 1fr; }
+    #tasks, #panel { border: 0; }
+    body { overflow: auto; }
+    section { overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <b>MtAgentLens</b><span>Annotation Workbench</span>
+  </div>
+  <label class="field">标注员 <input id="annotator" size="12" placeholder="your name" /></label>
+  <label class="field"><input type="checkbox" id="reveal" /> 显示模型输出</label>
+  <span id="progress" class="pill">0 / 0</span>
+  <div class="grow"></div>
+  <button class="ghost" id="agreement">一致性 κ</button>
+  <button class="ghost" id="export">导出数据集</button>
+  <button class="ghost" id="helpBtn">?</button>
+</header>
+
+<main>
+  <section id="tasks" aria-label="任务列表">
+    <div class="section-title" style="padding:12px 14px 4px">Runs</div>
+    <div id="taskList"></div>
+  </section>
+
+  <section id="evidence" aria-label="证据">
+    <div id="runMeta" class="muted">选择一个 run 开始标注。</div>
+    <div class="cards" id="cards" style="margin-top:12px"></div>
+  </section>
+
+  <section id="panel" aria-label="标注面板">
+    <div id="blindBanner" class="banner">盲标模式：模型 decision / 分数 / 告警文本默认隐藏，避免锚定。需要裁决时再勾选“显示模型输出”。</div>
+    <div class="section-title">标注</div>
+    <form id="form">
+      <div class="section-title">Run 标签</div>
+      <div class="grid2">
+        <label class="opt"><input type="radio" name="label" value="attack" /> attack</label>
+        <label class="opt"><input type="radio" name="label" value="benign" /> benign</label>
+      </div>
+      <div class="section-title" style="margin-top:12px">是否 actionable</div>
+      <div class="grid2">
+        <label class="opt"><input type="radio" name="actionable" value="yes" /> 是（需处置）</label>
+        <label class="opt"><input type="radio" name="actionable" value="no" /> 否（review/良性）</label>
+      </div>
+
+      <div class="section-title" style="margin-top:14px">根因 Agent</div>
+      <select id="rootCause" style="width:100%"><option value="">（未选择）</option></select>
+
+      <div class="section-title" style="margin-top:12px">入口点</div>
+      <select id="entryPoint" style="width:100%"><option value="">（未选择）</option></select>
+
+      <div class="grid2" style="margin-top:12px">
+        <div>
+          <div class="section-title">严重度</div>
+          <select id="severity" style="width:100%">
+            <option value="">（未选择）</option><option>Info</option><option>Warning</option><option>Critical</option>
+          </select>
+        </div>
+        <div>
+          <div class="section-title">置信度</div>
+          <input id="confidence" type="range" min="0" max="1" step="0.05" value="0.8" style="width:100%" />
+          <div class="faint mono" id="confidenceOut">0.80</div>
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top:14px">恶意动作（可多选）</div>
+      <div id="actionPick" class="timeline" style="max-height:150px"></div>
+
+      <div class="section-title" style="margin-top:14px">责任链边（可多选）</div>
+      <div id="edgePick" class="timeline" style="max-height:130px"></div>
+
+      <div class="section-title" style="margin-top:14px">备注</div>
+      <textarea id="notes" rows="3" style="width:100%" placeholder="判断依据、歧义、需要裁决的点"></textarea>
+
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button type="button" class="primary" id="save">保存标注 (s)</button>
+        <button type="button" class="ghost" id="prev">← (k)</button>
+        <button type="button" class="ghost" id="next">→ (j)</button>
+      </div>
+      <div id="status" class="status" role="status"></div>
+    </form>
+  </section>
+</main>
+
+<div class="help" id="help">
+  <div class="box">
+    <h3 style="margin-top:0">快捷键</h3>
+    <p><kbd>j</kbd>/<kbd>k</kbd> 下一个 / 上一个 run · <kbd>a</kbd>/<kbd>b</kbd> attack/benign · <kbd>s</kbd> 保存 · <kbd>r</kbd> 切换模型输出</p>
+    <h3>标注规则</h3>
+    <ul>
+      <li><b>label</b>：按场景 ground truth 与动作轨迹判断，不看模型分数。</li>
+      <li><b>actionable</b>：只有“有足够证据、应当立即处置”的攻击才选是；灰区/仅 review 选否。</li>
+      <li><b>根因 Agent</b>：责任链上游的触发者，不是最后一个执行者。</li>
+      <li><b>入口点</b>：载荷进入系统的位置（prompt、文件、命令输出、委派）。</li>
+      <li><b>恶意动作</b>：真正执行了攻击关键步骤的 action，不选“意图里提到但没执行”的动作。</li>
+      <li><b>责任链边</b>：从入口到根因到执行的证据边，至少包含关键 PBC / 委派边。</li>
+    </ul>
+    <p class="faint">Codebook v1 · 盲标默认开启 · 保存即写入本地 annotations/。</p>
+    <button class="ghost" id="helpClose">关闭</button>
+  </div>
+</div>
+
+<div class="modal" id="agreementModal">
+  <div class="box">
+    <h3 style="margin-top:0">标注一致性</h3>
+    <div id="agreementBody" class="muted">计算中…</div>
+    <button class="ghost" id="agreementClose" style="margin-top:12px">关闭</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const state = { tasks: [], current: null, data: null, index: -1, annotations: new Map(), dirty: false };
+  const $ = (id) => document.getElementById(id);
+  const esc = (value) => String(value ?? "");
+
+  function annotator() {
+    return ($("annotator").value || "").trim();
+  }
+
+  function parseArgs(raw) {
+    try { return JSON.stringify(JSON.parse(raw)); } catch { return String(raw ?? ""); }
+  }
+
+  function short(value, n = 46) {
+    const text = String(value ?? "");
+    return text.length > n ? text.slice(0, n - 1) + "…" : text;
+  }
+
+  async function fetchJson(url, options) {
+    const response = await fetch(url, options);
+    if (!response.ok) throw new Error(`${url} → ${response.status}`);
+    return response.json();
+  }
+
+  async function loadTasks() {
+    const payload = await fetchJson("/api/tasks");
+    state.tasks = payload.tasks || [];
+    renderTasks();
+    updateProgress();
+    if (state.tasks.length && state.current === null) selectTask(0);
+  }
+
+  function renderTasks() {
+    const list = $("taskList");
+    list.replaceChildren();
+    state.tasks.forEach((task, index) => {
+      const row = document.createElement("div");
+      row.className = "task" + (index === state.index ? " active" : "");
+      row.tabIndex = 0;
+      row.setAttribute("role", "button");
+      const dot = document.createElement("span");
+      const saved = state.annotations.get(task.run_id) || [];
+      dot.className = "dot" + (saved.length ? " done" : "");
+      const body = document.createElement("div");
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = task.scenario_id;
+      const sub = document.createElement("div");
+      sub.className = "sub";
+      sub.textContent = `${task.counts.actions ?? 0} actions · ${task.counts.responsibility_alerts ?? 0} alerts · ${task.counts.graph_edges ?? 0} edges`;
+      body.append(name, sub);
+      const count = document.createElement("span");
+      count.className = "pill";
+      count.textContent = saved.length ? `${saved.length} 人` : "—";
+      row.append(dot, body, count);
+      row.addEventListener("click", () => selectTask(index));
+      row.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") selectTask(index);
+      });
+      list.append(row);
+    });
+  }
+
+  async function selectTask(index) {
+    if (index < 0 || index >= state.tasks.length) return;
+    state.index = index;
+    const task = state.tasks[index];
+    state.current = task;
+    renderTasks();
+    const reveal = $("reveal").checked ? "1" : "0";
+    try {
+      state.data = await fetchJson(`/api/task/${encodeURIComponent(task.run_id)}?reveal=${reveal}&annotator=${encodeURIComponent(annotator())}`);
+    } catch (error) {
+      setStatus(String(error), "err");
+      return;
+    }
+    populateForm(state.data);
+    renderEvidence(state.data);
+    setStatus("");
+  }
+
+  function populateForm(data) {
+    const form = $("form");
+    form.reset();
+    const existing = (data.annotations || []).find((a) => a.annotator === annotator());
+    const source = existing || {};
+    for (const field of ["label", "actionable", "severity"]) {
+      const value = source[field];
+      if (value) {
+        const input = form.querySelector(`input[name="${field}"][value="${CSS.escape(String(value))}"], #${field}`);
+        if (input) input.checked = true;
+        if (field === "severity" && input) input.value = value;
+      }
+    }
+    $("rootCause").replaceChildren(new Option("（未选择）", ""));
+    (data.agents || []).forEach((agent) => {
+      $("rootCause").append(new Option(agent.agent_id, agent.agent_id));
+    });
+    $("rootCause").value = source.root_cause_agent || "";
+
+    $("entryPoint").replaceChildren(new Option("（未选择）", ""));
+    (data.intents || []).forEach((intent) => {
+      const label = `${intent.tool_name} · ${short(parseArgs(intent.tool_args_json), 60)}`;
+      $("entryPoint").append(new Option(label, intent.intent_id));
+    });
+    $("entryPoint").value = source.entry_point || "";
+
+    $("notes").value = source.notes || "";
+    $("confidence").value = source.confidence ?? 0.8;
+    $("confidenceOut").textContent = Number($("confidence").value).toFixed(2);
+
+    const actions = $("actionPick");
+    actions.replaceChildren();
+    const chosen = new Set(source.malicious_actions || []);
+    (data.actions || []).slice(0, 200).forEach((action) => {
+      const label = document.createElement("label");
+      label.className = "opt";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = action.action_id;
+      input.dataset.kind = "action";
+      input.checked = chosen.has(action.action_id);
+      const text = document.createElement("span");
+      text.className = "mono truncate";
+      text.textContent = `${action.action_type} · ${short(parseArgs(action.normalized_args_json), 70)}`;
+      label.append(input, text);
+      actions.append(label);
+    });
+
+    const edges = $("edgePick");
+    edges.replaceChildren();
+    const chosenEdges = new Set(source.chain_edges || []);
+    const nodeName = new Map((data.graph?.nodes || []).map((node) => [node.node_id, node.agent_id || node.node_type]));
+    (data.graph?.edges || []).slice(0, 200).forEach((edge) => {
+      const label = document.createElement("label");
+      label.className = "opt";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = edge.edge_id;
+      input.dataset.kind = "edge";
+      input.checked = chosenEdges.has(edge.edge_id);
+      const text = document.createElement("span");
+      text.className = "mono truncate";
+      text.textContent = `${edge.edge_type} · ${short(nodeName.get(edge.source_node_id) || edge.source_node_id, 14)} → ${short(nodeName.get(edge.target_node_id) || edge.target_node_id, 14)}`;
+      label.append(input, text);
+      edges.append(label);
+    });
+    updateProgress();
+  }
+
+  function renderEvidence(data) {
+    const meta = $("runMeta");
+    meta.replaceChildren();
+    const chips = [
+      ["scenario", data.scenario_id],
+      ["db", (data.db_sha256 || "").slice(0, 12)],
+      ["agents", (data.agents || []).length],
+      ["intents", (data.intents || []).length],
+      ["actions", (data.actions || []).length],
+      ["claims", (data.claims || []).length],
+      ["alerts", (data.alerts || []).length],
+    ];
+    chips.forEach(([key, value]) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      const k = document.createElement("span"); k.textContent = key + " ";
+      const b = document.createElement("b"); b.textContent = esc(value);
+      chip.append(k, b);
+      meta.append(chip);
+    });
+    const reveal = data.model_revealed;
+    if (!reveal) {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = "模型输出已隐藏";
+      meta.append(chip);
+    }
+
+    const cards = $("cards");
+    cards.replaceChildren();
+
+    const timeline = card("时间线（intents + actions）");
+    const list = document.createElement("div");
+    list.className = "timeline";
+    const events = [
+      ...(data.intents || []).map((intent) => ({ ts: intent.timestamp_ns, type: intent.tool_name, text: parseArgs(intent.tool_args_json) })),
+      ...(data.actions || []).map((action) => ({ ts: action.timestamp_ns, type: action.action_type, text: parseArgs(action.normalized_args_json) })),
+    ].sort((a, b) => a.ts - b.ts);
+    const origin = events[0]?.ts || 0;
+    const relative = (ts) => {
+      const delta = Math.max(0, Number(ts) - Number(origin));
+      if (delta < 1_000_000) return `${(delta / 1e3).toFixed(1)}µs`;
+      if (delta < 1_000_000_000) return `${(delta / 1e6).toFixed(1)}ms`;
+      return `${(delta / 1e9).toFixed(2)}s`;
+    };
+    events.slice(0, 400).forEach((event) => {
+      const row = document.createElement("div");
+      row.className = "event";
+      const ts = document.createElement("span"); ts.className = "ts"; ts.textContent = relative(event.ts);
+      const type = document.createElement("span"); type.className = "type"; type.textContent = esc(event.type);
+      const text = document.createElement("span"); text.className = "txt"; text.title = esc(event.text); text.textContent = esc(event.text);
+      row.append(ts, type, text);
+      list.append(row);
+    });
+    timeline.body.append(list);
+    cards.append(timeline.element);
+
+    const graph = card("责任图");
+    graph.body.append(renderGraph(data));
+    cards.append(graph.element);
+
+    const detail = card(reveal ? "模型判定（已展开）" : "模型判定（盲标隐藏）");
+    const body = document.createElement("div");
+    body.className = "body";
+    if (reveal) {
+      (data.alerts || []).forEach((alert) => {
+        const row = document.createElement("div");
+        row.className = "row";
+        const key = document.createElement("span"); key.className = "k"; key.textContent = alert.decision || "—";
+        const value = document.createElement("span"); value.className = "mono"; value.textContent = `${alert.severity || ""} · ${alert.title || ""} · ${alert.primary_agent_id || ""}`;
+        row.append(key, value);
+        body.append(row);
+      });
+      if (!(data.alerts || []).length) body.append(text("该 run 没有告警。"));
+    } else {
+      body.append(text("盲标模式下不展示 decision、分数和告警标题。勾选右上角“显示模型输出”用于裁决。"));
+    }
+    detail.body.append(body);
+    cards.append(detail.element);
+  }
+
+  function text(value) {
+    const p = document.createElement("span");
+    p.className = "muted";
+    p.textContent = value;
+    return p;
+  }
+
+  function card(title) {
+    const wrap = document.createElement("div");
+    wrap.className = "card";
+    const h = document.createElement("h3"); h.textContent = title;
+    const body = document.createElement("div"); body.className = "body";
+    wrap.append(h, body);
+    return { wrap, body, element: wrap };
+  }
+
+  function renderGraph(data) {
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "graph");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "责任图");
+    const nodes = (data.graph?.nodes || []).slice(0, 80);
+    const edges = (data.graph?.edges || []).slice(0, 160);
+    const columns = { Agent: 0, PolicyBoundary: 1, Resource: 2 };
+    const grouped = { 0: [], 1: [], 2: [] };
+    nodes.forEach((node) => {
+      const col = columns[node.node_type] ?? 2;
+      grouped[col].push(node);
+    });
+    const positions = new Map();
+    const tallest = Math.max(1, ...Object.values(grouped).map((list) => list.length));
+    const height = Math.max(260, tallest * 26 + 40);
+    svg.setAttribute("viewBox", `0 0 900 ${height}`);
+    svg.style.height = `${height}px`;
+    Object.entries(grouped).forEach(([col, list]) => {
+      list.forEach((node, index) => {
+        const x = 130 + Number(col) * 310;
+        const y = 24 + ((index + 1) * (height - 40)) / (list.length + 1);
+        positions.set(node.node_id, { x, y });
+      });
+    });
+    const defs = document.createElementNS(NS, "defs");
+    const marker = document.createElementNS(NS, "marker");
+    marker.setAttribute("id", "arrow");
+    marker.setAttribute("viewBox", "0 0 10 10");
+    marker.setAttribute("refX", "9");
+    marker.setAttribute("refY", "5");
+    marker.setAttribute("markerWidth", "5");
+    marker.setAttribute("markerHeight", "5");
+    marker.setAttribute("orient", "auto-start-reverse");
+    const path = document.createElementNS(NS, "path");
+    path.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+    path.setAttribute("fill", "#2b3a48");
+    marker.append(path);
+    defs.append(marker);
+    svg.append(defs);
+
+    edges.forEach((edge) => {
+      const from = positions.get(edge.source_node_id);
+      const to = positions.get(edge.target_node_id);
+      if (!from || !to) return;
+      const line = document.createElementNS(NS, "line");
+      line.setAttribute("x1", from.x + 55);
+      line.setAttribute("y1", from.y);
+      line.setAttribute("x2", to.x - 55);
+      line.setAttribute("y2", to.y);
+      line.setAttribute("marker-end", "url(#arrow)");
+      if (edge.edge_type === "AgentDelegatesTo") line.setAttribute("class", "delegation");
+      if (edge.edge_type === "PolicyBoundaryCrossing") line.setAttribute("class", "pbc");
+      svg.append(line);
+    });
+
+    nodes.forEach((node) => {
+      const pos = positions.get(node.node_id);
+      if (!pos) return;
+      const group = document.createElementNS(NS, "g");
+      group.setAttribute("class", "node " + (node.node_type === "Agent" ? "agent" : node.node_type === "PolicyBoundary" ? "boundary" : "resource"));
+      const rect = document.createElementNS(NS, "rect");
+      rect.setAttribute("x", pos.x - 55);
+      rect.setAttribute("y", pos.y - 11);
+      rect.setAttribute("width", 110);
+      rect.setAttribute("height", 22);
+      rect.setAttribute("rx", 6);
+      const label = document.createElementNS(NS, "text");
+      label.setAttribute("x", pos.x);
+      label.setAttribute("y", pos.y + 3);
+      label.setAttribute("text-anchor", "middle");
+      label.textContent = short(nodeLabel(node), 18);
+      group.append(rect, label);
+      svg.append(group);
+    });
+    return svg;
+  }
+
+  function nodeLabel(node) {
+    if (node.agent_id) return node.agent_id;
+    if (node.node_type === "Resource" && node.resource_json) {
+      try {
+        const resource = JSON.parse(node.resource_json);
+        return resource.path || resource.Credential || resource.tool_name || "Resource";
+      } catch { /* fall through */ }
+    }
+    return node.node_type || "node";
+  }
+
+  function setStatus(message, kind = "") {
+    const el = $("status");
+    el.textContent = message;
+    el.className = "status " + kind;
+  }
+
+  function readForm() {
+    const form = $("form");
+    const pick = (name) => form.querySelector(`input[name="${name}"]:checked`)?.value || "";
+    const actions = [...document.querySelectorAll('#actionPick input:checked')].map((i) => i.value);
+    const edges = [...document.querySelectorAll('#edgePick input:checked')].map((i) => i.value);
+    return {
+      db_sha256: state.data?.db_sha256,
+      label: pick("label"),
+      actionable: pick("actionable"),
+      root_cause_agent: $("rootCause").value,
+      entry_point: $("entryPoint").value,
+      severity: $("severity").value,
+      confidence: Number($("confidence").value),
+      notes: $("notes").value,
+      malicious_actions: actions,
+      chain_edges: edges,
+    };
+  }
+
+  async function save() {
+    if (!state.current) return;
+    if (!annotator()) {
+      setStatus("先填写标注员名字", "err");
+      $("annotator").focus();
+      return;
+    }
+    const annotation = readForm();
+    if (!annotation.label) {
+      setStatus("至少选择 attack / benign", "err");
+      return;
+    }
+    try {
+      await fetchJson("/api/annotation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ run_id: state.current.run_id, annotator: annotator(), annotation }),
+      });
+      const saved = state.annotations.get(state.current.run_id) || [];
+      const without = saved.filter((a) => a.annotator !== annotator());
+      state.annotations.set(state.current.run_id, [...without, { annotator: annotator(), ...annotation }]);
+      renderTasks();
+      updateProgress();
+      setStatus("已保存", "ok");
+    } catch (error) {
+      setStatus(String(error), "err");
+    }
+  }
+
+  function updateProgress() {
+    const total = state.tasks.length;
+    const done = state.tasks.filter((task) => (state.annotations.get(task.run_id) || []).length > 0).length;
+    $("progress").textContent = `${done} / ${total}`;
+  }
+
+  async function refreshAnnotations() {
+    try {
+      const payload = await fetchJson("/api/export");
+      state.annotations = new Map();
+      for (const record of payload.annotations || []) {
+        const list = state.annotations.get(record.run_id) || [];
+        list.push(record);
+        state.annotations.set(record.run_id, list);
+      }
+      renderTasks();
+      updateProgress();
+    } catch { /* served before any annotation exists is fine */ }
+  }
+
+  function bind() {
+    $("save").addEventListener("click", save);
+    $("prev").addEventListener("click", () => selectTask(state.index - 1));
+    $("next").addEventListener("click", () => selectTask(state.index + 1));
+    $("confidence").addEventListener("input", () => { $("confidenceOut").textContent = Number($("confidence").value).toFixed(2); });
+    $("reveal").addEventListener("change", () => { if (state.current) selectTask(state.index); });
+    $("annotator").addEventListener("change", () => {
+      localStorage.setItem("mtl.annotator", annotator());
+      if (state.data) populateForm(state.data);
+    });
+    $("helpBtn").addEventListener("click", () => $("help").classList.add("open"));
+    $("helpClose").addEventListener("click", () => $("help").classList.remove("open"));
+    $("agreement").addEventListener("click", async () => {
+      $("agreementModal").classList.add("open");
+      const body = $("agreementBody");
+      body.textContent = "计算中…";
+      try {
+        const report = await fetchJson("/api/agreement");
+        body.replaceChildren();
+        const table = document.createElement("table");
+        const head = document.createElement("tr");
+        ["字段", "κ / 一致度"].forEach((value) => { const th = document.createElement("th"); th.textContent = value; head.append(th); });
+        table.append(head);
+        Object.entries(report.summary || {}).forEach(([field, value]) => {
+          const tr = document.createElement("tr");
+          const a = document.createElement("td"); a.textContent = field;
+          const b = document.createElement("td"); b.className = "mono"; b.textContent = value == null ? "—" : Number(value).toFixed(3);
+          tr.append(a, b); table.append(tr);
+        });
+        body.append(table);
+      } catch (error) {
+        body.textContent = String(error);
+      }
+    });
+    $("agreementClose").addEventListener("click", () => $("agreementModal").classList.remove("open"));
+    $("export").addEventListener("click", async () => {
+      const payload = await fetchJson("/api/export");
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `mtagentlens-annotations-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.target.matches("input, textarea, select")) return;
+      if (event.key === "j") selectTask(state.index + 1);
+      else if (event.key === "k") selectTask(state.index - 1);
+      else if (event.key === "s") save();
+      else if (event.key === "a") setRadio("label", "attack");
+      else if (event.key === "b") setRadio("label", "benign");
+      else if (event.key === "r") { $("reveal").checked = !$("reveal").checked; if (state.current) selectTask(state.index); }
+      else if (event.key === "?") $("help").classList.toggle("open");
+    });
+  }
+
+  function setRadio(name, value) {
+    const input = document.querySelector(`input[name="${name}"][value="${value}"]`);
+    if (input) input.checked = true;
+  }
+
+  async function boot() {
+    $("annotator").value = localStorage.getItem("mtl.annotator") || "";
+    bind();
+    await refreshAnnotations();
+    await loadTasks();
+  }
+
+  boot().catch((error) => setStatus(String(error), "err"));
+})();
+</script>
+</body>
+</html>

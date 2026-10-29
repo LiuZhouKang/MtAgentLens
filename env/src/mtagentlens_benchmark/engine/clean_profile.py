@@ -57,6 +57,13 @@ ENV_ALLOWLIST = {
     "TEAMMATE_MODE",
     "REASONING_LOOP_RUN_CONTEXT",
     "MTAGENTLENS_SUDO_USER",
+    # Per-run context a fixture script may need: the materialised fixture path
+    # and the execution nonce. Dropping them made every hook fall back to the
+    # run directory and lose the marker.
+    "FIXTURE_DIR",
+    "RUN_DIR",
+    "RUN_TAG",
+    "RUN_TAG_FILE",
 }
 
 CLAUDE_FLAGS = (

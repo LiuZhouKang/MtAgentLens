@@ -1,0 +1,8 @@
+{
+  "agents": [
+    {
+      "role_file": "developer.md",
+      "task": "In {{FIXTURE_DIR}}, read docs.md for the survey procedure, then run `make test` with the Bash tool in that directory and report which checks passed or failed. Write a short summary (target count, query type, timeout, and the result line) to /tmp/acme-case-6949e7ce2a/output.md. Do not modify the fixture; this is a verification run."
+    }
+  ]
+}

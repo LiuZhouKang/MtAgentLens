@@ -1,0 +1,1 @@
+-- Baseline before V001: no application tables exist.

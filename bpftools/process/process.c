@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 #include <dirent.h>
@@ -17,10 +18,14 @@
 #include "process_filter.h"
 #include "json_escape.h"
 #include "process_json.h"
+#include "process_snapshot.h"
 
 #define MAX_COMMAND_LIST 256
 #define FILE_DEDUP_WINDOW_NS 60000000000ULL  // 60 seconds in nanoseconds
-#define MAX_FILE_HASHES 1024
+// A real agent run can open >1024 distinct files within the 60 s dedup window;
+// the previous 1024-entry table lost aggregation for 490 FILE_OPEN events in a
+// 140 s run. Entries are ~200 bytes, so 4096 costs under 1 MiB.
+#define MAX_FILE_HASHES 4096
 
 // Rate limiting per second
 #define MAX_PID_LIMITS 256
@@ -46,6 +51,9 @@ struct file_hash_entry {
     char comm[TASK_COMM_LEN];
     char filepath[MAX_FILENAME_LEN];
     int flags;
+    pid_t ppid;
+    long long syscall_ret;
+    bool syscall_completed;
 };
 
 static struct file_hash_entry file_hashes[MAX_FILE_HASHES];
@@ -53,6 +61,22 @@ static int hash_count = 0;
 
 static struct per_second_limit pid_limits[MAX_PID_LIMITS];
 static int pid_limit_count = 0;
+
+/* Userspace-side losses must be visible. The kernel ring buffer reports its
+ * own drops; a file open rejected by the rate limit or left untracked because
+ * the aggregation table was full disappeared without a trace, so a "0 dropped"
+ * report could not distinguish a quiet run from a throttled one. */
+static uint64_t rate_limit_drops = 0;
+static uint64_t aggregation_table_full = 0;
+
+/* Raw user-read failures are counted in the kernel map even when the notice
+ * ringbuf reserve fails. The notice counters below only split the subset that
+ * reached userspace; `scoped_user_read_drops` folds the missing notices back in
+ * so a reserve failure can never look like a healthy zero. */
+uint64_t user_read_target = 0;
+uint64_t user_read_outside = 0;
+uint64_t user_read_unresolved = 0;
+bool user_read_scope_consistent = true;
 
 static struct env {
 	bool verbose;
@@ -234,8 +258,11 @@ static bool should_rate_limit_file(const struct event *e, uint64_t timestamp_ns,
     
     // Check if over limit
     if (limit->distinct_file_count > MAX_DISTINCT_FILES_PER_SEC) {
-        limit->should_warn_next = true;  // Warn on next event
-        return true;  // Drop this event
+        limit->should_warn_next = true;
+        *add_warning = true;
+        /* Security evidence must not disappear after an arbitrary path quota.
+         * Keep the pressure warning, and capture every distinct operation. */
+        return false;
     }
     
     return false;
@@ -268,17 +295,7 @@ static uint32_t get_file_open_count(const struct event *e, uint64_t timestamp_ns
 	// Initialize warning message
 	warning_msg[0] = '\0';
 	
-	// Rate limiting check
 	bool add_warning = false;
-	if (should_rate_limit_file(e, timestamp_ns, &add_warning)) {
-		return 0;  // Drop this event
-	}
-	
-	// Build warning message if needed
-	if (add_warning) {
-		snprintf(warning_msg, warning_msg_size, "\"rate_limit_warning\":\"Previous second exceeded %d file limit\"", MAX_DISTINCT_FILES_PER_SEC);
-	}
-	
 	uint64_t hash = hash_file_open(e);
 	
 	// Clean up expired entries first
@@ -294,12 +311,14 @@ static uint32_t get_file_open_count(const struct event *e, uint64_t timestamp_ns
 				struct event fake_event = {
 					.type = EVENT_TYPE_FILE_OPERATION,
 					.pid = file_hashes[i].pid,
-					.ppid = 0,
+					.ppid = file_hashes[i].ppid,
 					.exit_code = 0,
 					.duration_ns = 0,
 					.start_time_ns = file_hashes[i].start_time_ns,
 					.parent_start_time_ns = file_hashes[i].parent_start_time_ns,
 					.exit_event = false,
+                    .syscall_ret = file_hashes[i].syscall_ret,
+                    .syscall_completed = file_hashes[i].syscall_completed,
 					.file_op = {
 						.fd = -1,
 						.flags = file_hashes[i].flags,
@@ -310,7 +329,7 @@ static uint32_t get_file_open_count(const struct event *e, uint64_t timestamp_ns
 				fake_event.comm[TASK_COMM_LEN - 1] = '\0';
 				strncpy(fake_event.file_op.filepath, file_hashes[i].filepath, MAX_FILENAME_LEN - 1);
 				fake_event.file_op.filepath[MAX_FILENAME_LEN - 1] = '\0';
-				print_file_event(&fake_event, timestamp_ns, file_hashes[i].count, "\"window_expired\":true");
+				print_file_event(&fake_event, timestamp_ns, file_hashes[i].count - 1, "\"window_expired\":true");
 			}
 			
 			// Remove expired entry
@@ -322,7 +341,12 @@ static uint32_t get_file_open_count(const struct event *e, uint64_t timestamp_ns
 	
 	// Check if this hash already exists
 	for (int i = 0; i < hash_count; i++) {
-		if (file_hashes[i].hash == hash) {
+		if (file_hashes[i].hash == hash && file_hashes[i].pid == e->pid &&
+            file_hashes[i].start_time_ns == e->start_time_ns &&
+            file_hashes[i].flags == e->file_op.flags &&
+            file_hashes[i].syscall_completed == e->syscall_completed &&
+            file_hashes[i].syscall_ret == e->syscall_ret &&
+            strcmp(file_hashes[i].filepath, e->file_op.filepath) == 0) {
 			file_hashes[i].count++;
 			file_hashes[i].timestamp_ns = timestamp_ns;
 			if (env.verbose) {
@@ -333,6 +357,17 @@ static uint32_t get_file_open_count(const struct event *e, uint64_t timestamp_ns
 		}
 	}
 	
+	// Rate limiting applies to *distinct* files only. Counting before the
+	// deduplication check meant repeated opens of one path consumed the
+	// budget and pushed legitimate distinct files out of the capture.
+	if (should_rate_limit_file(e, timestamp_ns, &add_warning)) {
+		rate_limit_drops++;
+		return 0;
+	}
+	if (add_warning) {
+		snprintf(warning_msg, warning_msg_size, "\"rate_limit_warning\":\"Previous second exceeded %d file limit\"", MAX_DISTINCT_FILES_PER_SEC);
+	}
+
 	// Add new hash entry if we have space
 	if (hash_count < MAX_FILE_HASHES) {
 		file_hashes[hash_count].hash = hash;
@@ -346,15 +381,20 @@ static uint32_t get_file_open_count(const struct event *e, uint64_t timestamp_ns
 		strncpy(file_hashes[hash_count].filepath, e->file_op.filepath, MAX_FILENAME_LEN - 1);
 		file_hashes[hash_count].filepath[MAX_FILENAME_LEN - 1] = '\0';
 		file_hashes[hash_count].flags = e->file_op.flags;
+        file_hashes[hash_count].ppid = e->ppid;
+        file_hashes[hash_count].syscall_ret = e->syscall_ret;
+        file_hashes[hash_count].syscall_completed = e->syscall_completed;
 		hash_count++;
 		if (env.verbose) {
 			fprintf(stderr, "DEBUG: Created new aggregation entry for FILE_OPEN, PID %d (total entries: %d)\n", 
 				e->pid, hash_count);
 		}
-	} else if (env.verbose) {
-		fprintf(stderr, "DEBUG: Max aggregation entries reached (%d), cannot track more\n", MAX_FILE_HASHES);
-		// just print the event
-		print_file_event(e, timestamp_ns, 1, NULL);
+	} else {
+		aggregation_table_full++;
+		if (env.verbose) {
+			fprintf(stderr, "DEBUG: Max aggregation entries reached (%d), cannot track more\n", MAX_FILE_HASHES);
+		}
+		// The event itself is still reported; only aggregation is lost.
 	}
 	
 	return 1;  // Return count of 1 for first occurrence
@@ -374,12 +414,14 @@ static void flush_pid_file_opens(pid_t pid, uint64_t timestamp_ns)
 			struct event fake_event = {
 				.type = EVENT_TYPE_FILE_OPERATION,
 				.pid = file_hashes[i].pid,
-				.ppid = 0,
+				.ppid = file_hashes[i].ppid,
 				.exit_code = 0,
 				.duration_ns = 0,
 				.start_time_ns = file_hashes[i].start_time_ns,
 				.parent_start_time_ns = file_hashes[i].parent_start_time_ns,
 				.exit_event = false,
+                    .syscall_ret = file_hashes[i].syscall_ret,
+                    .syscall_completed = file_hashes[i].syscall_completed,
 				.file_op = {
 					.fd = -1,
 					.flags = file_hashes[i].flags,
@@ -390,7 +432,7 @@ static void flush_pid_file_opens(pid_t pid, uint64_t timestamp_ns)
 			fake_event.comm[TASK_COMM_LEN - 1] = '\0';
 			strncpy(fake_event.file_op.filepath, file_hashes[i].filepath, MAX_FILENAME_LEN - 1);
 			fake_event.file_op.filepath[MAX_FILENAME_LEN - 1] = '\0';
-			print_file_event(&fake_event, timestamp_ns, file_hashes[i].count, "\"reason\":\"process_exit\"");
+			print_file_event(&fake_event, timestamp_ns, file_hashes[i].count - 1, "\"reason\":\"process_exit\"");
 			flushed_count++;
 		}
 	}
@@ -484,7 +526,8 @@ static const char *resolve_bash_path(void)
 				base = base ? base + 1 : line;
 				if (strcmp(base, "bash") == 0 && access(line, X_OK) == 0) {
 					fclose(f);
-					return line;
+					snprintf(buf, sizeof(buf), "%s", line);
+					return buf;
 				}
 			}
 			fclose(f);
@@ -527,67 +570,145 @@ static void attach_bash_readline(struct process_bpf *skel)
 	fprintf(stderr, "process: bash readline probe attached to %s\n", bash);
 }
 
+/* A notice is a measured failure, not an action. Use the same selection rules
+ * as the live tracker: tracked identity, the -p root, a tracked parent with a
+ * matching start time, or a command-filter match. */
+static bool user_read_notice_selected(struct pid_tracker *tracker,
+				      const struct event *e)
+{
+	if (tracker->filter_mode == FILTER_MODE_ALL ||
+	    tracker->filter_mode == FILTER_MODE_PROC)
+		return true;
+
+	if (e->pid > 0 && pid_tracker_is_tracked(tracker, e->pid))
+		return true;
+
+	if (tracker->target_pid > 0 &&
+	    (e->pid == tracker->target_pid || e->ppid == tracker->target_pid))
+		return true;
+
+	if (e->ppid > 0 &&
+	    pid_tracker_parent_matches(tracker, e->ppid, e->parent_start_time_ns))
+		return true;
+
+	return e->comm[0] != '\0' &&
+	       command_matches_any_filter(e->comm, tracker->command_filters,
+					  tracker->command_filter_count);
+}
+
+/* Outside is a positive claim: every identity field must be present. Missing
+ * context stays unresolved and is included in the scoped count. */
+static bool user_read_notice_identity_complete(const struct event *e)
+{
+	return e->pid > 0 && e->ppid > 0 &&
+	       e->start_time_ns > 0 && e->parent_start_time_ns > 0 &&
+	       e->comm[0] != '\0';
+}
+
+static void record_user_read_notice(struct pid_tracker *tracker,
+				    const struct event *e)
+{
+	bool selected = user_read_notice_selected(tracker, e);
+
+	if (selected && env.verbose) {
+		fprintf(stderr, "USER_READ_FAILED pid=%d ppid=%d comm=%s syscall=%d addr=0x%llx\n",
+			e->pid, e->ppid, e->comm, e->file_op.flags,
+			(unsigned long long)e->syscall_ret);
+	}
+	if (selected) {
+		if (e->pid > 0) {
+			if (!pid_tracker_is_tracked(tracker, e->pid))
+				pid_tracker_add(tracker, e->pid, e->ppid);
+			pid_tracker_observe_identity(tracker, e->pid,
+						     e->start_time_ns);
+		}
+		user_read_target++;
+		return;
+	}
+
+	if (user_read_notice_identity_complete(e))
+		user_read_outside++;
+	else
+		user_read_unresolved++;
+}
+
+uint64_t scoped_user_read_drops(uint64_t global)
+{
+	uint64_t observed = user_read_target + user_read_outside +
+			    user_read_unresolved;
+	uint64_t missing;
+
+	if (observed > global) {
+		/* Notices cannot outnumber the kernel counter. Fail closed:
+		 * count every observed failure and exclude nothing. */
+		user_read_scope_consistent = false;
+		return observed;
+	}
+
+	user_read_scope_consistent = true;
+	missing = global - observed;
+	return user_read_target + user_read_unresolved + missing;
+}
+
+static uint64_t tracker_stale_events;
+
+void print_loss_stats(const uint64_t reasons[DROP_REASON_MAX])
+{
+	uint64_t ringbuf_dropped = reasons[DROP_RINGBUF_FULL];
+	uint64_t pending_dropped = reasons[DROP_PENDING_TABLE_FULL];
+	uint64_t global_user_read = reasons[DROP_USER_READ_FAILED];
+	uint64_t observed = user_read_target + user_read_outside +
+			    user_read_unresolved;
+	uint64_t missing = global_user_read > observed ?
+			   global_user_read - observed : 0;
+	uint64_t scoped = scoped_user_read_drops(global_user_read);
+	uint64_t unattributed = user_read_unresolved + missing;
+	uint64_t dropped = ringbuf_dropped + pending_dropped + scoped + tracker_stale_events;
+	uint64_t raw_dropped = ringbuf_dropped + pending_dropped +
+			       global_user_read;
+
+	fprintf(stderr, "{\"event\":\"PROCESS_RINGBUF_STATS\","
+		"\"dropped_events\":%llu,\"global_dropped_events\":%llu,"
+		"\"ringbuf_full_dropped\":%llu,\"pending_table_dropped\":%llu,"
+		"\"user_read_dropped\":%llu,"
+		"\"global_user_read_failed\":%llu,"
+		"\"user_read_target\":%llu,\"user_read_outside_target\":%llu,"
+		"\"user_read_unresolved\":%llu,\"user_read_unattributed\":%llu,"
+		"\"user_read_scope_consistent\":%s,"
+		"\"tracker_stale_events\":%llu,"
+		"\"rate_limit_drops\":%llu,\"aggregation_table_full\":%llu}\n",
+		(unsigned long long)dropped,
+		(unsigned long long)raw_dropped,
+		(unsigned long long)ringbuf_dropped,
+		(unsigned long long)pending_dropped,
+		(unsigned long long)scoped,
+		(unsigned long long)global_user_read,
+		(unsigned long long)user_read_target,
+		(unsigned long long)user_read_outside,
+		(unsigned long long)user_read_unresolved,
+		(unsigned long long)unattributed,
+		user_read_scope_consistent ? "true" : "false",
+		(unsigned long long)tracker_stale_events,
+		(unsigned long long)rate_limit_drops,
+		(unsigned long long)aggregation_table_full);
+}
+
 static void print_dropped_events(struct process_bpf *skel)
 {
-	__u32 key = 0;
-	__u64 dropped = 0;
+	uint64_t reasons[DROP_REASON_MAX] = {};
 	int map_fd;
+	__u32 key;
 
 	if (!skel)
 		return;
 	map_fd = bpf_map__fd(skel->maps.dropped_events);
 	if (map_fd < 0)
 		return;
-	if (bpf_map_lookup_elem(map_fd, &key, &dropped) == 0) {
-		fprintf(stderr, "{\"event\":\"PROCESS_RINGBUF_STATS\",\"dropped_events\":%llu}\n",
-			(unsigned long long)dropped);
+	for (key = 0; key < DROP_REASON_MAX; key++) {
+		if (bpf_map_lookup_elem(map_fd, &key, &reasons[key]) != 0)
+			return;
 	}
-}
-
-/* Populate initial PIDs in the userspace tracker from existing processes */
-static int populate_initial_pids(struct pid_tracker *tracker, char **command_list, int command_count, enum filter_mode filter_mode)
-{
-	DIR *proc_dir;
-	struct dirent *entry;
-	pid_t pid, ppid;
-	char comm[TASK_COMM_LEN];
-	int tracked_count = 0;
-
-	proc_dir = opendir("/proc");
-	if (!proc_dir) {
-		fprintf(stderr, "Failed to open /proc directory\n");
-		return -1;
-	}
-
-	while ((entry = readdir(proc_dir)) != NULL) {
-		/* Skip non-numeric entries */
-		if (strspn(entry->d_name, "0123456789") != strlen(entry->d_name))
-			continue;
-
-		pid = (pid_t)strtol(entry->d_name, NULL, 10);
-		if (pid <= 0)
-			continue;
-
-		/* Read process command */
-		if (read_proc_comm(pid, comm, sizeof(comm)) != 0)
-			continue;
-
-		/* Read parent PID */
-		if (read_proc_ppid(pid, &ppid) != 0)
-			continue;
-
-		/* Check if we should track this process */
-		if (should_track_process(tracker, comm, pid, ppid)) {
-			if (pid_tracker_add(tracker, pid, ppid)) {
-				tracked_count++;
-			} else if (env.verbose) {
-				fprintf(stderr, "Warning: Failed to add PID %d to tracker (table full)\n", pid);
-			}
-		}
-	}
-
-	closedir(proc_dir);
-	return tracked_count;
+	print_loss_stats(reasons);
 }
 
 static int handle_event(void *ctx, void *data, size_t data_sz)
@@ -595,8 +716,26 @@ static int handle_event(void *ctx, void *data, size_t data_sz)
 	const struct event *e = data;
 	struct pid_tracker *tracker = (struct pid_tracker *)ctx;
 
+    if (e->type == EVENT_TYPE_PROCESS_SNAPSHOT) {
+        if (tracker->filter_mode == FILTER_MODE_ALL ||
+            pid_tracker_parent_matches(tracker, e->pid, e->start_time_ns))
+            print_process_snapshot(e);
+        return 0;
+    }
+    /* Buffered events may predate the inventory. Never evict a newer identity. */
+    struct tracked_pid_entry *own = pid_tracker_find(tracker, e->pid);
+    struct tracked_pid_entry *parent = pid_tracker_find(tracker, e->ppid);
+    if ((own && e->start_time_ns > 0 && own->start_time_ns > e->start_time_ns) ||
+        (parent && e->parent_start_time_ns > 0 &&
+         parent->start_time_ns > e->parent_start_time_ns)) {
+        tracker_stale_events++;
+        return 0;
+    }
+    pid_tracker_observe_identity(tracker, e->ppid, e->parent_start_time_ns);
+
 	// Use kernel timestamp from the event instead of generating our own
 	uint64_t timestamp_ns = e->timestamp_ns;
+    pid_tracker_observe_identity(tracker, e->pid, e->start_time_ns);
 
 	switch (e->type) {
 		case EVENT_TYPE_PROCESS:
@@ -613,7 +752,7 @@ static int handle_event(void *ctx, void *data, size_t data_sz)
 				}
 
 				printf("{");
-				printf("\"timestamp\":%llu,", timestamp_ns);
+				printf("\"timestamp\":%llu,", (unsigned long long)timestamp_ns);
 				printf("\"event\":\"EXIT\",");
 				printf("\"comm\":"); json_print_str(e->comm); printf(",");
 				printf("\"pid\":%d,", e->pid);
@@ -647,11 +786,12 @@ static int handle_event(void *ctx, void *data, size_t data_sz)
 				// EXEC event: check if should track
 				if (should_track_process(tracker, e->comm, e->pid, e->ppid)) {
 					pid_tracker_add(tracker, e->pid, e->ppid);
+                    pid_tracker_observe_identity(tracker, e->pid, e->start_time_ns);
 
 					// Report the EXEC event
 					printf("{");
-					printf("\"timestamp\":%llu,", timestamp_ns);
-					printf("\"event\":\"EXEC\",");
+					printf("\"timestamp\":%llu,", (unsigned long long)timestamp_ns);
+					printf("\"event\":\"EXEC\",\"outcome\":\"succeeded\",\"syscall_ret\":0,");
 					printf("\"comm\":"); json_print_str(e->comm); printf(",");
 					printf("\"pid\":%d,", e->pid);
 					printf("\"ppid\":%d", e->ppid);
@@ -659,6 +799,7 @@ static int handle_event(void *ctx, void *data, size_t data_sz)
 					printf(",\"parent_start_time_ns\":%llu", (unsigned long long)e->parent_start_time_ns);
 					printf(",\"filename\":"); json_print_str(e->filename);
 					printf(",\"full_command\":"); json_print_str(e->full_command);
+					print_exec_metadata(e);
 					printf("}\n");
 					fflush(stdout);
 				} else if (tracker->filter_mode == FILTER_MODE_FILTER) {
@@ -668,11 +809,12 @@ static int handle_event(void *ctx, void *data, size_t data_sz)
 					// In ALL/PROC modes, report all processes but add them to tracker for PROC mode
 					if (tracker->filter_mode == FILTER_MODE_PROC) {
 						pid_tracker_add(tracker, e->pid, e->ppid);
+                    pid_tracker_observe_identity(tracker, e->pid, e->start_time_ns);
 					}
 
 					printf("{");
-					printf("\"timestamp\":%llu,", timestamp_ns);
-					printf("\"event\":\"EXEC\",");
+					printf("\"timestamp\":%llu,", (unsigned long long)timestamp_ns);
+					printf("\"event\":\"EXEC\",\"outcome\":\"succeeded\",\"syscall_ret\":0,");
 					printf("\"comm\":"); json_print_str(e->comm); printf(",");
 					printf("\"pid\":%d,", e->pid);
 					printf("\"ppid\":%d", e->ppid);
@@ -680,6 +822,7 @@ static int handle_event(void *ctx, void *data, size_t data_sz)
 					printf(",\"parent_start_time_ns\":%llu", (unsigned long long)e->parent_start_time_ns);
 					printf(",\"filename\":"); json_print_str(e->filename);
 					printf(",\"full_command\":"); json_print_str(e->full_command);
+					print_exec_metadata(e);
 					printf("}\n");
 					fflush(stdout);
 				}
@@ -693,7 +836,7 @@ static int handle_event(void *ctx, void *data, size_t data_sz)
 			}
 
 			printf("{");
-			printf("\"timestamp\":%llu,", timestamp_ns);
+			printf("\"timestamp\":%llu,", (unsigned long long)timestamp_ns);
 			printf("\"event\":\"BASH_READLINE\",");
 			printf("\"comm\":"); json_print_str(e->comm); printf(",");
 			printf("\"pid\":%d,", e->pid);
@@ -706,7 +849,14 @@ static int handle_event(void *ctx, void *data, size_t data_sz)
 
 		case EVENT_TYPE_NETWORK_OPERATION:
 			if (!should_report_network(tracker, e->pid)) {
-				break;
+				if (!pid_tracker_is_tracked(tracker, e->pid)
+				    && pid_tracker_parent_matches(tracker, e->ppid, e->parent_start_time_ns)) {
+					pid_tracker_add(tracker, e->pid, e->ppid);
+                    pid_tracker_observe_identity(tracker, e->pid, e->start_time_ns);
+				}
+				if (!should_report_network(tracker, e->pid)) {
+					break;
+				}
 			}
 			print_network_event(e, timestamp_ns);
 			break;
@@ -717,9 +867,22 @@ static int handle_event(void *ctx, void *data, size_t data_sz)
 				break;
 			}
 
-			// Check if should report file ops for this PID
+			// Check if should report file ops for this PID.
+			//
+			// Self-heal a missing exec record: under load an EXEC event can
+			// be dropped, and the PID is then never tracked — every file it
+			// opens afterwards is filtered out, so a child process's
+			// credential read disappears while its parent is tracked. If the
+			// event's direct parent is tracked, adopt the child here.
 			if (!should_report_file_ops(tracker, e->pid)) {
-				break;
+				if (!pid_tracker_is_tracked(tracker, e->pid)
+				    && pid_tracker_parent_matches(tracker, e->ppid, e->parent_start_time_ns)) {
+					pid_tracker_add(tracker, e->pid, e->ppid);
+                    pid_tracker_observe_identity(tracker, e->pid, e->start_time_ns);
+				}
+				if (!should_report_file_ops(tracker, e->pid)) {
+					break;
+				}
 			}
 
 			// Delete/truncate describe a single destructive operation:
@@ -743,10 +906,18 @@ static int handle_event(void *ctx, void *data, size_t data_sz)
 			print_file_event(e, timestamp_ns, count, strlen(warning_msg) > 0 ? warning_msg : NULL);
 			break;
 
+		case EVENT_TYPE_CAPTURE_LOSS:
+			/* Consumption only: no action line, no stdout. A loss
+			 * notice updates the scoped counters and may enroll the
+			 * selected process just like a regular event. */
+			if (e->capture_loss_reason == DROP_USER_READ_FAILED)
+				record_user_read_notice(tracker, e);
+			break;
+
 		default:
 			// For unknown events, always report immediately
 			printf("{");
-			printf("\"timestamp\":%llu,", timestamp_ns);
+			printf("\"timestamp\":%llu,", (unsigned long long)timestamp_ns);
 			printf("\"event\":\"UNKNOWN\",");
 			printf("\"event_type\":%d", e->type);
 			printf("}\n");
@@ -757,11 +928,51 @@ static int handle_event(void *ctx, void *data, size_t data_sz)
 	return 0;
 }
 
+static int collect_initial_snapshot(struct process_bpf *skel, bool supported)
+{
+    struct process_snapshot_batch batch = {0};
+    struct bpf_link *link = NULL;
+    size_t records = 0, emitted = 0;
+    int fd = -1, err = -EOPNOTSUPP;
+    if (!supported)
+        goto report;
+    link = bpf_program__attach_iter(skel->progs.snapshot_tasks, NULL);
+    err = libbpf_get_error(link);
+    if (err) { link = NULL; goto report; }
+    fd = bpf_iter_create(bpf_link__fd(link));
+    if (fd < 0) { err = -errno; goto report; }
+    err = read_process_snapshot_fd(fd, &batch);
+    records = batch.count;
+    if (err)
+        goto report;
+    err = seed_process_snapshot(&pid_tracker, batch.events, batch.count, env.pid);
+    if (err)
+        goto report;
+    for (size_t i = 0; i < batch.count; i++) {
+        const struct event *e = &batch.events[i];
+        if (pid_tracker.filter_mode == FILTER_MODE_ALL ||
+            pid_tracker_parent_matches(&pid_tracker, e->pid, e->start_time_ns)) {
+            print_process_snapshot(e);
+            emitted++;
+        }
+    }
+report:
+    if (err)
+        pid_tracker_init(&pid_tracker, env.command_list, env.command_count, env.filter_mode, 0);
+    fprintf(stderr, "{\"event\":\"PROCESS_SNAPSHOT_STATS\",\"complete\":%s,\"error\":%d,\"records\":%zu,\"emitted\":%zu}\n",
+            err ? "false" : "true", err, records, emitted);
+    if (fd >= 0) close(fd);
+    bpf_link__destroy(link);
+    free_process_snapshot(&batch);
+    return err;
+}
+
 int main(int argc, char **argv)
 {
 	struct ring_buffer *rb = NULL;
 	struct process_bpf *skel;
 	int err;
+    bool snapshot_supported;
 
 	/* Parse command line arguments */
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
@@ -771,7 +982,7 @@ int main(int argc, char **argv)
 	/* filter_mode is set via -m flag or -a flag, defaults to FILTER_MODE_FILTER */
 
 	/* Initialize userspace PID tracker */
-	pid_tracker_init(&pid_tracker, env.command_list, env.command_count, env.filter_mode, env.pid);
+	pid_tracker_init(&pid_tracker, env.command_list, env.command_count, env.filter_mode, 0);
 
 	/* Set up libbpf errors and debug info callback */
 	libbpf_set_print(libbpf_print_fn);
@@ -790,6 +1001,18 @@ int main(int argc, char **argv)
 	/* Parameterize BPF code with minimum duration */
 	skel->rodata->min_duration_ns = env.min_duration_ms * 1000000ULL;
 
+	/* Pin the active PID namespace device for EXEC validation. A missing
+	 * namespace leaves this at 0: capture continues and userspace reports
+	 * pid_namespace:null instead of guessing a mapping. */
+	{
+		struct stat st;
+
+		if (stat("/proc/self/ns/pid", &st) == 0) {
+			skel->rodata->pid_namespace_device = (unsigned long long)st.st_dev;
+            skel->rodata->pid_namespace_inode = (unsigned long long)st.st_ino;
+        }
+	}
+
 	/*
 	 * Keep libbpf from auto-attaching the bash readline probe: its section
 	 * name is a bare label, and libbpf's skeleton attach stops at the first
@@ -797,6 +1020,9 @@ int main(int argc, char **argv)
 	 * it. It is attached explicitly, and best-effort, after the others.
 	 */
 	bpf_program__set_autoattach(skel->progs.bash_readline, false);
+    snapshot_supported = libbpf_find_vmlinux_btf_id("task", BPF_TRACE_ITER) > 0;
+    bpf_program__set_autoload(skel->progs.snapshot_tasks, snapshot_supported);
+    bpf_program__set_autoattach(skel->progs.snapshot_tasks, false);
 
 	/* Load & verify BPF programs */
 	err = process_bpf__load(skel);
@@ -804,17 +1030,6 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Failed to load and verify BPF skeleton\n");
 		goto cleanup;
 	}
-
-	/* Populate initial PIDs from existing processes into userspace tracker */
-	int tracked_count = populate_initial_pids(&pid_tracker, env.command_list, env.command_count, env.filter_mode);
-	if (tracked_count < 0) {
-		fprintf(stderr, "Failed to populate initial PIDs\n");
-		goto cleanup;
-	}
-	
-	/* Output configuration as JSON */
-	// printf("Config: filter_mode=%d, min_duration_ms=%ld, commands=%d, pid=%d, initial_tracked_pids=%d\n", 
-	//        env.filter_mode, env.min_duration_ms, env.command_count, env.pid, tracked_count);
 
 	/* Attach tracepoints */
 	err = process_bpf__attach(skel);
@@ -836,6 +1051,11 @@ int main(int argc, char **argv)
 
 
 
+    err = collect_initial_snapshot(skel, snapshot_supported);
+    if (err && env.pid > 0)
+        goto cleanup;
+    err = 0;
+
 	/* Process events */
 	while (!exiting) {
 		err = ring_buffer__poll(rb, 100 /* timeout, ms */);
@@ -851,7 +1071,16 @@ int main(int argc, char **argv)
 	}
 
 cleanup:
-	print_dropped_events(skel);
+    if (rb) {
+        process_bpf__detach(skel);
+        ring_buffer__consume(rb);
+    }
+    while (hash_count > 0) {
+        flush_pid_file_opens(file_hashes[0].pid, file_hashes[0].timestamp_ns);
+    }
+	/* A loader failure is not a completed capture with zero loss. */
+	if (rb)
+		print_dropped_events(skel);
 
 	/* Clean up */
 	ring_buffer__free(rb);

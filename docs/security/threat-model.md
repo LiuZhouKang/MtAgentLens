@@ -11,7 +11,6 @@
 | 运行库 | `env/runs/<id>/collector/collector.responsibility.db` | 全量意图/动作/证据/告警/图快照 |
 | 告警与责任链 | `responsibility_alerts` / `claims` / `tracebacks` | 对 agent 行为的归因结论 |
 | 导出 span | `export-genai` 输出 | 离开信任边界的副本 |
-| 认证材料 | `collector/src/auth/`（TOTP secret、备份码） | 可绕过 UI 认证 |
 | 构建产物 | `collector/build/`、`bpftools/.output/` | 被篡改的二进制会以高权限运行 |
 
 ## 2. 信任边界
@@ -94,9 +93,23 @@
 2. 跨 TLS 记录拆分的头值、跨两次 read/write 拆分的 stdio 凭据不脱敏
    （无法在不损坏凭据的前提下半改）。
 3. 同 uid 进程可读运行库；`0600` 只挡其他用户。
-4. Web API 默认无鉴权（TOTP 为可选组件）；请仅绑回环。
+4. Web API 无内置鉴权（已删除未接线的 TOTP 模块）；默认仅绑回环，远程部署必须前置反向代理与认证。
 5. 不设 CI（ADR-0014）；门禁在本地执行。
 6. eBPF 依赖内核版本（下限 5.8）；低版本加载失败必须显式报错，不得降级静默。
+7. 跨 agent 上下文共享的授权模型很窄（ADR-0015）：只认**直接**观测到的
+   process-spawn 委派关系；传递委派、角色/能力、`SubagentBoundary` 均不作授权。
+   因此它降低良性误报，但不构成完整的权限系统；未授权共享之外的真实滥用仍依赖
+   其他信号，且授权门本身尚未在干净主机的新鲜语料上测过（P1.2）。
+
+### Observer 语义仲裁的数据出口
+
+启用远端 Observer 时，collector 向配置的 Anthropic-compatible endpoint 发送
+候选资源／操作、实际 outcome／syscall 返回值，以及单独有界的
+`ObservedTaskContext`（8 KiB 文本、16 条消息，源文本 hash 与截断／遗漏标志）。
+该任务上下文来自 eBPF 捕获的请求，响应或无请求 framing 的 messages 不提升为用户任务；
+TLS role=user 仍不代表认证。数据可能含敏感任务正文，不具有通用正文脱敏保证；
+`export-genai --include-content` 只控制导出，不控制此已配置的 Observer 通路。
+产品不读取原生Agent日志或框架插桩作为检测输入；实验独立参考不回填预测。
 
 ## 5. 复核触发器
 
@@ -106,4 +119,5 @@
 - 新增 HTTP 端点或改变绑定地址；
 - 改变运行库/日志文件权限；
 - 新增 eBPF hook（尤其带指针解引用的 kprobe/fentry）；
-- 修改身份解析的信任信号。
+- 修改身份解析的信任信号；
+- 修改告警可行动口径（`decision`/`severity`/`actionable`）或污点授权门（ADR-0015）。

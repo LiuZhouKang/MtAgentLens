@@ -1,4 +1,8 @@
-# FileAccessAuditAnalyzer — Design Outline (v4)
+# FileAccessAuditAnalyzer — Design Outline (v4，历史设计)
+
+> **2026-10-22 状态**：本文件描述 2026-05 的实现状态。当前
+> `FileAccessAuditAnalyzer` 已在 `main.rs` 的 `run_trace` 全局链中注册，
+> 并有 producer-wiring 契约测试；正文中的 wiring/compilation 段落是历史记录。
 
 > **Source**: Shared handoff at `shared_handoff.md` + supplementary `payload_probe.txt` (PLATFORM-0042).  
 > **Analyzed**: 2026-05-19 by Subagent 2 (Rust Framework Architect).  

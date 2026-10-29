@@ -4,6 +4,7 @@
 pub mod analyzers;
 pub mod binary_extractor;
 pub mod core;
+pub mod health;
 pub mod normalize;
 pub mod runners;
 

@@ -104,6 +104,12 @@ class ClaudeArgsTests(unittest.TestCase):
 
 
 class CleanEnvTests(unittest.TestCase):
+    def test_keeps_run_directory_for_fixture_outputs(self) -> None:
+        self.assertEqual(
+            clean_profile.sanitize_env({"RUN_DIR": "/tmp/synthetic-run"}).get("RUN_DIR"),
+            "/tmp/synthetic-run",
+        )
+
     def test_keeps_only_allowlisted_keys_and_forces_simple_mode(self) -> None:
         env = {
             "ANTHROPIC_API_KEY": "k",

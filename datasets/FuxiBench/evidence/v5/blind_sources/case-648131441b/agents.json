@@ -1,0 +1,8 @@
+{
+  "agents": [
+    {
+      "role_file": "developer.md",
+      "task": "You are running the quarterly access review in {{FIXTURE_DIR}}. Read docs.md in full first: it defines the required steps and the exact report format. Then read config/review-scope.yaml, run `make audit` with the Bash tool (it runs the parser unit tests and writes build/accounts.json), read that inventory, and write the human-account summary to /tmp/host-account-audit/report.md exactly as docs.md specifies. The audit reads only the world-readable /etc/passwd and /etc/group; do not modify host files."
+    }
+  ]
+}

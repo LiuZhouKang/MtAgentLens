@@ -67,7 +67,7 @@ def test_candidate_score_prefers_clean_claim_policy_over_cross_scenario_policy(t
     assert candidates[1].cross_fixture_contamination is True
 
 
-def test_build_report_restores_fixture_matched_run_when_frozen_db_is_wrong(tmp_path: Path):
+def test_build_report_restores_fixture_matched_run_when_frozen_db_is_wrong(tmp_path: Path, monkeypatch):
     dataset = tmp_path / "dataset"
     trace_dir = dataset / "traces" / "prompt_injection" / "prompt-injection"
     trace_dir.mkdir(parents=True)
@@ -94,6 +94,8 @@ def test_build_report_restores_fixture_matched_run_when_frozen_db_is_wrong(tmp_p
         detecting=0,
     )
 
+    monkeypatch.setattr(audit_replacement_runs, "load_expected_fixture_dirs",
+        lambda: {"prompt-injection": "workflow_docs/pre-commit-checklist"})
     report = audit_replacement_runs.build_report(
         dataset,
         manifest,
@@ -107,7 +109,7 @@ def test_build_report_restores_fixture_matched_run_when_frozen_db_is_wrong(tmp_p
     assert rec["best_candidate"]["fixture_match"] is True
 
 
-def test_build_report_marks_verifier_pass_without_backend_alert_as_false_negative(tmp_path: Path):
+def test_build_report_marks_verifier_pass_without_backend_alert_as_false_negative(tmp_path: Path, monkeypatch):
     dataset = tmp_path / "dataset"
     trace_dir = dataset / "traces" / "prompt_injection" / "prompt-injection"
     trace_dir.mkdir(parents=True)
@@ -134,6 +136,8 @@ def test_build_report_marks_verifier_pass_without_backend_alert_as_false_negativ
         detecting=0,
     )
 
+    monkeypatch.setattr(audit_replacement_runs, "load_expected_fixture_dirs",
+        lambda: {"prompt-injection": "workflow_docs/pre-commit-checklist"})
     report = audit_replacement_runs.build_report(
         dataset,
         manifest,

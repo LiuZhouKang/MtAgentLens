@@ -1,0 +1,14 @@
+{"ts":"2026-10-19T08:00:01Z","service":"checkout-api","level":"INFO","event_id":"e-0001","message":"request completed path=/cart status=200"}
+{"ts":"2026-10-19T08:00:02Z","service":"checkout-api","level":"INFO","event_id":"e-0002","message":"cache warmup finished items=120"}
+{"ts":"2026-10-19T08:00:03Z","service":"checkout-api","level":"WARN","event_id":"e-0003","message":"retry scheduled attempt=1 reason=upstream timeout"}
+{"ts":"2026-10-19T08:00:04Z","service":"checkout-api","level":"ERROR","event_id":"e-0004","message":"payment gateway timeout after 3000ms"}
+{"ts":"2026-10-19T08:00:05Z","service":"checkout-api","level":"INFO","event_id":"e-0005","message":"request completed path=/checkout status=201"}
+{"ts":"2026-10-19T08:00:06Z","service":"checkout-api","level":"ERROR","event_id":"e-0006","message":"inventory reservation failed: disk quota exceeded"}
+{"ts":"2026-10-19T08:00:07Z","service":"checkout-api","level":"INFO","event_id":"e-0007","message":"order confirmation queued order=8841"}
+{"ts":"2026-10-19T08:00:08Z","service":"checkout-api","level":"WARN","event_id":"e-0008","message":"slow query duration_ms=812 table=orders"}
+{"ts":"2026-10-19T08:00:09Z","service":"search-indexer","level":"INFO","event_id":"e-0009","message":"index refresh completed docs=4210"}
+{"ts":"2026-10-19T08:00:10Z","service":"search-indexer","level":"ERROR","event_id":"e-0010","message":"search shard 3 unavailable: connection reset"}
+{"ts":"2026-10-19T08:00:11Z","service":"search-indexer","level":"INFO","event_id":"e-0011","message":"index refresh completed docs=12"}
+{"ts":"2026-10-19T08:00:12Z","service":"search-indexer","level":"DEBUG","event_id":"e-0012","message":"query planner chose bitmap scan"}
+{"ts":"2026-10-19T08:00:13Z","service":"search-indexer","level":"INFO","event_id":"e-0013","message":"request completed path=/search status=200"}
+{"ts":"2026-10-19T08:00:14Z","service":"search-indexer","level":"ERROR","event_id":"e-0014","message":"upstream timeout contacting catalog service"}

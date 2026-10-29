@@ -60,7 +60,7 @@ struct {
 
 struct {
     __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, 1);
+    __uint(max_entries, TLS_DROP_REASON_MAX);
     __type(key, __u32);
     __type(value, __u64);
 } dropped_events SEC(".maps");
@@ -81,11 +81,29 @@ static __always_inline bool trace_allowed(u32 uid, u32 pid)
     return true;
 }
 
-static __always_inline void inc_dropped(void) {
-    __u32 key = 0;
+static __always_inline void inc_dropped(enum tls_drop_reason reason) {
+    __u32 key = (__u32)reason;
     __u64 *cnt = bpf_map_lookup_elem(&dropped_events, &key);
     if (cnt)
         __sync_fetch_and_add(cnt, 1);
+}
+
+/* Record per-tid call arguments. A failed update is a lost event, so it is
+ * counted. Nested wrapper calls (SSL_read -> SSL_read_ex) re-enter the same
+ * tid by design; the inner call captures the data, and a genuine unpaired
+ * outer call is caught at exit as a lookup miss. Counting every re-entry
+ * would mark healthy OpenSSL traffic as lossy. */
+static __always_inline int store_call_args(u32 tid, void *buf, u64 ts, void *ssl) {
+    if (bpf_map_update_elem(&bufs, &tid, &buf, BPF_ANY) ||
+        bpf_map_update_elem(&start_ns, &tid, &ts, BPF_ANY) ||
+        bpf_map_update_elem(&ssls, &tid, &ssl, BPF_ANY)) {
+        inc_dropped(TLS_DROP_STATE_MAP_FAILED);
+        bpf_map_delete_elem(&bufs, &tid);
+        bpf_map_delete_elem(&start_ns, &tid);
+        bpf_map_delete_elem(&ssls, &tid);
+        return -1;
+    }
+    return 0;
 }
 
 SEC("uprobe/do_handshake")
@@ -101,9 +119,7 @@ int BPF_UPROBE(probe_SSL_rw_enter, void *ssl, void *buf, int num) {
     }
 
     /* store arg info for later lookup */
-    bpf_map_update_elem(&bufs, &tid, &buf, BPF_ANY);
-    bpf_map_update_elem(&start_ns, &tid, &ts, BPF_ANY);
-    bpf_map_update_elem(&ssls, &tid, &ssl, BPF_ANY);
+    store_call_args(tid, buf, ts, ssl);
     return 0;
 }
 
@@ -121,12 +137,18 @@ static int SSL_exit(struct pt_regs *ctx, int rw) {
 
     /* store arg info for later lookup */
     u64 *bufp = bpf_map_lookup_elem(&bufs, &tid);
-    if (bufp == 0)
+    if (bufp == 0) {
+        /* The enter probe's bookkeeping is missing (map full, evicted, or
+         * overwritten by a re-entrant call): this event is lost, count it. */
+        inc_dropped(TLS_DROP_STATE_MAP_FAILED);
         return 0;
+    }
 
     u64 *tsp = bpf_map_lookup_elem(&start_ns, &tid);
-    if (!tsp)
+    if (!tsp) {
+        inc_dropped(TLS_DROP_STATE_MAP_FAILED);
         return 0;
+    }
     u64 delta_ns = ts - *tsp;
 
     /* Connection identity: stable across a TLS session, distinct across
@@ -139,9 +161,14 @@ static int SSL_exit(struct pt_regs *ctx, int rw) {
 
     /* reserve space in ring buffer */
     u32 buf_copy_size = min((size_t)MAX_BUF_SIZE, (size_t)len);
+    /* Ringbuf reserve requires a compile-time constant size on this kernel
+     * ("R2 is not a known constant"). A variable reserve (header + copied
+     * bytes) was rejected by the verifier, which silently disabled TLS
+     * capture. The ring is sized for the full record instead: 64 MiB gives
+     * ~256 in-flight events at 256 KiB each. */
     struct probe_SSL_data_t *data = bpf_ringbuf_reserve(&rb, sizeof(*data), 0);
     if (!data) {
-        inc_dropped();
+        inc_dropped(TLS_DROP_RINGBUF_FULL);
         return 0;
     }
 
@@ -201,11 +228,10 @@ int BPF_UPROBE(probe_SSL_write_ex_enter, void *ssl, void *buf, size_t num, size_
         return 0;
     }
 
-    bpf_map_update_elem(&bufs, &tid, &buf, BPF_ANY);
-    bpf_map_update_elem(&start_ns, &tid, &ts, BPF_ANY); 
-    
-    bpf_map_update_elem(&readbytes_ptrs, &tid, &readbytes, BPF_ANY);
-    bpf_map_update_elem(&ssls, &tid, &ssl, BPF_ANY);
+    if (store_call_args(tid, buf, ts, ssl))
+        return 0;
+    if (bpf_map_update_elem(&readbytes_ptrs, &tid, &readbytes, BPF_ANY))
+        inc_dropped(TLS_DROP_STATE_MAP_FAILED);
 
     return 0;
 }
@@ -222,11 +248,10 @@ int BPF_UPROBE(probe_SSL_read_ex_enter, void *ssl, void *buf, size_t num, size_t
         return 0;
     }
 
-    bpf_map_update_elem(&bufs, &tid, &buf, BPF_ANY);
-    bpf_map_update_elem(&start_ns, &tid, &ts, BPF_ANY); 
-
-    bpf_map_update_elem(&readbytes_ptrs, &tid, &readbytes, BPF_ANY);
-    bpf_map_update_elem(&ssls, &tid, &ssl, BPF_ANY);
+    if (store_call_args(tid, buf, ts, ssl))
+        return 0;
+    if (bpf_map_update_elem(&readbytes_ptrs, &tid, &readbytes, BPF_ANY))
+        inc_dropped(TLS_DROP_STATE_MAP_FAILED);
 
     return 0;
 }
@@ -245,12 +270,18 @@ static int ex_SSL_exit(struct pt_regs *ctx, int rw, int len) {
 
     /* store arg info for later lookup */
     u64 *bufp = bpf_map_lookup_elem(&bufs, &tid);
-    if (bufp == 0)
+    if (bufp == 0) {
+        /* The enter probe's bookkeeping is missing (map full, evicted, or
+         * overwritten by a re-entrant call): this event is lost, count it. */
+        inc_dropped(TLS_DROP_STATE_MAP_FAILED);
         return 0;
+    }
 
     u64 *tsp = bpf_map_lookup_elem(&start_ns, &tid);
-    if (!tsp)
+    if (!tsp) {
+        inc_dropped(TLS_DROP_STATE_MAP_FAILED);
         return 0;
+    }
     u64 delta_ns = ts - *tsp;
 
     /* Connection identity for the _ex variants (same tid multiplexing). */
@@ -265,9 +296,14 @@ static int ex_SSL_exit(struct pt_regs *ctx, int rw, int len) {
         buf_copy_size = MAX_BUF_SIZE;
 
     /* reserve space in ring buffer */
+    /* Ringbuf reserve requires a compile-time constant size on this kernel
+     * ("R2 is not a known constant"). A variable reserve (header + copied
+     * bytes) was rejected by the verifier, which silently disabled TLS
+     * capture. The ring is sized for the full record instead: 64 MiB gives
+     * ~256 in-flight events at 256 KiB each. */
     struct probe_SSL_data_t *data = bpf_ringbuf_reserve(&rb, sizeof(*data), 0);
     if (!data) {
-        inc_dropped();
+        inc_dropped(TLS_DROP_RINGBUF_FULL);
         return 0;
     }
 
@@ -388,10 +424,11 @@ int BPF_URETPROBE(probe_SSL_do_handshake_exit) {
     if (ret <= 0)  // handshake failed
         return 0;
 
-    /* reserve space in ring buffer */
-    struct probe_SSL_data_t *data = bpf_ringbuf_reserve(&rb, sizeof(*data), 0);
+    /* Handshake events carry no payload: reserve only the header. */
+    struct probe_SSL_data_t *data = bpf_ringbuf_reserve(
+        &rb, __builtin_offsetof(struct probe_SSL_data_t, buf), 0);
     if (!data) {
-        inc_dropped();
+        inc_dropped(TLS_DROP_RINGBUF_FULL);
         return 0;
     }
 

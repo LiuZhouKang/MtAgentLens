@@ -1,0 +1,2273 @@
+{
+  "scenarios": 93,
+  "method": "ai_consensus_3",
+  "input_view": "human-design-audit-v2",
+  "protocol_version": "ai-consensus-3+adjudication/2",
+  "quality_tier": "ai_consensus",
+  "human_review": false,
+  "human_annotations": 0,
+  "annotator_count": 3,
+  "label_counts": {
+    "benign": 36,
+    "attack": 57
+  },
+  "attack_type_counts": {
+    "benign": 36,
+    "B": 45,
+    "C": 12
+  },
+  "resolution_counts": {
+    "consensus": 91,
+    "adjudicated": 2
+  },
+  "field_status_counts": {
+    "authorization_boundary": {
+      "known": 93
+    },
+    "entry_point": {
+      "not_applicable": 36,
+      "known": 57
+    },
+    "root_source": {
+      "not_applicable": 36,
+      "known": 57
+    },
+    "instruction_introducer": {
+      "not_applicable": 35,
+      "known": 58
+    }
+  },
+  "agreement": {
+    "label_pairwise": {
+      "pairs_total": 279,
+      "pairs_equal": 259,
+      "rate": 0.9283
+    },
+    "attack_type_pairwise": {
+      "pairs_total": 279,
+      "pairs_equal": 253,
+      "rate": 0.9068
+    },
+    "field_status_pairwise": {
+      "authorization_boundary": {
+        "pairs_total": 279,
+        "pairs_equal": 279,
+        "rate": 1.0
+      },
+      "entry_point": {
+        "pairs_total": 279,
+        "pairs_equal": 259,
+        "rate": 0.9283
+      },
+      "root_source": {
+        "pairs_total": 279,
+        "pairs_equal": 259,
+        "rate": 0.9283
+      },
+      "instruction_introducer": {
+        "pairs_total": 279,
+        "pairs_equal": 259,
+        "rate": 0.9283
+      }
+    },
+    "label_fleiss_kappa": 0.847856909150398,
+    "attack_type_fleiss_kappa": 0.8441340782122904,
+    "scope": "pairwise equality and Fleiss kappa over 3 annotators; same-model process independence only, not human kappa or accuracy"
+  },
+  "raw_disagreement_cases": [
+    "delegation-chain",
+    "identity-replay"
+  ],
+  "value_divergence_cases": [
+    "atlas-recon-discovery",
+    "benign-api-doc",
+    "benign-build-debug",
+    "benign-code-refactor",
+    "benign-config-setup",
+    "benign-credential-rotation-plan",
+    "benign-data-migration",
+    "benign-dependency-update",
+    "benign-doc-review",
+    "benign-env-example-review",
+    "benign-etc-group-audit",
+    "benign-heavy-build",
+    "benign-known-hosts-audit",
+    "benign-log-analysis",
+    "benign-multi-ci-pipeline",
+    "benign-multi-code-review",
+    "benign-multi-db-migration",
+    "benign-multi-distributed-test",
+    "benign-multi-handoff",
+    "benign-multi-incident-response",
+    "benign-multi-log-aggregation",
+    "benign-multi-performance-bench",
+    "benign-multi-release-orchestration",
+    "benign-passwd-audit",
+    "benign-review-response",
+    "benign-ssh-config-audit",
+    "benign-test-writing",
+    "c2-beacon-direct",
+    "c2-dns-dead-drop",
+    "c2-reverse-shell",
+    "collusion-ring",
+    "consensus-attack",
+    "consensus-split",
+    "context-multihop",
+    "covert-file",
+    "credential-keylogger",
+    "credential-memory-scrape",
+    "credential-ssh-direct",
+    "credential-ssh-keys",
+    "credential-theft-direct",
+    "cve-curl-ssrf",
+    "cve-sudoedit-bypass",
+    "data-exfil-direct",
+    "defense-direct",
+    "defense-log-tampering",
+    "defense-timed-attack",
+    "delegation-chain",
+    "exfil-archive-upload",
+    "exfil-covert-timing",
+    "exfil-dns-tunnel",
+    "exfil-env-secrets",
+    "exfil-steganography",
+    "fragmented-payload",
+    "handoff-injection",
+    "handoff-unicode",
+    "identity-confusion",
+    "identity-replay",
+    "leader-betrayal",
+    "malicious-feedback",
+    "mirror-poisoning",
+    "network-anomaly",
+    "network-c2-beacon",
+    "output-tampering",
+    "persistence-cron-backdoor",
+    "privsec-direct",
+    "privsec-docker-escape",
+    "prompt-injection",
+    "prompt-injection-classical",
+    "prompt-injection-direct",
+    "recon-direct",
+    "recon-passive-sniff",
+    "recon-user-enumeration",
+    "resource-cpu-coin-miner",
+    "resource-direct",
+    "resource-disk-fill",
+    "resource-runaway-loop",
+    "role-hijack",
+    "role-progressive",
+    "shadow-agent",
+    "shadow-spawning",
+    "stealth-credential-leak",
+    "stealth-recon-via-monitoring",
+    "stealth-sleeping-backdoor",
+    "stealth-slow-burn-exfil",
+    "stealth-team-build-coordination",
+    "stealth-team-oncall-handoff",
+    "stealth-team-sprint-planning",
+    "supplychain-dependency-confusion",
+    "supplychain-direct",
+    "supplychain-malicious-build",
+    "supplychain-poison-config",
+    "supplychain-typosquatting",
+    "token-replay"
+  ],
+  "adjudicated_cases": [
+    "delegation-chain",
+    "identity-replay"
+  ],
+  "adjudication_sessions": 2,
+  "sessions": {
+    "annotator_sessions": 279,
+    "adjudication_sessions": 2,
+    "distinct_session_ids": 281,
+    "all_fresh_text_only": true,
+    "annotator_session_ids": {
+      "batch-00-annotator-1": [
+        "session-b2b9b1d3-f2c6-423f-a2db-dac875309cd3"
+      ],
+      "batch-00-annotator-2-retry1": [
+        "session-60a66ea5-9a5d-469a-91ac-e19578c227e0"
+      ],
+      "batch-00-annotator-3": [
+        "session-ff0f9082-4449-4418-8f48-f81b3d46e1e0"
+      ],
+      "batch-01-annotator-1": [
+        "session-f8227a8b-324a-4216-b635-7e9b93710636"
+      ],
+      "batch-01-annotator-2": [
+        "session-c8181597-4a99-45d9-8fd8-279a65a91bb7"
+      ],
+      "batch-01-annotator-3": [
+        "session-82bcd16b-933f-4636-813a-3745d8fc3d1c"
+      ],
+      "batch-02-annotator-1": [
+        "session-8a80d058-6b7d-42d8-9c62-bc1c1c72f06c"
+      ],
+      "batch-02-annotator-2-retry1": [
+        "session-57a00f00-70cd-4c8f-befe-99a59c2e7aba"
+      ],
+      "batch-02-annotator-3": [
+        "session-9579921a-f589-4cb0-9903-ebfa191c1800"
+      ],
+      "batch-03-annotator-1": [
+        "session-6e5d70b4-9c40-411f-b944-d52ac3b3e226"
+      ],
+      "batch-03-annotator-2-retry1": [
+        "session-19093dda-8e2b-4020-bfc3-41f551b9051e"
+      ],
+      "batch-03-annotator-3-retry1": [
+        "session-c56e4966-9f65-4a73-87d6-ee960c125d6e"
+      ],
+      "batch-04-annotator-1": [
+        "session-f87edf85-ab8b-4c63-9430-6852b57e5feb"
+      ],
+      "batch-04-annotator-2": [
+        "session-0dbd5760-55ce-48b1-be4e-ea174f56a05b"
+      ],
+      "batch-04-annotator-3": [
+        "session-e46ac4d7-b2f7-4f7b-ac8a-fb5c136bedfe"
+      ],
+      "batch-05-annotator-1": [
+        "session-5f358b48-9bb0-4e76-8ce9-187b40feae65"
+      ],
+      "batch-05-annotator-2": [
+        "session-dbb6c00c-e765-4934-871b-79500d762c8f"
+      ],
+      "batch-05-annotator-3": [
+        "session-2ecf27a6-f8d6-4baa-bdad-ac7c1b8b5aaf"
+      ],
+      "batch-06-annotator-1": [
+        "session-cc4f7b97-7336-450d-9ee1-f2b5ef7c178f"
+      ],
+      "batch-06-annotator-2": [
+        "session-395faa09-3eb8-44ec-a6ea-28a7647e4d3d"
+      ],
+      "batch-06-annotator-3": [
+        "session-f552f0c2-f200-446c-9398-5094b9c3104d"
+      ],
+      "batch-07-annotator-1": [
+        "session-1877c5ca-c081-49c6-8e4b-df62004c85bc"
+      ],
+      "batch-07-annotator-2": [
+        "session-1fb3bd7c-5b67-48ab-8307-d5c42532c31c"
+      ],
+      "batch-07-annotator-3": [
+        "session-2e2b32d0-849b-45df-b5a6-f1fe80cfa855"
+      ],
+      "batch-08-annotator-1": [
+        "session-9980582b-95d3-4ba0-959e-48a56ad2dee6"
+      ],
+      "batch-08-annotator-2": [
+        "session-e491fdde-6015-4c27-bfcc-9bcdfa13f774"
+      ],
+      "batch-08-annotator-3": [
+        "session-ffc26e4a-6b02-41e9-9e11-f2d205471570"
+      ],
+      "batch-09-annotator-1": [
+        "session-a25ad3cc-0431-47a7-af38-3945f0d5e657"
+      ],
+      "batch-09-annotator-2": [
+        "session-6e358471-db9d-4487-9cd5-866ae2fb008e"
+      ],
+      "batch-09-annotator-3": [
+        "session-c083c396-9691-495f-b8a1-6432dc38b656"
+      ],
+      "batch-10-annotator-1": [
+        "session-0a2a370d-84de-4737-ba82-e6a847cfad0c"
+      ],
+      "batch-10-annotator-2": [
+        "session-467d8c43-a6b0-40aa-a32a-19f9b7ebb799"
+      ],
+      "batch-10-annotator-3": [
+        "session-b96ec71c-e175-476b-9b29-ac1fe92f6a67"
+      ],
+      "batch-11-annotator-1": [
+        "session-5cfb0e4b-bcad-4b45-bf91-1a2b9c4513dc"
+      ],
+      "batch-11-annotator-2": [
+        "session-d4d0c6a7-04bc-4702-94ea-6421c095842f"
+      ],
+      "batch-11-annotator-3": [
+        "session-d32cb85a-2fc4-48b2-b90a-a9678f1e2b8f"
+      ],
+      "batch-12-annotator-1": [
+        "session-7a1b39bd-c44f-4da4-9aac-e7a5387b431c"
+      ],
+      "batch-12-annotator-2": [
+        "session-79a8e9ef-1806-491a-bc16-313871d2b0c3"
+      ],
+      "batch-12-annotator-3": [
+        "session-d7515b61-ade3-4a9b-9eae-9855d807df03"
+      ],
+      "batch-13-annotator-1": [
+        "session-c4ba2f57-c273-4108-b684-d4597107b468"
+      ],
+      "batch-13-annotator-2": [
+        "session-90a84cb9-6147-408b-813f-312128047e84"
+      ],
+      "batch-13-annotator-3": [
+        "session-6191c6a9-c3b7-4db4-9869-6e8676e42415"
+      ],
+      "batch-14-annotator-1-retry1": [
+        "session-1b99a0ac-20b7-4925-b70b-5e924f3901a6"
+      ],
+      "batch-14-annotator-2": [
+        "session-6642305e-7451-47c3-bd15-62989e0039a2"
+      ],
+      "batch-14-annotator-3": [
+        "session-9e8c9a15-689c-4142-a613-b12d7e5c776b"
+      ],
+      "batch-15-annotator-1-retry1": [
+        "session-e02dd454-641c-4473-ac34-8da0ca067388"
+      ],
+      "batch-15-annotator-2": [
+        "session-d0dc1de2-3cf9-4b81-90ee-85ee5e40d36a"
+      ],
+      "batch-15-annotator-3": [
+        "session-bf1ee99d-4de2-46b1-b984-8c4a8f61a8d5"
+      ],
+      "batch-16-annotator-1": [
+        "session-4ae84720-9254-4ec9-a584-10fa160e7cf8"
+      ],
+      "batch-16-annotator-2": [
+        "session-bd380b40-ac2a-4499-96d5-d9a9d27d13c2"
+      ],
+      "batch-16-annotator-3": [
+        "session-f4ad6563-ba53-41e4-8872-bc79476c6fa1"
+      ],
+      "batch-17-annotator-1": [
+        "session-44d4d925-4467-4b44-aa26-33c9fe5d3eab"
+      ],
+      "batch-17-annotator-2-retry1": [
+        "session-6eba0f45-a3b7-411a-935b-42e0490e76b9"
+      ],
+      "batch-17-annotator-3": [
+        "session-3ec06130-b518-4423-baa2-3c7e893c9c3a"
+      ],
+      "batch-18-annotator-1": [
+        "session-b794692d-0ad0-4d8f-9df7-1ca77a52286e"
+      ],
+      "batch-18-annotator-2": [
+        "session-49e621f0-c7b4-4d45-9c9f-a15f3ddac67a"
+      ],
+      "batch-18-annotator-3": [
+        "session-bd148e18-8dcc-4516-abdf-72a8e9f2632c"
+      ],
+      "batch-19-annotator-1": [
+        "session-98faf6bf-e583-434c-a63a-379aa50ad3db"
+      ],
+      "batch-19-annotator-2": [
+        "session-42e59e6f-658c-4092-b6a3-924b3c5d3387"
+      ],
+      "batch-19-annotator-3": [
+        "session-8a0e4d43-bffc-4dc2-a3a8-f54aab601ef6"
+      ],
+      "batch-20-annotator-1": [
+        "session-4dc1c407-f372-4d82-8d68-e7eec0f15a58"
+      ],
+      "batch-20-annotator-2": [
+        "session-a458d351-d26e-498b-8c1b-b26a143f6c6b"
+      ],
+      "batch-20-annotator-3": [
+        "session-bb3b07fb-6bc0-40c4-b188-ac24b81c19be"
+      ],
+      "batch-21-annotator-1": [
+        "session-85ed9df7-330e-40f9-89a0-53ce64d0f083"
+      ],
+      "batch-21-annotator-2": [
+        "session-8981a991-c84c-4f47-98b2-3aaaf804d442"
+      ],
+      "batch-21-annotator-3": [
+        "session-780d5a03-80d7-40f7-bac6-7b1f71a11e51"
+      ],
+      "batch-22-annotator-1": [
+        "session-59c6b24a-4de9-4fea-9472-6b9b524ff3db"
+      ],
+      "batch-22-annotator-2": [
+        "session-6fa1418f-b58c-4cbd-8176-39fad4452b18"
+      ],
+      "batch-22-annotator-3": [
+        "session-5c2e881c-3bf7-4ebb-993e-f768069ff44c"
+      ],
+      "batch-23-annotator-1": [
+        "session-b0540a72-c07a-442f-8b21-5c2d0ba6da95"
+      ],
+      "batch-23-annotator-2": [
+        "session-118b70ec-1814-4f4c-8fd1-a110c8cee10c"
+      ],
+      "batch-23-annotator-3": [
+        "session-2077a750-a54a-48b0-b45c-50a171b2eb7f"
+      ],
+      "batch-24-annotator-1": [
+        "session-bceefcec-c16d-49e6-a3e6-042ef690b9c3"
+      ],
+      "batch-24-annotator-2": [
+        "session-d68b39f7-d7e7-44b3-9905-530fa149e647"
+      ],
+      "batch-24-annotator-3": [
+        "session-c7314ca5-4119-459d-8922-56bd5e87eddf"
+      ],
+      "batch-25-annotator-1": [
+        "session-4a231ebc-2d9a-4acd-a00e-7880e3fa5d1a"
+      ],
+      "batch-25-annotator-2": [
+        "session-df8b137a-0b30-490c-b997-81ccbb178dcb"
+      ],
+      "batch-25-annotator-3-retry1": [
+        "session-ebe13358-f394-4a69-ab0c-d4a901f1befd"
+      ],
+      "batch-26-annotator-1": [
+        "session-64572b3c-2a43-4cfd-b72a-e409f1e0c786"
+      ],
+      "batch-26-annotator-2": [
+        "session-44935f8b-ac94-4718-a090-5aa78428b132"
+      ],
+      "batch-26-annotator-3": [
+        "session-ba1db9f7-4f78-4c97-b76e-45a9caab371a"
+      ],
+      "batch-27-annotator-1": [
+        "session-72143813-43d5-4fa3-8b6f-b196271ecaa2"
+      ],
+      "batch-27-annotator-2": [
+        "session-3a708410-acd5-47a9-b4df-07cf4eb16b03"
+      ],
+      "batch-27-annotator-3": [
+        "session-2845b387-9bc4-4bd2-b8af-60bf87772765"
+      ],
+      "batch-28-annotator-1": [
+        "session-20065932-5985-47a0-99f9-966e29d9f947"
+      ],
+      "batch-28-annotator-2": [
+        "session-e30f7aec-3a51-4f9d-8a3c-dff22a455276"
+      ],
+      "batch-28-annotator-3": [
+        "session-83b23e4f-efee-48fb-821b-b7e0d55dddcd"
+      ],
+      "batch-29-annotator-1": [
+        "session-ebc80bb9-61c7-4e39-9848-88ecc0e95574"
+      ],
+      "batch-29-annotator-2": [
+        "session-2533883e-9d62-4611-a6d6-e73b401e9e54"
+      ],
+      "batch-29-annotator-3": [
+        "session-a257f5f0-c968-4fb9-a73f-321d5bb85b75"
+      ],
+      "batch-30-annotator-1": [
+        "session-c8d62d8e-4e21-49ea-acca-29c4ea7b81a0"
+      ],
+      "batch-30-annotator-2": [
+        "session-b1c9f7b5-c227-48b7-bcc8-abfe9a085f27"
+      ],
+      "batch-30-annotator-3": [
+        "session-4d2db964-3627-4517-8dd0-0b38b0858a7b"
+      ],
+      "batch-31-annotator-1": [
+        "session-a3adebdf-01cb-4d42-ba87-c4b044c31bb3"
+      ],
+      "batch-31-annotator-2": [
+        "session-0cc6a431-d866-47d0-98c5-0f7c1a58e778"
+      ],
+      "batch-31-annotator-3": [
+        "session-67204bd5-83f4-4ca6-b7f8-abacc4af4d2d"
+      ],
+      "batch-32-annotator-1": [
+        "session-8f28e96f-cafd-460a-882d-ada5089f7ee9"
+      ],
+      "batch-32-annotator-2": [
+        "session-def9038a-5eb1-4e5e-8979-307bb4e07979"
+      ],
+      "batch-32-annotator-3": [
+        "session-082c8fec-4c7a-4df8-a9e3-d09926b4e58f"
+      ],
+      "batch-33-annotator-1": [
+        "session-ca4850d2-9b9b-4210-8ef1-8e5c2751c190"
+      ],
+      "batch-33-annotator-2": [
+        "session-02ecf371-d348-43e2-8dd8-065cb95664c3"
+      ],
+      "batch-33-annotator-3": [
+        "session-c1c2256d-7da2-4428-8182-54b9902075cb"
+      ],
+      "batch-34-annotator-1": [
+        "session-12b9e16e-e7f8-4366-a025-e5ce6cbcffce"
+      ],
+      "batch-34-annotator-2": [
+        "session-30abd556-06e4-4a65-ac02-fab0ad394c79"
+      ],
+      "batch-34-annotator-3": [
+        "session-6fe1eeba-d0b6-40e8-ac1f-30a6d699a30a"
+      ],
+      "batch-35-annotator-1": [
+        "session-e9ac3fe5-741c-4749-a6c7-2281e41d8b08"
+      ],
+      "batch-35-annotator-2": [
+        "session-02c5c23d-726b-4faa-a163-62db31bb9e25"
+      ],
+      "batch-35-annotator-3": [
+        "session-f5de7372-fb82-46b0-a76c-9075322a62f7"
+      ],
+      "batch-36-annotator-1": [
+        "session-9037519d-3e8b-45d4-8050-acc000a83b79"
+      ],
+      "batch-36-annotator-2": [
+        "session-59a25e49-236f-4fd4-b815-3ef040a19972"
+      ],
+      "batch-36-annotator-3": [
+        "session-b43d4248-c599-4584-82bc-7f4396c74c28"
+      ],
+      "batch-37-annotator-1": [
+        "session-c13f026b-9203-4fb1-af00-de13cf5c5f22"
+      ],
+      "batch-37-annotator-2": [
+        "session-0d3c144e-721d-4905-8832-e199dfa94658"
+      ],
+      "batch-37-annotator-3": [
+        "session-e2e85801-67bf-4105-abc6-5e3c965183fc"
+      ],
+      "batch-38-annotator-1": [
+        "session-2ded75d8-b908-4e39-bc72-cd426481959c"
+      ],
+      "batch-38-annotator-2": [
+        "session-dfc6d129-5883-44e3-872d-e37a9050f135"
+      ],
+      "batch-38-annotator-3": [
+        "session-eb6bf261-81d1-420a-94e7-44a469e7f921"
+      ],
+      "batch-39-annotator-1": [
+        "session-a664d2e5-a147-4b27-a3f5-82f2bf64a6f1"
+      ],
+      "batch-39-annotator-2": [
+        "session-abe31146-6afe-4570-a9a0-dd5c5f733039"
+      ],
+      "batch-39-annotator-3": [
+        "session-fabe0d64-d35a-499f-bf25-59bd87fba9e4"
+      ],
+      "batch-40-annotator-1": [
+        "session-28bc3ef2-ffc7-4f02-ba91-3358ff1fa4e4"
+      ],
+      "batch-40-annotator-2": [
+        "session-4facf25a-6c6c-4d39-b241-4390bfe19564"
+      ],
+      "batch-40-annotator-3": [
+        "session-e57f65f7-94d4-4f67-a1ee-bbd20c60ca42"
+      ],
+      "batch-41-annotator-1": [
+        "session-a32e9e45-6451-42e7-a31f-c3a9f7b37c44"
+      ],
+      "batch-41-annotator-2": [
+        "session-0af07823-1fa9-4195-82e9-5f71f4068fcb"
+      ],
+      "batch-41-annotator-3-retry1": [
+        "session-27bbdca3-a114-403d-8889-76db56198e98"
+      ],
+      "batch-42-annotator-1": [
+        "session-4a83c9ef-a450-4847-897a-842c9102642e"
+      ],
+      "batch-42-annotator-2": [
+        "session-186c5b90-14ae-42e4-98ad-50cd109873cb"
+      ],
+      "batch-42-annotator-3": [
+        "session-04838a6c-1809-4337-bc20-9db2df4d0d58"
+      ],
+      "batch-43-annotator-1": [
+        "session-2ccac902-3764-494e-b2d8-6b220288d9ff"
+      ],
+      "batch-43-annotator-2": [
+        "session-1a779267-f403-49d6-8cdc-baf04a7bfad4"
+      ],
+      "batch-43-annotator-3": [
+        "session-daf025f1-10e4-4915-8fd3-194661f4a284"
+      ],
+      "batch-44-annotator-1": [
+        "session-95ac9e91-5cc6-40fc-b36e-0de117944167"
+      ],
+      "batch-44-annotator-2": [
+        "session-cc33dfa3-46b1-4b22-8176-9c2c350a8f4c"
+      ],
+      "batch-44-annotator-3": [
+        "session-c0c127e5-11a8-49f5-bcd6-15e963a32570"
+      ],
+      "batch-45-annotator-1": [
+        "session-b08d0278-7ee5-4c93-a316-c30224b7ecb6"
+      ],
+      "batch-45-annotator-2": [
+        "session-4b30e570-03fc-47ee-b11a-caaa0e2db239"
+      ],
+      "batch-45-annotator-3": [
+        "session-85938c2f-891b-41ee-a841-37916c09acd0"
+      ],
+      "batch-46-annotator-1": [
+        "session-eca5abbb-a630-4a81-9aed-68fdab9d2178"
+      ],
+      "batch-46-annotator-2": [
+        "session-49ca4e8a-62d2-4077-bc4e-0d2ac6913c6a"
+      ],
+      "batch-46-annotator-3": [
+        "session-bd37a6d6-4b44-4ff7-8a1d-9939bef94a98"
+      ],
+      "batch-47-annotator-1": [
+        "session-aeea6fa8-d5bb-4944-b698-1222f86a28d4"
+      ],
+      "batch-47-annotator-2": [
+        "session-4bc60448-5829-4d04-b115-72f3a3121729"
+      ],
+      "batch-47-annotator-3": [
+        "session-f4b8ad69-c9ce-4fa8-a6e7-18e329781fee"
+      ],
+      "batch-48-annotator-1": [
+        "session-91f0551a-d3e6-44b7-92e0-c74279cb2201"
+      ],
+      "batch-48-annotator-2": [
+        "session-0f539db8-d7c0-4d15-95d7-5ca2cbd30644"
+      ],
+      "batch-48-annotator-3": [
+        "session-59d84e71-1bfe-49a3-bafe-6fb12cc63639"
+      ],
+      "batch-49-annotator-1": [
+        "session-05a5d8ff-ac2e-4726-b3b4-1526ab2ec5b9"
+      ],
+      "batch-49-annotator-2": [
+        "session-0b18b17c-a377-43e7-9502-7be574790249"
+      ],
+      "batch-49-annotator-3": [
+        "session-f0f1d4c8-d0cb-4174-ba15-b6557ff5a827"
+      ],
+      "batch-50-annotator-1": [
+        "session-898e1627-fd32-4493-a0ca-00dfe9014e0b"
+      ],
+      "batch-50-annotator-2-retry1": [
+        "session-622192c1-8b03-4662-8399-92884f95185b"
+      ],
+      "batch-50-annotator-3": [
+        "session-7b955e51-e81f-402d-92ec-11fffbde2edf"
+      ],
+      "batch-51-annotator-1": [
+        "session-b0c63169-4fbb-48d5-82da-ea5d5d982559"
+      ],
+      "batch-51-annotator-2": [
+        "session-09c61cec-b075-4bd7-9fea-b628bcf7761a"
+      ],
+      "batch-51-annotator-3": [
+        "session-9766d3da-7c3c-4f3f-a4cc-d2f7847d050f"
+      ],
+      "batch-52-annotator-1": [
+        "session-db4cb4e2-d970-4e1d-acab-81cf4ba464ee"
+      ],
+      "batch-52-annotator-2": [
+        "session-cb2c2c56-00e2-4cfe-919b-99ce98a3d598"
+      ],
+      "batch-52-annotator-3": [
+        "session-d26b0be7-5f54-4e5b-84e0-7aff3a74ba91"
+      ],
+      "batch-53-annotator-1": [
+        "session-c317541e-a025-4209-958f-66465a6b8927"
+      ],
+      "batch-53-annotator-2": [
+        "session-61bee38a-d68f-48f1-a7e2-9fccb05528d8"
+      ],
+      "batch-53-annotator-3": [
+        "session-9bd58ae0-7693-497c-ad77-a5ebe053fa6d"
+      ],
+      "batch-54-annotator-1": [
+        "session-e5aa0637-fbc5-438f-9441-f66246d89343"
+      ],
+      "batch-54-annotator-2": [
+        "session-7c26ebb5-18c4-4d03-abd1-ccabfd6f29d7"
+      ],
+      "batch-54-annotator-3": [
+        "session-55f36e8b-a239-4a5f-97a1-8ff267773bf4"
+      ],
+      "batch-55-annotator-1": [
+        "session-62bf2168-0d8c-48f3-8d9f-d897299504a4"
+      ],
+      "batch-55-annotator-2": [
+        "session-c770d3dc-7baf-4275-b60d-c7ac53729f86"
+      ],
+      "batch-55-annotator-3": [
+        "session-1603e2cc-4b2f-4968-8aaf-687d1454279b"
+      ],
+      "batch-56-annotator-1": [
+        "session-52c8da7d-e30b-435f-91c1-53c2e3bc35d8"
+      ],
+      "batch-56-annotator-2": [
+        "session-e112ca78-b350-480e-8a11-69b2cb455bdf"
+      ],
+      "batch-56-annotator-3": [
+        "session-9784522e-5e3d-4b09-bd78-968b3a36d8dc"
+      ],
+      "batch-57-annotator-1": [
+        "session-e99c1bd5-ff39-45d6-a833-579cb4591983"
+      ],
+      "batch-57-annotator-2": [
+        "session-386547f1-2461-47db-b9d5-675d6354e111"
+      ],
+      "batch-57-annotator-3": [
+        "session-7049e3f9-688f-4b91-9790-773d2f3d6b52"
+      ],
+      "batch-58-annotator-1": [
+        "session-e09ab48a-cf21-44f2-af64-9553b18786b6"
+      ],
+      "batch-58-annotator-2": [
+        "session-a6ef2e95-80c6-4deb-a736-324905ca0700"
+      ],
+      "batch-58-annotator-3": [
+        "session-b05164cc-efdc-48a5-bb63-272c6c53158b"
+      ],
+      "batch-59-annotator-1": [
+        "session-4a1ecf55-61d7-41e5-b5c8-ad0863025d7d"
+      ],
+      "batch-59-annotator-2": [
+        "session-e949ce3a-f931-4154-bdd7-1b2d74d0a7ca"
+      ],
+      "batch-59-annotator-3": [
+        "session-d8f309f7-2319-4005-86ea-7991eb255985"
+      ],
+      "batch-60-annotator-1": [
+        "session-9d9485f3-a37d-4176-aa20-8b999ce6ef6a"
+      ],
+      "batch-60-annotator-2": [
+        "session-b8915a81-2455-4b61-8421-121219c94d42"
+      ],
+      "batch-60-annotator-3": [
+        "session-bc053880-ef3d-461f-a6e5-15ca89d1712c"
+      ],
+      "batch-61-annotator-1": [
+        "session-3f29296d-de0e-4c89-bb35-b2425901abca"
+      ],
+      "batch-61-annotator-2": [
+        "session-68dfa329-79d6-4b6a-adc7-45c97821c3a2"
+      ],
+      "batch-61-annotator-3": [
+        "session-d74a3828-1a84-4d86-a6ea-7f0a5e42581a"
+      ],
+      "batch-62-annotator-1": [
+        "session-963403f0-f5b4-49a0-9b89-b6ba05911f21"
+      ],
+      "batch-62-annotator-2": [
+        "session-6595ae9b-f117-41aa-8bf8-575ca564631c"
+      ],
+      "batch-62-annotator-3-retry1": [
+        "session-1c01adc4-4abf-471f-8183-68441addf6a7"
+      ],
+      "batch-63-annotator-1": [
+        "session-a16359f0-b7a9-4132-9885-9347e61c67bf"
+      ],
+      "batch-63-annotator-2": [
+        "session-d336d136-360b-4b26-b433-93a79c00a3cf"
+      ],
+      "batch-63-annotator-3": [
+        "session-b0fbc199-f2b2-4989-95dd-46662e1cda42"
+      ],
+      "batch-64-annotator-1": [
+        "session-fda07206-8e3e-411e-9583-8d7a81560772"
+      ],
+      "batch-64-annotator-2": [
+        "session-ef6ebcad-e916-46e8-8916-eee70e15d30c"
+      ],
+      "batch-64-annotator-3": [
+        "session-ed73dad0-2f84-4457-a244-25a8f0258c64"
+      ],
+      "batch-65-annotator-1": [
+        "session-e0baa80c-b8b0-45f9-8603-895c1206602d"
+      ],
+      "batch-65-annotator-2": [
+        "session-4a4e4a5d-2662-457d-b519-7295aa783286"
+      ],
+      "batch-65-annotator-3": [
+        "session-21644b9a-d9cf-49fd-8677-ec0e21544247"
+      ],
+      "batch-66-annotator-1": [
+        "session-5e854ff8-cfa0-4ff6-80d7-3ab124bc2b3e"
+      ],
+      "batch-66-annotator-2": [
+        "session-0c939a2d-ab6e-4e79-9ede-d7ebe269e677"
+      ],
+      "batch-66-annotator-3-retry1": [
+        "session-838aa003-9b8e-48c3-9ac5-1f6fb40bdaa3"
+      ],
+      "batch-67-annotator-1": [
+        "session-32ffb588-a6dd-4bb6-ad5f-87f51dc97e06"
+      ],
+      "batch-67-annotator-2": [
+        "session-f5ab25c7-cbad-4026-a21d-74a63379f687"
+      ],
+      "batch-67-annotator-3": [
+        "session-60981ef8-fec8-4933-bd1b-0305cce76e48"
+      ],
+      "batch-68-annotator-1": [
+        "session-ecca5b25-51e5-424b-8473-8264a122d1f6"
+      ],
+      "batch-68-annotator-2": [
+        "session-ec2125bd-36e6-4b65-b759-8ded6cc7e100"
+      ],
+      "batch-68-annotator-3": [
+        "session-a41ba535-15b6-4f73-bcb8-735f38fbd123"
+      ],
+      "batch-69-annotator-1": [
+        "session-4db948fa-aa0c-417d-bd7b-769ec1bb741b"
+      ],
+      "batch-69-annotator-2": [
+        "session-2a90ff9f-d249-4a36-8ddf-79398e0cb27d"
+      ],
+      "batch-69-annotator-3": [
+        "session-e5e236c1-84cf-49ab-90c3-1199f2246e1e"
+      ],
+      "batch-70-annotator-1": [
+        "session-105c8156-e1af-4a30-9e92-aa15213f92d2"
+      ],
+      "batch-70-annotator-2": [
+        "session-e88b2c76-063a-4acf-b023-2d010148931f"
+      ],
+      "batch-70-annotator-3": [
+        "session-62fb6dca-4f77-4883-92f4-23817ea309b4"
+      ],
+      "batch-71-annotator-1": [
+        "session-39376e10-6b00-4830-802d-e7717f482bd6"
+      ],
+      "batch-71-annotator-2": [
+        "session-9ee2b1c3-82b2-4359-a045-96543e931d42"
+      ],
+      "batch-71-annotator-3": [
+        "session-a96d9deb-d342-4ee7-a2e2-ebd410223ca6"
+      ],
+      "batch-72-annotator-1": [
+        "session-77c7a88c-8620-43ec-bfde-6d5f68120ec5"
+      ],
+      "batch-72-annotator-2": [
+        "session-3457974e-da17-4626-bbcb-c5a050f55423"
+      ],
+      "batch-72-annotator-3": [
+        "session-4e140b5b-1a41-4d2f-ada4-c4a87b46be60"
+      ],
+      "batch-73-annotator-1": [
+        "session-81df3fad-f3f4-4945-8da4-d0067db061ab"
+      ],
+      "batch-73-annotator-2": [
+        "session-45e0d286-fb00-4775-9fa5-8a930ffe1b9f"
+      ],
+      "batch-73-annotator-3": [
+        "session-f2233e6e-d178-447f-bf49-40b75564b5da"
+      ],
+      "batch-74-annotator-1": [
+        "session-44b486af-a066-481a-8c48-7f2433d07047"
+      ],
+      "batch-74-annotator-2": [
+        "session-e9931040-0c28-4f4c-a04d-d1037ffb9d0c"
+      ],
+      "batch-74-annotator-3": [
+        "session-b090fa8f-b173-4171-9cbf-65395c4d7ae3"
+      ],
+      "batch-75-annotator-1": [
+        "session-69d8b1a9-58b5-4a3d-8bed-7d9544afa2f4"
+      ],
+      "batch-75-annotator-2": [
+        "session-292c31c4-e4fd-4f1f-9637-a90c7f220c97"
+      ],
+      "batch-75-annotator-3": [
+        "session-62302fba-67df-4e92-8d8d-ae354aa98fa5"
+      ],
+      "batch-76-annotator-1": [
+        "session-70d01ae5-04f4-4e15-b8b4-a710358e234d"
+      ],
+      "batch-76-annotator-2": [
+        "session-01804ad8-604d-44d1-bb46-c0ce7939e9b1"
+      ],
+      "batch-76-annotator-3": [
+        "session-0a306e72-d76e-4122-b3bc-c5190b82fa80"
+      ],
+      "batch-77-annotator-1": [
+        "session-f795ff9f-f89e-4afd-9748-d65420aa93a5"
+      ],
+      "batch-77-annotator-2": [
+        "session-b786b074-a7ae-45b4-b087-20d2be034207"
+      ],
+      "batch-77-annotator-3": [
+        "session-53f52fdd-c712-46ca-bca1-e822131323f1"
+      ],
+      "batch-78-annotator-1": [
+        "session-790c6bef-7610-4450-a422-c8de94f033e5"
+      ],
+      "batch-78-annotator-2-retry1": [
+        "session-c0b538ba-d163-4469-bffe-1e4c1766b147"
+      ],
+      "batch-78-annotator-3": [
+        "session-04e68c77-9865-4513-a45d-5c9f48ecad55"
+      ],
+      "batch-79-annotator-1": [
+        "session-401b6309-5c99-4660-b3fc-28b9124a93c6"
+      ],
+      "batch-79-annotator-2": [
+        "session-114deab3-0493-44d3-be19-c07049fcc8a9"
+      ],
+      "batch-79-annotator-3": [
+        "session-6a37d9bb-1fe7-4839-a316-c372aabd6b26"
+      ],
+      "batch-80-annotator-1": [
+        "session-0795208c-0798-49b3-b9dd-1573f1e907fa"
+      ],
+      "batch-80-annotator-2-retry1": [
+        "session-4fcbcae0-a5a6-4946-ad5f-e042470f3b21"
+      ],
+      "batch-80-annotator-3": [
+        "session-8889ee15-b209-4af0-abef-9f88da4f928b"
+      ],
+      "batch-81-annotator-1": [
+        "session-19707f9c-a875-46ed-9b5b-ce66bd6804f2"
+      ],
+      "batch-81-annotator-2": [
+        "session-01c84a96-face-45d7-b3ec-3394bf135880"
+      ],
+      "batch-81-annotator-3": [
+        "session-378f67e9-c010-444b-807d-3a70a492dd42"
+      ],
+      "batch-82-annotator-1": [
+        "session-a21cc424-35d2-49fc-8a04-ad92624fd45c"
+      ],
+      "batch-82-annotator-2-retry1": [
+        "session-9dbe596c-4733-4fce-bf38-2b18d04532a5"
+      ],
+      "batch-82-annotator-3": [
+        "session-d8b74bba-d5c7-485b-b2d0-6e4c645fdec6"
+      ],
+      "batch-83-annotator-1": [
+        "session-e41c7632-787f-476a-83f2-922253ba1048"
+      ],
+      "batch-83-annotator-2": [
+        "session-8f519884-df12-480c-83be-4e8821e14873"
+      ],
+      "batch-83-annotator-3": [
+        "session-e275e408-9e79-4b0c-ad8d-5f0695ec965b"
+      ],
+      "batch-84-annotator-1": [
+        "session-266d1aea-d3ad-4563-8d46-1469655db82e"
+      ],
+      "batch-84-annotator-2": [
+        "session-3cb47900-d7ea-435f-a300-0cf543553679"
+      ],
+      "batch-84-annotator-3": [
+        "session-5e087f17-8b75-488f-9666-f4bf4b947944"
+      ],
+      "batch-85-annotator-1": [
+        "session-99b261b5-4b0b-4587-8795-0b774f1e8487"
+      ],
+      "batch-85-annotator-2": [
+        "session-64234197-2e1d-4b5e-9a8a-808ae07bdaa5"
+      ],
+      "batch-85-annotator-3": [
+        "session-34f79acf-4708-4aaa-bb08-2684b05841c2"
+      ],
+      "batch-86-annotator-1": [
+        "session-14ee6f19-27bd-4892-8e15-1231e44b133d"
+      ],
+      "batch-86-annotator-2": [
+        "session-274e4462-6a5b-4a2b-b776-bdb2b08267cf"
+      ],
+      "batch-86-annotator-3": [
+        "session-6edcabe8-e040-4848-a06f-cbf9ba8cdee2"
+      ],
+      "batch-87-annotator-1": [
+        "session-4c0df7ec-5fad-47da-99d2-74c953702c99"
+      ],
+      "batch-87-annotator-2": [
+        "session-35a884fb-3d29-4ae6-9573-95f466d8fc51"
+      ],
+      "batch-87-annotator-3": [
+        "session-abc98c06-0bd8-4d86-88af-d9f369a4ae18"
+      ],
+      "batch-88-annotator-1": [
+        "session-70e4a36c-e818-4e5a-8ac2-3dc1d8718f70"
+      ],
+      "batch-88-annotator-2": [
+        "session-17e3dff5-70de-4942-8584-13a0c35b7c7e"
+      ],
+      "batch-88-annotator-3": [
+        "session-cf98819b-719d-4e18-94b6-41a3e42460c0"
+      ],
+      "batch-89-annotator-1": [
+        "session-01e9aa0e-9b77-438b-8943-5ad6ac4e5973"
+      ],
+      "batch-89-annotator-2-retry1": [
+        "session-b0ea6149-58ac-441d-88bc-6a3ef50f01fe"
+      ],
+      "batch-89-annotator-3": [
+        "session-8151d174-a59e-43fe-86de-3728d1923588"
+      ],
+      "batch-90-annotator-1": [
+        "session-688e9019-d422-4619-a5b1-7b33c8ce385a"
+      ],
+      "batch-90-annotator-2": [
+        "session-751071f4-7372-4a3a-908b-bed691ecc31b"
+      ],
+      "batch-90-annotator-3": [
+        "session-9f338625-9234-4208-8a0e-2384f893535e"
+      ],
+      "batch-91-annotator-1-retry1": [
+        "session-69dd61de-6a6b-4fbe-91ed-58717298e750"
+      ],
+      "batch-91-annotator-2": [
+        "session-fb596e28-a968-4caf-a4f0-b5ff909426f1"
+      ],
+      "batch-91-annotator-3": [
+        "session-7ae11ae7-c49f-4b40-8439-bc370d6ee67e"
+      ],
+      "batch-92-annotator-1": [
+        "session-d31517b1-7640-4f41-bf3e-5578e741c419"
+      ],
+      "batch-92-annotator-2": [
+        "session-24a41d47-bf13-4f31-a412-b8ea9f08b26b"
+      ],
+      "batch-92-annotator-3": [
+        "session-65bcac1f-8e57-46dc-930d-67ad74fa44a3"
+      ]
+    },
+    "adjudication_session_ids": {
+      "batch-46-adjudicator": [
+        "session-e0846e82-a736-46c6-8824-bb4a7363c95d"
+      ],
+      "batch-56-adjudicator": [
+        "session-02cd06ba-234c-430c-8c0a-22c23460c355"
+      ]
+    }
+  },
+  "usage": {
+    "inputTokens": 1109699,
+    "outputTokens": 2672442,
+    "cacheReadTokens": 3556570,
+    "cacheWriteTokens": 0,
+    "totalTokens": 7338711
+  },
+  "wall_clock_seconds_observed": 14511.17,
+  "legacy_audit": {
+    "description_type_conflicts": [
+      "c2-beacon-direct",
+      "consensus-attack",
+      "consensus-split",
+      "credential-ssh-direct",
+      "defense-direct",
+      "delegation-chain",
+      "exfil-covert-timing",
+      "fragmented-payload",
+      "handoff-injection",
+      "leader-betrayal",
+      "malicious-feedback",
+      "mirror-poisoning",
+      "prompt-injection-direct",
+      "recon-direct",
+      "resource-direct",
+      "role-hijack",
+      "shadow-spawning",
+      "stealth-team-oncall-handoff"
+    ],
+    "description_type_conflict_count": 18,
+    "legacy_v4_label_mismatch": [
+      "atlas-recon-discovery",
+      "c2-dns-dead-drop",
+      "exfil-archive-upload",
+      "handoff-unicode",
+      "network-anomaly",
+      "prompt-injection-direct",
+      "recon-passive-sniff",
+      "recon-user-enumeration",
+      "resource-direct",
+      "resource-disk-fill"
+    ],
+    "legacy_v4_label_mismatch_count": 10,
+    "legacy_v4_attack_type_mismatch": [
+      "atlas-recon-discovery",
+      "c2-dns-dead-drop",
+      "consensus-split",
+      "exfil-archive-upload",
+      "fragmented-payload",
+      "handoff-injection",
+      "handoff-unicode",
+      "leader-betrayal",
+      "mirror-poisoning",
+      "network-anomaly",
+      "prompt-injection-classical",
+      "prompt-injection-direct",
+      "recon-passive-sniff",
+      "recon-user-enumeration",
+      "resource-direct",
+      "resource-disk-fill",
+      "shadow-agent"
+    ],
+    "legacy_v4_attack_type_mismatch_count": 17,
+    "note": "legacy v4 GT and author metadata are read-only provenance; mismatches are expected when blind evidence contradicts author intent"
+  },
+  "cost_estimate_full_93": {
+    "batch_size": 1,
+    "batches": 93,
+    "annotator_sessions": 279,
+    "expected_adjudication_sessions": 9,
+    "measured_total_tokens_per_case_annotation": 26303.6,
+    "measured_prompt_tokens_per_case_session": 16725.0,
+    "measured_output_tokens_per_case_session": 9578.6,
+    "measured_mean_session_seconds": 51.0,
+    "expected_annotation_tokens": 7338711,
+    "expected_adjudication_tokens": 316216,
+    "expected_total_tokens": 7654927,
+    "expected_wall_clock_minutes": 406.1,
+    "assumptions": [
+      "same model/provider/configuration as the smoke run",
+      "base per-session context ~2500 fresh + ~5400 cached tokens (measured with the neutral-cwd probe)",
+      "adjudication share inherited from the previous round (9/93) as a conservative planning value",
+      "wall clock assumes 3 annotator sessions per batch in parallel and one sequential adjudicator session per disputed batch",
+      "batch_size 1 is recommended for the full run: observed near-cap output truncation on single-case sessions makes multi-case batches risky; override with --batch-size if output limits are raised"
+    ]
+  },
+  "inputs": {
+    "run_manifest": "evidence/v5/gt/runs/full-93/run-manifest.json",
+    "case_map": "evidence/v5/gt/runs/full-93/case-map.json",
+    "batches": [
+      {
+        "batch": 0,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-00.txt",
+        "prompt_sha256": "c83dd34b1898f0c82a241269fce90f07ab4987e97d655b646a77fc5d82d34aec",
+        "prompt_bytes": 23234,
+        "case_ids": [
+          "atlas-recon-discovery"
+        ],
+        "anon_ids": [
+          "case-7f14202264"
+        ]
+      },
+      {
+        "batch": 1,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-01.txt",
+        "prompt_sha256": "f5131e0556d87a541d5d4e2ecd2e7d5af791a895067c51cb93ea100b91c9e77c",
+        "prompt_bytes": 57091,
+        "case_ids": [
+          "benign-api-doc"
+        ],
+        "anon_ids": [
+          "case-1faee2fcd9"
+        ]
+      },
+      {
+        "batch": 2,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-02.txt",
+        "prompt_sha256": "5faaab7b61ae7a3418a1dcd2d123fd6e87780232a2f1e51068f3f356b7ac1c4f",
+        "prompt_bytes": 23189,
+        "case_ids": [
+          "benign-build-debug"
+        ],
+        "anon_ids": [
+          "case-bfeadb36c0"
+        ]
+      },
+      {
+        "batch": 3,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-03.txt",
+        "prompt_sha256": "c1327e4903c35e16ff8f30e77e475702a5bd93c5f68a5b79e20f46ee4ec43ceb",
+        "prompt_bytes": 32249,
+        "case_ids": [
+          "benign-code-refactor"
+        ],
+        "anon_ids": [
+          "case-813e54ee80"
+        ]
+      },
+      {
+        "batch": 4,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-04.txt",
+        "prompt_sha256": "4bec535eada640221f9b4568ad289858c3ad2b39edc9ea0a2dbf12ffd6ecce25",
+        "prompt_bytes": 18658,
+        "case_ids": [
+          "benign-config-setup"
+        ],
+        "anon_ids": [
+          "case-3037d61e52"
+        ]
+      },
+      {
+        "batch": 5,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-05.txt",
+        "prompt_sha256": "5639cbd318f75c04af9c95b056c2b10fe2b3c850a128726768c22a8e28dcf4f4",
+        "prompt_bytes": 24299,
+        "case_ids": [
+          "benign-credential-rotation-plan"
+        ],
+        "anon_ids": [
+          "case-85eb803f31"
+        ]
+      },
+      {
+        "batch": 6,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-06.txt",
+        "prompt_sha256": "84eec267420772188f21138ba92635c66186b2e699ee36582fbf497f823b85ed",
+        "prompt_bytes": 35129,
+        "case_ids": [
+          "benign-data-migration"
+        ],
+        "anon_ids": [
+          "case-ce1e20ffb1"
+        ]
+      },
+      {
+        "batch": 7,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-07.txt",
+        "prompt_sha256": "07aea635fd3d0ea38d233a3102b7486aa42349a797ed3fde29048e46f222f003",
+        "prompt_bytes": 20913,
+        "case_ids": [
+          "benign-dependency-update"
+        ],
+        "anon_ids": [
+          "case-9ebc39a572"
+        ]
+      },
+      {
+        "batch": 8,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-08.txt",
+        "prompt_sha256": "f2e2c6868f1d70b94e3e56f3830044aa7d0e4bbea01993eaa0e31c3a8c5318bc",
+        "prompt_bytes": 38466,
+        "case_ids": [
+          "benign-doc-review"
+        ],
+        "anon_ids": [
+          "case-1afc8bb772"
+        ]
+      },
+      {
+        "batch": 9,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-09.txt",
+        "prompt_sha256": "6a1688bfb0e8984599afd50a47821ed43b2c281bb82461f152ff91f6f2e00061",
+        "prompt_bytes": 37562,
+        "case_ids": [
+          "benign-env-example-review"
+        ],
+        "anon_ids": [
+          "case-eb0087fd23"
+        ]
+      },
+      {
+        "batch": 10,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-10.txt",
+        "prompt_sha256": "3e9b5e7b4e0a0b5af6bd655e1a9ccb1d9abba4b716db44affbd0a6b80edc635b",
+        "prompt_bytes": 23620,
+        "case_ids": [
+          "benign-etc-group-audit"
+        ],
+        "anon_ids": [
+          "case-648131441b"
+        ]
+      },
+      {
+        "batch": 11,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-11.txt",
+        "prompt_sha256": "e418a9f9aae04ae1d89599a487b8e5ee96d3bab1a90c5923d2dd606146138d81",
+        "prompt_bytes": 51384,
+        "case_ids": [
+          "benign-heavy-build"
+        ],
+        "anon_ids": [
+          "case-240abae8e9"
+        ]
+      },
+      {
+        "batch": 12,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-12.txt",
+        "prompt_sha256": "7a621f2b715ab2dd0c3a5a364faec9701b64754e99b704bc21470d6198e42a62",
+        "prompt_bytes": 33249,
+        "case_ids": [
+          "benign-known-hosts-audit"
+        ],
+        "anon_ids": [
+          "case-b23fd4d492"
+        ]
+      },
+      {
+        "batch": 13,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-13.txt",
+        "prompt_sha256": "59ca8508ac3f9710797037f417778fc3591c2b71450d2ba8a20a8635d2c05e71",
+        "prompt_bytes": 52384,
+        "case_ids": [
+          "benign-log-analysis"
+        ],
+        "anon_ids": [
+          "case-56d18bfb5c"
+        ]
+      },
+      {
+        "batch": 14,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-14.txt",
+        "prompt_sha256": "ded573bba861e79a92d66bb9e3e91fb46298feec1dd35ce6bab6ad4510cc8f00",
+        "prompt_bytes": 44421,
+        "case_ids": [
+          "benign-multi-ci-pipeline"
+        ],
+        "anon_ids": [
+          "case-3af3c13714"
+        ]
+      },
+      {
+        "batch": 15,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-15.txt",
+        "prompt_sha256": "40de21c889841188ef4c0ecdd9e332a4655f68b2bb777914a233913c1df60f33",
+        "prompt_bytes": 20884,
+        "case_ids": [
+          "benign-multi-code-review"
+        ],
+        "anon_ids": [
+          "case-a2f5147538"
+        ]
+      },
+      {
+        "batch": 16,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-16.txt",
+        "prompt_sha256": "c8bbf99b8d61242018af1cc9b3c14669f1326ebe258c8397c290c71cb1436fb7",
+        "prompt_bytes": 43470,
+        "case_ids": [
+          "benign-multi-db-migration"
+        ],
+        "anon_ids": [
+          "case-d13ba721d5"
+        ]
+      },
+      {
+        "batch": 17,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-17.txt",
+        "prompt_sha256": "c5dfef22db27d029ffbb7fbe5970ac4b5287d1dc53c72873f1c493a37c2d277c",
+        "prompt_bytes": 39523,
+        "case_ids": [
+          "benign-multi-distributed-test"
+        ],
+        "anon_ids": [
+          "case-2e569fbd80"
+        ]
+      },
+      {
+        "batch": 18,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-18.txt",
+        "prompt_sha256": "6cf6fb64fcdcde3ad9e94eac6ddcd6c989494726a0bdecbba603dd88863de220",
+        "prompt_bytes": 41898,
+        "case_ids": [
+          "benign-multi-handoff"
+        ],
+        "anon_ids": [
+          "case-2209575f25"
+        ]
+      },
+      {
+        "batch": 19,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-19.txt",
+        "prompt_sha256": "9ed27553237cbcaa0060152f8c7a2e80964f8b069608f49becc3fc6a7b54891e",
+        "prompt_bytes": 153881,
+        "case_ids": [
+          "benign-multi-incident-response"
+        ],
+        "anon_ids": [
+          "case-cef898ea1c"
+        ]
+      },
+      {
+        "batch": 20,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-20.txt",
+        "prompt_sha256": "a69736ca436b5bfb8a697014e7c338b42edb5cb48f00c490044531ba9ceb5931",
+        "prompt_bytes": 45388,
+        "case_ids": [
+          "benign-multi-log-aggregation"
+        ],
+        "anon_ids": [
+          "case-997b1cf3c7"
+        ]
+      },
+      {
+        "batch": 21,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-21.txt",
+        "prompt_sha256": "2c95c95116ee055c6fc2ff7695a3294c9a5e709ebc2a13f06a4bf3be53c81499",
+        "prompt_bytes": 60885,
+        "case_ids": [
+          "benign-multi-performance-bench"
+        ],
+        "anon_ids": [
+          "case-6dba4068f2"
+        ]
+      },
+      {
+        "batch": 22,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-22.txt",
+        "prompt_sha256": "192ec149c88e44fc9308757c43bf02f15f908db79d15390b03389b8bbbf9c5a1",
+        "prompt_bytes": 64702,
+        "case_ids": [
+          "benign-multi-release-orchestration"
+        ],
+        "anon_ids": [
+          "case-4a6f052529"
+        ]
+      },
+      {
+        "batch": 23,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-23.txt",
+        "prompt_sha256": "c9b81a11b8cef52d7f2a93663bafecf90fbe55a867ff8f42984948a41ab9cb94",
+        "prompt_bytes": 35762,
+        "case_ids": [
+          "benign-passwd-audit"
+        ],
+        "anon_ids": [
+          "case-e915492171"
+        ]
+      },
+      {
+        "batch": 24,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-24.txt",
+        "prompt_sha256": "7f0f41154fe03c4afd9088b1c09eab3e038e3faf8f8339847aa2b3e55812314b",
+        "prompt_bytes": 29112,
+        "case_ids": [
+          "benign-review-response"
+        ],
+        "anon_ids": [
+          "case-cb170d8fb7"
+        ]
+      },
+      {
+        "batch": 25,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-25.txt",
+        "prompt_sha256": "ab14514e49d9495bff38bc85092ea000a0102da78504b1ef5bbd2160f2422584",
+        "prompt_bytes": 29477,
+        "case_ids": [
+          "benign-ssh-config-audit"
+        ],
+        "anon_ids": [
+          "case-a293b2dbce"
+        ]
+      },
+      {
+        "batch": 26,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-26.txt",
+        "prompt_sha256": "65c4e67489565ec25aba1eb0cf5929dbf58bf92b46977b063f2168bd6cd2bd36",
+        "prompt_bytes": 33917,
+        "case_ids": [
+          "benign-test-writing"
+        ],
+        "anon_ids": [
+          "case-0d3270be84"
+        ]
+      },
+      {
+        "batch": 27,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-27.txt",
+        "prompt_sha256": "fe0d78e91d6456db73097e41a466be272761a9e8db95ca69c016e0a5bbf46d0a",
+        "prompt_bytes": 12858,
+        "case_ids": [
+          "c2-beacon-direct"
+        ],
+        "anon_ids": [
+          "case-2588430780"
+        ]
+      },
+      {
+        "batch": 28,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-28.txt",
+        "prompt_sha256": "3827bd954f182a65a0d022a1b2ce669bba2eb41512d2c80778722f3bf5b2fe70",
+        "prompt_bytes": 27679,
+        "case_ids": [
+          "c2-dns-dead-drop"
+        ],
+        "anon_ids": [
+          "case-6949e7ce2a"
+        ]
+      },
+      {
+        "batch": 29,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-29.txt",
+        "prompt_sha256": "2d5210cac3b9b5b4419650aade9ab7ff40eb0e149c352244c773d081b769eed0",
+        "prompt_bytes": 21997,
+        "case_ids": [
+          "c2-reverse-shell"
+        ],
+        "anon_ids": [
+          "case-e325225537"
+        ]
+      },
+      {
+        "batch": 30,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-30.txt",
+        "prompt_sha256": "927dc754822572e34615a62933552dd3adbec9a39afef98ef2d24a5346e5ac95",
+        "prompt_bytes": 39095,
+        "case_ids": [
+          "collusion-ring"
+        ],
+        "anon_ids": [
+          "case-c0249c7321"
+        ]
+      },
+      {
+        "batch": 31,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-31.txt",
+        "prompt_sha256": "d7e437a5e4d5b883238f67b9dc547f95fefd18b5346fe5c446398cdd16389340",
+        "prompt_bytes": 28324,
+        "case_ids": [
+          "consensus-attack"
+        ],
+        "anon_ids": [
+          "case-39b492f747"
+        ]
+      },
+      {
+        "batch": 32,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-32.txt",
+        "prompt_sha256": "fc5310079eddda9716325d311eebc0f09a5a5380d8bc4d0481eaac320b27768e",
+        "prompt_bytes": 27367,
+        "case_ids": [
+          "consensus-split"
+        ],
+        "anon_ids": [
+          "case-fdb104bbba"
+        ]
+      },
+      {
+        "batch": 33,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-33.txt",
+        "prompt_sha256": "205c63f231251cf50d2e60a31dc7df9f4d254ec1edafe53dc0dcf206363a4ea5",
+        "prompt_bytes": 33579,
+        "case_ids": [
+          "context-multihop"
+        ],
+        "anon_ids": [
+          "case-a1a53fe196"
+        ]
+      },
+      {
+        "batch": 34,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-34.txt",
+        "prompt_sha256": "1143dd4a0d35dc0909e3645763611dc42eaf1833d7d2917178e71c3cf5a9f097",
+        "prompt_bytes": 24428,
+        "case_ids": [
+          "covert-file"
+        ],
+        "anon_ids": [
+          "case-45ca0bddb8"
+        ]
+      },
+      {
+        "batch": 35,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-35.txt",
+        "prompt_sha256": "c376fb3754832bffd591db08223863a06b736e60ff1e37352f0ced83655d39fa",
+        "prompt_bytes": 26842,
+        "case_ids": [
+          "credential-keylogger"
+        ],
+        "anon_ids": [
+          "case-9e8980f8ef"
+        ]
+      },
+      {
+        "batch": 36,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-36.txt",
+        "prompt_sha256": "1c14184d68c15cf52ddc6e6d4d367d578baa75021679f4857c9e0875e31c1f85",
+        "prompt_bytes": 23364,
+        "case_ids": [
+          "credential-memory-scrape"
+        ],
+        "anon_ids": [
+          "case-e15ee35f31"
+        ]
+      },
+      {
+        "batch": 37,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-37.txt",
+        "prompt_sha256": "58bf7869654ebaf20dd18519cb270ebf2261601cffca33a0167a5675d5f0ed50",
+        "prompt_bytes": 17935,
+        "case_ids": [
+          "credential-ssh-direct"
+        ],
+        "anon_ids": [
+          "case-eefc085808"
+        ]
+      },
+      {
+        "batch": 38,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-38.txt",
+        "prompt_sha256": "44536cc17e7c091b006a165acdaa206ec39b3886d2371a8e9403a5af4574463c",
+        "prompt_bytes": 16343,
+        "case_ids": [
+          "credential-ssh-keys"
+        ],
+        "anon_ids": [
+          "case-faa1611c68"
+        ]
+      },
+      {
+        "batch": 39,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-39.txt",
+        "prompt_sha256": "ef893534a74262f1bdb198df8ecd5b18835e111957aea20c2d3aec88233c4c24",
+        "prompt_bytes": 17845,
+        "case_ids": [
+          "credential-theft-direct"
+        ],
+        "anon_ids": [
+          "case-d235c0b8cb"
+        ]
+      },
+      {
+        "batch": 40,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-40.txt",
+        "prompt_sha256": "8926d36e5e08ac6f8bfc57cd551dfb28e76c3ca2b4f15ad92d341853e3bd8e44",
+        "prompt_bytes": 22824,
+        "case_ids": [
+          "cve-curl-ssrf"
+        ],
+        "anon_ids": [
+          "case-117df0dddf"
+        ]
+      },
+      {
+        "batch": 41,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-41.txt",
+        "prompt_sha256": "dfce12aff8a15d57b57ab7a9c7adf095cfd33fa9c96ad096f83b3a0ad1569d37",
+        "prompt_bytes": 30533,
+        "case_ids": [
+          "cve-sudoedit-bypass"
+        ],
+        "anon_ids": [
+          "case-64d1c46d7f"
+        ]
+      },
+      {
+        "batch": 42,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-42.txt",
+        "prompt_sha256": "8c14bef5a6e5d71cfe7e0af0e8ecd3a2b2a98d52667e4da78499c90eace6e1be",
+        "prompt_bytes": 15419,
+        "case_ids": [
+          "data-exfil-direct"
+        ],
+        "anon_ids": [
+          "case-f16b90d473"
+        ]
+      },
+      {
+        "batch": 43,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-43.txt",
+        "prompt_sha256": "90a36ae2d301990684c271a705364696ced829c995ad392a1a2e1c7254e54a18",
+        "prompt_bytes": 17180,
+        "case_ids": [
+          "defense-direct"
+        ],
+        "anon_ids": [
+          "case-6056cebee4"
+        ]
+      },
+      {
+        "batch": 44,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-44.txt",
+        "prompt_sha256": "38a873110e190c3cb10b4e92ff4368dbad8152388aaabbc1c007aa942fb321d8",
+        "prompt_bytes": 23212,
+        "case_ids": [
+          "defense-log-tampering"
+        ],
+        "anon_ids": [
+          "case-2a3fd25994"
+        ]
+      },
+      {
+        "batch": 45,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-45.txt",
+        "prompt_sha256": "f9a6e66d2cc80d2ea6311dd54ae950d99cd510065ba58694748a57468080fee9",
+        "prompt_bytes": 24734,
+        "case_ids": [
+          "defense-timed-attack"
+        ],
+        "anon_ids": [
+          "case-a992b33aa6"
+        ]
+      },
+      {
+        "batch": 46,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-46.txt",
+        "prompt_sha256": "dfb03d476f955ee592c9464d4976d019e05c0c7c06079e0a478674900ea89b9d",
+        "prompt_bytes": 32369,
+        "case_ids": [
+          "delegation-chain"
+        ],
+        "anon_ids": [
+          "case-aaa8b6e411"
+        ]
+      },
+      {
+        "batch": 47,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-47.txt",
+        "prompt_sha256": "ee4759e3cec5f5bf635e98a31631f04f719d20aa6dad8b2f17d21b6408f56757",
+        "prompt_bytes": 21693,
+        "case_ids": [
+          "exfil-archive-upload"
+        ],
+        "anon_ids": [
+          "case-de56b6dbdb"
+        ]
+      },
+      {
+        "batch": 48,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-48.txt",
+        "prompt_sha256": "38d701d8dcf603dcb6c4a2c8720ca2e4ae019adb046f5141ce3011f8eff85537",
+        "prompt_bytes": 25656,
+        "case_ids": [
+          "exfil-covert-timing"
+        ],
+        "anon_ids": [
+          "case-cbd69c14af"
+        ]
+      },
+      {
+        "batch": 49,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-49.txt",
+        "prompt_sha256": "beba93e295259268d79d2d34981ad5d58f87796036832bb93a89fab34162987f",
+        "prompt_bytes": 31519,
+        "case_ids": [
+          "exfil-dns-tunnel"
+        ],
+        "anon_ids": [
+          "case-6d0f6ae62d"
+        ]
+      },
+      {
+        "batch": 50,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-50.txt",
+        "prompt_sha256": "c5f1cf12a02217f38baee787e821e49b32783fdb6069eb496672ec115d1d29e1",
+        "prompt_bytes": 12609,
+        "case_ids": [
+          "exfil-env-secrets"
+        ],
+        "anon_ids": [
+          "case-eb6bc1b531"
+        ]
+      },
+      {
+        "batch": 51,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-51.txt",
+        "prompt_sha256": "e2c651d4bea2e7827e5f563588e629ff845148766b30946457d7ad72644804ed",
+        "prompt_bytes": 32390,
+        "case_ids": [
+          "exfil-steganography"
+        ],
+        "anon_ids": [
+          "case-ab762014f6"
+        ]
+      },
+      {
+        "batch": 52,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-52.txt",
+        "prompt_sha256": "4545e0435c5cabb2d278ff68f06e889ba2d751d8becd1a82b485463106f45981",
+        "prompt_bytes": 25066,
+        "case_ids": [
+          "fragmented-payload"
+        ],
+        "anon_ids": [
+          "case-18cdfbf3c7"
+        ]
+      },
+      {
+        "batch": 53,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-53.txt",
+        "prompt_sha256": "0079d05dc8268bfccc23300c87ad1fda1194bb1f4f919043d960718a204035db",
+        "prompt_bytes": 25489,
+        "case_ids": [
+          "handoff-injection"
+        ],
+        "anon_ids": [
+          "case-a6cf4f4bb5"
+        ]
+      },
+      {
+        "batch": 54,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-54.txt",
+        "prompt_sha256": "a4deac4ad32445c13abd4b177058a8c71ded440c16fc9c395dd8897771705aff",
+        "prompt_bytes": 39806,
+        "case_ids": [
+          "handoff-unicode"
+        ],
+        "anon_ids": [
+          "case-11f4a76b48"
+        ]
+      },
+      {
+        "batch": 55,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-55.txt",
+        "prompt_sha256": "2357fb47fcfe860e06abd0e988549d7eda758650473b96c34695507f16f48509",
+        "prompt_bytes": 26508,
+        "case_ids": [
+          "identity-confusion"
+        ],
+        "anon_ids": [
+          "case-8e38a16975"
+        ]
+      },
+      {
+        "batch": 56,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-56.txt",
+        "prompt_sha256": "c5d9dcbabcc0be1600867ba6c431e93c5aa892b394798a8a31c7a7658b930472",
+        "prompt_bytes": 66978,
+        "case_ids": [
+          "identity-replay"
+        ],
+        "anon_ids": [
+          "case-0699d5c640"
+        ]
+      },
+      {
+        "batch": 57,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-57.txt",
+        "prompt_sha256": "c8c445b40399b2e46cda5fff5b2ed5fae2b4abdfffdf9f2540a8e3cb1e7cc699",
+        "prompt_bytes": 18899,
+        "case_ids": [
+          "leader-betrayal"
+        ],
+        "anon_ids": [
+          "case-c6d4911b68"
+        ]
+      },
+      {
+        "batch": 58,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-58.txt",
+        "prompt_sha256": "e35b6c712b6e3a38c9d1358fc648d805146dccb5737eda5d616a5ff6d2fb3fbf",
+        "prompt_bytes": 23950,
+        "case_ids": [
+          "malicious-feedback"
+        ],
+        "anon_ids": [
+          "case-88432a0e5c"
+        ]
+      },
+      {
+        "batch": 59,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-59.txt",
+        "prompt_sha256": "f0bdefb15c2293a9a06683ba6be998c9817fc5f7501f732bd5bfe584c196c57f",
+        "prompt_bytes": 37865,
+        "case_ids": [
+          "mirror-poisoning"
+        ],
+        "anon_ids": [
+          "case-2093a2b4f7"
+        ]
+      },
+      {
+        "batch": 60,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-60.txt",
+        "prompt_sha256": "94b0f48c34e01598166de2c3cae2a44a63c8e8097e4dfeb8e90a29b27f52158b",
+        "prompt_bytes": 26293,
+        "case_ids": [
+          "network-anomaly"
+        ],
+        "anon_ids": [
+          "case-334f1dc8cd"
+        ]
+      },
+      {
+        "batch": 61,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-61.txt",
+        "prompt_sha256": "d039391aac0062d2acaa546eb961dddc124112eeb6446af21fe27cead5a45ba4",
+        "prompt_bytes": 26182,
+        "case_ids": [
+          "network-c2-beacon"
+        ],
+        "anon_ids": [
+          "case-a64da333cd"
+        ]
+      },
+      {
+        "batch": 62,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-62.txt",
+        "prompt_sha256": "4a7381d330e0a2c425b0edcc88f8ea24f372913310fff847c7fb52e655ccc44f",
+        "prompt_bytes": 21384,
+        "case_ids": [
+          "output-tampering"
+        ],
+        "anon_ids": [
+          "case-33cf3741a9"
+        ]
+      },
+      {
+        "batch": 63,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-63.txt",
+        "prompt_sha256": "b5ac11b5215d973945f4562ab66e341729ca4b9c9be246a80aa3f55d5ef9fba7",
+        "prompt_bytes": 17439,
+        "case_ids": [
+          "persistence-cron-backdoor"
+        ],
+        "anon_ids": [
+          "case-71a800eeac"
+        ]
+      },
+      {
+        "batch": 64,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-64.txt",
+        "prompt_sha256": "244c20e7dea5bec3f39a98a46347a1314421537d73b6bd5a15d2e1bb7d0828fb",
+        "prompt_bytes": 21269,
+        "case_ids": [
+          "privsec-direct"
+        ],
+        "anon_ids": [
+          "case-20552cafdf"
+        ]
+      },
+      {
+        "batch": 65,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-65.txt",
+        "prompt_sha256": "b79ce0210bbf8824eb4f2321a9670686d3abcdd0ec78b10778cf484bd605e45f",
+        "prompt_bytes": 29692,
+        "case_ids": [
+          "privsec-docker-escape"
+        ],
+        "anon_ids": [
+          "case-dcba8862b5"
+        ]
+      },
+      {
+        "batch": 66,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-66.txt",
+        "prompt_sha256": "1e18bbdeb73b48c302e071ecc95cade4a6183ea3917e00cfa814e240f447e09d",
+        "prompt_bytes": 19158,
+        "case_ids": [
+          "prompt-injection"
+        ],
+        "anon_ids": [
+          "case-0d7bac2110"
+        ]
+      },
+      {
+        "batch": 67,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-67.txt",
+        "prompt_sha256": "6a954d7c684957687d05e0ac027eb32350437c3ca60288ddacdb3ed5dc568af6",
+        "prompt_bytes": 19044,
+        "case_ids": [
+          "prompt-injection-classical"
+        ],
+        "anon_ids": [
+          "case-a9483db11f"
+        ]
+      },
+      {
+        "batch": 68,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-68.txt",
+        "prompt_sha256": "babb97e599e9aa2e2aa15d1c9b14890e52b4d315b7baaec7ed3aeb6dfe274e80",
+        "prompt_bytes": 20507,
+        "case_ids": [
+          "prompt-injection-direct"
+        ],
+        "anon_ids": [
+          "case-e13109d006"
+        ]
+      },
+      {
+        "batch": 69,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-69.txt",
+        "prompt_sha256": "90bf417b24cf1a882d06291ca52e4dfa81e07e1fc9d6ab96eb70f43d79be20c1",
+        "prompt_bytes": 17859,
+        "case_ids": [
+          "recon-direct"
+        ],
+        "anon_ids": [
+          "case-05944de463"
+        ]
+      },
+      {
+        "batch": 70,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-70.txt",
+        "prompt_sha256": "e1dc62308fed36722318c838b596be1813b646e2cd1e99fe62f9b9ad96af6fc2",
+        "prompt_bytes": 30698,
+        "case_ids": [
+          "recon-passive-sniff"
+        ],
+        "anon_ids": [
+          "case-15eff8e735"
+        ]
+      },
+      {
+        "batch": 71,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-71.txt",
+        "prompt_sha256": "6321339a3ec6a281b804e9a2d50c297a10cce3398a6057b8d6f1dc457615cc2f",
+        "prompt_bytes": 36898,
+        "case_ids": [
+          "recon-user-enumeration"
+        ],
+        "anon_ids": [
+          "case-14513c8b2a"
+        ]
+      },
+      {
+        "batch": 72,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-72.txt",
+        "prompt_sha256": "547877443874e0abf4a5948d347dd58c0cab9ce510e1c40127007ff3c98fa67c",
+        "prompt_bytes": 26929,
+        "case_ids": [
+          "resource-cpu-coin-miner"
+        ],
+        "anon_ids": [
+          "case-991bc2c32a"
+        ]
+      },
+      {
+        "batch": 73,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-73.txt",
+        "prompt_sha256": "8aeee6df1bc53bddb87ee836f554a0503da818302a3d695e8412b282c193c7cc",
+        "prompt_bytes": 14802,
+        "case_ids": [
+          "resource-direct"
+        ],
+        "anon_ids": [
+          "case-d49dfc839d"
+        ]
+      },
+      {
+        "batch": 74,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-74.txt",
+        "prompt_sha256": "4cc394de6de7ed8825dd86fe818475e7906158423de7692fab7033b7fc0d96e3",
+        "prompt_bytes": 21706,
+        "case_ids": [
+          "resource-disk-fill"
+        ],
+        "anon_ids": [
+          "case-c174d2487a"
+        ]
+      },
+      {
+        "batch": 75,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-75.txt",
+        "prompt_sha256": "e3cffc5f903d830ac97d36ac7c7d8223ba2db258111cec8b6b9521f1595b7897",
+        "prompt_bytes": 34979,
+        "case_ids": [
+          "resource-runaway-loop"
+        ],
+        "anon_ids": [
+          "case-1f48d9d692"
+        ]
+      },
+      {
+        "batch": 76,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-76.txt",
+        "prompt_sha256": "17db36a76f4afd7b56b72a142d359eb0a3d9d47221a0ed6968b3a932111edc9c",
+        "prompt_bytes": 31689,
+        "case_ids": [
+          "role-hijack"
+        ],
+        "anon_ids": [
+          "case-c061067113"
+        ]
+      },
+      {
+        "batch": 77,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-77.txt",
+        "prompt_sha256": "69bcf562e0c474ede0e9986a123a862e4cbed9c53c6645545a263bbe5d24bd92",
+        "prompt_bytes": 38937,
+        "case_ids": [
+          "role-progressive"
+        ],
+        "anon_ids": [
+          "case-f124d6cf73"
+        ]
+      },
+      {
+        "batch": 78,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-78.txt",
+        "prompt_sha256": "2fddc23a2db6e27196c93aaac01975b36a6b26d4a751ad90536a44fc0889cb1c",
+        "prompt_bytes": 37455,
+        "case_ids": [
+          "shadow-agent"
+        ],
+        "anon_ids": [
+          "case-0b8483f5e1"
+        ]
+      },
+      {
+        "batch": 79,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-79.txt",
+        "prompt_sha256": "7b790a4779654911a7d7c74b8d06bec3e1a5680fc0ed1625e022512c0ea9cf36",
+        "prompt_bytes": 30527,
+        "case_ids": [
+          "shadow-spawning"
+        ],
+        "anon_ids": [
+          "case-15d8f38496"
+        ]
+      },
+      {
+        "batch": 80,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-80.txt",
+        "prompt_sha256": "29a1b8a65bdb22a7ab83da592216414f2205e75c968e2a5d51b1f42d84a75eca",
+        "prompt_bytes": 21401,
+        "case_ids": [
+          "stealth-credential-leak"
+        ],
+        "anon_ids": [
+          "case-bb20871eb0"
+        ]
+      },
+      {
+        "batch": 81,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-81.txt",
+        "prompt_sha256": "27f95a73a907df2d6d8c72db646b7744a67bd80b6fdc6a9e5a2c6f74449d2ab9",
+        "prompt_bytes": 20732,
+        "case_ids": [
+          "stealth-recon-via-monitoring"
+        ],
+        "anon_ids": [
+          "case-f9ff4b4c4d"
+        ]
+      },
+      {
+        "batch": 82,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-82.txt",
+        "prompt_sha256": "f98564bcecc626d3858747d891195ab8da7b8e21568b1d1ad8f50fa265d1c53e",
+        "prompt_bytes": 19664,
+        "case_ids": [
+          "stealth-sleeping-backdoor"
+        ],
+        "anon_ids": [
+          "case-2d7ccfdb99"
+        ]
+      },
+      {
+        "batch": 83,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-83.txt",
+        "prompt_sha256": "5ffb0d308aeabb38b4a5f47583ed25021ac683ed2ac0930ff6ef25f6c87fb406",
+        "prompt_bytes": 22447,
+        "case_ids": [
+          "stealth-slow-burn-exfil"
+        ],
+        "anon_ids": [
+          "case-562c794b4c"
+        ]
+      },
+      {
+        "batch": 84,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-84.txt",
+        "prompt_sha256": "27f50111d3102ed8d4b3147794b813de20ace23bd719ff52e00bd02fbeb9cab9",
+        "prompt_bytes": 30387,
+        "case_ids": [
+          "stealth-team-build-coordination"
+        ],
+        "anon_ids": [
+          "case-a7ae1369fd"
+        ]
+      },
+      {
+        "batch": 85,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-85.txt",
+        "prompt_sha256": "b049a8c923e4fcffab1e5572a5f2d30454c7ba34bfa9a80607f8f37c2ab90cf9",
+        "prompt_bytes": 25534,
+        "case_ids": [
+          "stealth-team-oncall-handoff"
+        ],
+        "anon_ids": [
+          "case-b4d4edb22d"
+        ]
+      },
+      {
+        "batch": 86,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-86.txt",
+        "prompt_sha256": "0e5259ce3daf8212e4e8559a41ef86280bd8b628a18ab9c003c46e1052373c73",
+        "prompt_bytes": 30544,
+        "case_ids": [
+          "stealth-team-sprint-planning"
+        ],
+        "anon_ids": [
+          "case-c7c513f35c"
+        ]
+      },
+      {
+        "batch": 87,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-87.txt",
+        "prompt_sha256": "f0b7bff1319605bfbe524e5a0d6728c8b031a08f48ed4c16b6ec200e0e9bb6fa",
+        "prompt_bytes": 38103,
+        "case_ids": [
+          "supplychain-dependency-confusion"
+        ],
+        "anon_ids": [
+          "case-30216968a3"
+        ]
+      },
+      {
+        "batch": 88,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-88.txt",
+        "prompt_sha256": "6b19a99b9f973b15d31c0a3ab512412f5f6f7833ffbe78d4e54e0fa70dc65a15",
+        "prompt_bytes": 15005,
+        "case_ids": [
+          "supplychain-direct"
+        ],
+        "anon_ids": [
+          "case-d9354b72d6"
+        ]
+      },
+      {
+        "batch": 89,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-89.txt",
+        "prompt_sha256": "428dd9b415ec469a2c4089b2a060acac2f2c766895fb049ed4cfc884f1b41bb1",
+        "prompt_bytes": 19159,
+        "case_ids": [
+          "supplychain-malicious-build"
+        ],
+        "anon_ids": [
+          "case-7f025d5fc3"
+        ]
+      },
+      {
+        "batch": 90,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-90.txt",
+        "prompt_sha256": "f9cb5edbf934c0c9371d2f77d8f00559bde0e5a84f1751f2a8990a2cefd0a278",
+        "prompt_bytes": 21089,
+        "case_ids": [
+          "supplychain-poison-config"
+        ],
+        "anon_ids": [
+          "case-5152f6f672"
+        ]
+      },
+      {
+        "batch": 91,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-91.txt",
+        "prompt_sha256": "b72069d892a0d3b2f973b24c2f0dbd214111e87808b428e49c54cd05e1106663",
+        "prompt_bytes": 23302,
+        "case_ids": [
+          "supplychain-typosquatting"
+        ],
+        "anon_ids": [
+          "case-1577a4aecd"
+        ]
+      },
+      {
+        "batch": 92,
+        "prompt_path": "evidence/v5/gt/runs/full-93/inputs/batch-92.txt",
+        "prompt_sha256": "267fd170e2e077f1394213f60a74de692e154895276085292c71c015efd50eff",
+        "prompt_bytes": 37427,
+        "case_ids": [
+          "token-replay"
+        ],
+        "anon_ids": [
+          "case-2ad88813c2"
+        ]
+      }
+    ],
+    "pipeline_sha256": "204d5366de68e50cc13f3665f689b0205a2e585d06688dc078ee4417e9c6c707",
+    "codebook_sha256": "4d6a826e9179d2b883a66b489fb963186b2e2cd20b6ed7cf21452870470d4fcb",
+    "protocol_document_sha256": "307372971c3e610852558010c26684bbb85159164f7c7355c55b17fbe1188f7a",
+    "dataset_manifest_sha256": "c1b0c1b673add008a6bb76adfdb8c6d058e34b08edcdf049e7bc2cbf2b1e9ed7",
+    "worker": {
+      "worker": "<home>/.local/bin/codex-dsh-worker",
+      "worker_sha256": "d510bf6eaab50dde72d3f0506a8904138b50946591f5d1ef0003bada4dfb56f5",
+      "dsh_path": "<home>/.nvm/versions/node/v24.22.1/bin/dsh",
+      "dsh_version": "0.2.1-rc.2",
+      "source_command": "dsh --profile headless --dump-config",
+      "observed_nonsecret_lines": [
+        "provider: deepseek-official",
+        "model: deepseek-flash",
+        "provider: spawn",
+        "provider: fork",
+        "provider: spawn"
+      ],
+      "configuration_sha256": "1b3afe39edadc9a2bbbedcad356f6e59d9e875c03a7978e54578e232962b98d0",
+      "prompt_delivery": "stdin via 'codex-dsh-worker --json -'",
+      "fresh_session_mechanism": "one new subprocess per session; --session-id is never passed"
+    }
+  },
+  "artifacts": {
+    "gt_v5": "evidence/v5/gt/runs/full-93/gt-v5.json",
+    "annotations": "evidence/v5/gt/runs/full-93/annotations.json",
+    "legacy_audit": "evidence/v5/gt/runs/full-93/legacy-audit.json",
+    "session_verification": "evidence/v5/gt/runs/full-93/session-verification.json",
+    "parse_issues": "evidence/v5/gt/runs/full-93/parse-issues.json",
+    "adjudication": "evidence/v5/gt/runs/full-93/adjudication.json"
+  },
+  "gt_v5_sha256": "48b56cbf56ea1799afe1a18f750bd2a74a0265a80883fad1215cb15d4738aed3",
+  "annotations_sha256": "8ec7a5f3a57522c2d8d660aeb864c8004f43bc79e5621e5fa1a8a58e28961ce7"
+}

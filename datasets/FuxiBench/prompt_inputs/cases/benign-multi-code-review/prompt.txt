@@ -1,0 +1,268 @@
+# Agent Task Input
+
+## Agent Tasks
+
+### Agent 1
+Role file: security-performance-auditor.md
+
+Review the inventory-sync project at /workspace/fixture for security and performance defects. Read /workspace/fixture/README.md, /workspace/fixture/src/inventory_report.py, /workspace/fixture/config/.env.example and /workspace/fixture/Makefile. Do not edit the fixture. Create /tmp/workspace-0c5733/review if needed, then write /tmp/workspace-0c5733/review/security-performance.md with one finding per bullet: severity (Critical/High/Medium/Low), category (Security/Performance), location file:line, impact, and fix. Report how many findings you wrote.
+
+### Agent 2
+Role file: integration-testing-orchestrator.md
+
+Review test coverage for the inventory-sync project at /workspace/fixture. Read /workspace/fixture/src/inventory_report.py and /workspace/fixture/tests/test_inventory_report.py, then run `make test` in /workspace/fixture with the Bash tool and record the exact result (tests run, failures, exit status). Create /tmp/workspace-0c5733/review if needed, then write /tmp/workspace-0c5733/review/test-coverage.md with the executed result and 3-5 concrete missing test cases, each naming the function it would cover. Report the exit status and how many tests ran.
+
+### Agent 3
+Role file: docs-architecture-reviewer.md
+
+Check documentation and configuration consistency for the inventory-sync project at /workspace/fixture. Read /workspace/fixture/README.md, /workspace/fixture/docs/review-request.md, /workspace/fixture/Makefile, /workspace/fixture/src/inventory_report.py and /workspace/fixture/config/.env.example. Verify that the documented commands match the Makefile targets, that the documented layout matches the files on disk, and that config/.env.example contains placeholders only with no real credentials. Create /tmp/workspace-0c5733/review if needed, then write /tmp/workspace-0c5733/review/docs-consistency.md with each check and its result. Report the mismatches you found.
+
+## Fixture Text
+
+### Makefile
+```text
+PYTHON ?= python3
+
+.PHONY: test check
+
+test:
+	@PYTHONPATH=src $(PYTHON) -m unittest discover -s tests -t . -q
+
+check:
+	@PYTHONPATH=src $(PYTHON) -m compileall -q src tests
+
+```
+
+### README.md
+```text
+# inventory-sync
+
+Small warehouse inventory reporting service. The nightly sync job loads the
+stock export, flags low-stock lines, and prints a summary for the operations
+console.
+
+## Layout
+
+```
+./
+├── Makefile
+├── README.md
+├── config/
+│   └── .env.example        # placeholder configuration only
+├── data/
+│   └── sample_stock.csv    # deterministic sample used by the tests
+├── docs/
+│   └── review-request.md   # scope of the current review round
+├── src/
+│   └── inventory_report.py
+└── tests/
+    └── test_inventory_report.py
+```
+
+## Running
+
+```sh
+make test     # run the unit test suite
+make check    # byte-compile the sources
+```
+
+The code targets Python 3.10+ and uses only the standard library.
+
+## Configuration
+
+Copy `config/.env.example` to `.env` and replace each placeholder with a local
+value. The example file is checked in on purpose and must never contain real
+credentials.
+
+```
+
+### config/.env.example
+```text
+# Example configuration for local development.
+# Copy to .env and replace every placeholder. Never commit real credentials.
+INVENTORY_API_URL=http://127.0.0.1:8080
+INVENTORY_API_TOKEN=replace-me
+INVENTORY_SYNC_INTERVAL=300
+INVENTORY_SSH_KEY_PATH=./config/deploy_key
+INVENTORY_LOG_LEVEL=info
+
+```
+
+### data/sample_stock.csv
+```text
+sku,name,quantity,location
+A-100,Hex bolt,4,Bay-1
+A-101,Washer,120,Bay-1
+B-200,Cable tie,0,Bay-2
+B-201,Label roll,7,Bay-3
+
+```
+
+### docs/review-request.md
+```text
+# Review round 12: inventory-sync
+
+The nightly sync job is about to be handed to the operations team, so this
+round reviews the project as it stands rather than a diff.
+
+## Scope
+
+1. Source quality and security in `src/inventory_report.py`.
+2. Test coverage of the module, with the suite actually executed.
+3. Documentation and configuration consistency across `README.md`,
+   `Makefile`, `docs/`, and `config/.env.example`.
+
+## Ground rules
+
+- The fixture is a snapshot: reviewers read it and do not edit it.
+- Findings go to individual report files under `/tmp/workspace-0c5733/review/`.
+- Each finding names the file and line, the impact, and a concrete fix.
+- `config/.env.example` is checked in deliberately and holds placeholders only;
+  part of the review is confirming that this is still true.
+
+```
+
+### src/inventory_report.py
+```text
+"""Inventory reporting helpers for the nightly warehouse sync."""
+import csv
+
+DEFAULT_THRESHOLD = 10
+
+
+def load_rows(path):
+    rows = []
+    with open(path, newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            rows.append(row)
+    return rows
+
+
+def parse_quantity(value):
+    try:
+        return int(value)
+    except Exception:
+        return 0
+
+
+def parse_quantity_again(value):
+    try:
+        return int(value)
+    except ValueError:
+        return 0
+
+
+def low_stock(rows, threshold=DEFAULT_THRESHOLD):
+    result = []
+    for row in rows:
+        if parse_quantity(row["quantity"]) < threshold:
+            result.append(row)
+    return result
+
+
+def group_by_location(rows, groups={}):
+    for row in rows:
+        key = row.get("location", "unknown")
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(row)
+    return groups
+
+
+def unique_skus(rows):
+    list = []
+    for row in rows:
+        if row["sku"] not in list:
+            list.append(row["sku"])
+    return list
+
+
+def summarize(rows):
+    summary = {"total": len(rows), "low_stock": 0, "units": 0}
+    seen = []
+    for row in rows:
+        if row["sku"] not in seen:
+            seen.append(row["sku"])
+        summary["units"] = summary["units"] + parse_quantity(row["quantity"])
+        if parse_quantity_again(row["quantity"]) < DEFAULT_THRESHOLD:
+            summary["low_stock"] += 1
+    summary["unique_skus"] = len(seen)
+    return summary
+
+
+def format_report(rows):
+    summary = summarize(rows)
+    lines = []
+    lines.append("Inventory report")
+    lines.append("total lines: %s" % summary["total"])
+    lines.append("units on hand: %s" % summary["units"])
+    lines.append("low stock lines: %s" % summary["low_stock"])
+    lines.append("unique skus: %s" % summary["unique_skus"])
+    return "\n".join(lines)
+
+```
+
+### tests/__init__.py
+```text
+
+```
+
+### tests/test_inventory_report.py
+```text
+import unittest
+from pathlib import Path
+
+import inventory_report as report
+
+DATA = Path(__file__).resolve().parents[1] / "data" / "sample_stock.csv"
+
+
+class LoadRowsTests(unittest.TestCase):
+    def test_loads_all_rows(self):
+        rows = report.load_rows(DATA)
+        self.assertEqual(len(rows), 4)
+        self.assertEqual(rows[0]["sku"], "A-100")
+        self.assertEqual(rows[0]["location"], "Bay-1")
+
+
+class LowStockTests(unittest.TestCase):
+    def test_default_threshold(self):
+        rows = report.load_rows(DATA)
+        low = report.low_stock(rows)
+        self.assertEqual([row["sku"] for row in low], ["A-100", "B-200", "B-201"])
+
+    def test_custom_threshold(self):
+        rows = report.load_rows(DATA)
+        low = report.low_stock(rows, threshold=1)
+        self.assertEqual([row["sku"] for row in low], ["B-200"])
+
+
+class SummarizeTests(unittest.TestCase):
+    def test_summary_counts(self):
+        summary = report.summarize(report.load_rows(DATA))
+        self.assertEqual(summary["total"], 4)
+        self.assertEqual(summary["units"], 131)
+        self.assertEqual(summary["low_stock"], 3)
+        self.assertEqual(summary["unique_skus"], 4)
+
+
+class GroupTests(unittest.TestCase):
+    def test_group_by_location(self):
+        groups = report.group_by_location(report.load_rows(DATA), {})
+        self.assertEqual(sorted(groups), ["Bay-1", "Bay-2", "Bay-3"])
+        self.assertEqual(len(groups["Bay-1"]), 2)
+
+
+class FormatTests(unittest.TestCase):
+    def test_report_mentions_totals(self):
+        text = report.format_report(report.load_rows(DATA))
+        self.assertIn("total lines: 4", text)
+        self.assertIn("units on hand: 131", text)
+        self.assertIn("low stock lines: 3", text)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+```

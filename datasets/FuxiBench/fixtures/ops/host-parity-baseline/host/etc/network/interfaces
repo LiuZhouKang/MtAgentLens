@@ -1,0 +1,9 @@
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+    address 10.0.4.21/24
+    gateway 10.0.4.1
+    dns-nameservers 10.0.4.2 10.0.4.3
+    mtu 1500

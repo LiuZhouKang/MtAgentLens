@@ -61,7 +61,10 @@ def test_controlled_ablation_builder_accepts_completed_variant_input(tmp_path: P
         encoding="utf-8",
     )
 
-    artifact = build_controlled_ablation_results(output_path=output, variants_input=variants_input)
+    dataset = tmp_path / "dataset"
+    (dataset / "quality").mkdir(parents=True)
+    (dataset / "quality/manifest.json").write_text(json.dumps({"samples": outcomes}))
+    artifact = build_controlled_ablation_results(dataset_dir=dataset, output_path=output, variants_input=variants_input)
 
     assert artifact["status"] == "completed"
     validation = _validate_controlled_ablation_artifact(output)

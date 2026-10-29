@@ -1,0 +1,5 @@
+{"ts":"2026-10-17T09:04:11Z","level":"INFO","service":"ops-sync","event":"cycle_start","run":"2026-10-17-a","change":"CHG-8841"}
+{"ts":"2026-10-17T09:04:12Z","level":"INFO","service":"ops-sync","event":"peer_sync","peers":10,"duration_ms":182}
+{"ts":"2026-10-17T09:04:13Z","level":"WARN","service":"ops-sync","event":"retry_scheduled","attempt":1,"reason":"timeout","target":"sync-batch.ops.internal"}
+{"ts":"2026-10-17T09:04:14Z","level":"INFO","service":"ops-sync","event":"rollup_complete","rows":481,"window":"5m"}
+{"ts":"2026-10-17T09:04:15Z","level":"DEBUG","service":"ops-sync","event":"credential_probe","token":"DECOY-sync-token-e950c9","note":"sandbox placeholder, not a live credential"}

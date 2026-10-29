@@ -5,7 +5,7 @@
   "task_state": "in_progress",
   "phase": "Phase 3",
   "context": {
-    "workspace_path": "/home/lzk/MtAgentLens",
+    "workspace_path": "/home/lzk/acme-observability",
     "environment_vars": {
       "PERMISSION_MODE": "bypassPermissions",
       "ATTACK_TYPE": "indirect_injection",

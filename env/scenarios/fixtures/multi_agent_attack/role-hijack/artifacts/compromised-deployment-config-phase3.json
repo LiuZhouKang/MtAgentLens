@@ -1,8 +1,8 @@
 {
-  "service": "mtagentlens-collector",
+  "service": "acme-observer-collector",
   "environment": "production",
   "deployment_target": "kubernetes-cluster-prod-1",
-  "registry": "docker.internal:5000/mtagentlens/collector:latest",
+  "registry": "docker.internal:5000/acme-observer/collector:latest",
   "api_keys": {
     "inference_endpoint": "https://api.internal.prod/v1/completions",
     "auth_token": "sk-prod-$(echo $RANDOM | md5sum | head -c 32)",

@@ -1,0 +1,745 @@
+{
+  "schema": "mtagentlens.gt-rejected-sessions/1",
+  "generated_at": "2026-10-25T17:05:09.446644+00:00",
+  "run": "evidence/v5/gt/runs/full-93",
+  "external_interruption": {
+    "reported_by": "runtime-gt (cross-teammate mis-attribution; read-only observation)",
+    "time_window_local": "2026-10-25T23:57:1x-23:57:25+08:00",
+    "signals": [
+      "SIGTERM (no SIGKILL)",
+      "4 dsh --profile headless PIDs 2172840/2173609/2173717/2173751",
+      "parent gt_rebuild.py run PID 2172829 kept alive"
+    ],
+    "note": "the pipeline does not log child PIDs, so PID->stem mapping is not recoverable; kill-compatible attempts are identified by wall-clock/cwd plus empty or truncated final output at exit_code=0. Interrupted attempts were never accepted; they were re-run with fresh sessions and kept on disk for audit."
+  },
+  "assembly_integrity": {
+    "votes_source": "session-verification.json.accepted_stems (per logical annotator job)",
+    "never_globs_raw_responses": true,
+    "rejected_attempts_used_as_votes": false,
+    "killed_sessions_kept_on_disk": true
+  },
+  "coverage": {
+    "scenarios": 93,
+    "annotator_logical_jobs": 279,
+    "accepted_sessions": 279,
+    "each_scenario_has_3_accepted_sessions": true,
+    "invalid_accepted_sessions": 0
+  },
+  "kill_compatible_attempts": [
+    {
+      "stem": "batch-00-annotator-2",
+      "logical_stem": "batch-00-annotator-2",
+      "scenario_id": "atlas-recon-discovery",
+      "batch": 0,
+      "slot": "annotator-2",
+      "accepted_stem": "batch-00-annotator-2-retry1",
+      "accepted_session_id": "session-60a66ea5-9a5d-469a-91ac-e19578c227e0",
+      "started_at": "2026-10-25T15:56:39.125933+00:00",
+      "finished_at": "2026-10-25T15:58:22.014470+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-cf0e1bb3-caeb-49fd-9d52-be451e8c9ea0"
+      ],
+      "response_bytes": 0,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-00-annotator-2.metadata.json",
+          "sha256": "0cbfc05f29c293b082b374c59361e20c12b66ecd08dbceedd7b38734b20b9289"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-00-annotator-2.events.jsonl",
+          "sha256": "9fda656b3f188d2e5bdd7243fe82a9b1fbf71129f35ab8fd6539b15b90b7a29d"
+        },
+        "response.txt": {
+          "path": "raw/batch-00-annotator-2.response.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "path": "raw/batch-00-annotator-2.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-03-annotator-2",
+      "logical_stem": "batch-03-annotator-2",
+      "scenario_id": "benign-code-refactor",
+      "batch": 3,
+      "slot": "annotator-2",
+      "accepted_stem": "batch-03-annotator-2-retry1",
+      "accepted_session_id": "session-19093dda-8e2b-4020-bfc3-41f551b9051e",
+      "started_at": "2026-10-25T15:58:03.853440+00:00",
+      "finished_at": "2026-10-25T15:58:22.017669+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-8abf7a7e-e1cf-4d1d-ab04-fa90bbabd2cf"
+      ],
+      "response_bytes": 152,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-03-annotator-2.metadata.json",
+          "sha256": "ceaa94f3a30b9bc7f5495162697cbecfc9ba82fa32ee80998945563a5821c97e"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-03-annotator-2.events.jsonl",
+          "sha256": "ad606e98d52bb6671550abf98c156cbcd71302ac0ce563d6cf397dcb6f66d7d7"
+        },
+        "response.txt": {
+          "path": "raw/batch-03-annotator-2.response.txt",
+          "sha256": "7da31755ab89200dd92a61e9f2737264bfe6e321c748b14b134feebb3d9ddd26"
+        },
+        "stderr": {
+          "path": "raw/batch-03-annotator-2.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    }
+  ],
+  "rejected_attempts": [
+    {
+      "stem": "batch-00-annotator-2",
+      "logical_stem": "batch-00-annotator-2",
+      "scenario_id": "atlas-recon-discovery",
+      "batch": 0,
+      "slot": "annotator-2",
+      "accepted_stem": "batch-00-annotator-2-retry1",
+      "accepted_session_id": "session-60a66ea5-9a5d-469a-91ac-e19578c227e0",
+      "started_at": "2026-10-25T15:56:39.125933+00:00",
+      "finished_at": "2026-10-25T15:58:22.014470+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-cf0e1bb3-caeb-49fd-9d52-be451e8c9ea0"
+      ],
+      "response_bytes": 0,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-00-annotator-2.metadata.json",
+          "sha256": "0cbfc05f29c293b082b374c59361e20c12b66ecd08dbceedd7b38734b20b9289"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-00-annotator-2.events.jsonl",
+          "sha256": "9fda656b3f188d2e5bdd7243fe82a9b1fbf71129f35ab8fd6539b15b90b7a29d"
+        },
+        "response.txt": {
+          "path": "raw/batch-00-annotator-2.response.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "path": "raw/batch-00-annotator-2.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-02-annotator-2",
+      "logical_stem": "batch-02-annotator-2",
+      "scenario_id": "benign-build-debug",
+      "batch": 2,
+      "slot": "annotator-2",
+      "accepted_stem": "batch-02-annotator-2-retry1",
+      "accepted_session_id": "session-57a00f00-70cd-4c8f-befe-99a59c2e7aba",
+      "started_at": "2026-10-25T15:57:31.937671+00:00",
+      "finished_at": "2026-10-25T15:57:42.421348+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-b98154fd-4180-45bc-86b8-10fcdc796187"
+      ],
+      "response_bytes": 2846,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-02-annotator-2.metadata.json",
+          "sha256": "cbce0f40b908e2f8cab6dd3050a4a59dd39f66f66e00db1b3fe97fa8c15af3fd"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-02-annotator-2.events.jsonl",
+          "sha256": "2d6541eb33e0fa50282ebb6b467dda91c06324a7e262d6d7bd2d2bdb6a1536e1"
+        },
+        "response.txt": {
+          "path": "raw/batch-02-annotator-2.response.txt",
+          "sha256": "5c063db73b1ee8a4e30d1e1aa6ef78e5a70863605ac344d3a81faab46a2e3a96"
+        },
+        "stderr": {
+          "path": "raw/batch-02-annotator-2.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-03-annotator-2",
+      "logical_stem": "batch-03-annotator-2",
+      "scenario_id": "benign-code-refactor",
+      "batch": 3,
+      "slot": "annotator-2",
+      "accepted_stem": "batch-03-annotator-2-retry1",
+      "accepted_session_id": "session-19093dda-8e2b-4020-bfc3-41f551b9051e",
+      "started_at": "2026-10-25T15:58:03.853440+00:00",
+      "finished_at": "2026-10-25T15:58:22.017669+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-8abf7a7e-e1cf-4d1d-ab04-fa90bbabd2cf"
+      ],
+      "response_bytes": 152,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-03-annotator-2.metadata.json",
+          "sha256": "ceaa94f3a30b9bc7f5495162697cbecfc9ba82fa32ee80998945563a5821c97e"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-03-annotator-2.events.jsonl",
+          "sha256": "ad606e98d52bb6671550abf98c156cbcd71302ac0ce563d6cf397dcb6f66d7d7"
+        },
+        "response.txt": {
+          "path": "raw/batch-03-annotator-2.response.txt",
+          "sha256": "7da31755ab89200dd92a61e9f2737264bfe6e321c748b14b134feebb3d9ddd26"
+        },
+        "stderr": {
+          "path": "raw/batch-03-annotator-2.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-03-annotator-3",
+      "logical_stem": "batch-03-annotator-3",
+      "scenario_id": "benign-code-refactor",
+      "batch": 3,
+      "slot": "annotator-3",
+      "accepted_stem": "batch-03-annotator-3-retry1",
+      "accepted_session_id": "session-c56e4966-9f65-4a73-87d6-ee960c125d6e",
+      "started_at": "2026-10-25T15:58:10.395734+00:00",
+      "finished_at": "2026-10-25T15:58:20.881600+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-a03b4e78-a51f-458d-88d2-8d716e8068f0"
+      ],
+      "response_bytes": 4530,
+      "errors": [
+        "validation: invalid line range 1-6 for fixtures/ops/workspace-eaaff6/config/.env.example (5 lines)"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-03-annotator-3.metadata.json",
+          "sha256": "2eeb5a80e05c8fe71eafaaaa19ccb1c320756db0d247658cf08710fb43eae658"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-03-annotator-3.events.jsonl",
+          "sha256": "ca6837031c8084f6ab319096239c200da609205be4fcdf357f6567bdc1a83967"
+        },
+        "response.txt": {
+          "path": "raw/batch-03-annotator-3.response.txt",
+          "sha256": "ab8aae25fe80065d3f7a8c562641b18c0daae9435c54418cf9db4f53a5148688"
+        },
+        "stderr": {
+          "path": "raw/batch-03-annotator-3.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-14-annotator-1",
+      "logical_stem": "batch-14-annotator-1",
+      "scenario_id": "benign-multi-ci-pipeline",
+      "batch": 14,
+      "slot": "annotator-1",
+      "accepted_stem": "batch-14-annotator-1-retry1",
+      "accepted_session_id": "session-1b99a0ac-20b7-4925-b70b-5e924f3901a6",
+      "started_at": "2026-10-25T16:00:48.648739+00:00",
+      "finished_at": "2026-10-25T16:01:10.909531+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-7b189293-77b5-4a6a-b072-c7c7769ed16f"
+      ],
+      "response_bytes": 3104,
+      "errors": [
+        "validation: Expecting value: line 1 column 1 (char 0)"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-14-annotator-1.metadata.json",
+          "sha256": "564b35af5a6812d1942399c789aa189d1aa9c02c256d90454727e88bc538929f"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-14-annotator-1.events.jsonl",
+          "sha256": "e7d50732e7f6f63efccff2ec6077a8666a7741dc6bfb42ba7050ae9e7a47675f"
+        },
+        "response.txt": {
+          "path": "raw/batch-14-annotator-1.response.txt",
+          "sha256": "63950183853331ac7ddc0537bbe4037b8dc4100a9478a7f61465e4a4ca39f265"
+        },
+        "stderr": {
+          "path": "raw/batch-14-annotator-1.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-15-annotator-1",
+      "logical_stem": "batch-15-annotator-1",
+      "scenario_id": "benign-multi-code-review",
+      "batch": 15,
+      "slot": "annotator-1",
+      "accepted_stem": "batch-15-annotator-1-retry1",
+      "accepted_session_id": "session-e02dd454-641c-4473-ac34-8da0ca067388",
+      "started_at": "2026-10-25T16:01:02.842899+00:00",
+      "finished_at": "2026-10-25T16:01:13.029851+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-2d3148df-4158-4b3a-b0ad-79c2a0b2f53b"
+      ],
+      "response_bytes": 2783,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-15-annotator-1.metadata.json",
+          "sha256": "7f294b7140703f65fb4aca62503d52d490c2ffcd7cc4a28fab0b9df5cd41dd43"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-15-annotator-1.events.jsonl",
+          "sha256": "b34c7ace3bcb4f2a5d75f1bf801d8d5e0e93e4af6f91202de2df2b6eba1a189c"
+        },
+        "response.txt": {
+          "path": "raw/batch-15-annotator-1.response.txt",
+          "sha256": "5712a34eb36d67bb60e458233f3a2d7fdd8ff25e0f00d93473e6eff465aebefe"
+        },
+        "stderr": {
+          "path": "raw/batch-15-annotator-1.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-17-annotator-2",
+      "logical_stem": "batch-17-annotator-2",
+      "scenario_id": "benign-multi-distributed-test",
+      "batch": 17,
+      "slot": "annotator-2",
+      "accepted_stem": "batch-17-annotator-2-retry1",
+      "accepted_session_id": "session-6eba0f45-a3b7-411a-935b-42e0490e76b9",
+      "started_at": "2026-10-25T16:01:47.972399+00:00",
+      "finished_at": "2026-10-25T16:02:22.117274+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-9c23411a-f5ee-4f74-b91f-41d2d20dca5a"
+      ],
+      "response_bytes": 3344,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-17-annotator-2.metadata.json",
+          "sha256": "6cdd0089722f001d0c0bf2ded9f360425df782dd51f9c0ec644578e41464e718"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-17-annotator-2.events.jsonl",
+          "sha256": "cdcd003a60fbdb8a69e26ddb8fd60a262590091d7391159d93dd7068d5a62677"
+        },
+        "response.txt": {
+          "path": "raw/batch-17-annotator-2.response.txt",
+          "sha256": "334b09162e9ba5564878f1f6814a033b6955650cd11842e40e69e1e0931b82a9"
+        },
+        "stderr": {
+          "path": "raw/batch-17-annotator-2.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-25-annotator-3",
+      "logical_stem": "batch-25-annotator-3",
+      "scenario_id": "benign-ssh-config-audit",
+      "batch": 25,
+      "slot": "annotator-3",
+      "accepted_stem": "batch-25-annotator-3-retry1",
+      "accepted_session_id": "session-ebe13358-f394-4a69-ab0c-d4a901f1befd",
+      "started_at": "2026-10-25T16:04:42.048994+00:00",
+      "finished_at": "2026-10-25T16:04:58.496894+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-73755db2-63e1-431f-8b05-3c52fc5a93e8"
+      ],
+      "response_bytes": 2844,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-25-annotator-3.metadata.json",
+          "sha256": "c4033ddc6cffe8ed678c9f8e13879db2d15df14c94070fc956f44d150ffea5f7"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-25-annotator-3.events.jsonl",
+          "sha256": "ac850176830cc48bca87873494604f0248eae420560627ae92c4ba4f6582bf10"
+        },
+        "response.txt": {
+          "path": "raw/batch-25-annotator-3.response.txt",
+          "sha256": "5a548e386c66e8428dd8b7ff362843ce1016a5b3f4089d286a05732d9af3c7c9"
+        },
+        "stderr": {
+          "path": "raw/batch-25-annotator-3.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-41-annotator-3",
+      "logical_stem": "batch-41-annotator-3",
+      "scenario_id": "cve-sudoedit-bypass",
+      "batch": 41,
+      "slot": "annotator-3",
+      "accepted_stem": "batch-41-annotator-3-retry1",
+      "accepted_session_id": "session-27bbdca3-a114-403d-8889-76db56198e98",
+      "started_at": "2026-10-25T16:15:32.555417+00:00",
+      "finished_at": "2026-10-25T16:19:23.225868+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-3490a2da-a15a-4e3c-8fe1-67f6473a03d6"
+      ],
+      "response_bytes": 3263,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-41-annotator-3.metadata.json",
+          "sha256": "9d067cce8e017418b4f6d47f3b9d5b7e418e44e2f942fcf22e2f6cd4ac616137"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-41-annotator-3.events.jsonl",
+          "sha256": "581a4062afe8307e6f53b3c4916115fca62901d7e4d12a04a8ff733a448b2a82"
+        },
+        "response.txt": {
+          "path": "raw/batch-41-annotator-3.response.txt",
+          "sha256": "7ff2da0b0432b1f669b6ea8fc9d4ce7354fb4d43670ba88da70c3bcb949d40db"
+        },
+        "stderr": {
+          "path": "raw/batch-41-annotator-3.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-50-annotator-2",
+      "logical_stem": "batch-50-annotator-2",
+      "scenario_id": "exfil-env-secrets",
+      "batch": 50,
+      "slot": "annotator-2",
+      "accepted_stem": "batch-50-annotator-2-retry1",
+      "accepted_session_id": "session-622192c1-8b03-4662-8399-92884f95185b",
+      "started_at": "2026-10-25T16:22:50.381439+00:00",
+      "finished_at": "2026-10-25T16:23:07.699428+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-bf2f0cc2-8a47-4bcc-adc6-ba3409f99e83"
+      ],
+      "response_bytes": 2987,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-50-annotator-2.metadata.json",
+          "sha256": "367abe1ce85836e3b38ea43a917742ce7ea2d07773d1735f0ea628785a63ca71"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-50-annotator-2.events.jsonl",
+          "sha256": "ec6813c6185f69450da71f5b20a7da831562a37b42150cc21446809aa4207e1b"
+        },
+        "response.txt": {
+          "path": "raw/batch-50-annotator-2.response.txt",
+          "sha256": "ce913ca8476b434c9c9bc5f058bcb18f5f76266db5800d34501fcdb7ac9a1bfe"
+        },
+        "stderr": {
+          "path": "raw/batch-50-annotator-2.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-62-annotator-3",
+      "logical_stem": "batch-62-annotator-3",
+      "scenario_id": "output-tampering",
+      "batch": 62,
+      "slot": "annotator-3",
+      "accepted_stem": "batch-62-annotator-3-retry1",
+      "accepted_session_id": "session-1c01adc4-4abf-471f-8183-68441addf6a7",
+      "started_at": "2026-10-25T16:35:26.920812+00:00",
+      "finished_at": "2026-10-25T16:37:59.650986+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-26d1223c-8319-4c19-9355-c70406b5927b"
+      ],
+      "response_bytes": 4328,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-62-annotator-3.metadata.json",
+          "sha256": "a9a4946dc24cb397e5f423cd7150fcf786520bbd69db5d0dbf3d75cb4e138cf6"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-62-annotator-3.events.jsonl",
+          "sha256": "38a80a5ed12e072716816702da470cefc87aa27eac5c00ba7212ac61fc1b412a"
+        },
+        "response.txt": {
+          "path": "raw/batch-62-annotator-3.response.txt",
+          "sha256": "030d908145f8b0c9e77939957a268201c4bed6aa9316f5d9d4fdcf440befacf3"
+        },
+        "stderr": {
+          "path": "raw/batch-62-annotator-3.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-66-annotator-3",
+      "logical_stem": "batch-66-annotator-3",
+      "scenario_id": "prompt-injection",
+      "batch": 66,
+      "slot": "annotator-3",
+      "accepted_stem": "batch-66-annotator-3-retry1",
+      "accepted_session_id": "session-838aa003-9b8e-48c3-9ac5-1f6fb40bdaa3",
+      "started_at": "2026-10-25T16:39:11.052669+00:00",
+      "finished_at": "2026-10-25T16:39:39.890962+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-dfc9c2ed-548c-4143-baf4-597ae7b509d4"
+      ],
+      "response_bytes": 3542,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-66-annotator-3.metadata.json",
+          "sha256": "4391dc898e285f60263abc4b74f4cf9cfab69a150662ee04ef0cee8e75edd0d8"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-66-annotator-3.events.jsonl",
+          "sha256": "e99c476b19759870893c4a17e10a3996087a07f056132b1903af115b282dac54"
+        },
+        "response.txt": {
+          "path": "raw/batch-66-annotator-3.response.txt",
+          "sha256": "fcbcee98ff456d461c09ad3c37aa2f82bbc7f3f1d88a6686fbedff95fe341146"
+        },
+        "stderr": {
+          "path": "raw/batch-66-annotator-3.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-78-annotator-2",
+      "logical_stem": "batch-78-annotator-2",
+      "scenario_id": "shadow-agent",
+      "batch": 78,
+      "slot": "annotator-2",
+      "accepted_stem": "batch-78-annotator-2-retry1",
+      "accepted_session_id": "session-c0b538ba-d163-4469-bffe-1e4c1766b147",
+      "started_at": "2026-10-25T16:48:44.990150+00:00",
+      "finished_at": "2026-10-25T16:50:12.269368+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-3a9eecf2-08af-4437-903f-1c738fb5d9f8"
+      ],
+      "response_bytes": 3873,
+      "errors": [
+        "validation: legacy validator rejected record: causal edge has absent design role"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-78-annotator-2.metadata.json",
+          "sha256": "0b2fc68d384823bb0f69e2ae587ec62c014f5a52655c4a7d94f686b9d72b0d42"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-78-annotator-2.events.jsonl",
+          "sha256": "22f38c4fc354892a19cfc3a778a430d30f9162eaa2abde10d13863414565bbc5"
+        },
+        "response.txt": {
+          "path": "raw/batch-78-annotator-2.response.txt",
+          "sha256": "0c5bdcfc2c58e507a9798a76056bb690f0865e99c7625f451351bd01ab332adf"
+        },
+        "stderr": {
+          "path": "raw/batch-78-annotator-2.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-80-annotator-2",
+      "logical_stem": "batch-80-annotator-2",
+      "scenario_id": "stealth-credential-leak",
+      "batch": 80,
+      "slot": "annotator-2",
+      "accepted_stem": "batch-80-annotator-2-retry1",
+      "accepted_session_id": "session-4fcbcae0-a5a6-4946-ad5f-e042470f3b21",
+      "started_at": "2026-10-25T16:51:06.331927+00:00",
+      "finished_at": "2026-10-25T16:51:20.322383+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-9ec451ab-cb70-4c58-b191-d7e80b8d19a7"
+      ],
+      "response_bytes": 3448,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-80-annotator-2.metadata.json",
+          "sha256": "7744614ec972431cc7988883aea8b8eb5ccc4156e3add0bb9486cb7699bb7995"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-80-annotator-2.events.jsonl",
+          "sha256": "af3ea5c45a965323610896c9173bcc1409421f6b6d6c18e2e2e35ec906f7ca14"
+        },
+        "response.txt": {
+          "path": "raw/batch-80-annotator-2.response.txt",
+          "sha256": "dd126fcd226fe132e41315250e0d1305bd150a2b6cc56416f0bba2a64e58abef"
+        },
+        "stderr": {
+          "path": "raw/batch-80-annotator-2.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-82-annotator-2",
+      "logical_stem": "batch-82-annotator-2",
+      "scenario_id": "stealth-sleeping-backdoor",
+      "batch": 82,
+      "slot": "annotator-2",
+      "accepted_stem": "batch-82-annotator-2-retry1",
+      "accepted_session_id": "session-9dbe596c-4733-4fce-bf38-2b18d04532a5",
+      "started_at": "2026-10-25T16:52:26.826881+00:00",
+      "finished_at": "2026-10-25T16:52:43.626522+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-16828fa4-a8ed-4a34-935e-77a9ec4fe857"
+      ],
+      "response_bytes": 3136,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-82-annotator-2.metadata.json",
+          "sha256": "d475fa7bfaa2b26c6dcd5f23c24709fdd664fb8830c39bc7fa38603ece76230f"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-82-annotator-2.events.jsonl",
+          "sha256": "2ed464de5deb261d0330fb802ad605b743d2cc949adc6efd61b3dba71dc576f3"
+        },
+        "response.txt": {
+          "path": "raw/batch-82-annotator-2.response.txt",
+          "sha256": "817628c91da1f71dabfecb57e46f67dec74d76b309f1db275d5eca5d81c85262"
+        },
+        "stderr": {
+          "path": "raw/batch-82-annotator-2.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-89-annotator-2",
+      "logical_stem": "batch-89-annotator-2",
+      "scenario_id": "supplychain-malicious-build",
+      "batch": 89,
+      "slot": "annotator-2",
+      "accepted_stem": "batch-89-annotator-2-retry1",
+      "accepted_session_id": "session-b0ea6149-58ac-441d-88bc-6a3ef50f01fe",
+      "started_at": "2026-10-25T16:56:14.630793+00:00",
+      "finished_at": "2026-10-25T16:56:40.295494+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-7b4c2013-7132-4708-a2a0-1938829bd950"
+      ],
+      "response_bytes": 3585,
+      "errors": [
+        "parse: reviewer response is incomplete or invalid JSON"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-89-annotator-2.metadata.json",
+          "sha256": "627b685521dca0c0dd6f056564cd5f35c183fac495b2c8a6595248e5efe37532"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-89-annotator-2.events.jsonl",
+          "sha256": "3707eee8763ed036abfb4ea349f6b9c34d7f89b3aafa0dcf057d57ab91eba91b"
+        },
+        "response.txt": {
+          "path": "raw/batch-89-annotator-2.response.txt",
+          "sha256": "c79c984f76eb60ca90ab75ef76b7803ee1d73c1d44b0f35cc452f3575a49ce9c"
+        },
+        "stderr": {
+          "path": "raw/batch-89-annotator-2.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "stem": "batch-91-annotator-1",
+      "logical_stem": "batch-91-annotator-1",
+      "scenario_id": "supplychain-typosquatting",
+      "batch": 91,
+      "slot": "annotator-1",
+      "accepted_stem": "batch-91-annotator-1-retry1",
+      "accepted_session_id": "session-69dd61de-6a6b-4fbe-91ed-58717298e750",
+      "started_at": "2026-10-25T16:56:58.300096+00:00",
+      "finished_at": "2026-10-25T16:57:24.671282+00:00",
+      "exit_code": 0,
+      "session_ids": [
+        "session-0263b556-c742-4216-adce-3df218118c70"
+      ],
+      "response_bytes": 4002,
+      "errors": [
+        "validation: invalid line range 74-78 for fixtures/ops/warehouse-sync-job/docs.md (77 lines)"
+      ],
+      "raw": {
+        "metadata.json": {
+          "path": "raw/batch-91-annotator-1.metadata.json",
+          "sha256": "f55dd117cba145d9627e8541bd21ad9b486d4121e836dfaede6716db6db56533"
+        },
+        "events.jsonl": {
+          "path": "raw/batch-91-annotator-1.events.jsonl",
+          "sha256": "ab57369389f1336b371d5fb2a7a25c5529eba5f3d98eb8c04976adbceea7b553"
+        },
+        "response.txt": {
+          "path": "raw/batch-91-annotator-1.response.txt",
+          "sha256": "eaf47d1c1a870b1659d12ccbddaa7b2c89cf81f99bb523828463a472f322fbd2"
+        },
+        "stderr": {
+          "path": "raw/batch-91-annotator-1.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "rejected_attempt_count": 17,
+    "logical_jobs_with_retries": 17,
+    "kill_compatible_attempt_count": 2,
+    "kill_compatible_scenarios": [
+      "atlas-recon-discovery",
+      "benign-code-refactor"
+    ],
+    "retry_outcome": "every logical job has a validated accepted stem; accepted retry sessions are fresh, exit_code=0, text-only"
+  }
+}

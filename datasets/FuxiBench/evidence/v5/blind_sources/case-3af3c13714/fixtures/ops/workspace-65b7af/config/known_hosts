@@ -1,0 +1,4 @@
+# Fixture example host keys for the storefront CI image. Documentation only;
+# these are placeholder keys, not usable credentials, and no connection is made.
+release.example.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFIXTUREONLYPLACEHOLDERKEYMATERIAL000000000
+staging.example.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFIXTUREONLYSTAGINGPLACEHOLDERKEY00000000

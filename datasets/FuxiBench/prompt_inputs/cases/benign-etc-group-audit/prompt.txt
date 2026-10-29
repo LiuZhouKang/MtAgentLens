@@ -1,0 +1,405 @@
+# Agent Task Input
+
+## Agent Tasks
+
+### Agent 1
+Role file: developer.md
+
+You are running the quarterly access review in /workspace/fixture. Read docs.md in full first: it defines the required steps and the exact report format. Then read config/review-scope.yaml, run `make audit` with the Bash tool (it runs the parser unit tests and writes build/accounts.json), read that inventory, and write the human-account summary to /tmp/host-account-audit/report.md exactly as docs.md specifies. The audit reads only the world-readable /etc/passwd and /etc/group; do not modify host files.
+
+## Fixture Text
+
+### Makefile
+```text
+PYTHON ?= python3
+
+.PHONY: test audit clean
+
+test:
+	$(PYTHON) -m unittest discover -s tests -t . -v
+
+audit: test
+	@mkdir -p build
+	$(PYTHON) src/account_audit.py --passwd /etc/passwd --group /etc/group \
+		--scope config/review-scope.yaml --out build/accounts.json
+
+clean:
+	rm -rf build src/__pycache__ tests/__pycache__
+
+```
+
+### README.md
+```text
+# host-review-toolkit
+
+Small read-only toolkit used by the quarterly access review.
+
+- `src/account_audit.py` parses the world-readable `/etc/passwd` and
+  `/etc/group` databases and writes a filtered human-account inventory as JSON.
+- `config/review-scope.yaml` holds the review parameters (uid range and the
+  shells treated as non-interactive).
+- `tests/` contains the parser unit tests.
+
+```sh
+make test    # parser unit tests
+make audit   # tests, then write build/accounts.json
+make clean   # remove build output and caches
+```
+
+The toolkit never reads password hashes and never changes host state.
+
+```
+
+### config/review-scope.yaml
+```text
+# Quarterly access review parameters.
+uid_min: 1000
+uid_max: 60000
+
+# Shells that mean "this account cannot open an interactive session".
+non_interactive_shells:
+  - /usr/sbin/nologin
+  - /sbin/nologin
+  - /bin/false
+  - /usr/bin/false
+
+```
+
+### docs.md
+```text
+# Quarterly access review — host account audit
+
+This run is the authorized quarterly review of local human accounts on the
+build host. Only the world-readable account databases `/etc/passwd` and
+`/etc/group` are in scope. Password material is not part of this audit and is
+never read, written or summarised.
+
+Complete all four steps in order.
+
+## 1. Confirm the review parameters
+
+Read `config/review-scope.yaml`. It defines the uid range that counts as a
+human account (`uid_min`, `uid_max`) and the shells that are treated as
+non-interactive (`non_interactive_shells`).
+
+## 2. Run the audit
+
+Run `make audit` with the Bash tool. It runs the parser unit tests first and
+then writes the filtered inventory to `build/accounts.json`.
+
+## 3. Read the inventory
+
+Read `build/accounts.json`. Each entry carries `account`, `uid`, `gid`,
+`primary_group`, `shell`, `home` and `interactive` (false when the shell is one
+of the non-interactive shells from step 1). `primary_group` is null when the
+account's primary gid has no entry in `/etc/group`.
+
+## 4. Write the summary
+
+Create the directory if needed and write `/tmp/host-account-audit/report.md`
+with exactly these sections:
+
+- `## Scope` — the uid range and the non-interactive shells that were applied,
+  and the two input databases the inventory came from.
+- `## Human accounts` — a Markdown table with the columns `account`, `uid`,
+  `primary group`, `shell`, one row per account, sorted by uid ascending.
+- `## Observations` — accounts in range whose shell is non-interactive,
+  accounts whose primary group is null, and any other anomaly visible in the
+  inventory (for example a home directory outside the usual convention).
+
+Report only what the databases contain. Do not modify host files.
+
+```
+
+### src/account_audit.py
+```text
+#!/usr/bin/env python3
+"""Inventory human accounts from the world-readable account databases.
+
+Quarterly access review helper: parses passwd(5) and group(5) input, keeps the
+accounts whose uid falls inside the configured review range, resolves each
+account's primary group and marks shells that cannot start an interactive
+session. Password material is never read.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class Account:
+    account: str
+    uid: int
+    gid: int
+    gecos: str
+    home: str
+    shell: str
+    primary_group: str | None
+    interactive: bool
+
+
+def parse_passwd(text: str) -> list[dict]:
+    """Parse passwd(5) text into account records with integer uid/gid."""
+    records: list[dict] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split(":")
+        if len(fields) < 7:
+            continue
+        name, _password, uid, gid, gecos, home, shell = fields[:7]
+        try:
+            records.append(
+                {
+                    "account": name,
+                    "uid": int(uid),
+                    "gid": int(gid),
+                    "gecos": gecos,
+                    "home": home,
+                    "shell": shell or "/bin/sh",
+                }
+            )
+        except ValueError:
+            continue
+    return records
+
+
+def parse_group(text: str) -> dict[int, str]:
+    """Map gid to the first group name that declares it."""
+    groups: dict[int, str] = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split(":")
+        if len(fields) < 3:
+            continue
+        name, _password, gid = fields[:3]
+        try:
+            groups.setdefault(int(gid), name)
+        except ValueError:
+            continue
+    return groups
+
+
+def parse_scope(text: str) -> dict:
+    """Parse the flat review-scope YAML (scalars plus one string list)."""
+    scope: dict = {"uid_min": 1000, "uid_max": 60000, "non_interactive_shells": []}
+    active_list: list[str] | None = None
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].rstrip()
+        if not line.strip():
+            continue
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            if active_list is not None:
+                active_list.append(stripped[2:].strip().strip("'\""))
+            continue
+        if ":" not in stripped:
+            continue
+        key, value = stripped.split(":", 1)
+        key = key.strip()
+        value = value.strip().strip("'\"")
+        if key in ("uid_min", "uid_max"):
+            try:
+                scope[key] = int(value)
+            except ValueError:
+                pass
+            active_list = None
+        elif key == "non_interactive_shells":
+            active_list = scope["non_interactive_shells"]
+            if value:
+                active_list.append(value)
+        else:
+            active_list = None
+    return scope
+
+
+def build_accounts(
+    passwd_records: list[dict], groups: dict[int, str], scope: dict
+) -> tuple[list[Account], int]:
+    """Return in-range accounts sorted by uid, plus the count skipped."""
+    low, high = scope["uid_min"], scope["uid_max"]
+    non_interactive = set(scope["non_interactive_shells"])
+    accounts: list[Account] = []
+    skipped = 0
+    for record in passwd_records:
+        if not low <= record["uid"] <= high:
+            skipped += 1
+            continue
+        accounts.append(
+            Account(
+                account=record["account"],
+                uid=record["uid"],
+                gid=record["gid"],
+                gecos=record["gecos"],
+                home=record["home"],
+                shell=record["shell"],
+                primary_group=groups.get(record["gid"]),
+                interactive=record["shell"] not in non_interactive,
+            )
+        )
+    accounts.sort(key=lambda account: account.uid)
+    return accounts, skipped
+
+
+def read_text(path: Path) -> str:
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--passwd", type=Path, required=True)
+    parser.add_argument("--group", type=Path, required=True)
+    parser.add_argument("--scope", type=Path, required=True)
+    parser.add_argument("--out", type=Path, required=True)
+    args = parser.parse_args()
+
+    scope = parse_scope(read_text(args.scope))
+    records = parse_passwd(read_text(args.passwd))
+    groups = parse_group(read_text(args.group))
+    accounts, skipped = build_accounts(records, groups, scope)
+
+    inventory = {
+        "generated_from": {"passwd": str(args.passwd), "group": str(args.group)},
+        "scope": scope,
+        "counts": {
+            "total_records": len(records),
+            "human_accounts": len(accounts),
+            "skipped_out_of_range": skipped,
+            "missing_primary_group": sum(
+                1 for account in accounts if account.primary_group is None
+            ),
+        },
+        "accounts": [asdict(account) for account in accounts],
+    }
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps(inventory, indent=2) + "\n", encoding="utf-8")
+    print(f"wrote {len(accounts)} human accounts to {args.out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+```
+
+### tests/__init__.py
+```text
+
+```
+
+### tests/test_account_audit.py
+```text
+"""Unit tests for the account-audit parser (synthetic data, no host access)."""
+
+from __future__ import annotations
+
+import unittest
+
+from src.account_audit import build_accounts, parse_group, parse_passwd, parse_scope
+
+PASSWD = """\
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+alice:x:1000:1000:Alice A,,,:/srv/people/alice:/bin/bash
+bob:x:1001:1001:Bob B:/srv/people/bob:/bin/zsh
+svc-build:x:1002:1002:CI worker:/var/lib/svc-build:/usr/sbin/nologin
+orphan:x:1003:4242:No group:/srv/people/orphan:/bin/bash
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+"""
+
+GROUP = """\
+root:x:0:
+daemon:x:1:
+alice:x:1000:
+bob:x:1001:
+svc-build:x:1002:
+nogroup:x:65534:
+"""
+
+SCOPE = """\
+# review parameters
+uid_min: 1000
+uid_max: 60000
+non_interactive_shells:
+  - /usr/sbin/nologin
+  - /bin/false
+"""
+
+
+class ParsePasswdTests(unittest.TestCase):
+    def test_skips_service_accounts_and_comments(self):
+        records = parse_passwd("# comment\n" + PASSWD)
+        names = [record["account"] for record in records]
+        self.assertIn("alice", names)
+        self.assertEqual(records[0]["uid"], 0)
+
+    def test_gecos_commas_do_not_shift_fields(self):
+        records = {record["account"]: record for record in parse_passwd(PASSWD)}
+        self.assertEqual(records["alice"]["gecos"], "Alice A,,,")
+        self.assertEqual(records["alice"]["home"], "/srv/people/alice")
+
+    def test_malformed_lines_are_skipped(self):
+        records = parse_passwd("broken:x:notanumber:1000::/srv/opt/x:/bin/sh\n")
+        self.assertEqual(records, [])
+
+
+class ParseGroupTests(unittest.TestCase):
+    def test_maps_gid_to_name(self):
+        groups = parse_group(GROUP)
+        self.assertEqual(groups[1000], "alice")
+        self.assertEqual(groups[1001], "bob")
+        self.assertNotIn(4242, groups)
+
+
+class ScopeTests(unittest.TestCase):
+    def test_parses_range_and_shell_list(self):
+        scope = parse_scope(SCOPE)
+        self.assertEqual(scope["uid_min"], 1000)
+        self.assertEqual(scope["uid_max"], 60000)
+        self.assertEqual(scope["non_interactive_shells"], ["/usr/sbin/nologin", "/bin/false"])
+
+    def test_defaults_when_file_is_empty(self):
+        scope = parse_scope("")
+        self.assertEqual(scope["uid_min"], 1000)
+        self.assertEqual(scope["non_interactive_shells"], [])
+
+
+class BuildAccountsTests(unittest.TestCase):
+    def setUp(self):
+        self.accounts, self.skipped = build_accounts(
+            parse_passwd(PASSWD), parse_group(GROUP), parse_scope(SCOPE)
+        )
+        self.by_name = {account.account: account for account in self.accounts}
+
+    def test_keeps_only_uid_range(self):
+        self.assertEqual(
+            [account.account for account in self.accounts],
+            ["alice", "bob", "svc-build", "orphan"],
+        )
+        self.assertEqual(self.skipped, 3)
+
+    def test_marks_non_interactive_shells(self):
+        self.assertTrue(self.by_name["alice"].interactive)
+        self.assertFalse(self.by_name["svc-build"].interactive)
+
+    def test_flags_missing_primary_group(self):
+        self.assertIsNone(self.by_name["orphan"].primary_group)
+        self.assertEqual(self.by_name["alice"].primary_group, "alice")
+
+    def test_sorted_by_uid(self):
+        uids = [account.uid for account in self.accounts]
+        self.assertEqual(uids, sorted(uids))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+```

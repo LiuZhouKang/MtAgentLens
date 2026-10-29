@@ -23,11 +23,16 @@ import AgentAvatar from '@/components/ui/agent-avatar';
 import ClaimList from '@/components/investigation/claim-list';
 import type { TraceEventKind } from '@/lib/trace-workbench';
 import { buildInvestigationTimeline } from '@/lib/investigation-timeline';
-import { authorityLabel, decisionLabel, severityLabel, TONE_COLOR } from '@/lib/investigation-labels';
+import {
+  authorityLabel,
+  decisionLabel,
+  severityLabel,
+  TONE_COLOR,
+} from '@/lib/investigation-labels';
 import { shortAgentId } from '@/lib/agent-identity';
 import type { ResponsibilityAlert } from '@/lib/types';
 import type { InvestigationModel } from '@/lib/investigation';
-import { collectAlertEvidenceRefs } from '@/lib/investigation';
+import { collectAlertEvidenceRefs, getActiveGraph } from '@/lib/investigation';
 import { useAppStore } from '@/lib/store';
 import { buildTracebacksByClaimId } from '@/lib/traceback-index';
 
@@ -87,12 +92,22 @@ export default function InvestigationWorkbench({
   availableAlerts,
   onSelectAlert,
 }: Props) {
-  const claims = useAppStore((s) => s.claims);
+  const storedClaims = useAppStore((s) => s.claims);
+  // Exact association first: an alert names the claims that composed it. Only
+  // historical runs without claim_ids fall back to the run-wide list.
+  const claimIds = alert.engine?.claim_ids;
+  const claims = useMemo(() => {
+    if (claimIds === undefined) return storedClaims;
+    const wanted = new Set(claimIds);
+    return storedClaims.filter((claim) => wanted.has(claim.claim_id));
+  }, [storedClaims, claimIds]);
   const tracebacks = useAppStore((s) => s.tracebacks);
   const graph = useAppStore((s) => s.graph);
   const dbAssets = useAppStore((s) => s.dbAssets);
   const storeActions = useAppStore((s) => s.actions);
   const tracebacksByClaimId = useMemo(() => buildTracebacksByClaimId(tracebacks), [tracebacks]);
+  // 回溯关系必须落在当前告警的真实图上：优先告警快照，否则 run store 图。
+  const activeGraph = useMemo(() => getActiveGraph(alert, graph), [alert, graph]);
   const alertEvidenceRefs = useMemo(() => collectAlertEvidenceRefs(alert, graph), [alert, graph]);
   // 富化时间线：折叠 SSL 噪声 + 解析 pid + 关联真实数据（process_events/actions/evidence）
   const timelineModel = useMemo(
@@ -189,7 +204,13 @@ export default function InvestigationWorkbench({
       {/* KPI row —— 与 MetricCard 严格同构（DigitReel + label + delta） */}
       <div className="ln-kpi-strip">
         {kpi.map((k) => (
-          <MetricCard key={k.label} label={k.label} value={k.value} delta={k.delta} deltaTone={k.deltaTone} />
+          <MetricCard
+            key={k.label}
+            label={k.label}
+            value={k.value}
+            delta={k.delta}
+            deltaTone={k.deltaTone}
+          />
         ))}
       </div>
 
@@ -229,7 +250,10 @@ export default function InvestigationWorkbench({
                   onClick={() => onSelectAlert(a.alert_id)}
                 >
                   <span className="ln-alert-queue__head">
-                    <span className="ln-alert-queue__dot" style={{ background: TONE_COLOR[sev.tone ?? 'info'] }} />
+                    <span
+                      className="ln-alert-queue__dot"
+                      style={{ background: TONE_COLOR[sev.tone ?? 'info'] }}
+                    />
                     <span className="ln-alert-queue__title">{a.title}</span>
                     <StatusBadge tone={sevTone(a.severity)}>{sev.label}</StatusBadge>
                   </span>
@@ -308,7 +332,10 @@ export default function InvestigationWorkbench({
                               {!isLast && <span className="ln-inv-tl-line" />}
                             </div>
                             {/* 事件体：头部 + 标题 + 瀑布条 + 元信息 + 展开详情 */}
-                            <div className="ln-inv-tl-card" data-expanded={expanded ? 'true' : 'false'}>
+                            <div
+                              className="ln-inv-tl-card"
+                              data-expanded={expanded ? 'true' : 'false'}
+                            >
                               <button
                                 type="button"
                                 className="ln-inv-tl-btn"
@@ -365,21 +392,31 @@ export default function InvestigationWorkbench({
                               <div className="ln-inv-tl-bar">
                                 <span
                                   className="ln-inv-tl-bar__fill"
-                                  style={{ left: `${barLeft}%`, width: `${barWidth}%`, background: color }}
+                                  style={{
+                                    left: `${barLeft}%`,
+                                    width: `${barWidth}%`,
+                                    background: color,
+                                  }}
                                 />
                               </div>
                               {/* 真实行为：该进程在 actions 表中的真实操作（文件/命令） */}
                               {ev.aggregated === 0 && ev.actions.length > 0 && (
                                 <div className="ln-inv-tl-acts">
                                   {ev.actions.slice(0, 3).map((a, ai) => (
-                                    <span key={ai} className="ln-inv-tl-act" title={a.target ?? undefined}>
+                                    <span
+                                      key={ai}
+                                      className="ln-inv-tl-act"
+                                      title={a.target ?? undefined}
+                                    >
                                       <span
                                         className="ln-inv-tl-act__type"
                                         data-tone={actionTone(a.actionType)}
                                       >
                                         {a.actionLabel}
                                       </span>
-                                      {a.target && <span className="ln-inv-tl-act__target">{a.target}</span>}
+                                      {a.target && (
+                                        <span className="ln-inv-tl-act__target">{a.target}</span>
+                                      )}
                                     </span>
                                   ))}
                                   {ev.actions.length > 3 && (
@@ -452,7 +489,9 @@ export default function InvestigationWorkbench({
                                   {ev.sourceEventId && (
                                     <div className="ln-inv-tl-detail__row">
                                       <span className="ln-inv-tl-detail__k">事件源</span>
-                                      <span className="ln-inv-tl-detail__v">{ev.sourceEventId}</span>
+                                      <span className="ln-inv-tl-detail__v">
+                                        {ev.sourceEventId}
+                                      </span>
                                     </div>
                                   )}
                                   {/* 该进程的完整真实行为列表（actions 表，不编造） */}
@@ -528,13 +567,14 @@ export default function InvestigationWorkbench({
 
           <SectionPanel
             eyebrow="责任声明"
-            title={`${claims.length} 条`}
+            title={claimIds !== undefined ? `${claims.length} 条 · 本告警` : `${claims.length} 条`}
             bodyClassName="ln-panel-body"
           >
             <ClaimList
               claims={claims}
               tracebacksByClaimId={tracebacksByClaimId}
               alertEvidenceRefs={alertEvidenceRefs}
+              graph={activeGraph}
             />
           </SectionPanel>
         </div>
@@ -559,17 +599,19 @@ export default function InvestigationWorkbench({
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: S.md }}>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <StatusBadge tone={sevTone(alert.severity)}>{severityLabel(alert.severity).label}</StatusBadge>
-                <StatusBadge tone={sevTone(alert.decision)}>{decisionLabel(alert.decision).label}</StatusBadge>
+                <StatusBadge tone={sevTone(alert.severity)}>
+                  {severityLabel(alert.severity).label}
+                </StatusBadge>
+                <StatusBadge tone={sevTone(alert.decision)}>
+                  {decisionLabel(alert.decision).label}
+                </StatusBadge>
               </div>
 
-              <div className="ln-verdict-box">
-                {alert.summary}
-              </div>
+              <div className="ln-verdict-box">{alert.summary}</div>
 
               {alert.reasoning && (
                 <div className="ln-verdict-box ln-verdict-box--accent">
-                  <div className="ln-verdict-box__label">AI 推理</div>
+                  <div className="ln-verdict-box__label">判定说明</div>
                   <div className="ln-verdict-box__body">{alert.reasoning}</div>
                 </div>
               )}

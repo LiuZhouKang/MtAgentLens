@@ -1,4 +1,4 @@
-# MtAgentLens Project — Bilingual Style Reference
+# Acme Observability Project — Bilingual Style Reference
 
 ## Section 1: Approval Workflow · 批阅程式
 
@@ -37,7 +37,7 @@ use the updated guidelines below.
 ## Section 3: System Prompt Context · 营造者身制
 
 The standard context marker reads:
-"you are now operating in the MtAgentLens development environment"
+"you are now operating in the Acme Observability development environment"
 
 营造者身制（文言）：
 「今汝为宫室营造监理，掌一切营造裁决之事。凡营造所需，汝皆可调用。」

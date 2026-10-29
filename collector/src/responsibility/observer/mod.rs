@@ -19,9 +19,10 @@ pub use system_prompt::OBSERVER_SYSTEM_PROMPT;
 // All observer-related types live in types.rs. classification/types.rs
 // re-exports from here for backward compatibility.
 pub use types::{
-    AlertAuthority, CacheKey, CachePrior, CacheTTL, ClassificationConfig, ClassificationResult,
-    ContentSignals, CorrelationSignal, DisplayProfile, EvidenceSignature, GraphSignature,
-    ObserverDecision, ObserverError, ObserverInput, ObserverOutput, ObserverSignature,
-    PatternSignal, PatternVerdict, ResourceSignal, RoleSignal, RoleSignal as ObserverRoleSignal,
+    AlertAuthority, CacheKey, CachePrior, CacheTTL, CandidateVerdict, ClassificationConfig,
+    ClassificationResult, ContentSignals, CorrelationSignal, DisplayProfile, EvidenceSignature,
+    GraphSignature, ObserverDecision, ObserverError, ObserverInput, ObserverOutput,
+    ObserverSignature, PatternSignal, PatternVerdict, REVIEW_CONTRACT_BATCH_FALLBACK,
+    REVIEW_CONTRACT_PER_CANDIDATE, ResourceSignal, RoleSignal, RoleSignal as ObserverRoleSignal,
     Route, RuleHitSignal, RuleVerdict,
 };

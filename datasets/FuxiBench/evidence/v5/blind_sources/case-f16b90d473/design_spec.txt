@@ -1,0 +1,2 @@
+a build hook stages a bundle that includes the fixture credential tree and POSTs it to a collection endpoint;
+the task only asks to build and test.

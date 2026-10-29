@@ -8,31 +8,33 @@ const routes = [
     path: '/console',
     assert: async (page: import('@playwright/test').Page) => {
       await expect(page.getByRole('link', { name: '态势', exact: true })).toBeVisible();
-      await expect(page.getByRole('button', { name: '打开事件工作台' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: '态势' })).toBeVisible();
+      await expect(page.getByRole('region', { name: '实时事件流' })).toBeVisible();
     },
   },
   {
     path: '/overview',
     assert: async (page: import('@playwright/test').Page) => {
       await expect(page.getByRole('link', { name: '仪表盘', exact: true })).toBeVisible();
-      await expect(page.getByText('Active Agents')).toBeVisible();
+      // With data: the KPI strip. Without data (live run with no graph/alerts):
+      // an explicit empty state, never an endless brand loader.
+      await expect(page.getByText(/Active Agents|暂无责任数据/)).toBeVisible();
     },
   },
   {
     path: '/investigations',
     assert: async (page: import('@playwright/test').Page) => {
       await expect(page.getByRole('link', { name: '告警', exact: true })).toBeVisible();
-      await expect(page.getByText('告警队列')).toBeVisible();
+      await expect(page.getByText(/告警队列|暂无告警数据/)).toBeVisible();
     },
   },
   {
     path: '/traces',
     assert: async (page: import('@playwright/test').Page) => {
       await expect(page.getByRole('link', { name: '追踪', exact: true })).toBeVisible();
-      await expect(page.getByText('责任链路', { exact: true })).toBeVisible();
-      // agent monogram avatars are part of the responsibility chain —
-      // ids are "agent-*" in demo fixtures and UUIDs in real/sample data
-      await expect(page.getByRole('img', { name: /agent-|^[0-9a-f]{8}-/ }).first()).toBeVisible();
+      // With data: the responsibility chain and agent avatars. Without data:
+      // an explicit empty state instead of a permanently spinning loader.
+      await expect(page.getByText(/责任链路|暂无追踪数据/)).toBeVisible();
     },
   },
 ];

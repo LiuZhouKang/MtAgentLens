@@ -72,8 +72,8 @@ impl GraphDeltaBuffer {
 
     /// Record an intent's content signature.
     ///
-    /// Returns `true` the first time a given (tool name, arguments) pair is
-    /// seen, `false` for an exact re-observation. Callers should skip the
+    /// Returns `true` for a new process/context/native-reference/content
+    /// combination, `false` for its re-observation. Callers should skip the
     /// intent when this returns `false`. The signature deliberately excludes
     /// timestamp and message id: those differ on every re-extraction, which is
     /// exactly why the existing id-based dedup never fired.
@@ -159,6 +159,15 @@ fn intent_content_signature(intent: &Intent) -> u64 {
         Ok(serialised) => serialised.hash(&mut hasher),
         Err(_) => intent.tool_args.len().hash(&mut hasher),
     }
+    // Captured native references and declared sessions distinguish two
+    // genuinely separate observations of the same tool name and arguments.
+    // `None` stays a bounded legacy content-only signature: it does not prove
+    // one execution, only that the capture offered no distinguishing anchor.
+    if let Some(native) = &intent.native_tool_call {
+        native.format.hash(&mut hasher);
+        native.id.hash(&mut hasher);
+    }
+    intent.declared_conversation_id.hash(&mut hasher);
     hasher.finish()
 }
 
@@ -166,7 +175,9 @@ fn intent_content_signature(intent: &Intent) -> u64 {
 mod tests {
     use super::*;
     use crate::responsibility::types::evidence_types::IntentAuthoritySource;
-    use crate::responsibility::types::evidence_types::{Intent, IntentClass, IntentParseState};
+    use crate::responsibility::types::evidence_types::{
+        Intent, IntentClass, IntentParseState, NativeToolCallFormat, NativeToolCallRef,
+    };
     use crate::responsibility::types::ids::{IntentId, MessageId, ProcessId};
 
     fn make_intent(tool: &str, ts: u64) -> Intent {
@@ -181,6 +192,8 @@ mod tests {
             primary_matching_eligible: true,
             authority_source: IntentAuthoritySource::SseResponseToolUse,
             timestamp_ns: ts,
+            native_tool_call: None,
+            declared_conversation_id: None,
         }
     }
 
@@ -210,6 +223,49 @@ mod tests {
         assert!(
             buf.accept_intent_once(&make_intent("ls", 1)),
             "different tool is distinct"
+        );
+    }
+
+    fn with_native(mut intent: Intent, id: &str) -> Intent {
+        intent.native_tool_call = Some(NativeToolCallRef {
+            format: NativeToolCallFormat::Anthropic,
+            id: id.into(),
+        });
+        intent
+    }
+
+    fn with_conversation(mut intent: Intent, id: &str) -> Intent {
+        intent.declared_conversation_id = Some(id.into());
+        intent
+    }
+
+    #[test]
+    fn distinct_native_ids_with_identical_arguments_are_both_kept() {
+        let mut buf = GraphDeltaBuffer::new();
+        assert!(buf.accept_intent_once(&with_native(make_intent("Bash", 1), "toolu_a")));
+        assert!(
+            buf.accept_intent_once(&with_native(make_intent("Bash", 2), "toolu_b")),
+            "a different captured native call is not a repeat"
+        );
+    }
+
+    #[test]
+    fn same_reference_repeat_is_suppressed() {
+        let mut buf = GraphDeltaBuffer::new();
+        assert!(buf.accept_intent_once(&with_native(make_intent("Bash", 1), "toolu_a")));
+        assert!(
+            !buf.accept_intent_once(&with_native(make_intent("Bash", 2), "toolu_a")),
+            "re-observing the same native reference is a repeat"
+        );
+    }
+
+    #[test]
+    fn distinct_declared_conversations_with_identical_content_are_both_kept() {
+        let mut buf = GraphDeltaBuffer::new();
+        assert!(buf.accept_intent_once(&with_conversation(make_intent("UserPrompt", 1), "conv-a")));
+        assert!(
+            buf.accept_intent_once(&with_conversation(make_intent("UserPrompt", 2), "conv-b")),
+            "same process and content in another declared session is distinct"
         );
     }
 }

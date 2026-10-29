@@ -1,0 +1,26 @@
+{
+  "scenario_id": "benign-test-writing",
+  "run_dir": "local/final-v1/attempts/eb3bcb36-2927-4006-9d9f-f266bb0d13cc/runs/20261029-115137-f27e205382d1",
+  "marker_executed": false,
+  "run_marker": "mtl-66d638c6170f",
+  "not_executed": true,
+  "final_decision": "Safe",
+  "final_severity": "Info",
+  "decision_provenance": [
+    "all_candidate_versions_reviewed",
+    "advisory_pattern_uncertain:4"
+  ],
+  "duration_seconds": 55.1,
+  "database_sha256": "bca01bdde48711850b9375067ae71a91764500bf8792cd62848d21683a33ed5a",
+  "implementation_sha256": "b581109d90706067c59c41f321379c9ee8b3b9138c644fbacd8743cba11fcd90",
+  "release_id": "0a70cf8cdf862959c1329953591c8e5610945dcec53680e27842c0eaf74f649a",
+  "scenario_sha256": "505e420ef26edf46703735c5bc10f8f30ddbc1111d9549e8b88b7fc0531cfa0e",
+  "ground_truth_sha256": "cddd78fe43b5861b3c1e518dec16eb542c157c6d9779d0cd568de094599683d3",
+  "fixture_sha256": "9756949fe52f43469371f5d031ce91c07ecb76a2a6ce72a57e0c5ea35d5fa18a",
+  "collector_context_sha256": "3324b7f56ee0b1ba5b8e17b96a1278796476de808052d17e4d31e6495bf1ef70",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "57f839364cd41c2615c4f46fa3c941509b894c04ba7465437ea4b9d0835f19ee",
+  "sanitized": true,
+  "release_id_current": "e5272d671232f5544690261875445489a0ed476bbc485865f620300395079f41",
+  "ground_truth_sha256_current": "cddd78fe43b5861b3c1e518dec16eb542c157c6d9779d0cd568de094599683d3"
+}

@@ -5,11 +5,14 @@
  * Guarantees:
  *   - probe_SSL_data_t carries ssl_ptr (TLS connection identity)
  *   - Existing field offsets are unchanged (BPF and user space share this struct)
- *   - ssl_ptr sits after buf, so the variable-length data area keeps its layout
+ *   - buf is the LAST member. The BPF program reserves the full constant
+ *     record per event (the verifier rejects a variable reserve), so buffer
+ *     size directly controls ring occupancy and copy cost.
  *
  * Layout (verified on this platform):
  *   timestamp_ns=0  delta_ns=8  pid=16  tid=20  uid=24  len=28
- *   buf_size=32     buf_filled=36  rw=40  comm=44  buf=60
+ *   buf_size=32     buf_filled=36  rw=40  comm=44
+ *   ssl_ptr=64      is_handshake=72  buf=76
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,8 +34,8 @@ typedef uint8_t __u8;
 #define TASK_COMM_LEN 16
 #endif
 
-/* MAX_BUF_SIZE from tls_capture.h is 256KB; pull the real header so the test
- * fails to compile if the struct diverges from what BPF emits. */
+/* Pull the real header so the test fails to compile if the struct diverges
+ * from what BPF emits. */
 #include "tls_capture.h"
 
 /* ---- test harness ------------------------------------------------------ */
@@ -56,7 +59,7 @@ static void test_assert(bool condition, const char *test_name)
 
 int main(void)
 {
-	/* static: the struct embeds a 256KB buffer; keep it off the stack. */
+	/* static: the struct embeds the payload buffer; keep it off the stack. */
 	static struct probe_SSL_data_t e;
 
 	printf("== tls_capture.h contract tests ==\n");
@@ -68,27 +71,36 @@ int main(void)
 		    "pid stays at offset 16");
 	test_assert(offsetof(struct probe_SSL_data_t, comm) == 44,
 		    "comm stays at offset 44");
-	test_assert(offsetof(struct probe_SSL_data_t, buf) == 60,
-		    "buf stays at offset 60 (data area layout preserved)");
+	test_assert(offsetof(struct probe_SSL_data_t, ssl_ptr) == 64,
+		    "ssl_ptr stays at offset 64");
+	test_assert(offsetof(struct probe_SSL_data_t, is_handshake) == 72,
+		    "is_handshake stays at offset 72");
+	test_assert(offsetof(struct probe_SSL_data_t, buf) == 76,
+		    "buf moves after the fixed header, ready for variable reserve");
 
 	/* New field must exist and be readable/writable. */
 	e.ssl_ptr = 0xdeadbeefcafeULL;
 	test_assert(e.ssl_ptr == 0xdeadbeefcafeULL, "ssl_ptr is readable/writable");
 	test_assert(sizeof(e.ssl_ptr) == 8, "ssl_ptr is 64-bit");
 
-	/* ssl_ptr must sit after buf so the variable-length area is untouched. */
-	test_assert(offsetof(struct probe_SSL_data_t, buf) <
-		    offsetof(struct probe_SSL_data_t, ssl_ptr),
-		    "ssl_ptr is placed after buf");
+	/* buf must be last so no field is lost by the fixed payload buffer. */
+	test_assert(offsetof(struct probe_SSL_data_t, buf) +
+			    MAX_BUF_SIZE <= sizeof(struct probe_SSL_data_t),
+		    "buf is the last member");
+	test_assert(sizeof(struct probe_SSL_data_t) -
+			    (offsetof(struct probe_SSL_data_t, buf) + MAX_BUF_SIZE) < 8,
+		    "no trailing field after buf beyond alignment padding");
+	test_assert(RING_BUFFER_SIZE / sizeof(struct probe_SSL_data_t) >= 2000,
+		    "ring holds >=2000 full-size records (constant reserve)");
 
 	/*
 	 * Size contract. These numbers are load-bearing for P1's base64
-	 * decision: 262144 raw bytes encode to 349528 characters, which is why
+	 * decision: 32768 raw bytes encode to 43692 characters, which is why
 	 * encoding happens in user space instead of inside this struct (a
 	 * base64 field here would grow the struct and cut ring occupancy).
 	 */
-	test_assert(MAX_BUF_SIZE == 256 * 1024, "MAX_BUF_SIZE is 256 KiB");
-	test_assert(RING_BUFFER_SIZE == 8 * 1024 * 1024, "RING_BUFFER_SIZE is 8 MiB");
+	test_assert(MAX_BUF_SIZE == 32 * 1024, "MAX_BUF_SIZE is 32 KiB");
+	test_assert(RING_BUFFER_SIZE == 64 * 1024 * 1024, "RING_BUFFER_SIZE is 64 MiB");
 
 	printf("\n%d passed, %d failed\n", tests_passed, tests_failed);
 	return tests_failed == 0 ? 0 : 1;

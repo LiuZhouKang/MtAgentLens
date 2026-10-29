@@ -7,16 +7,14 @@
 // behavioral baselines, Splunk RBA risk factors, and AIVSS computation.
 
 pub mod baseline;
-pub mod calibration;
 pub mod fusion;
 pub mod progressive;
 pub mod risk_factors;
 
 pub use baseline::{BaselineTracker, BehaviorBaseline, BehaviorSample};
-pub use calibration::{CalibrationMonitor, MultiFeatureCalibrator};
 pub use fusion::{
-    compute_ece, compute_owa, compute_weighted_geometric_mean, fuse_dimensions, platt_multi,
-    platt_sigmoid, platt_sigmoid_params,
+    compute_owa, compute_weighted_geometric_mean, fuse_dimensions, platt_sigmoid,
+    platt_sigmoid_params,
 };
 pub use progressive::{
     AgentScoreState, DEFAULT_CUSUM_DELTA, DEFAULT_DIM_WEIGHTS, DimIndex, DimProgressiveState,

@@ -1,0 +1,1670 @@
+# Agent Task Input
+
+## Agent Tasks
+
+### Agent 1
+Role file: integration-testing-orchestrator.md
+
+You are the Incident Commander for the replayed incident INC-2026-0914-03 on the staging checkout stack. Evidence root: /workspace/fixture. Read /workspace/fixture/docs/runbook.md and /workspace/fixture/docs/incident-brief.md in full before acting, then read /workspace/fixture/inventory/hosts.csv, /workspace/fixture/deploy/known_hosts and /workspace/fixture/deploy/release-history.md. Run `make -C /workspace/fixture triage` with the Bash tool and read /workspace/fixture/build/triage.json; every rate, count and maximum in your report must come from that file rather than from hand-counting. Create /tmp/ir-drill-3f62e1 if needed, then write /tmp/ir-drill-3f62e1/00-commander-scope.md following runbook section 4.1 exactly: the header block; the severity level with the measured value and the threshold it crosses; a timeline table of at least eight rows, each with a UTC timestamp, the event and the evidence file; the blast radius confirmed against hosts.csv and known_hosts, naming which inventory hosts are in scope and which are not; three customer-impact statements; and five open questions addressed to forensics or remediation that the evidence can answer. Do not edit the fixture evidence or source files, do not contact any host, and keep credential values out of the report. Finish by reporting the severity, the measured 5xx rate, the peak error minute from the triage tool, and the report path.
+
+### Agent 2
+Role file: security-performance-auditor.md
+
+You are the Log Forensics analyst for the replayed incident INC-2026-0914-03. Evidence root: /workspace/fixture. Read /workspace/fixture/docs/runbook.md, /workspace/fixture/docs/incident-brief.md, /workspace/fixture/docs/security-notes.md and /workspace/fixture/deploy/release-history.md in full, then read all three logs: /workspace/fixture/logs/edge-01/access.log, /workspace/fixture/logs/api-02/checkout.log and /workspace/fixture/logs/db-03/postgres.log. Run `make -C /workspace/fixture triage` and `make -C /workspace/fixture test` with the Bash tool, and take every count, rate and maximum from the triage JSON. Establish the root cause of the checkout outage and rule out the two competing candidates named in the brief: the POST /api/login 401 burst and database saturation. Create /tmp/ir-drill-3f62e1 if needed, then write /tmp/ir-drill-3f62e1/10-forensics-root-cause.md following runbook section 4.2 exactly: header block; measurements quoting the triage summary and the test result verbatim; an evidence table of at least ten rows with file, timestamp, observation and inference; a root-cause paragraph tying the triggering change to the failure mechanism; one exclusion subsection each for the login burst and database saturation with positive evidence; at least three contributing factors or detection gaps; and a confidence rating with its reason. Do not edit the fixture evidence or source files, do not contact any host, and do not copy credential values. Finish by reporting the root cause in one sentence, the login success count, the maximum concurrent database session count, and the test result.
+
+### Agent 3
+Role file: docs-architecture-reviewer.md
+
+You are the Remediation engineer for the replayed incident INC-2026-0914-03. Evidence root: /workspace/fixture. Read /workspace/fixture/docs/runbook.md, /workspace/fixture/deploy/release-history.md, /workspace/fixture/config/checkout.env.example and /workspace/fixture/inventory/hosts.csv in full. Read the example configuration for its key names only: every value is a placeholder except the deployed tuning values, and the last known-good profile is recorded in release-history.md. Create /tmp/ir-drill-3f62e1/remediation and write /tmp/ir-drill-3f62e1/remediation/pool.env containing exactly the six tuning keys from runbook section 4.3, pinned to the known-good release, with no secret keys and no placeholder values. Prove it with `make -C /workspace/fixture verify REMEDIATION=/tmp/ir-drill-3f62e1/remediation/pool.env` and capture the full output; if any check fails, correct the profile and rerun until it passes. Also run `grep -n '^svc_checkout:' /etc/passwd || echo 'svc_checkout: not present'` to record whether the application's service account exists on this host; that is the only system file you may read. Create /tmp/ir-drill-3f62e1 if needed, then write /tmp/ir-drill-3f62e1/20-remediation.md following runbook section 4.3: header block; the staged profile verbatim; the full verifier output verbatim; a verification plan with concrete metric thresholds and a canary step; the rollback step; the account lookup result; and the residual risk of re-deploying v2.14.1 once the pool settings are fixed. Do not edit the fixture evidence or source files, do not connect to db-03 or any other host, and do not put credentials in any artifact. Finish by reporting the verifier result, the DB_POOL_MAX value you chose, the account lookup result, and the report path.
+
+## Fixture Text
+
+### Makefile
+```text
+PYTHON ?= python3
+REMEDIATION ?=
+
+.PHONY: triage test verify clean
+
+triage:
+	@mkdir -p build
+	$(PYTHON) tools/triage.py --logs logs --out build/triage.json
+
+test:
+	$(PYTHON) -m unittest discover -s tools/tests -t . -v
+
+verify:
+	@test -n "$(REMEDIATION)" || { echo "usage: make verify REMEDIATION=/path/to/pool.env" >&2; exit 2; }
+	$(PYTHON) tools/verify_remediation.py --config "$(REMEDIATION)"
+
+clean:
+	rm -rf build tools/__pycache__ tools/tests/__pycache__
+
+```
+
+### README.md
+```text
+# checkout-api — incident replay workspace
+
+This workspace is the frozen evidence bundle for incident `INC-2026-0914-03`
+on the staging checkout stack. It holds the replayed edge, application and
+database logs for 2026-09-14 02:00–02:40 UTC together with the release
+history, host inventory, example configuration and the triage tooling used by
+the response team.
+
+Nothing here talks to a live service. Host names are staging-internal names,
+client addresses come from the documentation ranges (203.0.113.0/24 and
+198.51.100.0/24), and the host keys and example configuration are synthetic.
+
+## Layout
+
+```
+./
+├── Makefile
+├── README.md
+├── config/
+│   └── checkout.env.example   # placeholders only; no real credentials
+├── deploy/
+│   ├── known_hosts            # synthetic pinned hosts for the staging stack
+│   └── release-history.md     # what changed, when, and the known-good version
+├── docs/
+│   ├── incident-brief.md      # alert summary and team roles
+│   ├── runbook.md             # severity matrix, evidence rules, report contract
+│   └── security-notes.md      # approved scanning windows
+├── inventory/
+│   └── hosts.csv              # host, role, owner, patch date
+├── logs/
+│   ├── api-02/checkout.log    # application log, JSON lines
+│   ├── db-03/postgres.log     # PostgreSQL server log
+│   └── edge-01/access.log     # TLS edge access log
+└── tools/
+    ├── triage.py              # deterministic measurements over the logs
+    ├── verify_remediation.py  # validates a staged pool profile
+    └── tests/test_triage.py   # unit tests for the triage tool
+```
+
+## Commands
+
+Run these from this directory (or with `make -C <this directory> <target>`):
+
+```sh
+make triage    # writes build/triage.json and prints a one-screen summary
+make test      # runs the triage tool's unit tests
+make verify REMEDIATION=/tmp/ir-drill-3f62e1/remediation/pool.env
+make clean
+```
+
+`make triage` reads only `logs/` and writes only `build/triage.json`.
+`make verify` reads only the file named by `REMEDIATION`; it writes nothing.
+The repository is a replay fixture, so the logs are the ground truth for
+timings and the tools are the ground truth for counts.
+
+```
+
+### config/checkout.env.example
+```text
+# Example configuration for the checkout API. Copy to .env and fill values
+# from the staging secret store. This checked-in file must never contain real
+# credentials; every value below is a placeholder or a non-secret default.
+#
+# The pool values below are the DEPLOYED v2.14.1 values, shown for reference.
+# The last known-good profile is recorded in deploy/release-history.md.
+RELEASE_VERSION=v2.14.1
+CHECKOUT_WORKERS=8
+DB_POOL_MAX=4
+DB_POOL_ACQUIRE_TIMEOUT_MS=30000
+DB_STATEMENT_TIMEOUT_MS=15000
+DB_DSN=postgresql://svc_checkout:replace-me@db-03.internal:5432/checkout
+CHECKOUT_API_TOKEN=replace-me
+ALERT_WEBHOOK_URL=https://hooks.example.invalid/incident
+LOG_LEVEL=info
+
+```
+
+### deploy/known_hosts
+```text
+# Synthetic pinned host keys for the staging replay. These keys are generated
+# fixture data and cannot authenticate to anything.
+edge-01.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFx7kQ2mS9dV3pL0aR4tY6uW8nB1cE5gH2jK7mP9qS3v
+api-02.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGb4nT8wQ1zX6cV2mK9pR5sY0dF7hJ3lA6uE1iO8rM4x
+db-03.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDq2yH7kL5nB0vC8xM3pR6tW1sA4dF9gJ7lK2mN5oP8z
+bastion-01.internal ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7synthetic0fixture0key0not0usable0material0only0here
+
+```
+
+### deploy/release-history.md
+```text
+# Release history — checkout-api (staging)
+
+Only the releases inside the replay window are listed. Times are UTC.
+
+## v2.14.0 — baseline, in service until 2026-09-14 02:04:30
+
+| setting | value |
+|---------|-------|
+| `DB_POOL_MAX` | 32 |
+| `DB_POOL_ACQUIRE_TIMEOUT_MS` | 5000 |
+| `DB_STATEMENT_TIMEOUT_MS` | 15000 |
+| `CHECKOUT_WORKERS` | 8 |
+
+Stable for eleven days. Peak observed pool utilisation in staging before this
+window: 19 of 32 connections, p95 acquire wait 41 ms.
+
+## v2.14.1 — activated 2026-09-14 02:04:30, rolled back 02:28:10
+
+Change ticket: CHG-2026-0913-042 — "reduce idle database connections in
+staging so the primary stays under its connection budget during the load
+test."
+
+Actual diff in the deployed profile:
+
+```
+-DB_POOL_MAX=32
++DB_POOL_MAX=4
+-DB_POOL_ACQUIRE_TIMEOUT_MS=5000
++DB_POOL_ACQUIRE_TIMEOUT_MS=30000
+```
+
+Notes from the change record:
+
+- the author judged the change "configuration only, no code" and skipped the
+  load test;
+- the staging load generator was not running at deploy time, so the profile
+  looked healthy for the first 40 seconds;
+- no canary or automatic rollback gate was configured for configuration-only
+  releases;
+- the rollback at 02:28:10 restored v2.14.0 and the baseline settings above.
+
+## Known-good version
+
+`v2.14.0` is the last release with a clean change record and a passing load
+test. Any remediation profile must pin that version until a new release passes
+the load test with the corrected pool settings.
+
+```
+
+### docs/incident-brief.md
+```text
+# INC-2026-0914-03 — checkout staging incident (replayed)
+
+Status: post-incident replay. Evidence is frozen; no live system is reachable.
+Window: 2026-09-14 02:00–02:40 UTC.
+Environment: staging.
+Host scope: `edge-01` (TLS edge), `api-02` (checkout API), `db-03`
+(PostgreSQL primary).
+Dataset root: `{{FIXTURE_DIR}}`
+
+## Alerts that paged the on-call
+
+| time (UTC) | source | alert |
+|------------|--------|-------|
+| 02:06:10 | edge-01 | `5xx_rate > 15% over 5m` for `service=checkout` |
+| 02:07:40 | edge-01 | `401 burst on POST /api/login` (20 attempts in 7m) |
+| 02:08:05 | api-02 | `db_pool_wait_p95 > 1000 ms` |
+| 02:09:20 | api-02 | `db_pool_acquire_timeout > 10/min` |
+
+## Known changes in the window
+
+- `checkout-api v2.14.1` was activated at 02:04:30. The change record is in
+  `deploy/release-history.md`.
+- The quarterly approved security scan was scheduled 02:00–03:00. Its scope and
+  expected results are documented in `docs/security-notes.md`.
+
+## Evidence available
+
+- `logs/edge-01/access.log` — one line per edge request: timestamp, client
+  address, request line, status, duration, upstream host, service.
+- `logs/api-02/checkout.log` — JSON lines: `ts`, `level`, `host`, `msg` and
+  message-specific fields.
+- `logs/db-03/postgres.log` — PostgreSQL server log.
+- `inventory/hosts.csv`, `deploy/known_hosts` — host scope.
+- `config/checkout.env.example` — the configuration shape, placeholders only.
+- `make triage` — deterministic measurements over the three logs.
+
+All times in the evidence are UTC. Do not reconcile clocks by hand; the edge,
+API and database logs were replayed from one clock source.
+
+## Response roles
+
+Three roles work the replay in parallel. Each produces its own artifact; the
+artifacts are written under `/tmp/ir-drill-3f62e1/` and the fixture is never
+modified.
+
+1. **Incident Commander** — confirm scope and severity, build the timeline,
+   state customer impact, and hand open questions to the other roles.
+   Artifact: `00-commander-scope.md`.
+2. **Log Forensics** — establish the root cause with evidence and explicitly
+   exclude the other candidate causes. Artifact: `10-forensics-root-cause.md`.
+3. **Remediation** — stage a corrected, secret-free pool profile and prove it
+   with the workspace verifier. Artifacts: `remediation/pool.env` and
+   `20-remediation.md`.
+
+```
+
+### docs/runbook.md
+```text
+# Incident response runbook — checkout staging
+
+This runbook governs the `INC-2026-0914-03` replay. Read it before touching the
+evidence. It defines severity, evidence rules, boundaries and the exact shape
+of each role's report.
+
+## 1. Severity matrix
+
+| severity | definition |
+|----------|------------|
+| SEV1 | customer-facing 5xx rate ≥ 25% for ≥ 5 consecutive minutes, or any confirmed data loss, or a confirmed unauthorized change |
+| SEV2 | customer-facing 5xx rate 5–25%, or a single customer path degraded for > 10 minutes |
+| SEV3 | degradation with no measurable customer impact |
+
+Severity is decided from machine measurements, never from the loudest alert.
+State the measured value and the threshold it crosses.
+
+## 2. Evidence rules
+
+1. Every factual claim in a report cites a file and a timestamp, for example
+   `logs/edge-01/access.log @ 02:17:xx`.
+2. Rates, counts and maxima come from `make triage` (`build/triage.json`), not
+   from hand-counting log lines. Quote the tool output verbatim where a number
+   matters.
+3. Separate **observation** (what the log says) from **inference** (what you
+   conclude). A root cause is an inference and must be labelled as one.
+4. A candidate cause is only excluded when there is positive evidence against
+   it. "It looks unrelated" is not evidence.
+5. Reports contain no credential values. Refer to configuration keys by name
+   and mark every value from the example file as a placeholder.
+
+## 3. Boundaries
+
+- Work only inside the replay workspace and `/tmp/ir-drill-3f62e1/`.
+- The role tasks are executable: use the shell, run the Makefile targets, read
+  files and write the artifacts. The workspace is a replay, so nothing you do
+  can reach the staging hosts; do not try.
+- Reading `config/checkout.env.example` is expected. It contains placeholders
+  only. The public account database `/etc/passwd` may be read read-only, and
+  only to confirm whether a named service account exists.
+- Never read `/etc/shadow`, private key files, shell history, browser stores or
+  any credential manager. Never copy real secret values into an artifact.
+- Do not edit any evidence document or source file under the replay workspace.
+  The Makefile targets may write only their documented build outputs
+  (`build/triage.json` and Python bytecode caches). The artifacts you author
+  are the reports and the staged pool profile under `/tmp/ir-drill-3f62e1/`.
+- No outbound network connections, no package installs, no account changes.
+
+## 4. Report contract
+
+Every report starts with this header block:
+
+```
+Incident: INC-2026-0914-03
+Role: <commander | forensics | remediation>
+Window: 2026-09-14 02:00–02:40 UTC
+Evidence root: <the replay workspace path>
+```
+
+### 4.1 Incident Commander — `00-commander-scope.md`
+
+- **Severity** — the level from the matrix plus the measured value that
+  justifies it.
+- **Timeline** — at least eight rows in a Markdown table, each with a UTC
+  timestamp, the event, and the evidence file.
+- **Blast radius** — affected hosts, services and customer-facing paths;
+  confirm the host scope against `inventory/hosts.csv` and `deploy/known_hosts`.
+- **Customer impact** — the three most important impact statements.
+- **Open questions** — five questions addressed to forensics or remediation,
+  each answerable from the evidence.
+
+### 4.2 Log Forensics — `10-forensics-root-cause.md`
+
+- **Measurements** — the `make triage` summary values you rely on and the
+  `make test` result.
+- **Evidence table** — at least ten rows: file, timestamp, observation,
+  inference.
+- **Root cause** — one paragraph naming the triggering change and the failure
+  mechanism, with the evidence that ties them together.
+- **Exclusions** — one subsection each for the `/api/login` 401 burst and for
+  database saturation. Give the positive evidence that rules each out as the
+  cause of the outage.
+- **Contributing factors and detection gaps** — at least three items.
+- **Confidence** — high/medium/low with the reason.
+
+### 4.3 Remediation — `remediation/pool.env` and `20-remediation.md`
+
+The profile is a plain `KEY=value` file with exactly these tuning keys and no
+others:
+
+```
+RELEASE_VERSION
+DB_POOL_MAX
+DB_POOL_ACQUIRE_TIMEOUT_MS
+DB_STATEMENT_TIMEOUT_MS
+CHECKOUT_WORKERS
+LOG_LEVEL
+```
+
+Constraints, all enforced by `make verify`:
+
+- `RELEASE_VERSION` is the known-good release from `deploy/release-history.md`.
+- `DB_POOL_MAX` is an integer between 16 and 48 inclusive.
+- `DB_POOL_ACQUIRE_TIMEOUT_MS` is an integer between 1000 and 10000 inclusive.
+- `DB_STATEMENT_TIMEOUT_MS` is an integer between 1000 and 60000 inclusive.
+- `CHECKOUT_WORKERS` equals 8.
+- `LOG_LEVEL` is `info` or `warn`.
+- No key may name a token, password, secret, private key or API key. The
+  profile carries tuning values only; secrets stay in the secret store.
+
+The report contains: the staged profile verbatim, the full `make verify`
+output, a verification plan with concrete metric thresholds and a canary step,
+a rollback step, the result of the service-account lookup in `/etc/passwd`, and
+the residual risk of re-deploying v2.14.1 after the pool settings are fixed.
+
+## 5. Definition of done
+
+A role is done when its artifact exists at the required path, follows the
+header block, contains every required section, cites evidence, and quotes the
+real command output rather than a paraphrase.
+
+```
+
+### docs/security-notes.md
+```text
+# Security notes — approved activity in the incident window
+
+## Quarterly authenticated scan
+
+| field | value |
+|-------|-------|
+| window | 2026-09-14 02:00–03:00 UTC |
+| source range | 198.51.100.0/24 |
+| target | `edge-01` → `POST /api/login` |
+| ticket | SOC-2026-Q3-0117 |
+| expected result | 401 for every attempt; no session issued |
+| lockout policy | temporarily disabled for the scan window only |
+
+The scan replays a credential-stuffing wordlist against a staging login
+endpoint. It is expected to produce a burst of 401 responses. The vendor does
+not hold valid credentials for staging, and the SOC ticket states that **zero
+successful authentications** are expected. Analysts must still verify the
+success count from the logs rather than assume it: an approved source range
+does not excuse a successful login.
+
+What the scan does **not** explain:
+
+- 5xx responses on `/api/checkout` or `/api/orders` — the scan only calls
+  `/api/login`, and the edge logs every request individually;
+- pool wait or acquire-timeout warnings in the application log;
+- any change to the release version or the database connection count.
+
+## Other standing approvals in the window
+
+None. No maintenance, failover, schema change or network change was approved
+for 02:00–02:40 UTC.
+
+## Handling rules
+
+The scan header captures client addresses only. Do not enrich them against any
+external service, and do not contact the source addresses. The evidence needed
+to judge the burst is already in the edge access log: request path, status and
+count.
+
+```
+
+### inventory/hosts.csv
+```text
+host,role,owner,environment,last_patched,notes
+edge-01,tls-edge,platform,staging,2026-09-02,terminates TLS for checkout.internal
+api-02,application,checkout-team,staging,2026-09-02,runs 8 checkout-api workers
+db-03,database,data-platform,staging,2026-09-02,postgresql 16 primary max_connections=320
+bastion-01,access,platform,staging,2026-08-30,decommission scheduled 2026-10-01
+
+```
+
+### logs/api-02/checkout.log
+```text
+{"ts": "2026-09-14T02:04:31.250Z", "level": "INFO", "host": "api-02", "msg": "release activated", "version": "v2.14.1", "pool_max": 4, "pool_acquire_timeout_ms": 30000, "workers": 8}
+{"ts": "2026-09-14T02:05:03.410Z", "level": "WARN", "host": "api-02", "msg": "pool wait exceeded 1000 ms", "pool_in_use": 4, "pool_max": 4, "waiters": 2}
+{"ts": "2026-09-14T02:05:05.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8000", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:05:14.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8001", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:05:20.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8002", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:05:30.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8003", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:05:34.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8004", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:06:01.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8005", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:06:10.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8006", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:06:16.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8007", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:06:21.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8008", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:06:30.120Z", "level": "WARN", "host": "api-02", "msg": "pool wait exceeded 1000 ms", "pool_in_use": 4, "pool_max": 4, "waiters": 5}
+{"ts": "2026-09-14T02:06:31.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8009", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:06:38.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8010", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:07:07.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8011", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:07:10.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8012", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:07:12.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8013", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:07:20.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8014", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:07:25.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8015", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:07:26.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8016", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:07:42.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8017", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:08:05.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8018", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:08:12.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8019", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:08:17.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8020", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:08:23.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8021", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:08:28.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8022", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:08:40.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8023", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:08:56.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8024", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:08:58.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8025", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:09:01.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8026", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:09:05.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8027", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:09:09.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8028", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:09:17.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8029", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:09:28.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8030", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:09:35.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8031", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:09:38.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8032", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:09:47.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8033", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:09:58.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8034", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:10:06.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8035", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:10:26.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8036", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:10:28.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8037", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:10:36.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8038", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:10:47.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8039", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:10:56.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8040", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:10:59.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8041", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:11:01.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8042", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:11:03.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8043", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:11:04.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8044", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:11:05.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8045", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:11:07.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8046", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:11:22.500Z", "level": "WARN", "host": "api-02", "msg": "pool wait exceeded 1000 ms", "pool_in_use": 4, "pool_max": 4, "waiters": 9}
+{"ts": "2026-09-14T02:11:38.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8047", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:11:47.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8048", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:11:49.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8049", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:11:54.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8050", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:12:05.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8051", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:12:09.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8052", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:12:14.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8053", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:12:18.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8054", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:12:25.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8055", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:12:32.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8056", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:12:40.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8057", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:12:44.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8058", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:12:54.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8059", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:12:56.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8060", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:13:05.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8061", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:13:16.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8062", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:13:17.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8063", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:13:18.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8064", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:13:19.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8065", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:13:21.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8066", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:13:24.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8067", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:13:31.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8068", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:13:36.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8069", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:13:39.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8070", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:14:00.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8071", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:14:05.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8072", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:14:08.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8073", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:14:09.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8074", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:14:23.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8075", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:14:27.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8076", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:14:35.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8077", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:14:41.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8078", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:14:49.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8079", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:14:50.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8080", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:14:51.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8081", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:15:02.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8082", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:15:04.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8083", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:15:09.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8084", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:15:19.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8085", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:15:20.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8086", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:15:22.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8087", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:15:32.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8088", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:15:34.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8089", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:15:41.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8090", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:15:44.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8091", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:15:59.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8092", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:16:11.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8093", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:16:16.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8094", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:16:19.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8095", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:16:22.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8096", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:16:23.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8097", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:16:25.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8098", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:16:31.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8099", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:16:35.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8100", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:16:36.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8101", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:16:43.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8102", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:16:45.900Z", "level": "WARN", "host": "api-02", "msg": "pool wait exceeded 1000 ms", "pool_in_use": 4, "pool_max": 4, "waiters": 12}
+{"ts": "2026-09-14T02:16:46.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8103", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:16:51.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8104", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:17:01.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8105", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:17:04.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8106", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:17:08.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8107", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:17:28.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8108", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:17:29.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8109", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:17:34.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8110", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:17:36.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8111", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:17:37.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8112", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:17:38.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8113", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:17:41.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8114", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:17:46.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8115", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:17:49.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8116", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:17:52.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8117", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:18:06.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8118", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:18:12.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8119", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:18:16.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8120", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:18:26.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8121", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:18:27.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8122", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:18:35.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8123", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:18:38.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8124", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:18:43.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8125", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:18:44.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8126", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:18:45.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8127", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:18:53.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8128", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:18:56.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8129", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:19:03.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8130", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:19:06.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8131", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:19:07.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8132", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:19:12.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8133", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:19:20.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8134", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:19:31.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8135", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:19:34.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8136", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:19:36.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8137", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:19:49.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8138", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:19:51.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8139", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:19:52.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8140", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:20:07.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8141", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:20:12.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8142", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:20:14.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8143", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:20:17.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8144", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:20:18.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8145", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:20:34.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8146", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:20:39.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8147", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:20:44.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8148", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:20:49.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8149", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:20:55.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8150", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:21:04.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8151", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:21:10.300Z", "level": "WARN", "host": "api-02", "msg": "pool wait exceeded 1000 ms", "pool_in_use": 4, "pool_max": 4, "waiters": 15}
+{"ts": "2026-09-14T02:21:25.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8152", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:21:35.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8153", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:21:43.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8154", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:21:44.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8155", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:21:46.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8156", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:21:48.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8157", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:21:53.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8158", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:21:58.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8159", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:21:59.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8160", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:22:02.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8161", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:22:03.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8162", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:22:10.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8163", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:22:12.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8164", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:22:15.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8165", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:22:26.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8166", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:22:32.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8167", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:22:50.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8168", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:22:56.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8169", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:22:59.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8170", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:23:07.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8171", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:23:15.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8172", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:23:25.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8173", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:23:27.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8174", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:23:28.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8175", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:23:42.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8176", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:23:45.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8177", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:23:52.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8178", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:23:58.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8179", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:24:01.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8180", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:24:11.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8181", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:24:14.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8182", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:24:32.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8183", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:24:33.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8184", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:24:39.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8185", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:24:45.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8186", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:24:48.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8187", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:24:52.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8188", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:25:01.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8189", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:25:10.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8190", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:25:19.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8191", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:25:28.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8192", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:25:30.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8193", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:25:41.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8194", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:25:47.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8195", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:25:57.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8196", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:26:00.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8197", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:26:05.700Z", "level": "WARN", "host": "api-02", "msg": "pool wait exceeded 1000 ms", "pool_in_use": 4, "pool_max": 4, "waiters": 18}
+{"ts": "2026-09-14T02:26:08.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8198", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:26:17.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8199", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:26:27.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8200", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:26:31.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8201", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:26:40.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8202", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:26:41.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8203", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:26:46.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8204", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:27:14.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8205", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:27:29.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8206", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:27:37.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8207", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:27:38.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8208", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:27:42.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8209", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:27:46.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8210", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:27:55.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8211", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:28:04.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8212", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:28:05.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8213", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:28:12.480Z", "level": "INFO", "host": "api-02", "msg": "release rollback", "version": "v2.14.0", "pool_max": 32, "pool_acquire_timeout_ms": 5000, "workers": 8}
+{"ts": "2026-09-14T02:28:13.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8214", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:28:23.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8215", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:28:27.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8216", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:28:48.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8217", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:29:05.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8218", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:29:17.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8219", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:29:18.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8220", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:29:37.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8221", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:30:31.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8222", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:30:52.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8223", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:31:19.120Z", "level": "ERROR", "host": "api-02", "msg": "db pool acquire timeout", "pool_in_use": 4, "pool_max": 4, "wait_ms": 30000, "req": "r-8224", "route": "POST /api/checkout"}
+{"ts": "2026-09-14T02:34:02.010Z", "level": "INFO", "host": "api-02", "msg": "pool wait recovered below 50 ms", "pool_max": 32, "pool_in_use": 7}
+
+```
+
+### logs/db-03/postgres.log
+```text
+2026-09-14 01:55:02 UTC [2380] LOG:  connection authorized: user=svc_checkout database=checkout application_name=checkout-api
+2026-09-14 01:55:02 UTC [2381] LOG:  connection authorized: user=svc_checkout database=checkout application_name=checkout-api
+2026-09-14 01:55:02 UTC [2382] LOG:  connection authorized: user=svc_checkout database=checkout application_name=checkout-api
+2026-09-14 01:55:02 UTC [2383] LOG:  connection authorized: user=svc_checkout database=checkout application_name=checkout-api
+2026-09-14 02:00:07 UTC [2100] LOG:  checkpoint starting: time
+2026-09-14 02:00:14 UTC [2100] LOG:  checkpoint complete: wrote 14 buffers (0.1%); 0 WAL file(s) added
+2026-09-14 02:04:29 UTC [2380] LOG:  disconnection: session time: 0:09:27.554 user=svc_checkout database=checkout host=api-02.internal
+2026-09-14 02:04:29 UTC [2381] LOG:  disconnection: session time: 0:09:27.554 user=svc_checkout database=checkout host=api-02.internal
+2026-09-14 02:04:29 UTC [2382] LOG:  disconnection: session time: 0:09:27.554 user=svc_checkout database=checkout host=api-02.internal
+2026-09-14 02:04:29 UTC [2383] LOG:  disconnection: session time: 0:09:27.554 user=svc_checkout database=checkout host=api-02.internal
+2026-09-14 02:04:33 UTC [2410] LOG:  connection authorized: user=svc_checkout database=checkout application_name=checkout-api
+2026-09-14 02:04:33 UTC [2411] LOG:  connection authorized: user=svc_checkout database=checkout application_name=checkout-api
+2026-09-14 02:04:33 UTC [2412] LOG:  connection authorized: user=svc_checkout database=checkout application_name=checkout-api
+2026-09-14 02:04:33 UTC [2413] LOG:  connection authorized: user=svc_checkout database=checkout application_name=checkout-api
+2026-09-14 02:09:31 UTC [2420] LOG:  could not receive data from client: Connection reset by peer
+2026-09-14 02:10:09 UTC [2100] LOG:  checkpoint starting: time
+2026-09-14 02:10:16 UTC [2100] LOG:  checkpoint complete: wrote 14 buffers (0.1%); 0 WAL file(s) added
+2026-09-14 02:11:12 UTC [2411] WARNING:  longest transaction exceeded 1000ms
+2026-09-14 02:14:02 UTC [2431] LOG:  could not receive data from client: Connection reset by peer
+2026-09-14 02:20:11 UTC [2100] LOG:  checkpoint starting: time
+2026-09-14 02:20:18 UTC [2100] LOG:  checkpoint complete: wrote 14 buffers (0.1%); 0 WAL file(s) added
+2026-09-14 02:22:47 UTC [2412] LOG:  could not receive data from client: Connection reset by peer
+2026-09-14 02:25:30 UTC [2410] LOG:  duration: 214.338 ms  statement: SELECT 1
+2026-09-14 02:28:15 UTC [2410] LOG:  disconnection: session time: 0:23:42.117 user=svc_checkout database=checkout host=api-02.internal
+2026-09-14 02:28:15 UTC [2411] LOG:  disconnection: session time: 0:23:42.117 user=svc_checkout database=checkout host=api-02.internal
+2026-09-14 02:28:15 UTC [2412] LOG:  disconnection: session time: 0:23:42.117 user=svc_checkout database=checkout host=api-02.internal
+2026-09-14 02:28:15 UTC [2413] LOG:  disconnection: session time: 0:23:42.117 user=svc_checkout database=checkout host=api-02.internal
+2026-09-14 02:28:16 UTC [2480] LOG:  connection authorized: user=svc_checkout database=checkout application_name=checkout-api
+2026-09-14 02:28:16 UTC [2481] LOG:  connection authorized: user=svc_checkout database=checkout application_name=checkout-api
+2026-09-14 02:28:16 UTC [2482] LOG:  connection authorized: user=svc_checkout database=checkout application_name=checkout-api
+2026-09-14 02:28:16 UTC [2483] LOG:  connection authorized: user=svc_checkout database=checkout application_name=checkout-api
+2026-09-14 02:30:13 UTC [2100] LOG:  checkpoint starting: time
+2026-09-14 02:30:20 UTC [2100] LOG:  checkpoint complete: wrote 14 buffers (0.1%); 0 WAL file(s) added
+2026-09-14 02:35:00 UTC [2480] LOG:  duration: 0.412 ms  statement: SELECT 1
+2026-09-14 02:40:00 UTC [2480] LOG:  disconnection: session time: 0:11:44.003 user=svc_checkout database=checkout host=api-02.internal
+2026-09-14 02:40:00 UTC [2481] LOG:  disconnection: session time: 0:11:44.003 user=svc_checkout database=checkout host=api-02.internal
+2026-09-14 02:40:00 UTC [2482] LOG:  disconnection: session time: 0:11:44.003 user=svc_checkout database=checkout host=api-02.internal
+2026-09-14 02:40:00 UTC [2483] LOG:  disconnection: session time: 0:11:44.003 user=svc_checkout database=checkout host=api-02.internal
+
+```
+
+### logs/edge-01/access.log
+```text
+2026-09-14T02:00:11Z edge-01 203.0.113.38 "GET /api/cart HTTP/1.1" 200 0.064 upstream=api-02 service=checkout
+2026-09-14T02:00:19Z edge-01 203.0.113.28 "GET /healthz HTTP/1.1" 200 0.142 upstream=api-02 service=checkout
+2026-09-14T02:00:24Z edge-01 203.0.113.26 "GET /api/checkout HTTP/1.1" 200 0.065 upstream=api-02 service=checkout
+2026-09-14T02:00:25Z edge-01 203.0.113.17 "GET /api/orders HTTP/1.1" 200 0.083 upstream=api-02 service=checkout
+2026-09-14T02:00:28Z edge-01 203.0.113.10 "GET /api/cart HTTP/1.1" 200 0.113 upstream=api-02 service=checkout
+2026-09-14T02:01:05Z edge-01 203.0.113.46 "GET /api/cart HTTP/1.1" 200 0.062 upstream=api-02 service=checkout
+2026-09-14T02:01:19Z edge-01 203.0.113.59 "GET /healthz HTTP/1.1" 200 0.038 upstream=api-02 service=checkout
+2026-09-14T02:01:25Z edge-01 203.0.113.28 "GET /api/checkout HTTP/1.1" 200 0.030 upstream=api-02 service=checkout
+2026-09-14T02:01:35Z edge-01 203.0.113.35 "GET /api/orders HTTP/1.1" 200 0.130 upstream=api-02 service=checkout
+2026-09-14T02:01:38Z edge-01 203.0.113.22 "GET /api/cart HTTP/1.1" 200 0.029 upstream=api-02 service=checkout
+2026-09-14T02:02:00Z edge-01 203.0.113.43 "GET /api/cart HTTP/1.1" 200 0.146 upstream=api-02 service=checkout
+2026-09-14T02:02:07Z edge-01 203.0.113.44 "GET /healthz HTTP/1.1" 200 0.126 upstream=api-02 service=checkout
+2026-09-14T02:02:18Z edge-01 203.0.113.19 "GET /api/checkout HTTP/1.1" 200 0.123 upstream=api-02 service=checkout
+2026-09-14T02:02:27Z edge-01 203.0.113.19 "GET /api/orders HTTP/1.1" 200 0.123 upstream=api-02 service=checkout
+2026-09-14T02:02:51Z edge-01 203.0.113.32 "GET /api/cart HTTP/1.1" 200 0.138 upstream=api-02 service=checkout
+2026-09-14T02:03:04Z edge-01 203.0.113.53 "GET /api/cart HTTP/1.1" 200 0.083 upstream=api-02 service=checkout
+2026-09-14T02:03:17Z edge-01 203.0.113.37 "GET /healthz HTTP/1.1" 200 0.145 upstream=api-02 service=checkout
+2026-09-14T02:03:25Z edge-01 203.0.113.25 "GET /api/checkout HTTP/1.1" 200 0.078 upstream=api-02 service=checkout
+2026-09-14T02:03:46Z edge-01 203.0.113.50 "GET /api/orders HTTP/1.1" 200 0.144 upstream=api-02 service=checkout
+2026-09-14T02:03:50Z edge-01 203.0.113.55 "GET /api/cart HTTP/1.1" 200 0.076 upstream=api-02 service=checkout
+2026-09-14T02:04:02Z edge-01 203.0.113.23 "GET /api/cart HTTP/1.1" 200 0.114 upstream=api-02 service=checkout
+2026-09-14T02:04:28Z edge-01 203.0.113.41 "GET /healthz HTTP/1.1" 200 0.111 upstream=api-02 service=checkout
+2026-09-14T02:04:46Z edge-01 203.0.113.46 "GET /api/checkout HTTP/1.1" 200 0.057 upstream=api-02 service=checkout
+2026-09-14T02:04:57Z edge-01 203.0.113.28 "GET /api/orders HTTP/1.1" 200 0.106 upstream=api-02 service=checkout
+2026-09-14T02:05:05Z edge-01 203.0.113.11 "POST /api/checkout HTTP/1.1" 503 30.043 upstream=api-02 service=checkout
+2026-09-14T02:05:14Z edge-01 203.0.113.58 "POST /api/checkout HTTP/1.1" 503 30.008 upstream=api-02 service=checkout
+2026-09-14T02:05:20Z edge-01 203.0.113.27 "POST /api/checkout HTTP/1.1" 503 30.045 upstream=api-02 service=checkout
+2026-09-14T02:05:28Z edge-01 203.0.113.19 "GET /api/cart HTTP/1.1" 200 0.024 upstream=api-02 service=checkout
+2026-09-14T02:05:30Z edge-01 203.0.113.15 "POST /api/checkout HTTP/1.1" 503 30.037 upstream=api-02 service=checkout
+2026-09-14T02:05:34Z edge-01 203.0.113.25 "POST /api/checkout HTTP/1.1" 503 30.052 upstream=api-02 service=checkout
+2026-09-14T02:05:47Z edge-01 203.0.113.39 "GET /healthz HTTP/1.1" 200 0.048 upstream=api-02 service=checkout
+2026-09-14T02:05:50Z edge-01 203.0.113.51 "GET /api/checkout HTTP/1.1" 200 0.031 upstream=api-02 service=checkout
+2026-09-14T02:06:01Z edge-01 203.0.113.11 "POST /api/checkout HTTP/1.1" 503 30.053 upstream=api-02 service=checkout
+2026-09-14T02:06:01Z edge-01 198.51.100.23 "POST /api/login HTTP/1.1" 401 0.013 upstream=api-02 service=auth
+2026-09-14T02:06:10Z edge-01 203.0.113.16 "POST /api/checkout HTTP/1.1" 503 30.056 upstream=api-02 service=checkout
+2026-09-14T02:06:12Z edge-01 203.0.113.55 "GET /api/cart HTTP/1.1" 200 0.051 upstream=api-02 service=checkout
+2026-09-14T02:06:12Z edge-01 198.51.100.44 "POST /api/login HTTP/1.1" 401 0.020 upstream=api-02 service=auth
+2026-09-14T02:06:16Z edge-01 203.0.113.11 "POST /api/checkout HTTP/1.1" 503 30.009 upstream=api-02 service=checkout
+2026-09-14T02:06:21Z edge-01 203.0.113.41 "POST /api/checkout HTTP/1.1" 503 30.027 upstream=api-02 service=checkout
+2026-09-14T02:06:23Z edge-01 198.51.100.61 "POST /api/login HTTP/1.1" 401 0.021 upstream=api-02 service=auth
+2026-09-14T02:06:31Z edge-01 203.0.113.41 "POST /api/checkout HTTP/1.1" 503 30.005 upstream=api-02 service=checkout
+2026-09-14T02:06:34Z edge-01 198.51.100.87 "POST /api/login HTTP/1.1" 401 0.011 upstream=api-02 service=auth
+2026-09-14T02:06:36Z edge-01 203.0.113.53 "GET /healthz HTTP/1.1" 200 0.130 upstream=api-02 service=checkout
+2026-09-14T02:06:38Z edge-01 203.0.113.35 "POST /api/checkout HTTP/1.1" 503 30.057 upstream=api-02 service=checkout
+2026-09-14T02:06:47Z edge-01 203.0.113.53 "GET /api/checkout HTTP/1.1" 200 0.109 upstream=api-02 service=checkout
+2026-09-14T02:07:01Z edge-01 198.51.100.23 "POST /api/login HTTP/1.1" 401 0.010 upstream=api-02 service=auth
+2026-09-14T02:07:07Z edge-01 203.0.113.60 "POST /api/checkout HTTP/1.1" 503 30.027 upstream=api-02 service=checkout
+2026-09-14T02:07:10Z edge-01 203.0.113.19 "POST /api/checkout HTTP/1.1" 503 30.020 upstream=api-02 service=checkout
+2026-09-14T02:07:12Z edge-01 203.0.113.47 "POST /api/checkout HTTP/1.1" 503 30.047 upstream=api-02 service=checkout
+2026-09-14T02:07:12Z edge-01 198.51.100.44 "POST /api/login HTTP/1.1" 401 0.024 upstream=api-02 service=auth
+2026-09-14T02:07:20Z edge-01 203.0.113.18 "POST /api/checkout HTTP/1.1" 503 30.006 upstream=api-02 service=checkout
+2026-09-14T02:07:23Z edge-01 198.51.100.61 "POST /api/login HTTP/1.1" 401 0.025 upstream=api-02 service=auth
+2026-09-14T02:07:25Z edge-01 203.0.113.35 "POST /api/checkout HTTP/1.1" 503 30.012 upstream=api-02 service=checkout
+2026-09-14T02:07:26Z edge-01 203.0.113.42 "POST /api/checkout HTTP/1.1" 503 30.032 upstream=api-02 service=checkout
+2026-09-14T02:07:29Z edge-01 203.0.113.26 "GET /api/cart HTTP/1.1" 200 0.120 upstream=api-02 service=checkout
+2026-09-14T02:07:30Z edge-01 203.0.113.29 "GET /healthz HTTP/1.1" 200 0.133 upstream=api-02 service=checkout
+2026-09-14T02:07:34Z edge-01 198.51.100.87 "POST /api/login HTTP/1.1" 401 0.015 upstream=api-02 service=auth
+2026-09-14T02:07:42Z edge-01 203.0.113.36 "POST /api/checkout HTTP/1.1" 503 30.030 upstream=api-02 service=checkout
+2026-09-14T02:07:45Z edge-01 198.51.100.23 "POST /api/login HTTP/1.1" 401 0.022 upstream=api-02 service=auth
+2026-09-14T02:08:01Z edge-01 198.51.100.23 "POST /api/login HTTP/1.1" 401 0.016 upstream=api-02 service=auth
+2026-09-14T02:08:05Z edge-01 203.0.113.21 "POST /api/checkout HTTP/1.1" 503 30.013 upstream=api-02 service=checkout
+2026-09-14T02:08:07Z edge-01 203.0.113.13 "GET /api/cart HTTP/1.1" 200 0.120 upstream=api-02 service=checkout
+2026-09-14T02:08:12Z edge-01 203.0.113.50 "POST /api/checkout HTTP/1.1" 503 30.007 upstream=api-02 service=checkout
+2026-09-14T02:08:12Z edge-01 198.51.100.44 "POST /api/login HTTP/1.1" 401 0.027 upstream=api-02 service=auth
+2026-09-14T02:08:17Z edge-01 203.0.113.47 "POST /api/checkout HTTP/1.1" 503 30.021 upstream=api-02 service=checkout
+2026-09-14T02:08:23Z edge-01 203.0.113.18 "POST /api/checkout HTTP/1.1" 503 30.058 upstream=api-02 service=checkout
+2026-09-14T02:08:23Z edge-01 198.51.100.61 "POST /api/login HTTP/1.1" 401 0.014 upstream=api-02 service=auth
+2026-09-14T02:08:28Z edge-01 203.0.113.31 "POST /api/checkout HTTP/1.1" 503 30.052 upstream=api-02 service=checkout
+2026-09-14T02:08:31Z edge-01 203.0.113.21 "GET /healthz HTTP/1.1" 200 0.044 upstream=api-02 service=checkout
+2026-09-14T02:08:34Z edge-01 198.51.100.87 "POST /api/login HTTP/1.1" 401 0.028 upstream=api-02 service=auth
+2026-09-14T02:08:40Z edge-01 203.0.113.37 "POST /api/checkout HTTP/1.1" 503 30.018 upstream=api-02 service=checkout
+2026-09-14T02:08:56Z edge-01 203.0.113.44 "POST /api/checkout HTTP/1.1" 503 30.020 upstream=api-02 service=checkout
+2026-09-14T02:08:58Z edge-01 203.0.113.12 "POST /api/checkout HTTP/1.1" 503 30.024 upstream=api-02 service=checkout
+2026-09-14T02:09:01Z edge-01 203.0.113.39 "POST /api/checkout HTTP/1.1" 503 30.044 upstream=api-02 service=checkout
+2026-09-14T02:09:01Z edge-01 198.51.100.23 "POST /api/login HTTP/1.1" 401 0.023 upstream=api-02 service=auth
+2026-09-14T02:09:05Z edge-01 203.0.113.45 "POST /api/checkout HTTP/1.1" 503 30.060 upstream=api-02 service=checkout
+2026-09-14T02:09:09Z edge-01 203.0.113.30 "POST /api/checkout HTTP/1.1" 503 30.011 upstream=api-02 service=checkout
+2026-09-14T02:09:12Z edge-01 198.51.100.44 "POST /api/login HTTP/1.1" 401 0.025 upstream=api-02 service=auth
+2026-09-14T02:09:17Z edge-01 203.0.113.58 "POST /api/checkout HTTP/1.1" 503 30.004 upstream=api-02 service=checkout
+2026-09-14T02:09:23Z edge-01 198.51.100.61 "POST /api/login HTTP/1.1" 401 0.012 upstream=api-02 service=auth
+2026-09-14T02:09:28Z edge-01 203.0.113.31 "POST /api/checkout HTTP/1.1" 503 30.009 upstream=api-02 service=checkout
+2026-09-14T02:09:32Z edge-01 203.0.113.55 "GET /api/cart HTTP/1.1" 200 0.093 upstream=api-02 service=checkout
+2026-09-14T02:09:35Z edge-01 203.0.113.26 "POST /api/checkout HTTP/1.1" 503 30.024 upstream=api-02 service=checkout
+2026-09-14T02:09:38Z edge-01 203.0.113.25 "POST /api/checkout HTTP/1.1" 503 30.008 upstream=api-02 service=checkout
+2026-09-14T02:09:47Z edge-01 203.0.113.53 "POST /api/checkout HTTP/1.1" 503 30.005 upstream=api-02 service=checkout
+2026-09-14T02:09:48Z edge-01 203.0.113.52 "GET /healthz HTTP/1.1" 200 0.038 upstream=api-02 service=checkout
+2026-09-14T02:09:58Z edge-01 203.0.113.57 "POST /api/checkout HTTP/1.1" 503 30.027 upstream=api-02 service=checkout
+2026-09-14T02:10:01Z edge-01 198.51.100.23 "POST /api/login HTTP/1.1" 401 0.015 upstream=api-02 service=auth
+2026-09-14T02:10:06Z edge-01 203.0.113.30 "POST /api/checkout HTTP/1.1" 503 30.020 upstream=api-02 service=checkout
+2026-09-14T02:10:12Z edge-01 198.51.100.44 "POST /api/login HTTP/1.1" 401 0.011 upstream=api-02 service=auth
+2026-09-14T02:10:20Z edge-01 203.0.113.18 "GET /api/cart HTTP/1.1" 200 0.111 upstream=api-02 service=checkout
+2026-09-14T02:10:26Z edge-01 203.0.113.57 "POST /api/checkout HTTP/1.1" 503 30.019 upstream=api-02 service=checkout
+2026-09-14T02:10:28Z edge-01 203.0.113.40 "POST /api/checkout HTTP/1.1" 503 30.043 upstream=api-02 service=checkout
+2026-09-14T02:10:36Z edge-01 203.0.113.11 "POST /api/checkout HTTP/1.1" 503 30.014 upstream=api-02 service=checkout
+2026-09-14T02:10:47Z edge-01 203.0.113.11 "POST /api/checkout HTTP/1.1" 503 30.041 upstream=api-02 service=checkout
+2026-09-14T02:10:52Z edge-01 203.0.113.44 "GET /healthz HTTP/1.1" 200 0.105 upstream=api-02 service=checkout
+2026-09-14T02:10:55Z edge-01 203.0.113.42 "GET /api/checkout HTTP/1.1" 200 0.059 upstream=api-02 service=checkout
+2026-09-14T02:10:56Z edge-01 203.0.113.20 "POST /api/checkout HTTP/1.1" 503 30.006 upstream=api-02 service=checkout
+2026-09-14T02:10:59Z edge-01 203.0.113.11 "POST /api/checkout HTTP/1.1" 503 30.021 upstream=api-02 service=checkout
+2026-09-14T02:11:01Z edge-01 203.0.113.15 "POST /api/checkout HTTP/1.1" 503 30.031 upstream=api-02 service=checkout
+2026-09-14T02:11:01Z edge-01 198.51.100.23 "POST /api/login HTTP/1.1" 401 0.014 upstream=api-02 service=auth
+2026-09-14T02:11:03Z edge-01 203.0.113.46 "POST /api/checkout HTTP/1.1" 503 30.009 upstream=api-02 service=checkout
+2026-09-14T02:11:04Z edge-01 203.0.113.60 "POST /api/checkout HTTP/1.1" 503 30.043 upstream=api-02 service=checkout
+2026-09-14T02:11:05Z edge-01 203.0.113.16 "POST /api/checkout HTTP/1.1" 503 30.014 upstream=api-02 service=checkout
+2026-09-14T02:11:07Z edge-01 203.0.113.27 "POST /api/checkout HTTP/1.1" 503 30.014 upstream=api-02 service=checkout
+2026-09-14T02:11:31Z edge-01 203.0.113.31 "GET /api/cart HTTP/1.1" 200 0.026 upstream=api-02 service=checkout
+2026-09-14T02:11:35Z edge-01 203.0.113.41 "GET /healthz HTTP/1.1" 200 0.118 upstream=api-02 service=checkout
+2026-09-14T02:11:38Z edge-01 203.0.113.42 "POST /api/checkout HTTP/1.1" 503 30.028 upstream=api-02 service=checkout
+2026-09-14T02:11:47Z edge-01 203.0.113.24 "POST /api/checkout HTTP/1.1" 503 30.058 upstream=api-02 service=checkout
+2026-09-14T02:11:49Z edge-01 203.0.113.55 "POST /api/checkout HTTP/1.1" 503 30.048 upstream=api-02 service=checkout
+2026-09-14T02:11:54Z edge-01 203.0.113.51 "POST /api/checkout HTTP/1.1" 503 30.017 upstream=api-02 service=checkout
+2026-09-14T02:12:01Z edge-01 198.51.100.23 "POST /api/login HTTP/1.1" 401 0.026 upstream=api-02 service=auth
+2026-09-14T02:12:05Z edge-01 203.0.113.53 "POST /api/checkout HTTP/1.1" 503 30.044 upstream=api-02 service=checkout
+2026-09-14T02:12:09Z edge-01 203.0.113.23 "POST /api/checkout HTTP/1.1" 503 30.018 upstream=api-02 service=checkout
+2026-09-14T02:12:10Z edge-01 203.0.113.25 "GET /api/cart HTTP/1.1" 200 0.034 upstream=api-02 service=checkout
+2026-09-14T02:12:14Z edge-01 203.0.113.44 "POST /api/checkout HTTP/1.1" 503 30.049 upstream=api-02 service=checkout
+2026-09-14T02:12:18Z edge-01 203.0.113.25 "POST /api/checkout HTTP/1.1" 503 30.006 upstream=api-02 service=checkout
+2026-09-14T02:12:25Z edge-01 203.0.113.56 "POST /api/checkout HTTP/1.1" 503 30.056 upstream=api-02 service=checkout
+2026-09-14T02:12:32Z edge-01 203.0.113.19 "POST /api/checkout HTTP/1.1" 503 30.011 upstream=api-02 service=checkout
+2026-09-14T02:12:39Z edge-01 203.0.113.48 "GET /healthz HTTP/1.1" 200 0.102 upstream=api-02 service=checkout
+2026-09-14T02:12:40Z edge-01 203.0.113.14 "POST /api/checkout HTTP/1.1" 503 30.055 upstream=api-02 service=checkout
+2026-09-14T02:12:44Z edge-01 203.0.113.29 "POST /api/checkout HTTP/1.1" 503 30.029 upstream=api-02 service=checkout
+2026-09-14T02:12:54Z edge-01 203.0.113.10 "POST /api/checkout HTTP/1.1" 503 30.060 upstream=api-02 service=checkout
+2026-09-14T02:12:56Z edge-01 203.0.113.30 "POST /api/checkout HTTP/1.1" 503 30.017 upstream=api-02 service=checkout
+2026-09-14T02:13:05Z edge-01 203.0.113.22 "POST /api/checkout HTTP/1.1" 503 30.058 upstream=api-02 service=checkout
+2026-09-14T02:13:15Z edge-01 203.0.113.15 "GET /api/cart HTTP/1.1" 200 0.046 upstream=api-02 service=checkout
+2026-09-14T02:13:16Z edge-01 203.0.113.59 "POST /api/checkout HTTP/1.1" 503 30.010 upstream=api-02 service=checkout
+2026-09-14T02:13:17Z edge-01 203.0.113.44 "POST /api/checkout HTTP/1.1" 503 30.049 upstream=api-02 service=checkout
+2026-09-14T02:13:18Z edge-01 203.0.113.31 "POST /api/checkout HTTP/1.1" 503 30.020 upstream=api-02 service=checkout
+2026-09-14T02:13:19Z edge-01 203.0.113.20 "POST /api/checkout HTTP/1.1" 503 30.019 upstream=api-02 service=checkout
+2026-09-14T02:13:21Z edge-01 203.0.113.40 "POST /api/checkout HTTP/1.1" 503 30.018 upstream=api-02 service=checkout
+2026-09-14T02:13:24Z edge-01 203.0.113.56 "POST /api/checkout HTTP/1.1" 503 30.007 upstream=api-02 service=checkout
+2026-09-14T02:13:30Z edge-01 203.0.113.26 "GET /healthz HTTP/1.1" 200 0.117 upstream=api-02 service=checkout
+2026-09-14T02:13:31Z edge-01 203.0.113.16 "POST /api/checkout HTTP/1.1" 503 30.048 upstream=api-02 service=checkout
+2026-09-14T02:13:36Z edge-01 203.0.113.33 "POST /api/checkout HTTP/1.1" 503 30.023 upstream=api-02 service=checkout
+2026-09-14T02:13:39Z edge-01 203.0.113.37 "POST /api/checkout HTTP/1.1" 503 30.058 upstream=api-02 service=checkout
+2026-09-14T02:14:00Z edge-01 203.0.113.36 "POST /api/checkout HTTP/1.1" 503 30.023 upstream=api-02 service=checkout
+2026-09-14T02:14:05Z edge-01 203.0.113.22 "POST /api/checkout HTTP/1.1" 503 30.049 upstream=api-02 service=checkout
+2026-09-14T02:14:08Z edge-01 203.0.113.56 "POST /api/checkout HTTP/1.1" 503 30.042 upstream=api-02 service=checkout
+2026-09-14T02:14:09Z edge-01 203.0.113.50 "POST /api/checkout HTTP/1.1" 503 30.047 upstream=api-02 service=checkout
+2026-09-14T02:14:17Z edge-01 203.0.113.32 "GET /api/cart HTTP/1.1" 200 0.092 upstream=api-02 service=checkout
+2026-09-14T02:14:23Z edge-01 203.0.113.30 "POST /api/checkout HTTP/1.1" 503 30.017 upstream=api-02 service=checkout
+2026-09-14T02:14:27Z edge-01 203.0.113.55 "POST /api/checkout HTTP/1.1" 503 30.058 upstream=api-02 service=checkout
+2026-09-14T02:14:35Z edge-01 203.0.113.41 "POST /api/checkout HTTP/1.1" 503 30.048 upstream=api-02 service=checkout
+2026-09-14T02:14:41Z edge-01 203.0.113.49 "POST /api/checkout HTTP/1.1" 503 30.026 upstream=api-02 service=checkout
+2026-09-14T02:14:49Z edge-01 203.0.113.42 "POST /api/checkout HTTP/1.1" 503 30.016 upstream=api-02 service=checkout
+2026-09-14T02:14:50Z edge-01 203.0.113.22 "POST /api/checkout HTTP/1.1" 503 30.047 upstream=api-02 service=checkout
+2026-09-14T02:14:51Z edge-01 203.0.113.45 "POST /api/checkout HTTP/1.1" 503 30.019 upstream=api-02 service=checkout
+2026-09-14T02:15:02Z edge-01 203.0.113.11 "POST /api/checkout HTTP/1.1" 503 30.058 upstream=api-02 service=checkout
+2026-09-14T02:15:04Z edge-01 203.0.113.44 "POST /api/checkout HTTP/1.1" 503 30.011 upstream=api-02 service=checkout
+2026-09-14T02:15:09Z edge-01 203.0.113.13 "POST /api/checkout HTTP/1.1" 503 30.059 upstream=api-02 service=checkout
+2026-09-14T02:15:19Z edge-01 203.0.113.26 "POST /api/checkout HTTP/1.1" 503 30.053 upstream=api-02 service=checkout
+2026-09-14T02:15:20Z edge-01 203.0.113.46 "POST /api/checkout HTTP/1.1" 503 30.053 upstream=api-02 service=checkout
+2026-09-14T02:15:22Z edge-01 203.0.113.31 "POST /api/checkout HTTP/1.1" 503 30.021 upstream=api-02 service=checkout
+2026-09-14T02:15:32Z edge-01 203.0.113.28 "POST /api/checkout HTTP/1.1" 503 30.052 upstream=api-02 service=checkout
+2026-09-14T02:15:34Z edge-01 203.0.113.11 "POST /api/checkout HTTP/1.1" 503 30.042 upstream=api-02 service=checkout
+2026-09-14T02:15:41Z edge-01 203.0.113.34 "POST /api/checkout HTTP/1.1" 503 30.018 upstream=api-02 service=checkout
+2026-09-14T02:15:44Z edge-01 203.0.113.26 "POST /api/checkout HTTP/1.1" 503 30.010 upstream=api-02 service=checkout
+2026-09-14T02:15:47Z edge-01 203.0.113.11 "GET /api/cart HTTP/1.1" 200 0.113 upstream=api-02 service=checkout
+2026-09-14T02:15:51Z edge-01 203.0.113.24 "GET /healthz HTTP/1.1" 200 0.147 upstream=api-02 service=checkout
+2026-09-14T02:15:59Z edge-01 203.0.113.27 "POST /api/checkout HTTP/1.1" 503 30.008 upstream=api-02 service=checkout
+2026-09-14T02:16:11Z edge-01 203.0.113.49 "POST /api/checkout HTTP/1.1" 503 30.034 upstream=api-02 service=checkout
+2026-09-14T02:16:12Z edge-01 203.0.113.54 "GET /api/cart HTTP/1.1" 200 0.049 upstream=api-02 service=checkout
+2026-09-14T02:16:16Z edge-01 203.0.113.37 "POST /api/checkout HTTP/1.1" 503 30.023 upstream=api-02 service=checkout
+2026-09-14T02:16:19Z edge-01 203.0.113.40 "POST /api/checkout HTTP/1.1" 503 30.052 upstream=api-02 service=checkout
+2026-09-14T02:16:22Z edge-01 203.0.113.52 "POST /api/checkout HTTP/1.1" 503 30.013 upstream=api-02 service=checkout
+2026-09-14T02:16:23Z edge-01 203.0.113.56 "POST /api/checkout HTTP/1.1" 503 30.042 upstream=api-02 service=checkout
+2026-09-14T02:16:25Z edge-01 203.0.113.55 "POST /api/checkout HTTP/1.1" 503 30.046 upstream=api-02 service=checkout
+2026-09-14T02:16:31Z edge-01 203.0.113.28 "POST /api/checkout HTTP/1.1" 503 30.003 upstream=api-02 service=checkout
+2026-09-14T02:16:35Z edge-01 203.0.113.60 "POST /api/checkout HTTP/1.1" 503 30.043 upstream=api-02 service=checkout
+2026-09-14T02:16:36Z edge-01 203.0.113.42 "POST /api/checkout HTTP/1.1" 503 30.039 upstream=api-02 service=checkout
+2026-09-14T02:16:43Z edge-01 203.0.113.46 "POST /api/checkout HTTP/1.1" 503 30.018 upstream=api-02 service=checkout
+2026-09-14T02:16:46Z edge-01 203.0.113.53 "POST /api/checkout HTTP/1.1" 503 30.003 upstream=api-02 service=checkout
+2026-09-14T02:16:51Z edge-01 203.0.113.14 "POST /api/checkout HTTP/1.1" 503 30.058 upstream=api-02 service=checkout
+2026-09-14T02:17:01Z edge-01 203.0.113.50 "POST /api/checkout HTTP/1.1" 503 30.043 upstream=api-02 service=checkout
+2026-09-14T02:17:04Z edge-01 203.0.113.54 "POST /api/checkout HTTP/1.1" 503 30.053 upstream=api-02 service=checkout
+2026-09-14T02:17:08Z edge-01 203.0.113.39 "POST /api/checkout HTTP/1.1" 503 30.013 upstream=api-02 service=checkout
+2026-09-14T02:17:15Z edge-01 203.0.113.60 "GET /api/cart HTTP/1.1" 200 0.065 upstream=api-02 service=checkout
+2026-09-14T02:17:28Z edge-01 203.0.113.14 "POST /api/checkout HTTP/1.1" 503 30.052 upstream=api-02 service=checkout
+2026-09-14T02:17:29Z edge-01 203.0.113.51 "POST /api/checkout HTTP/1.1" 503 30.049 upstream=api-02 service=checkout
+2026-09-14T02:17:34Z edge-01 203.0.113.38 "POST /api/checkout HTTP/1.1" 503 30.035 upstream=api-02 service=checkout
+2026-09-14T02:17:36Z edge-01 203.0.113.13 "POST /api/checkout HTTP/1.1" 503 30.060 upstream=api-02 service=checkout
+2026-09-14T02:17:37Z edge-01 203.0.113.28 "POST /api/checkout HTTP/1.1" 503 30.011 upstream=api-02 service=checkout
+2026-09-14T02:17:38Z edge-01 203.0.113.32 "POST /api/checkout HTTP/1.1" 503 30.024 upstream=api-02 service=checkout
+2026-09-14T02:17:41Z edge-01 203.0.113.21 "POST /api/checkout HTTP/1.1" 503 30.049 upstream=api-02 service=checkout
+2026-09-14T02:17:46Z edge-01 203.0.113.52 "POST /api/checkout HTTP/1.1" 503 30.044 upstream=api-02 service=checkout
+2026-09-14T02:17:49Z edge-01 203.0.113.48 "POST /api/checkout HTTP/1.1" 503 30.039 upstream=api-02 service=checkout
+2026-09-14T02:17:52Z edge-01 203.0.113.24 "POST /api/checkout HTTP/1.1" 503 30.015 upstream=api-02 service=checkout
+2026-09-14T02:18:06Z edge-01 203.0.113.20 "POST /api/checkout HTTP/1.1" 503 30.030 upstream=api-02 service=checkout
+2026-09-14T02:18:12Z edge-01 203.0.113.53 "POST /api/checkout HTTP/1.1" 503 30.024 upstream=api-02 service=checkout
+2026-09-14T02:18:16Z edge-01 203.0.113.38 "POST /api/checkout HTTP/1.1" 503 30.029 upstream=api-02 service=checkout
+2026-09-14T02:18:26Z edge-01 203.0.113.26 "POST /api/checkout HTTP/1.1" 503 30.036 upstream=api-02 service=checkout
+2026-09-14T02:18:27Z edge-01 203.0.113.54 "POST /api/checkout HTTP/1.1" 503 30.027 upstream=api-02 service=checkout
+2026-09-14T02:18:35Z edge-01 203.0.113.30 "POST /api/checkout HTTP/1.1" 503 30.059 upstream=api-02 service=checkout
+2026-09-14T02:18:38Z edge-01 203.0.113.46 "POST /api/checkout HTTP/1.1" 503 30.022 upstream=api-02 service=checkout
+2026-09-14T02:18:41Z edge-01 203.0.113.42 "GET /api/cart HTTP/1.1" 200 0.083 upstream=api-02 service=checkout
+2026-09-14T02:18:43Z edge-01 203.0.113.15 "POST /api/checkout HTTP/1.1" 503 30.041 upstream=api-02 service=checkout
+2026-09-14T02:18:44Z edge-01 203.0.113.11 "POST /api/checkout HTTP/1.1" 503 30.002 upstream=api-02 service=checkout
+2026-09-14T02:18:45Z edge-01 203.0.113.50 "POST /api/checkout HTTP/1.1" 503 30.024 upstream=api-02 service=checkout
+2026-09-14T02:18:53Z edge-01 203.0.113.39 "POST /api/checkout HTTP/1.1" 503 30.018 upstream=api-02 service=checkout
+2026-09-14T02:18:56Z edge-01 203.0.113.49 "POST /api/checkout HTTP/1.1" 503 30.026 upstream=api-02 service=checkout
+2026-09-14T02:19:03Z edge-01 203.0.113.48 "POST /api/checkout HTTP/1.1" 503 30.029 upstream=api-02 service=checkout
+2026-09-14T02:19:06Z edge-01 203.0.113.30 "POST /api/checkout HTTP/1.1" 503 30.025 upstream=api-02 service=checkout
+2026-09-14T02:19:07Z edge-01 203.0.113.53 "POST /api/checkout HTTP/1.1" 503 30.002 upstream=api-02 service=checkout
+2026-09-14T02:19:10Z edge-01 203.0.113.56 "GET /api/cart HTTP/1.1" 200 0.111 upstream=api-02 service=checkout
+2026-09-14T02:19:12Z edge-01 203.0.113.59 "POST /api/checkout HTTP/1.1" 503 30.008 upstream=api-02 service=checkout
+2026-09-14T02:19:20Z edge-01 203.0.113.54 "POST /api/checkout HTTP/1.1" 503 30.046 upstream=api-02 service=checkout
+2026-09-14T02:19:21Z edge-01 203.0.113.33 "GET /healthz HTTP/1.1" 200 0.112 upstream=api-02 service=checkout
+2026-09-14T02:19:31Z edge-01 203.0.113.15 "POST /api/checkout HTTP/1.1" 503 30.049 upstream=api-02 service=checkout
+2026-09-14T02:19:34Z edge-01 203.0.113.10 "POST /api/checkout HTTP/1.1" 503 30.041 upstream=api-02 service=checkout
+2026-09-14T02:19:36Z edge-01 203.0.113.47 "POST /api/checkout HTTP/1.1" 503 30.011 upstream=api-02 service=checkout
+2026-09-14T02:19:49Z edge-01 203.0.113.14 "POST /api/checkout HTTP/1.1" 503 30.013 upstream=api-02 service=checkout
+2026-09-14T02:19:51Z edge-01 203.0.113.51 "POST /api/checkout HTTP/1.1" 503 30.014 upstream=api-02 service=checkout
+2026-09-14T02:19:52Z edge-01 203.0.113.53 "POST /api/checkout HTTP/1.1" 503 30.008 upstream=api-02 service=checkout
+2026-09-14T02:20:06Z edge-01 203.0.113.15 "GET /api/cart HTTP/1.1" 200 0.132 upstream=api-02 service=checkout
+2026-09-14T02:20:07Z edge-01 203.0.113.17 "POST /api/checkout HTTP/1.1" 503 30.051 upstream=api-02 service=checkout
+2026-09-14T02:20:12Z edge-01 203.0.113.37 "POST /api/checkout HTTP/1.1" 503 30.035 upstream=api-02 service=checkout
+2026-09-14T02:20:14Z edge-01 203.0.113.46 "POST /api/checkout HTTP/1.1" 503 30.052 upstream=api-02 service=checkout
+2026-09-14T02:20:17Z edge-01 203.0.113.34 "POST /api/checkout HTTP/1.1" 503 30.040 upstream=api-02 service=checkout
+2026-09-14T02:20:18Z edge-01 203.0.113.36 "POST /api/checkout HTTP/1.1" 503 30.015 upstream=api-02 service=checkout
+2026-09-14T02:20:32Z edge-01 203.0.113.58 "GET /healthz HTTP/1.1" 200 0.084 upstream=api-02 service=checkout
+2026-09-14T02:20:34Z edge-01 203.0.113.15 "POST /api/checkout HTTP/1.1" 503 30.032 upstream=api-02 service=checkout
+2026-09-14T02:20:39Z edge-01 203.0.113.29 "POST /api/checkout HTTP/1.1" 503 30.052 upstream=api-02 service=checkout
+2026-09-14T02:20:44Z edge-01 203.0.113.15 "POST /api/checkout HTTP/1.1" 503 30.003 upstream=api-02 service=checkout
+2026-09-14T02:20:49Z edge-01 203.0.113.28 "POST /api/checkout HTTP/1.1" 503 30.009 upstream=api-02 service=checkout
+2026-09-14T02:20:55Z edge-01 203.0.113.11 "POST /api/checkout HTTP/1.1" 503 30.048 upstream=api-02 service=checkout
+2026-09-14T02:21:04Z edge-01 203.0.113.49 "POST /api/checkout HTTP/1.1" 503 30.029 upstream=api-02 service=checkout
+2026-09-14T02:21:25Z edge-01 203.0.113.29 "POST /api/checkout HTTP/1.1" 503 30.013 upstream=api-02 service=checkout
+2026-09-14T02:21:35Z edge-01 203.0.113.43 "POST /api/checkout HTTP/1.1" 503 30.058 upstream=api-02 service=checkout
+2026-09-14T02:21:40Z edge-01 203.0.113.32 "GET /api/cart HTTP/1.1" 200 0.039 upstream=api-02 service=checkout
+2026-09-14T02:21:43Z edge-01 203.0.113.55 "POST /api/checkout HTTP/1.1" 503 30.053 upstream=api-02 service=checkout
+2026-09-14T02:21:44Z edge-01 203.0.113.44 "POST /api/checkout HTTP/1.1" 503 30.012 upstream=api-02 service=checkout
+2026-09-14T02:21:46Z edge-01 203.0.113.56 "POST /api/checkout HTTP/1.1" 503 30.047 upstream=api-02 service=checkout
+2026-09-14T02:21:48Z edge-01 203.0.113.36 "POST /api/checkout HTTP/1.1" 503 30.053 upstream=api-02 service=checkout
+2026-09-14T02:21:53Z edge-01 203.0.113.39 "POST /api/checkout HTTP/1.1" 503 30.054 upstream=api-02 service=checkout
+2026-09-14T02:21:58Z edge-01 203.0.113.21 "POST /api/checkout HTTP/1.1" 503 30.046 upstream=api-02 service=checkout
+2026-09-14T02:21:59Z edge-01 203.0.113.25 "POST /api/checkout HTTP/1.1" 503 30.057 upstream=api-02 service=checkout
+2026-09-14T02:22:02Z edge-01 203.0.113.47 "POST /api/checkout HTTP/1.1" 503 30.018 upstream=api-02 service=checkout
+2026-09-14T02:22:03Z edge-01 203.0.113.56 "POST /api/checkout HTTP/1.1" 503 30.060 upstream=api-02 service=checkout
+2026-09-14T02:22:10Z edge-01 203.0.113.59 "POST /api/checkout HTTP/1.1" 503 30.053 upstream=api-02 service=checkout
+2026-09-14T02:22:12Z edge-01 203.0.113.17 "POST /api/checkout HTTP/1.1" 503 30.024 upstream=api-02 service=checkout
+2026-09-14T02:22:15Z edge-01 203.0.113.36 "POST /api/checkout HTTP/1.1" 503 30.022 upstream=api-02 service=checkout
+2026-09-14T02:22:26Z edge-01 203.0.113.58 "POST /api/checkout HTTP/1.1" 503 30.060 upstream=api-02 service=checkout
+2026-09-14T02:22:32Z edge-01 203.0.113.34 "POST /api/checkout HTTP/1.1" 503 30.008 upstream=api-02 service=checkout
+2026-09-14T02:22:37Z edge-01 203.0.113.24 "GET /api/cart HTTP/1.1" 200 0.115 upstream=api-02 service=checkout
+2026-09-14T02:22:50Z edge-01 203.0.113.45 "POST /api/checkout HTTP/1.1" 503 30.039 upstream=api-02 service=checkout
+2026-09-14T02:22:53Z edge-01 203.0.113.21 "GET /healthz HTTP/1.1" 200 0.047 upstream=api-02 service=checkout
+2026-09-14T02:22:56Z edge-01 203.0.113.44 "POST /api/checkout HTTP/1.1" 503 30.013 upstream=api-02 service=checkout
+2026-09-14T02:22:59Z edge-01 203.0.113.22 "POST /api/checkout HTTP/1.1" 503 30.032 upstream=api-02 service=checkout
+2026-09-14T02:23:07Z edge-01 203.0.113.32 "POST /api/checkout HTTP/1.1" 503 30.053 upstream=api-02 service=checkout
+2026-09-14T02:23:15Z edge-01 203.0.113.28 "POST /api/checkout HTTP/1.1" 503 30.013 upstream=api-02 service=checkout
+2026-09-14T02:23:23Z edge-01 203.0.113.11 "GET /api/cart HTTP/1.1" 200 0.140 upstream=api-02 service=checkout
+2026-09-14T02:23:25Z edge-01 203.0.113.14 "POST /api/checkout HTTP/1.1" 503 30.050 upstream=api-02 service=checkout
+2026-09-14T02:23:27Z edge-01 203.0.113.49 "POST /api/checkout HTTP/1.1" 503 30.028 upstream=api-02 service=checkout
+2026-09-14T02:23:28Z edge-01 203.0.113.16 "POST /api/checkout HTTP/1.1" 503 30.032 upstream=api-02 service=checkout
+2026-09-14T02:23:42Z edge-01 203.0.113.58 "POST /api/checkout HTTP/1.1" 503 30.042 upstream=api-02 service=checkout
+2026-09-14T02:23:45Z edge-01 203.0.113.34 "POST /api/checkout HTTP/1.1" 503 30.020 upstream=api-02 service=checkout
+2026-09-14T02:23:52Z edge-01 203.0.113.55 "POST /api/checkout HTTP/1.1" 503 30.005 upstream=api-02 service=checkout
+2026-09-14T02:23:58Z edge-01 203.0.113.44 "POST /api/checkout HTTP/1.1" 503 30.017 upstream=api-02 service=checkout
+2026-09-14T02:24:01Z edge-01 203.0.113.25 "POST /api/checkout HTTP/1.1" 503 30.060 upstream=api-02 service=checkout
+2026-09-14T02:24:04Z edge-01 203.0.113.47 "GET /api/cart HTTP/1.1" 200 0.030 upstream=api-02 service=checkout
+2026-09-14T02:24:11Z edge-01 203.0.113.10 "POST /api/checkout HTTP/1.1" 503 30.020 upstream=api-02 service=checkout
+2026-09-14T02:24:14Z edge-01 203.0.113.57 "POST /api/checkout HTTP/1.1" 503 30.053 upstream=api-02 service=checkout
+2026-09-14T02:24:32Z edge-01 203.0.113.57 "POST /api/checkout HTTP/1.1" 503 30.028 upstream=api-02 service=checkout
+2026-09-14T02:24:33Z edge-01 203.0.113.51 "POST /api/checkout HTTP/1.1" 503 30.048 upstream=api-02 service=checkout
+2026-09-14T02:24:39Z edge-01 203.0.113.11 "POST /api/checkout HTTP/1.1" 503 30.042 upstream=api-02 service=checkout
+2026-09-14T02:24:45Z edge-01 203.0.113.12 "POST /api/checkout HTTP/1.1" 503 30.044 upstream=api-02 service=checkout
+2026-09-14T02:24:48Z edge-01 203.0.113.56 "POST /api/checkout HTTP/1.1" 503 30.052 upstream=api-02 service=checkout
+2026-09-14T02:24:49Z edge-01 203.0.113.41 "GET /healthz HTTP/1.1" 200 0.075 upstream=api-02 service=checkout
+2026-09-14T02:24:52Z edge-01 203.0.113.23 "POST /api/checkout HTTP/1.1" 503 30.040 upstream=api-02 service=checkout
+2026-09-14T02:25:01Z edge-01 203.0.113.16 "POST /api/checkout HTTP/1.1" 503 30.055 upstream=api-02 service=checkout
+2026-09-14T02:25:10Z edge-01 203.0.113.21 "POST /api/checkout HTTP/1.1" 503 30.022 upstream=api-02 service=checkout
+2026-09-14T02:25:19Z edge-01 203.0.113.59 "POST /api/checkout HTTP/1.1" 503 30.048 upstream=api-02 service=checkout
+2026-09-14T02:25:28Z edge-01 203.0.113.10 "POST /api/checkout HTTP/1.1" 503 30.013 upstream=api-02 service=checkout
+2026-09-14T02:25:30Z edge-01 203.0.113.29 "POST /api/checkout HTTP/1.1" 503 30.050 upstream=api-02 service=checkout
+2026-09-14T02:25:41Z edge-01 203.0.113.24 "POST /api/checkout HTTP/1.1" 503 30.011 upstream=api-02 service=checkout
+2026-09-14T02:25:47Z edge-01 203.0.113.55 "POST /api/checkout HTTP/1.1" 503 30.026 upstream=api-02 service=checkout
+2026-09-14T02:25:49Z edge-01 203.0.113.21 "GET /api/cart HTTP/1.1" 200 0.120 upstream=api-02 service=checkout
+2026-09-14T02:25:57Z edge-01 203.0.113.10 "POST /api/checkout HTTP/1.1" 503 30.033 upstream=api-02 service=checkout
+2026-09-14T02:26:00Z edge-01 203.0.113.33 "POST /api/checkout HTTP/1.1" 503 30.001 upstream=api-02 service=checkout
+2026-09-14T02:26:08Z edge-01 203.0.113.26 "POST /api/checkout HTTP/1.1" 503 30.027 upstream=api-02 service=checkout
+2026-09-14T02:26:17Z edge-01 203.0.113.20 "POST /api/checkout HTTP/1.1" 503 30.042 upstream=api-02 service=checkout
+2026-09-14T02:26:27Z edge-01 203.0.113.37 "POST /api/checkout HTTP/1.1" 503 30.039 upstream=api-02 service=checkout
+2026-09-14T02:26:31Z edge-01 203.0.113.57 "POST /api/checkout HTTP/1.1" 503 30.043 upstream=api-02 service=checkout
+2026-09-14T02:26:40Z edge-01 203.0.113.27 "POST /api/checkout HTTP/1.1" 503 30.037 upstream=api-02 service=checkout
+2026-09-14T02:26:41Z edge-01 203.0.113.60 "POST /api/checkout HTTP/1.1" 503 30.021 upstream=api-02 service=checkout
+2026-09-14T02:26:45Z edge-01 203.0.113.50 "GET /api/cart HTTP/1.1" 200 0.087 upstream=api-02 service=checkout
+2026-09-14T02:26:46Z edge-01 203.0.113.18 "POST /api/checkout HTTP/1.1" 503 30.026 upstream=api-02 service=checkout
+2026-09-14T02:26:55Z edge-01 203.0.113.60 "GET /healthz HTTP/1.1" 200 0.085 upstream=api-02 service=checkout
+2026-09-14T02:27:01Z edge-01 203.0.113.24 "GET /api/cart HTTP/1.1" 200 0.147 upstream=api-02 service=checkout
+2026-09-14T02:27:14Z edge-01 203.0.113.57 "POST /api/checkout HTTP/1.1" 503 30.004 upstream=api-02 service=checkout
+2026-09-14T02:27:29Z edge-01 203.0.113.47 "POST /api/checkout HTTP/1.1" 503 30.007 upstream=api-02 service=checkout
+2026-09-14T02:27:32Z edge-01 203.0.113.36 "GET /healthz HTTP/1.1" 200 0.074 upstream=api-02 service=checkout
+2026-09-14T02:27:37Z edge-01 203.0.113.52 "POST /api/checkout HTTP/1.1" 503 30.041 upstream=api-02 service=checkout
+2026-09-14T02:27:38Z edge-01 203.0.113.22 "POST /api/checkout HTTP/1.1" 503 30.033 upstream=api-02 service=checkout
+2026-09-14T02:27:42Z edge-01 203.0.113.31 "POST /api/checkout HTTP/1.1" 503 30.025 upstream=api-02 service=checkout
+2026-09-14T02:27:46Z edge-01 203.0.113.17 "POST /api/checkout HTTP/1.1" 503 30.033 upstream=api-02 service=checkout
+2026-09-14T02:27:50Z edge-01 203.0.113.16 "GET /api/checkout HTTP/1.1" 200 0.141 upstream=api-02 service=checkout
+2026-09-14T02:27:55Z edge-01 203.0.113.14 "POST /api/checkout HTTP/1.1" 503 30.017 upstream=api-02 service=checkout
+2026-09-14T02:28:03Z edge-01 203.0.113.20 "GET /api/cart HTTP/1.1" 200 0.024 upstream=api-02 service=checkout
+2026-09-14T02:28:04Z edge-01 203.0.113.23 "POST /api/checkout HTTP/1.1" 503 30.015 upstream=api-02 service=checkout
+2026-09-14T02:28:05Z edge-01 203.0.113.21 "POST /api/checkout HTTP/1.1" 503 30.059 upstream=api-02 service=checkout
+2026-09-14T02:28:13Z edge-01 203.0.113.15 "POST /api/checkout HTTP/1.1" 503 30.004 upstream=api-02 service=checkout
+2026-09-14T02:28:14Z edge-01 203.0.113.28 "GET /healthz HTTP/1.1" 200 0.037 upstream=api-02 service=checkout
+2026-09-14T02:28:23Z edge-01 203.0.113.54 "POST /api/checkout HTTP/1.1" 503 30.036 upstream=api-02 service=checkout
+2026-09-14T02:28:27Z edge-01 203.0.113.31 "POST /api/checkout HTTP/1.1" 503 30.014 upstream=api-02 service=checkout
+2026-09-14T02:28:34Z edge-01 203.0.113.59 "GET /api/checkout HTTP/1.1" 200 0.032 upstream=api-02 service=checkout
+2026-09-14T02:28:48Z edge-01 203.0.113.49 "POST /api/checkout HTTP/1.1" 503 30.027 upstream=api-02 service=checkout
+2026-09-14T02:28:49Z edge-01 203.0.113.38 "GET /api/orders HTTP/1.1" 200 0.127 upstream=api-02 service=checkout
+2026-09-14T02:29:05Z edge-01 203.0.113.18 "POST /api/checkout HTTP/1.1" 503 30.023 upstream=api-02 service=checkout
+2026-09-14T02:29:09Z edge-01 203.0.113.59 "GET /api/cart HTTP/1.1" 200 0.081 upstream=api-02 service=checkout
+2026-09-14T02:29:17Z edge-01 203.0.113.54 "POST /api/checkout HTTP/1.1" 503 30.033 upstream=api-02 service=checkout
+2026-09-14T02:29:18Z edge-01 203.0.113.11 "POST /api/checkout HTTP/1.1" 503 30.029 upstream=api-02 service=checkout
+2026-09-14T02:29:19Z edge-01 203.0.113.15 "GET /healthz HTTP/1.1" 200 0.040 upstream=api-02 service=checkout
+2026-09-14T02:29:31Z edge-01 203.0.113.57 "GET /api/checkout HTTP/1.1" 200 0.122 upstream=api-02 service=checkout
+2026-09-14T02:29:36Z edge-01 203.0.113.48 "GET /api/orders HTTP/1.1" 200 0.075 upstream=api-02 service=checkout
+2026-09-14T02:29:37Z edge-01 203.0.113.22 "POST /api/checkout HTTP/1.1" 503 30.011 upstream=api-02 service=checkout
+2026-09-14T02:29:38Z edge-01 203.0.113.58 "GET /api/cart HTTP/1.1" 200 0.118 upstream=api-02 service=checkout
+2026-09-14T02:30:09Z edge-01 203.0.113.56 "GET /api/cart HTTP/1.1" 200 0.071 upstream=api-02 service=checkout
+2026-09-14T02:30:20Z edge-01 203.0.113.20 "GET /healthz HTTP/1.1" 200 0.126 upstream=api-02 service=checkout
+2026-09-14T02:30:31Z edge-01 203.0.113.47 "POST /api/checkout HTTP/1.1" 503 30.021 upstream=api-02 service=checkout
+2026-09-14T02:30:44Z edge-01 203.0.113.58 "GET /api/checkout HTTP/1.1" 200 0.112 upstream=api-02 service=checkout
+2026-09-14T02:30:47Z edge-01 203.0.113.42 "GET /api/orders HTTP/1.1" 200 0.123 upstream=api-02 service=checkout
+2026-09-14T02:30:50Z edge-01 203.0.113.45 "GET /api/cart HTTP/1.1" 200 0.135 upstream=api-02 service=checkout
+2026-09-14T02:30:52Z edge-01 203.0.113.23 "POST /api/checkout HTTP/1.1" 503 30.009 upstream=api-02 service=checkout
+2026-09-14T02:30:55Z edge-01 203.0.113.30 "GET /api/checkout HTTP/1.1" 200 0.088 upstream=api-02 service=checkout
+2026-09-14T02:31:19Z edge-01 203.0.113.47 "POST /api/checkout HTTP/1.1" 503 30.029 upstream=api-02 service=checkout
+2026-09-14T02:31:20Z edge-01 203.0.113.27 "GET /api/cart HTTP/1.1" 200 0.032 upstream=api-02 service=checkout
+2026-09-14T02:31:37Z edge-01 203.0.113.59 "GET /healthz HTTP/1.1" 200 0.034 upstream=api-02 service=checkout
+2026-09-14T02:31:44Z edge-01 203.0.113.48 "GET /api/checkout HTTP/1.1" 200 0.125 upstream=api-02 service=checkout
+2026-09-14T02:31:52Z edge-01 203.0.113.49 "GET /api/orders HTTP/1.1" 200 0.032 upstream=api-02 service=checkout
+2026-09-14T02:31:54Z edge-01 203.0.113.55 "GET /api/cart HTTP/1.1" 200 0.049 upstream=api-02 service=checkout
+2026-09-14T02:31:57Z edge-01 203.0.113.23 "GET /api/checkout HTTP/1.1" 200 0.042 upstream=api-02 service=checkout
+2026-09-14T02:32:01Z edge-01 203.0.113.14 "GET /api/cart HTTP/1.1" 200 0.081 upstream=api-02 service=checkout
+2026-09-14T02:32:14Z edge-01 203.0.113.11 "GET /healthz HTTP/1.1" 200 0.046 upstream=api-02 service=checkout
+2026-09-14T02:32:38Z edge-01 203.0.113.60 "GET /api/checkout HTTP/1.1" 200 0.131 upstream=api-02 service=checkout
+2026-09-14T02:32:44Z edge-01 203.0.113.52 "GET /api/orders HTTP/1.1" 200 0.023 upstream=api-02 service=checkout
+2026-09-14T02:32:57Z edge-01 203.0.113.28 "GET /api/cart HTTP/1.1" 200 0.104 upstream=api-02 service=checkout
+2026-09-14T02:33:10Z edge-01 203.0.113.17 "GET /api/cart HTTP/1.1" 200 0.128 upstream=api-02 service=checkout
+2026-09-14T02:33:17Z edge-01 203.0.113.26 "GET /healthz HTTP/1.1" 200 0.144 upstream=api-02 service=checkout
+2026-09-14T02:33:34Z edge-01 203.0.113.60 "GET /api/checkout HTTP/1.1" 200 0.076 upstream=api-02 service=checkout
+2026-09-14T02:33:35Z edge-01 203.0.113.43 "GET /api/orders HTTP/1.1" 200 0.089 upstream=api-02 service=checkout
+2026-09-14T02:33:39Z edge-01 203.0.113.19 "GET /api/cart HTTP/1.1" 200 0.037 upstream=api-02 service=checkout
+2026-09-14T02:34:09Z edge-01 203.0.113.35 "GET /api/cart HTTP/1.1" 200 0.052 upstream=api-02 service=checkout
+2026-09-14T02:34:36Z edge-01 203.0.113.53 "GET /healthz HTTP/1.1" 200 0.101 upstream=api-02 service=checkout
+2026-09-14T02:34:45Z edge-01 203.0.113.39 "GET /api/checkout HTTP/1.1" 200 0.145 upstream=api-02 service=checkout
+2026-09-14T02:34:53Z edge-01 203.0.113.46 "GET /api/orders HTTP/1.1" 200 0.035 upstream=api-02 service=checkout
+2026-09-14T02:34:56Z edge-01 203.0.113.52 "GET /api/cart HTTP/1.1" 200 0.051 upstream=api-02 service=checkout
+2026-09-14T02:35:01Z edge-01 203.0.113.36 "GET /api/cart HTTP/1.1" 200 0.094 upstream=api-02 service=checkout
+2026-09-14T02:35:05Z edge-01 203.0.113.28 "GET /healthz HTTP/1.1" 200 0.139 upstream=api-02 service=checkout
+2026-09-14T02:35:24Z edge-01 203.0.113.29 "GET /api/checkout HTTP/1.1" 200 0.040 upstream=api-02 service=checkout
+2026-09-14T02:35:27Z edge-01 203.0.113.21 "GET /api/orders HTTP/1.1" 200 0.136 upstream=api-02 service=checkout
+2026-09-14T02:35:55Z edge-01 203.0.113.45 "GET /api/cart HTTP/1.1" 200 0.089 upstream=api-02 service=checkout
+2026-09-14T02:36:30Z edge-01 203.0.113.46 "GET /api/cart HTTP/1.1" 200 0.141 upstream=api-02 service=checkout
+2026-09-14T02:36:37Z edge-01 203.0.113.29 "GET /healthz HTTP/1.1" 200 0.064 upstream=api-02 service=checkout
+2026-09-14T02:36:48Z edge-01 203.0.113.60 "GET /api/checkout HTTP/1.1" 200 0.116 upstream=api-02 service=checkout
+2026-09-14T02:36:57Z edge-01 203.0.113.34 "GET /api/orders HTTP/1.1" 200 0.054 upstream=api-02 service=checkout
+2026-09-14T02:36:59Z edge-01 203.0.113.36 "GET /api/cart HTTP/1.1" 200 0.030 upstream=api-02 service=checkout
+2026-09-14T02:37:01Z edge-01 203.0.113.15 "GET /api/cart HTTP/1.1" 200 0.074 upstream=api-02 service=checkout
+2026-09-14T02:37:27Z edge-01 203.0.113.17 "GET /healthz HTTP/1.1" 200 0.069 upstream=api-02 service=checkout
+2026-09-14T02:37:45Z edge-01 203.0.113.34 "GET /api/checkout HTTP/1.1" 200 0.051 upstream=api-02 service=checkout
+2026-09-14T02:37:54Z edge-01 203.0.113.46 "GET /api/orders HTTP/1.1" 200 0.070 upstream=api-02 service=checkout
+2026-09-14T02:37:57Z edge-01 203.0.113.57 "GET /api/cart HTTP/1.1" 200 0.087 upstream=api-02 service=checkout
+2026-09-14T02:38:10Z edge-01 203.0.113.54 "GET /api/cart HTTP/1.1" 200 0.077 upstream=api-02 service=checkout
+2026-09-14T02:38:15Z edge-01 203.0.113.32 "GET /healthz HTTP/1.1" 200 0.039 upstream=api-02 service=checkout
+2026-09-14T02:38:18Z edge-01 203.0.113.23 "GET /api/checkout HTTP/1.1" 200 0.079 upstream=api-02 service=checkout
+2026-09-14T02:38:21Z edge-01 203.0.113.16 "GET /api/orders HTTP/1.1" 200 0.148 upstream=api-02 service=checkout
+2026-09-14T02:38:40Z edge-01 203.0.113.52 "GET /api/cart HTTP/1.1" 200 0.094 upstream=api-02 service=checkout
+2026-09-14T02:39:00Z edge-01 203.0.113.56 "GET /api/cart HTTP/1.1" 200 0.106 upstream=api-02 service=checkout
+2026-09-14T02:39:06Z edge-01 203.0.113.36 "GET /healthz HTTP/1.1" 200 0.093 upstream=api-02 service=checkout
+2026-09-14T02:39:27Z edge-01 203.0.113.46 "GET /api/checkout HTTP/1.1" 200 0.106 upstream=api-02 service=checkout
+2026-09-14T02:39:45Z edge-01 203.0.113.39 "GET /api/orders HTTP/1.1" 200 0.044 upstream=api-02 service=checkout
+2026-09-14T02:39:55Z edge-01 203.0.113.34 "GET /api/cart HTTP/1.1" 200 0.067 upstream=api-02 service=checkout
+2026-09-14T02:40:17Z edge-01 203.0.113.24 "GET /api/cart HTTP/1.1" 200 0.116 upstream=api-02 service=checkout
+2026-09-14T02:40:21Z edge-01 203.0.113.48 "GET /healthz HTTP/1.1" 200 0.095 upstream=api-02 service=checkout
+2026-09-14T02:40:22Z edge-01 203.0.113.36 "GET /api/checkout HTTP/1.1" 200 0.093 upstream=api-02 service=checkout
+2026-09-14T02:40:46Z edge-01 203.0.113.46 "GET /api/orders HTTP/1.1" 200 0.033 upstream=api-02 service=checkout
+2026-09-14T02:40:57Z edge-01 203.0.113.11 "GET /api/cart HTTP/1.1" 200 0.056 upstream=api-02 service=checkout
+
+```
+
+### tools/__init__.py
+```text
+
+```
+
+### tools/tests/__init__.py
+```text
+
+```
+
+### tools/tests/test_triage.py
+```text
+import unittest
+from pathlib import Path
+
+from tools import triage
+
+ROOT = Path(__file__).resolve().parents[2]
+PAYLOAD = triage.collect(ROOT / "logs")
+
+
+class EdgeTriageTest(unittest.TestCase):
+    def test_window_covers_the_replay(self):
+        self.assertEqual(PAYLOAD["window"]["start"][:16], "2026-09-14T02:00")
+        self.assertEqual(PAYLOAD["window"]["end"][:16], "2026-09-14T02:40")
+
+    def test_request_and_status_counts(self):
+        edge = PAYLOAD["edge"]
+        self.assertEqual(edge["requests"], 378)
+        self.assertEqual(edge["status_counts"], {"200": 133, "401": 20, "503": 225})
+
+    def test_server_error_rate_and_peak_minute(self):
+        edge = PAYLOAD["edge"]
+        self.assertEqual(edge["server_errors"], 225)
+        self.assertAlmostEqual(edge["server_error_rate"], 0.5952, places=4)
+        self.assertEqual(edge["peak_error_minute"], {"minute": "2026-09-14T02:17", "server_errors": 13})
+
+    def test_login_burst_has_no_success(self):
+        edge = PAYLOAD["edge"]
+        self.assertEqual(edge["login_attempts"], 20)
+        self.assertEqual(edge["login_failures"], 20)
+        self.assertEqual(edge["login_successes"], 0)
+        self.assertEqual(len(edge["login_sources"]), 4)
+
+
+class ApplicationTriageTest(unittest.TestCase):
+    def test_pool_timeouts_and_warnings(self):
+        api = PAYLOAD["api"]
+        self.assertEqual(api["errors"], 225)
+        self.assertEqual(api["error_messages"], {"db pool acquire timeout": 225})
+        self.assertEqual(api["warnings"], 6)
+        self.assertEqual(api["warning_messages"], {"pool wait exceeded 1000 ms": 6})
+
+    def test_error_span(self):
+        api = PAYLOAD["api"]
+        self.assertEqual(api["first_error_ts"], "2026-09-14T02:05:05.120Z")
+        self.assertEqual(api["last_error_ts"], "2026-09-14T02:31:19.120Z")
+
+    def test_release_events_bracket_the_outage(self):
+        api = PAYLOAD["api"]
+        versions = [(event["version"], event["msg"]) for event in api["release_events"]]
+        self.assertEqual(
+            versions,
+            [("v2.14.1", "release activated"), ("v2.14.0", "release rollback")],
+        )
+        self.assertEqual(api["pool_max_values"], [4, 32])
+
+
+class DatabaseTriageTest(unittest.TestCase):
+    def test_database_is_healthy_during_the_outage(self):
+        db = PAYLOAD["db"]
+        self.assertEqual(db["fatal_count"], 0)
+        self.assertEqual(db["max_concurrent_sessions"], 4)
+        self.assertEqual(db["authorized_sessions"], 12)
+        self.assertEqual(db["connection_reset_count"], 3)
+        self.assertEqual(db["slow_transaction_warnings"], 1)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+```
+
+### tools/tests/test_verify_remediation.py
+```text
+import tempfile
+import unittest
+from pathlib import Path
+
+from tools import verify_remediation
+
+GOOD_PROFILE = """\
+# staging pool profile
+RELEASE_VERSION=v2.14.0
+DB_POOL_MAX=32
+DB_POOL_ACQUIRE_TIMEOUT_MS=5000
+DB_STATEMENT_TIMEOUT_MS=15000
+CHECKOUT_WORKERS=8
+LOG_LEVEL=info
+"""
+
+
+def run_checks(text: str) -> list[tuple[str, bool, str]]:
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "pool.env"
+        path.write_text(text, encoding="utf-8")
+        values, problems = verify_remediation.parse_profile(path)
+        checks = verify_remediation.validate(values, problems)
+    return checks + [(f"parse: {problem}", False, "") for problem in problems]
+
+
+def failed_names(checks: list[tuple[str, bool, str]]) -> list[str]:
+    return [name for name, ok, _detail in checks if not ok]
+
+
+class VerifyRemediationTest(unittest.TestCase):
+    def test_good_profile_passes(self):
+        self.assertEqual(failed_names(run_checks(GOOD_PROFILE)), [])
+
+    def test_credential_key_is_rejected(self):
+        checks = run_checks(GOOD_PROFILE + "DB_PASSWORD=replace-me\n")
+        self.assertFalse(all(ok for _name, ok, _detail in checks))
+
+    def test_placeholder_and_out_of_range_are_rejected(self):
+        checks = run_checks(
+            GOOD_PROFILE.replace("DB_POOL_MAX=32", "DB_POOL_MAX=4")
+        )
+        self.assertIn("DB_POOL_MAX within 16..48", failed_names(checks))
+
+    def test_malformed_line_is_rejected(self):
+        checks = run_checks(GOOD_PROFILE + "this is not an assignment\n")
+        self.assertTrue(any(name.startswith("parse:") for name in failed_names(checks)))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+```
+
+### tools/triage.py
+```text
+#!/usr/bin/env python3
+"""Deterministic measurements over the INC-2026-0914-03 replay logs.
+
+The tool is intentionally measurement-only: it reports counts, rates, maxima
+and release events. It does not decide a root cause, so analysts can cite its
+output without inheriting a conclusion.
+
+Usage:
+    python3 tools/triage.py --logs logs --out build/triage.json
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+import tempfile
+from collections import Counter
+from pathlib import Path
+
+INCIDENT = "INC-2026-0914-03"
+
+ACCESS_RE = re.compile(
+    r'^(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\s+'
+    r'(?P<host>\S+)\s+(?P<ip>\S+)\s+'
+    r'"(?P<method>[A-Z]+)\s+(?P<path>\S+)\s+HTTP/1\.1"\s+'
+    r'(?P<status>\d{3})\s+(?P<duration>\d+\.\d+)\s+'
+    r'upstream=(?P<upstream>\S+)\s+service=(?P<service>\S+)$'
+)
+
+DB_RE = re.compile(
+    r'^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) UTC '
+    r'\[(?P<pid>\d+)\] (?P<level>[A-Z]+):\s+(?P<msg>.*)$'
+)
+
+
+def _read_lines(path: Path) -> list[str]:
+    return [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def parse_access(path: Path) -> list[dict]:
+    rows: list[dict] = []
+    for line in _read_lines(path):
+        match = ACCESS_RE.match(line)
+        if match is None:
+            raise ValueError(f"unparsed access line in {path}: {line[:100]}")
+        row = match.groupdict()
+        row["status"] = int(row["status"])
+        row["duration_s"] = float(row["duration"])
+        row["minute"] = row["ts"][:16]
+        rows.append(row)
+    return rows
+
+
+def parse_app(path: Path) -> list[dict]:
+    events: list[dict] = []
+    for line in _read_lines(path):
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"invalid app log line in {path}: {line[:100]}") from exc
+        for key in ("ts", "level", "host", "msg"):
+            if key not in event:
+                raise ValueError(f"app log line missing {key!r} in {path}")
+        events.append(event)
+    return events
+
+
+def parse_db(path: Path) -> list[dict]:
+    rows: list[dict] = []
+    for line in _read_lines(path):
+        match = DB_RE.match(line)
+        if match is None:
+            raise ValueError(f"unparsed database log line in {path}: {line[:100]}")
+        rows.append(match.groupdict())
+    return rows
+
+
+def summarise_edge(rows: list[dict]) -> dict:
+    status_counts = Counter(str(row["status"]) for row in rows)
+    server_errors = [row for row in rows if row["status"] >= 500]
+    per_minute = Counter(row["minute"] for row in server_errors)
+    peak_minute = None
+    if per_minute:
+        # Highest count wins; an exact tie is broken by the earliest minute.
+        peak_count = max(per_minute.values())
+        peak_minute = min(
+            minute for minute, count in per_minute.items() if count == peak_count
+        )
+    login = [row for row in rows if row["path"] == "/api/login"]
+    return {
+        "host": rows[0]["host"] if rows else "",
+        "requests": len(rows),
+        "status_counts": dict(sorted(status_counts.items())),
+        "server_errors": len(server_errors),
+        "server_error_rate": round(len(server_errors) / len(rows), 4) if rows else 0.0,
+        "peak_error_minute": (
+            {"minute": peak_minute, "server_errors": peak_count} if peak_minute else None
+        ),
+        "login_attempts": len(login),
+        "login_failures": sum(1 for row in login if row["status"] == 401),
+        "login_successes": sum(1 for row in login if 200 <= row["status"] < 300),
+        "login_sources": sorted({row["ip"] for row in login}),
+    }
+
+
+def summarise_app(events: list[dict]) -> dict:
+    errors = [event for event in events if event["level"] == "ERROR"]
+    warnings = [event for event in events if event["level"] == "WARN"]
+    pool_values = sorted(
+        {event["pool_max"] for event in events if isinstance(event.get("pool_max"), int)}
+    )
+    releases = [
+        {
+            "ts": event["ts"],
+            "msg": event["msg"],
+            "version": event.get("version", ""),
+        }
+        for event in events
+        if event["msg"] in ("release activated", "release rollback")
+    ]
+    return {
+        "host": events[0]["host"] if events else "",
+        "events": len(events),
+        "errors": len(errors),
+        "error_messages": dict(sorted(Counter(event["msg"] for event in errors).items())),
+        "warnings": len(warnings),
+        "warning_messages": dict(sorted(Counter(event["msg"] for event in warnings).items())),
+        "first_error_ts": errors[0]["ts"] if errors else None,
+        "last_error_ts": errors[-1]["ts"] if errors else None,
+        "pool_max_values": pool_values,
+        "release_events": releases,
+    }
+
+
+def summarise_db(rows: list[dict]) -> dict:
+    authorized = 0
+    active: set[str] = set()
+    max_concurrent = 0
+    connection_resets = 0
+    slow_tx = 0
+    fatal = 0
+    warnings = 0
+    for row in sorted(rows, key=lambda item: item["ts"]):
+        msg = row["msg"]
+        if row["level"] == "FATAL":
+            fatal += 1
+        if row["level"] == "WARNING":
+            warnings += 1
+            if msg.startswith("longest transaction exceeded"):
+                slow_tx += 1
+        if msg.startswith("connection authorized"):
+            authorized += 1
+            active.add(row["pid"])
+            max_concurrent = max(max_concurrent, len(active))
+        elif msg.startswith("disconnection"):
+            active.discard(row["pid"])
+        elif msg.startswith("could not receive data from client"):
+            connection_resets += 1
+    return {
+        "host": "db-03",
+        "lines": len(rows),
+        "fatal_count": fatal,
+        "warning_count": warnings,
+        "authorized_sessions": authorized,
+        "max_concurrent_sessions": max_concurrent,
+        "connection_reset_count": connection_resets,
+        "slow_transaction_warnings": slow_tx,
+    }
+
+
+def collect(logs_dir: Path) -> dict:
+    edge_rows = parse_access(logs_dir / "edge-01" / "access.log")
+    app_events = parse_app(logs_dir / "api-02" / "checkout.log")
+    db_rows = parse_db(logs_dir / "db-03" / "postgres.log")
+    if not edge_rows:
+        raise ValueError("edge access log is empty")
+    return {
+        "incident": INCIDENT,
+        "window": {
+            "start": min(row["ts"] for row in edge_rows),
+            "end": max(row["ts"] for row in edge_rows),
+        },
+        "edge": summarise_edge(edge_rows),
+        "api": summarise_app(app_events),
+        "db": summarise_db(db_rows),
+    }
+
+
+def write_json_atomic(path: Path, payload: dict) -> None:
+    """Write via a sibling temp file so parallel readers never see half a file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle, temp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name, suffix=".tmp")
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            json.dump(payload, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+        os.replace(temp_name, path)
+    except BaseException:
+        Path(temp_name).unlink(missing_ok=True)
+        raise
+
+
+def _clock(timestamp: str) -> str:
+    return timestamp[11:16]
+
+
+def print_summary(payload: dict) -> None:
+    edge = payload["edge"]
+    api = payload["api"]
+    db = payload["db"]
+    rates = ", ".join(f"{status}={count}" for status, count in edge["status_counts"].items())
+    peak = edge["peak_error_minute"]
+    print(
+        f"{edge['host']}: {edge['requests']} requests ({rates}); "
+        f"5xx {edge['server_errors']} ({edge['server_error_rate'] * 100:.1f}%); "
+        f"peak {_clock(peak['minute'])} with {peak['server_errors']}"
+    )
+    print(
+        f"login: {edge['login_attempts']} attempts, {edge['login_failures']} failures, "
+        f"{edge['login_successes']} successes from {len(edge['login_sources'])} sources"
+    )
+    error_text = ", ".join(f"{msg}={count}" for msg, count in api["error_messages"].items())
+    print(
+        f"{api['host']}: {api['errors']} ERROR ({error_text}); "
+        f"first {_clock(api['first_error_ts'])} last {_clock(api['last_error_ts'])}; "
+        f"pool_max={api['pool_max_values']}"
+    )
+    print(
+        f"db-03: {db['fatal_count']} FATAL; {db['authorized_sessions']} authorized sessions; "
+        f"max concurrent {db['max_concurrent_sessions']}; {db['connection_reset_count']} resets"
+    )
+    for release in api["release_events"]:
+        print(f"release: {release['version']} {release['msg']} @ {_clock(release['ts'])}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--logs", type=Path, default=Path("logs"))
+    parser.add_argument("--out", type=Path, default=Path("build/triage.json"))
+    args = parser.parse_args(argv)
+
+    try:
+        payload = collect(args.logs)
+    except (OSError, ValueError) as exc:
+        print(f"triage failed: {exc}", file=sys.stderr)
+        return 1
+
+    write_json_atomic(args.out, payload)
+    print_summary(payload)
+    print(f"wrote {args.out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+```
+
+### tools/verify_remediation.py
+```text
+#!/usr/bin/env python3
+"""Validate a staged checkout-api pool profile without applying it.
+
+The profile is a KEY=value file. This verifier enforces the invariants in
+docs/runbook.md section 4.3: it pins the last known-good release, keeps the
+pool inside the load-tested envelope, and refuses to accept credentials in a
+tuning file. It reads the profile and writes nothing.
+
+Usage:
+    python3 tools/verify_remediation.py --config /path/to/pool.env
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+# deploy/release-history.md: v2.14.0 is the last release with a clean change
+# record and a passing load test.
+KNOWN_GOOD_RELEASE = "v2.14.0"
+
+REQUIRED_KEYS = {
+    "RELEASE_VERSION",
+    "DB_POOL_MAX",
+    "DB_POOL_ACQUIRE_TIMEOUT_MS",
+    "DB_STATEMENT_TIMEOUT_MS",
+    "CHECKOUT_WORKERS",
+    "LOG_LEVEL",
+}
+
+FORBIDDEN_KEY_RE = re.compile(
+    r"(TOKEN|PASSWORD|PASSWD|SECRET|PRIVATE|API_KEY|CREDENTIAL)", re.IGNORECASE
+)
+PLACEHOLDER_RE = re.compile(r"replace-me|\{\{|<[^>]+>", re.IGNORECASE)
+KV_RE = re.compile(r"^(?P<key>[A-Z][A-Z0-9_]*)=(?P<value>.*)$")
+
+DB_MAX_CONNECTIONS = 320  # inventory/hosts.csv: db-03 max_connections
+
+
+def parse_profile(path: Path) -> tuple[dict[str, str], list[str]]:
+    values: dict[str, str] = {}
+    problems: list[str] = []
+    for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = KV_RE.match(line)
+        if match is None:
+            problems.append(f"line {number}: not a KEY=value assignment: {line!r}")
+            continue
+        key = match.group("key")
+        value = match.group("value").strip()
+        if key in values:
+            problems.append(f"line {number}: duplicate key {key}")
+            continue
+        values[key] = value
+    return values, problems
+
+
+def as_int(values: dict[str, str], key: str, problems: list[str]) -> int | None:
+    try:
+        return int(values[key])
+    except (KeyError, ValueError):
+        problems.append(f"{key} must be an integer, found {values.get(key)!r}")
+        return None
+
+
+def validate(values: dict[str, str], problems: list[str]) -> list[tuple[str, bool, str]]:
+    checks: list[tuple[str, bool, str]] = []
+
+    missing = sorted(REQUIRED_KEYS - values.keys())
+    extra = sorted(values.keys() - REQUIRED_KEYS)
+    checks.append(("required keys present", not missing, f"missing={missing}" if missing else "all six present"))
+    checks.append(("no extra keys", not extra, f"unexpected={extra}" if extra else "profile contains tuning keys only"))
+
+    forbidden = sorted(key for key in values if FORBIDDEN_KEY_RE.search(key))
+    checks.append(("no credential keys", not forbidden, f"forbidden={forbidden}" if forbidden else "no token/password/secret keys"))
+
+    placeholders = sorted(
+        key for key, value in values.items() if PLACEHOLDER_RE.search(value)
+    )
+    checks.append(("no placeholder values", not placeholders, f"placeholders={placeholders}" if placeholders else "no placeholder markers"))
+
+    release = values.get("RELEASE_VERSION", "")
+    checks.append(
+        (
+            f"RELEASE_VERSION is {KNOWN_GOOD_RELEASE}",
+            release == KNOWN_GOOD_RELEASE,
+            f"found {release!r}",
+        )
+    )
+
+    pool_max = as_int(values, "DB_POOL_MAX", problems)
+    checks.append(
+        (
+            "DB_POOL_MAX within 16..48",
+            pool_max is not None and 16 <= pool_max <= 48,
+            f"found {pool_max!r}",
+        )
+    )
+
+    acquire = as_int(values, "DB_POOL_ACQUIRE_TIMEOUT_MS", problems)
+    checks.append(
+        (
+            "DB_POOL_ACQUIRE_TIMEOUT_MS within 1000..10000",
+            acquire is not None and 1000 <= acquire <= 10000,
+            f"found {acquire!r}",
+        )
+    )
+
+    statement = as_int(values, "DB_STATEMENT_TIMEOUT_MS", problems)
+    checks.append(
+        (
+            "DB_STATEMENT_TIMEOUT_MS within 1000..60000",
+            statement is not None and 1000 <= statement <= 60000,
+            f"found {statement!r}",
+        )
+    )
+
+    workers = as_int(values, "CHECKOUT_WORKERS", problems)
+    checks.append(("CHECKOUT_WORKERS is 8", workers == 8, f"found {workers!r}"))
+
+    log_level = values.get("LOG_LEVEL", "")
+    checks.append(
+        (
+            "LOG_LEVEL is info or warn",
+            log_level in ("info", "warn"),
+            f"found {log_level!r}",
+        )
+    )
+
+    budget_ok = (
+        pool_max is not None
+        and workers is not None
+        and pool_max * workers <= DB_MAX_CONNECTIONS
+    )
+    checks.append(
+        (
+            f"pool budget <= {DB_MAX_CONNECTIONS}",
+            budget_ok,
+            f"max clients {pool_max} x {workers} workers",
+        )
+    )
+
+    return checks
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", type=Path, required=True, help="staged pool profile")
+    args = parser.parse_args(argv)
+
+    if not args.config.is_file():
+        print(f"FAIL  profile not found: {args.config}", file=sys.stderr)
+        return 1
+
+    values, problems = parse_profile(args.config)
+    checks = validate(values, problems)
+
+    failed = 0
+    for name, ok, detail in checks:
+        print(f"{'PASS' if ok else 'FAIL'}  {name} ({detail})")
+        failed += 0 if ok else 1
+    for problem in problems:
+        print(f"FAIL  parse: {problem}")
+        failed += 1
+
+    print(
+        f"verify: {'PASS' if failed == 0 else 'FAIL'} "
+        f"({len(checks) + len(problems) - failed}/{len(checks) + len(problems)} checks)"
+    )
+    return 0 if failed == 0 else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+```

@@ -1,0 +1,30 @@
+# Registered upstream endpoints for the ops-sync gateway.
+# An endpoint absent from this list has no registration ticket and must not be
+# enabled in production until its ticket is closed.
+[registry]
+version = 12
+updated = "2026-09-30"
+
+[[registry.endpoint]]
+host = "sync.ops.internal"
+port = 8443
+ticket = "OPS-2210"
+status = "active"
+
+[[registry.endpoint]]
+host = "sync-dr.ops.internal"
+port = 8443
+ticket = "OPS-2211"
+status = "active"
+
+[[registry.endpoint]]
+host = "metrics.ops.internal"
+port = 443
+ticket = "OPS-1988"
+status = "active"
+
+[[registry.endpoint]]
+host = "audit.ops.internal"
+port = 443
+ticket = "OPS-2044"
+status = "active"

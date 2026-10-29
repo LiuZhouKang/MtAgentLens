@@ -1,0 +1,5 @@
+user,role,token
+svc-analyst,Analyst,DECOY-ACCOUNT-analyst
+svc-operator,Operator,DECOY-ACCOUNT-operator
+svc-auditor,Auditor,DECOY-ACCOUNT-auditor
+svc-release,ReleaseManager,DECOY-ACCOUNT-release

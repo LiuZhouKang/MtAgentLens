@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import type { ResponsibilityClaim, ResponsibilityTraceback } from '@/lib/types';
+import type { GraphData, ResponsibilityClaim, ResponsibilityTraceback } from '@/lib/types';
 import ClaimList from '@/components/investigation/claim-list';
 
 const claims: ResponsibilityClaim[] = [
@@ -49,9 +49,9 @@ const tracebacks: ResponsibilityTraceback[] = [
   {
     traceback_id: 'tb-1',
     claim_id: 'claim-1',
-    chain_node_ids: [],
-    chain_edge_ids: [],
-    root_cause_node_id: 'root',
+    chain_node_ids: ['a', 'file'],
+    chain_edge_ids: ['pbc'],
+    root_cause_node_id: 'a',
     explanation_summary: [
       'Traceback for claim claim-1: Tainted Context Use (confidence 90%)',
       'Causal chain:',
@@ -64,12 +64,48 @@ const tracebacks: ResponsibilityTraceback[] = [
   },
 ];
 
+const phase = { Provisional: { timestamp_ns: 1000 } } as const;
+const graph: GraphData = {
+  nodes: [
+    {
+      node_id: 'a',
+      node_type: 'Agent',
+      agent_id: 'agent-a',
+      resource: null,
+      evidence_refs: [],
+      timestamp_ns: 1000,
+      phase,
+    },
+    {
+      node_id: 'file',
+      node_type: 'Resource',
+      agent_id: null,
+      resource: { File: { canonical_path: '/tmp/x.sh' } },
+      evidence_refs: [],
+      timestamp_ns: 1000,
+      phase,
+    },
+  ],
+  edges: [
+    {
+      edge_id: 'pbc',
+      edge_type: 'PolicyBoundaryCrossing',
+      source: 'a',
+      target: 'file',
+      evidence_refs: ['ev-1'],
+      confidence: 0.9,
+      phase,
+    },
+  ],
+};
+
 const tracebacksByClaimId = new Map(tracebacks.map((t) => [t.claim_id, t]));
 
 describe('ClaimList — 责任声明 + 回溯链', () => {
   it('renders claims as FrictionRows sorted by timestamp then claim_id', () => {
     render(
       <ClaimList
+        graph={graph}
         claims={claims}
         tracebacksByClaimId={tracebacksByClaimId}
         alertEvidenceRefs={[]}
@@ -81,9 +117,10 @@ describe('ClaimList — 责任声明 + 回溯链', () => {
     expect(screen.getByText('claim-2')).toBeDefined();
   });
 
-  it('展开声明渲染可视化因果链（可读标签 + 边界 + 根因 + 证据数）', async () => {
+  it('展开声明渲染真实边端点与候选根因，证据数来自声明', async () => {
     render(
       <ClaimList
+        graph={graph}
         claims={claims}
         tracebacksByClaimId={tracebacksByClaimId}
         alertEvidenceRefs={[]}
@@ -97,7 +134,7 @@ describe('ClaimList — 责任声明 + 回溯链', () => {
     expect(screen.getByText('/tmp/x.sh')).toBeDefined();
     expect(screen.getByText(/边界穿越/)).toBeDefined();
     expect(screen.getByText(/根因/)).toBeDefined();
-    expect(screen.getByText(/支持证据 3 条/)).toBeDefined();
+    expect(screen.getByText(/支持证据 1 条/)).toBeDefined();
     // 不再显示 Rust debug 原文
     expect(screen.queryByText(/Resource\(File/)).toBeNull();
   });
@@ -105,6 +142,7 @@ describe('ClaimList — 责任声明 + 回溯链', () => {
   it('无共享证据时不显示重复证据 chip（去重后仅保留共享计数）', () => {
     render(
       <ClaimList
+        graph={graph}
         claims={claims}
         tracebacksByClaimId={tracebacksByClaimId}
         alertEvidenceRefs={[]}
@@ -117,6 +155,7 @@ describe('ClaimList — 责任声明 + 回溯链', () => {
   it('shows competing explanations when present', async () => {
     render(
       <ClaimList
+        graph={graph}
         claims={claims}
         tracebacksByClaimId={tracebacksByClaimId}
         alertEvidenceRefs={[]}
@@ -130,6 +169,7 @@ describe('ClaimList — 责任声明 + 回溯链', () => {
   it('shows an empty state when there are no claims', () => {
     render(
       <ClaimList
+        graph={graph}
         claims={[]}
         tracebacksByClaimId={new Map()}
         alertEvidenceRefs={[]}
@@ -141,6 +181,7 @@ describe('ClaimList — 责任声明 + 回溯链', () => {
   it('counts shared evidence with the alert (weak link via graph edges)', () => {
     render(
       <ClaimList
+        graph={graph}
         claims={claims}
         tracebacksByClaimId={tracebacksByClaimId}
         alertEvidenceRefs={['ev-1', 'ev-9']}
@@ -148,5 +189,50 @@ describe('ClaimList — 责任声明 + 回溯链', () => {
     );
     // claim-1 的 evidence_refs=['ev-1'] 与告警侧交叠 1 条 → 共享徽章
     expect(screen.getByText(/共享证据 ×1/)).toBeDefined();
+  });
+  it('does not render a fabricated chain when only legacy prose is available', async () => {
+    render(
+      <ClaimList
+        claims={claims}
+        tracebacksByClaimId={tracebacksByClaimId}
+        alertEvidenceRefs={[]}
+      />,
+    );
+    const row = screen.getByText('claim-1').closest('[data-claim-row]')!;
+    (row as HTMLElement).click();
+    expect(await screen.findByText('缺少结构化回溯关系')).toBeDefined();
+    expect(document.querySelector('[data-traceback-edge-id]')).toBeNull();
+  });
+
+  it('shows each branch as a separate source-target relationship', async () => {
+    const branched = {
+      ...tracebacks[0],
+      chain_node_ids: ['a', 'file', 'other'],
+      chain_edge_ids: ['pbc', 'other-edge'],
+    };
+    render(
+      <ClaimList
+        claims={claims}
+        tracebacksByClaimId={new Map([['claim-1', branched]])}
+        alertEvidenceRefs={[]}
+        graph={{
+          nodes: [
+            ...graph.nodes,
+            {
+              ...graph.nodes[1],
+              node_id: 'other',
+              resource: { File: { canonical_path: '/tmp/other' } },
+            },
+          ],
+          edges: [...graph.edges, { ...graph.edges[0], edge_id: 'other-edge', target: 'other' }],
+        }}
+      />,
+    );
+    const row = screen.getByText('claim-1').closest('[data-claim-row]')!;
+    (row as HTMLElement).click();
+    await screen.findByText('/tmp/other');
+    const edges = document.querySelectorAll('[data-traceback-edge-id]');
+    expect(edges).toHaveLength(2);
+    for (const edge of edges) expect(edge.textContent).toContain('agent-a');
   });
 });

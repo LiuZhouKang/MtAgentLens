@@ -1,0 +1,170 @@
+{
+  "binary_detection": {
+    "searched_paths": [
+      "MTAGENTLENS_AGENT_BINARY -> /tmp/mtl-isolated-agent-ur8tiuyu/mtl-2189574"
+    ],
+    "candidates_checked": [],
+    "rejected_reasons": [],
+    "final_path": "/tmp/mtl-isolated-agent-ur8tiuyu/mtl-2189574"
+  },
+  "binary_path": "/tmp/mtl-isolated-agent-ur8tiuyu/mtl-2189574",
+  "comm_filter": "mtl-2189574",
+  "trace_args": [
+    "--ssl=true",
+    "--process=true"
+  ],
+  "configured_capture_sources": [
+    "process",
+    "tls"
+  ],
+  "ssl_binary_path_provided": "/tmp/mtl-isolated-agent-ur8tiuyu/mtl-2189574",
+  "uprobe_verification": {
+    "binary_path": "/tmp/mtl-isolated-agent-ur8tiuyu/mtl-2189574",
+    "debugfs_accessible": true,
+    "uprobe_events_accessible": true,
+    "attached": false,
+    "uprobe_count": 0,
+    "matching_uprobes": [],
+    "errors": [],
+    "note": "uprobe_events is empty; perf_event-based uprobes do not register tracefs entries. Runtime TLS sessions decide capture health."
+  },
+  "canary_test": {
+    "canary_url": "https://httpbin.org/get?mtagentlens-canary=verify",
+    "sent": false,
+    "curl_ok": false,
+    "captured_in_log": false,
+    "errors": [],
+    "skipped": true,
+    "skipped_reason": "collector comm filter 'mtl-2189574' excludes the curl canary; capture health is decided by runtime TLS sessions"
+  },
+  "runtime_metrics": {
+    "has_trace_output": true,
+    "trace_output_bytes": 6903876,
+    "ssl_events": 8500,
+    "http_events": 0,
+    "stdio_events": 0,
+    "ring_buffer_drops": 0,
+    "ring_buffer_drop_events": 2,
+    "rate_limit_drops": 0,
+    "aggregation_table_full": 0,
+    "capture_stats_complete": true,
+    "capture_loss_free": true,
+    "capture_sources": {
+      "process": {
+        "event": "PROCESS_RINGBUF_STATS",
+        "dropped_events": 0,
+        "global_dropped_events": 0,
+        "ringbuf_full_dropped": 0,
+        "pending_table_dropped": 0,
+        "user_read_dropped": 0,
+        "global_user_read_failed": 0,
+        "user_read_target": 0,
+        "user_read_outside_target": 0,
+        "user_read_unresolved": 0,
+        "user_read_unattributed": 0,
+        "user_read_scope_consistent": true,
+        "tracker_stale_events": 0,
+        "rate_limit_drops": 0,
+        "aggregation_table_full": 0
+      },
+      "tls": {
+        "event": "TLS_RINGBUF_STATS",
+        "dropped_events": 0,
+        "ringbuf_full_dropped": 0,
+        "state_map_dropped": 0
+      }
+    },
+    "capture_loss_reasons": {
+      "ringbuf_full": 0,
+      "pending_table": 0,
+      "user_read": 0
+    },
+    "diagnostics": {
+      "actions_dropped_bpf_noise": 0,
+      "actions_dropped_no_agent": 20,
+      "actions_produced": 7553,
+      "bodies_too_large": 0,
+      "classifier_degraded": null,
+      "decode_status": {},
+      "delegation_parent_unresolved": 3,
+      "evidence_attempted": 35,
+      "evidence_intents": 22,
+      "intents_deduped": 86,
+      "latency": {
+        "event_to_alert": {
+          "count": 0,
+          "max_us": null,
+          "p50_us": null,
+          "p95_us": null,
+          "p99_us": null
+        },
+        "route_event": {
+          "count": 11914,
+          "max_us": 44293,
+          "p50_us": 52,
+          "p95_us": 92,
+          "p99_us": 135
+        },
+        "trigger": {
+          "count": 27,
+          "max_us": 9562924,
+          "p50_us": 1093864,
+          "p95_us": 3371860,
+          "p99_us": 9562924
+        }
+      },
+      "observer_failures": 0,
+      "openclaw_tool_calls": 0,
+      "partial_tls_events": 4237,
+      "provenance_matched_intents": 0,
+      "provenance_spans": 4,
+      "provenance_strict": false,
+      "taint_authorized": 0,
+      "taint_claims_below_confidence": 0,
+      "taint_claims_emitted": 0,
+      "taint_edges": 0,
+      "taint_unattributed": 0,
+      "taint_unauthorized": 0
+    },
+    "actions_produced": 7553,
+    "evidence_intents": 22,
+    "taint_edges": 0,
+    "max_pbc_in_graph": 0,
+    "min_pbc_in_graph": 0,
+    "max_has_signal": 0,
+    "max_total_edges": 0,
+    "max_clusters": 0,
+    "http_filter_has_metrics": false,
+    "ssl_filter_has_metrics": false,
+    "ssl_uprobe_healthy": true,
+    "http_parser_healthy": false,
+    "pbc_detection_healthy": false,
+    "scoring_healthy": true,
+    "overall_healthy": true,
+    "trace_args": [
+      "--ssl=true",
+      "--process=true"
+    ],
+    "configured_capture_sources": [
+      "process",
+      "tls"
+    ],
+    "responsibility_db_exists": true,
+    "tls_sessions": 12,
+    "process_events": 66,
+    "graph_nodes": 2243,
+    "graph_edges": 17590,
+    "pbc_edges": 0,
+    "correlation_evidence": 41188,
+    "responsibility_claims": 0,
+    "responsibility_alerts": 1,
+    "policy_evaluations": 0,
+    "tls_capture_active": true,
+    "process_monitor_active": true,
+    "responsibility_runtime_active": true,
+    "observer_active": true,
+    "observer_calls": 0,
+    "observer_used": false,
+    "startup_capture_verified": false
+  }
+}

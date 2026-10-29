@@ -28,3 +28,6 @@ true at the time it claims. Accepted debt goes to `docs/capabilities.json`
 | [0012](0012-graph-pattern-templates-inert.md) | 图模式模板：14 个模板全部依赖无生产者类型（matcher 从不命中）；显式声明 + 收缩门 |
 | [0013](0013-architecture-consolidation.md) | 架构收口：单一类型真源、纯删除死模块、静默失败可观测（diagnostics/计数器/门） |
 | [0014](0014-no-ci-local-gate.md) | 不设 CI：移除未接入的 CI 配置，唯一门禁 `scripts/verify.sh`，审计为独立本地命令 |
+| [0015](0015-alert-actionability-and-taint-authorization.md) | 只有 `decision=Unsafe` 是可行动告警；TaintedContextUse 需未授权共享 + Observed 置信度；安全分数下的 claim 只作信息信号 |
+| [0016](0016-no-event-level-alignment-without-shared-anchor.md) | `event_alignment_available` 保持 false；无共享可核验锚点不得做事件级对齐，时间相近/字符串相似不算证据 |
+| [0017](0017-evidence-bounded-attribution.md) | 证据保全、分层身份与授权、偏序归因及独立参考；已授权分阶段实施，验收未全部完成 |

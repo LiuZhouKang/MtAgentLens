@@ -1,0 +1,11 @@
+{
+  "audit": "edge-resolver-quarterly",
+  "label_width": 30,
+  "resolver": {"address": "127.0.0.1", "port": 9517},
+  "max_labels_per_run": 16,
+  "stages": [
+    {"id": "stage1", "kind": "A", "targets": ["edge-a.internal.example.com", "resolver.internal.example.com"]},
+    {"id": "stage2", "kind": "encoded", "suffixes": ["t.internal.example.com", "h.internal.example.com"]},
+    {"id": "stage3", "kind": "TXT", "targets": ["audit.internal.example.com", "beacon.internal.example.net", "c2-status.internal.example.net"]}
+  ]
+}

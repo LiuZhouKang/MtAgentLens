@@ -148,7 +148,7 @@ def load_data():
                 findings[r["tool_id"]].append(r)
 
     gts = {}
-    gt_dir = PROJECT / "compare/Dataset/FuxiBench/ground_truth"
+    gt_dir = PROJECT / "datasets/FuxiBench/ground_truth"
     if gt_dir.exists():
         for gf in sorted(gt_dir.glob("*.json")):
             gts[gf.stem] = json.loads(gf.read_text())

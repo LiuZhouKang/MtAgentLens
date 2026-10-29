@@ -51,6 +51,18 @@ export function buildAnalysisTitle(alert: ResponsibilityAlert): string {
     const agentShort = alert.primary_agent.agent_id.slice(0, 8);
     return `${typeLabel} · ${modeLabel}（主体 ${agentShort}…）`;
   }
+  // Fallback translations for the engine's other title shapes. The UI is
+  // Chinese-first; an English-only engine string is a product defect.
+  const trimmed = t.trim();
+  if (/^Engine alert:/i.test(trimmed)) {
+    return trimmed.replace(/^Engine alert:\s*/i, '引擎告警：');
+  }
+  if (/^Observer reviewed:/i.test(trimmed)) {
+    return trimmed.replace(/^Observer reviewed:\s*/i, 'Observer 复核：');
+  }
+  if (/Agent activity observed.*no policy violations/i.test(trimmed)) {
+    return '观测到 Agent 活动 · 未发现策略违规';
+  }
   return t;
 }
 
@@ -97,7 +109,7 @@ export interface InvestigationModel {
   parentUnitId: string | null;
 }
 
-function getActiveGraph(alert: ResponsibilityAlert, fallbackGraph: GraphData): GraphData {
+export function getActiveGraph(alert: ResponsibilityAlert, fallbackGraph: GraphData): GraphData {
   if (alert.graph_snapshot?.nodes?.length || alert.graph_snapshot?.edges?.length) {
     return {
       nodes: alert.graph_snapshot.nodes,

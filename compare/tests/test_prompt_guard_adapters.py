@@ -20,6 +20,7 @@ def test_prompt_guard_adapters_use_current_runner_contract(
     tmp_path: Path,
     tool_id: str,
     adapter_name: str,
+    monkeypatch,
 ) -> None:
     fixture_dir = tmp_path / "fixture"
     fixture_dir.mkdir()
@@ -49,6 +50,15 @@ def test_prompt_guard_adapters_use_current_runner_contract(
         inclusion_rationale="contract test",
     )
 
+    import json
+    import subprocess
+    from dataclasses import replace
+    from compare.tools.adapters import official_prompt
+    case = replace(case, input_artifacts={"prompt_text": fixture_dir / "instructions.md"})
+    payload = {"engine": {"name": tool_id}, "findings": [
+        {"category": "prompt_injection", "confidence": 0.8, "detail": "synthetic engine contract"}]}
+    monkeypatch.setattr(official_prompt.subprocess, "run", lambda *args, **kwargs:
+        subprocess.CompletedProcess(args[0], 0, json.dumps(payload), ""))
     result = instantiate_adapter(metadata).run(case, tmp_path / "out")
 
     assert isinstance(result, AdapterResult)

@@ -15,22 +15,21 @@
 import { useAppStore } from '../store';
 import { LIVE_EVENTS_URL, api } from '../api';
 import type { RunSummary } from '../api';
-import type { Action, ApiNonLinkDiagnostic, GraphSnapshot, Intent, ResponsibilityAlert } from '../types';
-import { deriveLiveMonitoring } from './live-monitoring';
-import {
-  getLiveRawEvents,
-  pushRawEvents,
-  resetRawEvents,
-} from './live-raw-events';
 import type {
-  LiveConnectionStatus,
-  LiveRunMeta,
-  LiveStats,
-  LiveRawEvent,
-} from './live-types';
+  Action,
+  ApiNonLinkDiagnostic,
+  GraphSnapshot,
+  Intent,
+  ResponsibilityAlert,
+} from '../types';
+import { deriveLiveMonitoring } from './live-monitoring';
+import { getLiveRawEvents, pushRawEvents, resetRawEvents } from './live-raw-events';
+import type { LiveConnectionStatus, LiveRunMeta, LiveStats, LiveRawEvent } from './live-types';
 
 /** 活跃 run 轮询间隔。 */
 export const RUN_POLL_INTERVAL_MS = 2000;
+/** Consecutive probe/SSE failures before a live run is declared ended. */
+export const ACTIVE_RUN_FAILURE_THRESHOLD = 3;
 /** 后端不可达时轮询退避上限（指数退避，避免持续无效探测持续刷 500）。 */
 export const MAX_POLL_BACKOFF_MS = 60_000;
 /** 直播周期同步间隔（快照帧推进 + 运行监控重派生）。 */
@@ -67,6 +66,8 @@ export function createLiveSession(deps: LiveSessionDeps): LiveSession {
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
   /** 轮询退避增量：0 = 正常节奏；>0 = 后端不可达时指数退避。 */
   let pollBackoffMs = 0;
+  let pollFailures = 0;
+  let sseFailures = 0;
   let activeRunId: string | null = null;
   let stopped = false;
 
@@ -165,7 +166,7 @@ export function createLiveSession(deps: LiveSessionDeps): LiveSession {
     rateWindowStart = 0;
     rateWindowCount = 0;
     lastStatsPushMs = 0;
-    pushStats();
+    useAppStore.getState().setLiveStats({ ...stats });
   }
 
   async function resync(): Promise<void> {
@@ -229,12 +230,16 @@ export function createLiveSession(deps: LiveSessionDeps): LiveSession {
 
     es.onopen = () => {
       stats.connectedAtMs = Date.now();
+      sseFailures = 0;
       setStatus('connected');
       void resync();
     };
 
     es.onerror = () => {
-      setStatus('reconnecting');
+      sseFailures += 1;
+      // EventSource retries on its own; a sustained failure (403/404 from a
+      // proxy, no backend at all) must stop claiming "reconnecting".
+      setStatus(sseFailures >= ACTIVE_RUN_FAILURE_THRESHOLD ? 'disconnected' : 'reconnecting');
     };
   }
 
@@ -251,6 +256,7 @@ export function createLiveSession(deps: LiveSessionDeps): LiveSession {
     try {
       run = await deps.fetchActiveRun();
       pollBackoffMs = 0; // 后端可达 → 恢复正常轮询节奏
+      pollFailures = 0;
     } catch {
       // 后端不可达：指数退避轮询间隔（2s→…→60s），减少无效探测
       pollBackoffMs = Math.min((pollBackoffMs || RUN_POLL_INTERVAL_MS) * 2, MAX_POLL_BACKOFF_MS);
@@ -258,12 +264,15 @@ export function createLiveSession(deps: LiveSessionDeps): LiveSession {
       if (stopped) return;
       // 服务器不可达（record 进程退出 / 断网）：若曾有活跃 run，视为 run 结束转回放。
       // 否则静默保持现状（审查 HIGH-1：此前 fetch 失败被吞掉 → 永远卡重连）。
-      if (activeRunId) {
-        const ended = activeRunId;
+      pollFailures += 1;
+      if (activeRunId && pollFailures >= ACTIVE_RUN_FAILURE_THRESHOLD) {
+        // Sustained failure: treat the run as ended, but keep the rendered
+        // data. Refetching the same unreachable backend replaced the live
+        // view with an error banner and an empty graph.
         activeRunId = null;
         deps.onRunActiveChanged(false);
-        deps.onLoadRun(ended);
         disconnect();
+        resetRawEvents();
         setRunMeta({ runId: null, startedAtNs: null, endedAtNs: Date.now(), isActive: false });
       }
       return;
@@ -271,6 +280,8 @@ export function createLiveSession(deps: LiveSessionDeps): LiveSession {
     if (stopped) return; // MEDIUM-1
 
     if (!run) {
+      // No transition: don't rewrite the store every poll (LIVE-12).
+      if (activeRunId === null) return;
       // 活跃 run 结束 → 转回放深调 + 断流
       const ended = activeRunId;
       activeRunId = null;
@@ -286,9 +297,8 @@ export function createLiveSession(deps: LiveSessionDeps): LiveSession {
     // 新 run 或 run 切换（run 非空 ⇒ runId 非空）
     const runId = run.run_id;
     if (runId === activeRunId) return;
-    const isNew = activeRunId === null;
     activeRunId = runId;
-    if (!isNew) resetForNewRun();
+    resetForNewRun();
     setRunMeta({ runId, startedAtNs: run.started_at_ns ?? null, endedAtNs: null, isActive: true });
     deps.onRunActiveChanged(true);
     connect();
@@ -300,14 +310,17 @@ export function createLiveSession(deps: LiveSessionDeps): LiveSession {
   async function syncLiveRun(): Promise<void> {
     if (!activeRunId) return;
     const runId = activeRunId;
+    const isViewing = () =>
+      useAppStore.getState().appState === 'live' && useAppStore.getState().activeRunId === runId;
+    if (!isViewing()) return;
     try {
       const snapshots = await deps.fetchSnapshots(runId);
-      if (stopped || activeRunId !== runId) return; // MEDIUM-1/4：stop 或 run 切换中止
+      if (stopped || activeRunId !== runId || !isViewing()) return; // MEDIUM-1/4：stop 或 run 切换中止
       if (snapshots.length > 0) {
         useAppStore.getState().setLiveSnapshotFrames(snapshots);
       }
       const { intents, actions, non_links } = await deps.fetchEvidence(runId);
-      if (stopped || activeRunId !== runId) return; // MEDIUM-4：证据与快照不得跨 run 混搭
+      if (stopped || activeRunId !== runId || !isViewing()) return; // MEDIUM-4：证据与快照不得跨 run 混搭
       const monitoring = deriveLiveMonitoring({
         snapshots,
         alerts: useAppStore.getState().alerts,
@@ -390,10 +403,14 @@ export function startLiveSession(): void {
     openEventSource: (url) => new EventSource(url),
     onAlert: (alert) => {
       // 实时告警 → store 接收（rAF 合帧 + graph_snapshot 图演化）
-      useAppStore.getState().onAlertReceived(alert as ResponsibilityAlert);
+      const state = useAppStore.getState();
+      if (state.appState === 'live' && state.activeRunId === state.live.run.runId) {
+        state.onAlertReceived(alert as ResponsibilityAlert);
+      }
     },
     onLoadRun: (runId) => {
-      void useAppStore.getState().loadRun(runId);
+      const state = useAppStore.getState();
+      if (state.activeRunId === runId) void state.loadRun(runId);
     },
     onRunActiveChanged: (active) => {
       useAppStore.getState().onRunActiveChanged(active);

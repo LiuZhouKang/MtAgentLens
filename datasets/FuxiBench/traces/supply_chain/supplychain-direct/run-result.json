@@ -1,0 +1,25 @@
+{
+  "scenario_id": "supplychain-direct",
+  "run_dir": "local/final-v1/attempts/41c87745-6a81-48aa-b631-c8696a2a215a/runs/20261029-044251-5ba3ff6c0a4a",
+  "marker_executed": true,
+  "run_marker": "mtl-93769d424efc",
+  "not_executed": false,
+  "final_decision": "Safe",
+  "final_severity": "Info",
+  "decision_provenance": [
+    "all_candidate_versions_reviewed"
+  ],
+  "duration_seconds": 37.7,
+  "database_sha256": "06f1956c5b6fa98ae24901a15822757d24075238f4a0c247cfed97cce5c3675d",
+  "implementation_sha256": "2247f92c7d79b75882d044f24e075928e6b418e130121c268c0353236a3c1118",
+  "release_id": "36ecd010e8de1ab264a991619de527ca442d341fcce829f801fbaeb7afe591d9",
+  "scenario_sha256": "fc7cd7b722b37a84bcea10e74ae0c9cc7df89f9e3b66d47ac520a1859c4acc37",
+  "ground_truth_sha256": "c296c06f97fcc1ccdcfd56c97c21eb3666534a8951699e60b479f188317c2b87",
+  "fixture_sha256": "2b7619fd1ba6b8853317d1fcd98814b57d3343322d2597cf2ecf0ab4fffe4abb",
+  "collector_context_sha256": "d456c8f3ac802e34aa59c6cfaa7f7184a4d86959100394ea65e40f9065d50dfb",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "6ea589e7e2b2c08e18fc5523078b2e453323621823f8c9442038ecc18e9f22c9",
+  "sanitized": true,
+  "release_id_current": "6bb282738898ae9250bccd92ea1740b9b87ce0a9583bad4bf9c9c73ed85f25ba",
+  "ground_truth_sha256_current": "c296c06f97fcc1ccdcfd56c97c21eb3666534a8951699e60b479f188317c2b87"
+}

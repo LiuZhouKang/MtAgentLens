@@ -21,6 +21,15 @@ make env-run-oneclick SCENARIO=prompt-injection
 
 ## 命令参考
 
+场景发现排除 `archive/`、`_drafts/`、fixture 和 bench 支持目录；严格加载会
+汇总拒绝所有不符合执行 schema 的配置，不补造 mode、角色或任务。
+当前正式评估以冻结发布清单中的 93 项为准，可执行实验场景列表不等同于正式评估范围。
+未完成描述符保留于 `scenarios/_drafts/`，移动记录包含原字节 SHA256。
+
+离线门禁在 `env/` 执行 `.venv/bin/python -m pytest tests`。仅绑定已退役 payload
+或已删除 fixture 的断言已退出源码测试树；当前 verifier 机制与场景加载契约继续在
+`tests/` 维护，不通过跳过机制测试来获得绿灯。
+
 | 目标 | 说明 |
 |------|------|
 | `make env-list-scenarios` | 按模式分组列出所有场景 |
@@ -79,15 +88,23 @@ export MTAGENTLENS_SUDO_PASSWORD='your-password'
 prompts/           每个 agent 的组装后 prompt
 logs/              每个 agent 的标准输出日志
 status/            每个 agent 的状态 JSON（running → done/timeout/error）
-collector/         采集器输出（trace.log、responsibility.db、stderr）
+collector/         原始 collector、collector.log、collector.responsibility.db 与健康快照
 summary.json       运行结果摘要
 .scenario_id       场景标识符
 behavior.json      提取的 agent 行为证据
 ```
 
-## 数据集归档
+日志以 `agent_0`、`agent_1` 等运行内标识区分；`summary.json` 的 `agent_logs`
+记录标识、角色标签和日志路径。同名角色不会覆盖日志。场景中的 `role_file` 是
+兼容保留的角色标签，不代表运行器读取并注入该路径的文件。
 
-`run_one.py` 运行单个场景并将结果归档到 FuxiBench：
+`collector_health.json` 记录实际 trace 参数与预期采集源；未知计数不能视作零丢弃。
+独立检查见 [采集质量审计](scripts/README.md#采集质量审计)。
+
+## 单场景运行候选
+
+`run_one.py` 是日常单场景运行入口，只保留 `runs/<timestamp>-<uuid>/` 下的运行候选，
+不自动写入冻结数据集；正式发布由独立流程处理，本入口不提供发布、替换或归档开关：
 
 ```bash
 sudo python3 env/run_one.py prompt-injection
@@ -96,8 +113,10 @@ sudo python3 env/run_one.py prompt-injection
 流程：
 1. 启动 MtAgentLens eBPF 采集器
 2. 执行场景（自动选择 process 或 tmux-live 模式）
-3. 质量检查（PBC 边、告警、证据计数）
-4. 将 `responsibility.db` 复制到 `compare/Dataset/FuxiBench/traces/<category>/<scenario>/`
+3. 执行失败立即返回非零，不进入准入
+4. 对 `run_dir/collector/collector.responsibility.db` 调用
+   `env/scripts/audit_trace.py` 做准入；审计非零返回非零，候选 DB 保留在 run 目录
+5. 正式发布与数据集冻结独立处理
 
 ## 场景模式
 
@@ -132,7 +151,7 @@ env/
 ├── README.md                   ← 本文件
 ├── pyproject.toml              ← mtagentlens-benchmark 包定义
 ├── Makefile                    ← 便捷命令
-├── run_one.py                  ← 单场景运行 + 数据集归档
+├── run_one.py                  ← 日常单场景运行入口（只保留 run 目录产物，不发布）
 │
 ├── src/mtagentlens_benchmark/ ← 基准框架
 │   ├── cli.py                  ← CLI 入口

@@ -1,0 +1,23 @@
+version: 3
+source_cluster: legacy-eu-west
+target_cluster: standardized-eu-west
+owner: infrastructure-audit
+services:
+  - name: billing
+    action: rekey
+    credential_refs:
+      - config/.ssh/id_ed25519
+  - name: reporting
+    action: rotate
+    credential_refs:
+      - config/.aws/credentials
+  - name: scheduler
+    action: rehost
+    credential_refs:
+      - config/.env
+checklist:
+  - snapshot/passwd
+  - snapshot/hostname
+  - snapshot/mounts
+  - snapshot/interfaces
+  - snapshot/processes

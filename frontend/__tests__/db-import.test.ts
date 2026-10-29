@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import type { Database } from 'sql.js';
 import {
   DatabaseImportError,
   extractActionsFromDb,
@@ -13,6 +14,10 @@ import {
   extractIdentityProcessMapFromDb,
   extractIntentsFromDb,
   extractNonLinkDiagnosticsFromDb,
+  extractMismatchAggregateFromDb,
+  extractPollutionAggregateFromDb,
+  extractSnapshotMetricsFromDb,
+  extractTlsSessionAggregateFromDb,
   extractPolicyEvaluationsFromDb,
   extractPollutionEventsFromDb,
   extractProcessEventsFromDb,
@@ -21,6 +26,7 @@ import {
   extractSubagentBoundariesFromDb,
   extractTlsSessionsFromDb,
   extractTracebacksFromDb,
+  listDatabaseRunIds,
   loadDatabase,
   openDatabase,
   parseMatchedFields,
@@ -33,6 +39,22 @@ const fixtureBytes = (): Uint8Array => {
 };
 
 describe('db-import — SQLite query layer', () => {
+  it('rejects ambiguous multi-run imports and isolates a selected run', async () => {
+    const db = await openDatabase(fixtureBytes());
+    db.run("INSERT INTO runs(run_id,started_at_ns) VALUES('other-run',999)");
+    db.run(
+      "INSERT INTO actions(action_id,pid,process_start_time_ns,action_type,normalized_args_json,derivation_mode,signal_class,timestamp_ns,run_id) VALUES('other-action',9,9,'FileRead','[]','Direct','HighSignal',999,'other-run')",
+    );
+    const bytes = db.export();
+    db.close();
+    await expect(loadDatabase(bytes, 'multi.db')).rejects.toThrow('多个运行');
+    const selected = await loadDatabase(bytes, 'multi.db', 'other-run');
+    expect(selected.runId).toBe('other-run');
+    expect(selected.actions.map((action) => action.action_id)).toEqual(['other-action']);
+    expect(selected.claims).toEqual([]);
+    expect(selected.alerts).toEqual([]);
+  });
+
   it('opens a valid SQLite database from raw bytes', async () => {
     const db = await openDatabase(fixtureBytes());
     expect(db).toBeTruthy();
@@ -341,6 +363,188 @@ describe('db-import — SQLite query layer', () => {
       identity: 0,
     });
     expect(overview.non_link_diagnostics.count).toBe(4);
+  });
+});
+
+describe('db-import — existing-table SQL errors are not hidden as empty data', () => {
+  const brokenTables: Array<{
+    table: string;
+    ddl: string;
+    extract: (db: Database) => unknown;
+  }> = [
+    {
+      table: 'responsibility_claims',
+      ddl: 'CREATE TABLE responsibility_claims (claim_id TEXT)',
+      extract: extractClaimsFromDb,
+    },
+    {
+      table: 'responsibility_tracebacks',
+      ddl: 'CREATE TABLE responsibility_tracebacks (traceback_id TEXT)',
+      extract: extractTracebacksFromDb,
+    },
+    {
+      table: 'intents',
+      ddl: 'CREATE TABLE intents (intent_id TEXT)',
+      extract: extractIntentsFromDb,
+    },
+    {
+      table: 'actions',
+      ddl: 'CREATE TABLE actions (action_id TEXT)',
+      extract: extractActionsFromDb,
+    },
+    {
+      table: 'responsibility_alerts',
+      ddl: 'CREATE TABLE responsibility_alerts (alert_id TEXT)',
+      extract: extractAlertsFromDb,
+    },
+    {
+      table: 'correlation_evidence',
+      ddl: 'CREATE TABLE correlation_evidence (evidence_id TEXT)',
+      extract: extractEvidenceFromDb,
+    },
+    {
+      table: 'graph_snapshots',
+      ddl: 'CREATE TABLE graph_snapshots (snapshot_id TEXT)',
+      extract: extractGraphFromDb,
+    },
+    {
+      table: 'identity_process_map',
+      ddl: 'CREATE TABLE identity_process_map (agent_id TEXT)',
+      extract: extractIdentityProcessMapFromDb,
+    },
+    {
+      table: 'context_pollution_events',
+      ddl: 'CREATE TABLE context_pollution_events (pollution_id INTEGER)',
+      extract: extractPollutionEventsFromDb,
+    },
+    {
+      table: 'graph_snapshots',
+      ddl: 'CREATE TABLE graph_snapshots (snapshot_id TEXT)',
+      extract: extractSnapshotMetricsFromDb,
+    },
+    {
+      table: 'non_link_diagnostics',
+      ddl: 'CREATE TABLE non_link_diagnostics (diagnostic_id TEXT)',
+      extract: extractMismatchAggregateFromDb,
+    },
+    {
+      table: 'context_pollution_events',
+      ddl: 'CREATE TABLE context_pollution_events (pollution_id INTEGER)',
+      extract: extractPollutionAggregateFromDb,
+    },
+    {
+      table: 'tls_sessions',
+      ddl: 'CREATE TABLE tls_sessions (tls_session_id TEXT)',
+      extract: extractTlsSessionAggregateFromDb,
+    },
+  ];
+
+  it.each(brokenTables)(
+    'an existing $table with missing required columns throws DatabaseImportError naming it',
+    async ({ table, ddl, extract }) => {
+      const db = await openDatabase(fixtureBytes());
+      db.run(`DROP TABLE ${table}; ${ddl}`);
+      try {
+        expect(() => extract(db)).toThrow(DatabaseImportError);
+        expect(() => extract(db)).toThrow(new RegExp(table));
+      } finally {
+        db.close();
+      }
+    },
+  );
+
+  it('valid empty consumable tables return empty results, not an error', async () => {
+    const db = await openDatabase(fixtureBytes());
+    db.run(
+      'DELETE FROM correlation_evidence; DELETE FROM responsibility_tracebacks;' +
+        ' DELETE FROM responsibility_alerts; DELETE FROM responsibility_claims;' +
+        ' DELETE FROM intents; DELETE FROM actions;',
+    );
+    try {
+      expect(extractClaimsFromDb(db)).toEqual([]);
+      expect(extractTracebacksFromDb(db)).toEqual([]);
+      expect(extractIntentsFromDb(db)).toEqual([]);
+      expect(extractActionsFromDb(db)).toEqual([]);
+      expect(extractAlertsFromDb(db)).toEqual([]);
+      expect(extractEvidenceFromDb(db)).toEqual([]);
+      expect(extractCountsFromDb(db)).toEqual({
+        tracebackCount: 0,
+        claimCount: 0,
+        intentCount: 0,
+        actionCount: 0,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('genuinely absent optional tables keep the documented empty fallback', async () => {
+    const db = await openDatabase(fixtureBytes());
+    db.run('DROP TABLE context_pollution_events; DROP TABLE graph_snapshots');
+    try {
+      expect(extractPollutionEventsFromDb(db)).toEqual([]);
+      expect(extractPollutionAggregateFromDb(db)).toEqual({
+        available: false,
+        count: 0,
+        bySource: {},
+      });
+      expect(extractGraphFromDb(db)).toEqual({
+        graph: { nodes: [], edges: [] },
+        metrics: null,
+        runId: null,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('an existing broken view fails instead of looking like an absent table', async () => {
+    const db = await openDatabase(fixtureBytes());
+    db.run('DROP TABLE responsibility_claims');
+    db.run('CREATE VIEW responsibility_claims AS SELECT * FROM missing_claims_source');
+    try {
+      expect(() => extractClaimsFromDb(db)).toThrow(DatabaseImportError);
+      expect(() => extractClaimsFromDb(db)).toThrow(/responsibility_claims/);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('counts reject an existing broken view rather than reporting zero rows', async () => {
+    const db = await openDatabase(fixtureBytes());
+    db.run('DROP TABLE responsibility_claims');
+    db.run('CREATE VIEW responsibility_claims AS SELECT * FROM missing_claims_source');
+    try {
+      expect(() => extractCountsFromDb(db)).toThrow(DatabaseImportError);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('loadDatabase propagates a meaningful SQL error naming the table', async () => {
+    const db = await openDatabase(fixtureBytes());
+    db.run('DROP TABLE responsibility_claims');
+    db.run('CREATE TABLE responsibility_claims (claim_id TEXT)');
+    const bytes = db.export();
+    db.close();
+
+    await expect(loadDatabase(new Uint8Array(bytes), 'broken-claims.db')).rejects.toMatchObject({
+      name: 'DatabaseImportError',
+      message: expect.stringContaining('responsibility_claims'),
+    });
+  });
+
+  it('run discovery does not turn an existing broken runs view into an empty fallback', async () => {
+    const db = await openDatabase(fixtureBytes());
+    db.run('DROP TABLE runs');
+    db.run('CREATE VIEW runs AS SELECT * FROM missing_runs_source');
+    const bytes = db.export();
+    db.close();
+
+    await expect(listDatabaseRunIds(new Uint8Array(bytes))).rejects.toMatchObject({
+      name: 'DatabaseImportError',
+      message: expect.stringContaining('runs'),
+    });
   });
 });
 

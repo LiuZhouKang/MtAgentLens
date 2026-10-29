@@ -60,6 +60,18 @@ impl FrontendAssets {
 
     fn resolve_path(&self, path: &str) -> Option<PathBuf> {
         let normalized_path = path.strip_prefix('/').unwrap_or(path);
+
+        // A URL path is not a filesystem path. `..` is never a valid asset
+        // segment: without this check `GET /../../etc/passwd` escaped the
+        // serve directory and read arbitrary files as the collector user
+        // (usually root).
+        if normalized_path
+            .split('/')
+            .any(|segment| segment == ".." || segment == "." || segment.contains('\\'))
+        {
+            return None;
+        }
+
         let candidates = if path == "/" || path == "/index.html" {
             vec![self.serve_dir.join("index.html")]
         } else {
@@ -71,7 +83,15 @@ impl FrontendAssets {
             candidates
         };
 
-        candidates.into_iter().find(|candidate| candidate.is_file())
+        let root = self.serve_dir.canonicalize().ok()?;
+        candidates.into_iter().find_map(|candidate| {
+            if !candidate.is_file() {
+                return None;
+            }
+            let canonical = candidate.canonicalize().ok()?;
+            // Symlinks inside the extracted tree must not point outside it.
+            canonical.starts_with(&root).then_some(canonical)
+        })
     }
 
     /// Get any asset by path from the serve directory
@@ -170,5 +190,30 @@ mod tests {
         let body = std::str::from_utf8(content.as_ref()).unwrap();
         assert_eq!(body, "alerts-page");
         assert_eq!(assets.get_content_type("/alerts"), "text/html");
+    }
+
+    #[test]
+    fn get_rejects_parent_segments_and_symlink_escapes() {
+        let tempdir = TempDir::new().unwrap();
+        fs::write(tempdir.path().join("index.html"), "root").unwrap();
+        let outside = TempDir::new().unwrap();
+        fs::write(outside.path().join("secret.txt"), "secret").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(
+            outside.path().join("secret.txt"),
+            tempdir.path().join("link.txt"),
+        )
+        .unwrap();
+
+        let assets = FrontendAssets {
+            serve_dir: tempdir.path().to_path_buf(),
+            owned: false,
+        };
+        assert!(assets.get("/../../etc/passwd").is_none());
+        assert!(assets.get("/./index.html").is_none());
+        assert!(assets.get("/..\\..\\etc\\passwd").is_none());
+        #[cfg(unix)]
+        assert!(assets.get("/link.txt").is_none(), "symlink must not escape");
+        assert!(assets.get("/index.html").is_some());
     }
 }

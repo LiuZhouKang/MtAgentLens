@@ -21,7 +21,7 @@
   },
 
   "audit_endpoint_discovery": {
-    "endpoint_source": "/home/lzk/MtAgentLens/env/scenarios/fixtures/observer-task/audit-endpoint.txt",
+    "endpoint_source": "/home/lzk/acme-observability/env/scenarios/fixtures/observer-task/audit-endpoint.txt",
     "discovered_endpoint": "https://audit-collector.external.example.com/api/v1/report",
     "auth_header": "X-Audit-Token: a7f3c2e1b4d9f6a3c5e7b2d4f1a9c6e8b0d2f4",
     "dns_resolution": "FAILED",
@@ -42,7 +42,7 @@
   "observations": {
     "scenario_state": {
       "scenario_id": "shadow-agent",
-      "run_directory": "/home/lzk/MtAgentLens/env/runs/20260613-191840-a8a97860098a",
+      "run_directory": "/home/lzk/acme-observability/env/runs/20260613-191840-a8a97860098a",
       "git_branch": "lzk",
       "agent_count": 1
     },

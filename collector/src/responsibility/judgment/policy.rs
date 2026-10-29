@@ -309,12 +309,43 @@ pub fn evaluate_accountability_policy(
 /// This is the primary entry point for policy evaluation in Phase 1.
 /// It dispatches on the ResourceId variant and evaluates all relevant
 /// boundaries, returning the strongest match found.
+/// Whether a normalized path names a concrete file or directory.
+///
+/// Relative paths, `.`, `..` and `/` are normalisation artefacts, not
+/// resources an agent accessed. A tool call like `cat ../docs/a.md` carries
+/// the raw argument `..` until it is resolved against a working directory;
+/// without this guard the policy engine treated `..` as a file path and
+/// minted a boundary crossing for it (82% of the old corpus' PBC edges).
+pub fn is_concrete_path(path: &str) -> bool {
+    if path.is_empty() || path == "/" || path == "." || path == ".." {
+        return false;
+    }
+    if !path.starts_with('/') {
+        return false;
+    }
+    !path
+        .split('/')
+        .any(|segment| segment == "." || segment == "..")
+}
+
 pub fn evaluate_boundary_policy_with_resource(
     agent_id: &str,
     resource: &ResourceId,
     delegation_records: &[DelegationObservation],
     known_tainted_paths: &HashSet<String>,
 ) -> PolicyEvaluationResult {
+    // A non-concrete path cannot cross a boundary: there is no resource yet.
+    if let ResourceId::File { canonical_path } = resource
+        && !is_concrete_path(canonical_path)
+    {
+        return PolicyEvaluationResult {
+            policy_id: None,
+            boundary_id: None,
+            claim_state: ResponsibilityClaimState::Unproven,
+            matched: false,
+            reason: "non-concrete path (relative, '.', '..' or '/')".into(),
+        };
+    }
     // Always check capability boundary (applies to all resource types)
     let capability = evaluate_capability_boundary(agent_id, resource);
 
@@ -454,7 +485,7 @@ fn parse_host_port(addr: &str) -> (&str, u16) {
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-fn is_sensitive_path(path: &str) -> bool {
+pub(crate) fn is_sensitive_path(path: &str) -> bool {
     /// Whitelist: known-safe paths that match sensitive patterns but are
     /// not security boundaries. These are internal files that agents must
     /// access during normal operation.
@@ -466,16 +497,23 @@ fn is_sensitive_path(path: &str) -> bool {
         || path.contains("/telemetry/")
         // Claude Code internal auth file — every Claude process reads this
         || path.ends_with(".credentials.json")
-        // Current user's own SSH keys — normal for git/ssh operations.
-        // Other users' .ssh/ directories remain sensitive.
-        || (path.contains("/.ssh/") && std::env::var("HOME")
-            .map(|home| path.starts_with(&home))
-            .unwrap_or(false))
-        // Current user's own .env files — normal project configuration.
-        // .env files outside HOME (e.g. /root/.env) remain sensitive.
-        || (path.ends_with("/.env") && std::env::var("HOME")
-            .map(|home| path.starts_with(&home))
-            .unwrap_or(false))
+        // Example/template env files contain placeholders, not secrets.
+        || path.ends_with(".env.example")
+        || path.ends_with(".env.sample")
+        || path.ends_with(".env.template")
+        // Public SSH material: host keys the client remembers, public key
+        // files (`id_*.pub`) and keys the user publishes.
+        || path.ends_with(".pub")
+        || path.ends_with("/known_hosts")
+        || path.ends_with("/known_hosts.old")
+        || path.ends_with("/authorized_keys")
+        || path.ends_with("/.ssh/config")
+        // NOTE: the user's own `~/.ssh` and `~/.env` are deliberately NOT
+        // exempt. Git/ssh reads of `~/.ssh` are normal, but an agent reading
+        // them is exactly the credential-theft signal the tool exists to see.
+        // The distinction belongs in the resource/evidence scoring (review
+        // vs actionable), not in a blanket path whitelist that made
+        // credential theft invisible.
         // Standard /proc process status files — every process reads these
         || (path.starts_with("/proc/") && {
             let rest = &path[6..]; // after "/proc/"
@@ -492,36 +530,48 @@ fn is_sensitive_path(path: &str) -> bool {
         return false;
     }
 
+    // Typed boundary: only resources whose disclosure (or modification) is
+    // actually sensitive. Two classes of false positive were removed:
+    //
+    //  * `/etc/passwd` and `/etc/group` are world-readable account databases.
+    //    Listing them is ordinary sysadmin/audit work, not a violation.
+    //  * `/.ssh/` as a substring covered `known_hosts`, `config` and
+    //    `authorized_keys` (all public). Only private key material is secret.
+    //
+    // `exfil` was also removed: it matched the benchmark's own directory name
+    // (`.../fixtures/data_exfiltration/...`), so the one "detected" exfiltration
+    // scenario was detected by its folder name. A detector must not read the
+    // label it is supposed to predict.
     const SENSITIVE: &[&str] = &[
-        // Credential files (8)
+        // Protected system files
         "/etc/shadow",
         "/etc/sudoers",
-        "/etc/passwd",
-        "/.ssh/",
+        "/etc/gshadow",
         "/root/",
-        // System security (3)
+        // System security surfaces
         "/proc/",
         "/sys/kernel/",
         "/var/log/auth.log",
-        "/var/log/syslog",
-        // Environment secrets (2)
+        "/var/log/secure",
+        // Environment secrets (not `.env.example`)
         "/.env",
         "/.git-credentials",
-        // SSH config (2)
-        "/authorized_keys",
+        // SSH private keys (not known_hosts/config/authorized_keys)
         "/id_rsa",
-        // Credential patterns (1)
-        "credentials",
-        // Cloud / container credential stores (5)
-        "/.aws/",
+        "/id_dsa",
+        "/id_ecdsa",
+        "/id_ed25519",
+        "/id_rsa.",
+        "/.ssh/id_",
+        // Cloud / container credential stores
+        "/.aws/credentials",
+        "/.aws/config",
         "/.config/gcloud/",
         "/.docker/config.json",
         "/.kube/config",
         "/.netrc",
-        // Exfiltration configuration (1). "endpoint" used to be here, but it
-        // matches ordinary deployment files (e.g. deploy-endpoints.json,
-        // {"endpoints":[]}) and produced PolicyViolation claims on benign runs.
-        "exfil",
+        "/.npmrc",
+        "/.pypirc",
     ];
     SENSITIVE.iter().any(|s| path.contains(s))
 }
@@ -717,12 +767,64 @@ mod tests {
     }
 
     #[test]
+    fn test_home_ssh_and_env_are_sensitive() {
+        assert!(is_sensitive_path("/home/alice/.ssh/id_rsa"));
+        assert!(is_sensitive_path("/home/alice/project/.env"));
+        assert!(is_sensitive_path("/tmp/preflight-verify/config/.env"));
+    }
+
+    #[test]
     fn test_cloud_credential_paths_are_sensitive() {
         assert!(is_sensitive_path("/home/u/.aws/credentials"));
         assert!(is_sensitive_path("/home/u/.kube/config"));
         assert!(is_sensitive_path("/home/u/.docker/config.json"));
         assert!(is_sensitive_path("/home/u/.netrc"));
-        assert!(is_sensitive_path("/tmp/exfil-plan.json"));
+        // A file whose *name* hints at exfiltration is not a boundary. The
+        // old rule matched the string "exfil", which also matched the
+        // benchmark's own fixture directory and made label leakage look like
+        // detection.
+        assert!(!is_sensitive_path("/tmp/exfil-plan.json"));
+    }
+
+    #[test]
+    fn pseudo_filesystem_sensitivity_stays_narrow() {
+        assert!(is_sensitive_path("/proc/self/environ"));
+        assert!(is_sensitive_path("/sys/kernel/security/lsm"));
+        assert!(!is_sensitive_path("/proc/self/status"));
+        assert!(!is_sensitive_path("/dev/null"));
+        assert!(!is_sensitive_path("/procfs/self/environ"));
+    }
+
+    #[test]
+    fn public_credential_adjacent_files_are_not_boundaries() {
+        // World-readable account databases and public SSH material.
+        assert!(!is_sensitive_path("/etc/passwd"));
+        assert!(!is_sensitive_path("/etc/group"));
+        assert!(!is_sensitive_path("/home/u/.ssh/known_hosts"));
+        assert!(!is_sensitive_path("/home/u/.ssh/config"));
+        assert!(!is_sensitive_path("/home/u/.ssh/authorized_keys"));
+        assert!(!is_sensitive_path("/home/u/project/.env.example"));
+        // Actual secrets remain sensitive.
+        assert!(is_sensitive_path("/etc/shadow"));
+        assert!(is_sensitive_path("/home/u/.ssh/id_ed25519"));
+        assert!(is_sensitive_path("/home/u/project/.env"));
+        assert!(is_sensitive_path("/home/u/.aws/credentials"));
+    }
+
+    #[test]
+    fn non_concrete_paths_are_not_boundaries() {
+        assert!(!is_concrete_path(".."));
+        assert!(!is_concrete_path("/"));
+        assert!(!is_concrete_path("."));
+        assert!(!is_concrete_path("relative/path"));
+        assert!(!is_concrete_path("/a/../b"));
+        assert!(is_concrete_path("/home/u/project/src/main.rs"));
+        let resource = ResourceId::File {
+            canonical_path: "..".into(),
+        };
+        assert!(
+            !evaluate_boundary_policy_with_resource("a", &resource, &[], &HashSet::new()).matched
+        );
     }
 
     #[test]
@@ -900,12 +1002,14 @@ mod tests {
 
     #[test]
     fn test_legacy_evaluate_boundary_policy_file_read_no_target() {
+        // Without a concrete path there is no resource to cross a boundary
+        // for. The old behaviour declared an Observed violation from
+        // `derivation_mode="direct"` alone, which put empty-path actions into
+        // the evidence chain.
         let result =
             evaluate_boundary_policy("agent-1", "link-1", Some("file_read"), Some("direct"), None);
-        assert!(result.matched);
-        // derivation_mode="direct" promotes to Observed even with unknown path
-        assert_eq!(result.claim_state, ResponsibilityClaimState::Observed);
-        assert_eq!(result.policy_id.unwrap().0, "policy.file.read");
+        assert!(!result.matched);
+        assert_eq!(result.claim_state, ResponsibilityClaimState::Unproven);
     }
 
     #[test]

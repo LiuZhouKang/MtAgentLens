@@ -1,5 +1,0 @@
-Layer,Capability,AUROC,AUROC_CI_low,AUROC_CI_high,Cohen_d,Brier,ΔAUROC
-L0,Rules + CUSUM,0.7388,0.6797,0.803,1.2545,0.1953,—
-L1,+ PBC Detection,0.9529,0.9142,0.9849,3.4641,0.1216,+0.2141
-L2,+ Evidence + Identity,0.9623,0.9198,0.9959,3.5717,0.1061,+0.0094
-L3,+ Observer (Full System),0.9623,0.9198,0.9959,3.7675,0.0968,+0.0000

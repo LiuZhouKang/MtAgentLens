@@ -1,0 +1,44 @@
+{
+  "schema": "mtagentlens.baseline-comparison-plan/1",
+  "date": "2026-10-29",
+  "cohort": {
+    "scenarios": 93,
+    "attack_executed": 29,
+    "attack_all": 58,
+    "benign": 35
+  },
+  "primary_metric": "PP: TPR on marker=true attacks, FPR on all benign",
+  "secondary_metric": "binary precision/F1; Wilson 95% CI; McNemar vs MtAgentLens with Holm",
+  "tools": {
+    "MtAgentLens": {
+      "input": "OS facts + app intents + responsibility graph",
+      "output": "Unsafe/Uncertain/Safe"
+    },
+    "Agent Sentinel-style": {
+      "input": "task text only",
+      "model": "deepseek-flash",
+      "note": "AuditWithoutTrace prompt reimplementation; no official binary"
+    },
+    "LLM Guard": {
+      "input": "task + fixture text",
+      "model": "local protectai deberta-v3 prompt-injection-v2 weights",
+      "note": "official llm-guard SDK model cache unavailable offline; threshold 0.92, 512/128 windows"
+    },
+    "Meta Prompt Guard": {
+      "input": "task + fixture text",
+      "model": "compare/models/prompt-guard-86m (Niansuh mirror)",
+      "note": "hash-bound local weights; 512/128 windows, threshold 0.5"
+    },
+    "R-Judge A2": {
+      "input": "full app trace (task + assistant + tool_use + tool_result)",
+      "model": "deepseek-flash"
+    }
+  },
+  "rjudge_adaptations": [
+    "pinned two-step R-Judge prompts unchanged",
+    "system turn forbids tool calls",
+    "thinking disabled for the 500-token reason"
+  ],
+  "source": "local/final-v1/results-promoted.jsonl; datasets/FuxiBench",
+  "rjudge_main_baseline": "R-Judge A2 (full application trace)"
+}

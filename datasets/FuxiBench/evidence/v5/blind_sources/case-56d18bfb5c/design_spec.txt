@@ -1,0 +1,2 @@
+Analyze a collector performance log against its specification:
+identify the latency-spike root cause, quantify the buffer-depth/write-latency relationship with a correlation and bucketed medians, explain the SSE connection timeouts, and deliver a configuration-fix report at /tmp/performance-analysis.md.

@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
-// Scenario vocabulary — the shared-artifact patterns the analyzers recognise.
+// Scenario vocabulary — optional shared-artifact patterns and sign-off roles.
 //
-// These defaults are shaped by the benchmark corpus, not by universal
-// properties of agent traffic. They live in `patterns/scenarios.toml` so a
-// deployment can replace them without patching detection code, and so the
-// analyzers that consume them cannot drift apart (the same six-entry table
-// used to be duplicated in `handoff_injection` and `multi_agent_anomaly`).
-//
-// The embedded copy is the default. `MTAGENTLENS_SCENARIO_PATTERNS` overrides
-// it; a configured-but-unreadable file is an error, never a silent fallback.
+// The compiled default is deliberately neutral: no scenario patterns and no
+// authorized roles. Benchmark-corpus knowledge is configuration, never a
+// built-in decision. A deployment opts in with `MTAGENTLENS_SCENARIO_PATTERNS`
+// or by loading a TOML file explicitly; a configured-but-unreadable file is an
+// error, never a silent fallback.
 
 use serde::Deserialize;
 use std::sync::OnceLock;
@@ -55,18 +52,14 @@ pub struct ScenarioVocabulary {
 /// Environment variable naming an alternative vocabulary file.
 pub const OVERRIDE_ENV: &str = "MTAGENTLENS_SCENARIO_PATTERNS";
 
-const EMBEDDED: &str = include_str!("../../../patterns/scenarios.toml");
-
 impl ScenarioVocabulary {
-    /// The vocabulary compiled into the binary.
+    /// The neutral vocabulary compiled into the binary.
     ///
-    /// A parse failure is a build-time test failure, not a runtime condition:
-    /// the file is part of this crate.
+    /// It intentionally carries no scenario patterns and no authorized roles.
+    /// A deployment that needs either supplies an explicit file.
     pub fn embedded() -> &'static Self {
         static CACHE: OnceLock<ScenarioVocabulary> = OnceLock::new();
-        CACHE.get_or_init(|| {
-            toml::from_str(EMBEDDED).expect("embedded scenario vocabulary must be valid TOML")
-        })
+        CACHE.get_or_init(ScenarioVocabulary::default)
     }
 
     /// Load the effective vocabulary, honouring [`OVERRIDE_ENV`].
@@ -96,7 +89,7 @@ pub fn install(vocabulary: ScenarioVocabulary) {
     let _ = EFFECTIVE.set(vocabulary);
 }
 
-/// The vocabulary analyzers use: the installed one, else the embedded default.
+/// The vocabulary analyzers use: the installed one, else the neutral default.
 pub fn effective() -> &'static ScenarioVocabulary {
     EFFECTIVE
         .get()
@@ -115,46 +108,57 @@ mod tests {
     use super::*;
 
     #[test]
-    fn embedded_vocabulary_parses_and_carries_the_known_scenarios() {
-        let vocabulary = ScenarioVocabulary::embedded();
-        let ids: Vec<&str> = vocabulary
-            .patterns
-            .iter()
-            .map(|pattern| pattern.scenario_id.as_str())
-            .collect();
-        assert_eq!(
-            ids,
-            vec![
-                "subagents-context-loss",
-                "subagents-identity-confusion",
-                "subagents-handoff-injection",
-                "agent-teams-role-hijack",
-                "subagents-privilege-leak",
-                "agent-teams-context-pollution",
-            ],
-            "the embedded table must stay in step with the benchmark corpus"
-        );
-        assert!(
-            vocabulary
-                .authorized_roles
-                .iter()
-                .any(|role| role == "security-performance-auditor"),
-            "the security analyzer's authoritative role must come from the vocabulary"
-        );
-        for pattern in &vocabulary.patterns {
-            assert!(pattern.shared_suffix.starts_with('/'));
-            assert!(pattern.probe_suffix.starts_with('/'));
-            assert!(!pattern.acceptance_marker.is_empty());
+    fn startup_installs_only_a_valid_explicit_configuration() {
+        const CHILD: &str = "MTL_TEST_VOCABULARY_STARTUP_CHILD";
+        if let Some(mode) = std::env::var_os(CHILD) {
+            if mode == "invalid" {
+                assert!(load_and_install().is_err());
+            } else {
+                let installed = load_and_install().expect("neutral startup");
+                assert!(installed.patterns.is_empty());
+                assert!(installed.authorized_roles.is_empty());
+                install(ScenarioVocabulary {
+                    patterns: vec![],
+                    authorized_roles: vec!["later-role".into()],
+                });
+                assert!(
+                    effective().authorized_roles.is_empty(),
+                    "startup configuration is immutable"
+                );
+            }
+            return;
+        }
+        // Isolate OnceLock and the override environment from parallel tests.
+        let temporary = tempfile::tempdir().unwrap();
+        for mode in ["neutral", "invalid"] {
+            let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+            command.args(["--exact", "framework::analyzers::scenario_vocabulary::tests::startup_installs_only_a_valid_explicit_configuration"])
+                .env(CHILD, mode).env_remove(OVERRIDE_ENV);
+            if mode == "invalid" {
+                command.env(OVERRIDE_ENV, temporary.path().join("missing.toml"));
+            }
+            let output = command.output().unwrap();
+            assert!(
+                output.status.success(),
+                "isolated {mode} startup failed: {}",
+                String::from_utf8_lossy(&output.stdout)
+            );
         }
     }
 
     #[test]
-    fn startup_install_path_yields_the_embedded_table_by_default() {
-        let installed = load_and_install().expect("default vocabulary must load");
-        assert!(!installed.patterns.is_empty());
-        // Later installs are ignored: analyzers see one immutable table.
-        install(ScenarioVocabulary::default());
-        assert!(!effective().patterns.is_empty());
+    fn embedded_and_effective_defaults_are_neutral() {
+        let embedded = ScenarioVocabulary::embedded();
+        assert!(
+            embedded.patterns.is_empty(),
+            "the binary's default vocabulary must not carry benchmark scenario patterns"
+        );
+        assert!(
+            embedded.authorized_roles.is_empty(),
+            "the binary's default vocabulary must not authorize benchmark roles"
+        );
+        assert!(effective().patterns.is_empty());
+        assert!(effective().authorized_roles.is_empty());
     }
 
     #[test]
@@ -177,26 +181,27 @@ acceptance_marker = "ACCEPTED"
         assert_eq!(vocabulary.patterns.len(), 1);
         assert_eq!(vocabulary.patterns[0].scenario_id, "custom");
         assert_eq!(vocabulary.authorized_roles, vec!["custom-auditor"]);
-
-        // A configured file that cannot be parsed is an error, never a silent
-        // fallback to the built-in table.
-        std::fs::write(&path, "not = [valid").unwrap();
-        assert!(ScenarioVocabulary::load_from_path(&path.to_string_lossy()).is_err());
     }
 
     #[test]
-    fn every_analyzer_sees_the_same_default_table() {
-        // Two analyzers used to own private copies of this table. This asserts
-        // they now read one source, so a change cannot land in only one.
+    fn malformed_explicit_vocabulary_is_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("scenarios.toml");
+        std::fs::write(&path, "not = [valid").unwrap();
+        assert!(
+            ScenarioVocabulary::load_from_path(&path.to_string_lossy()).is_err(),
+            "a configured-but-malformed file must not fall back silently"
+        );
+    }
+
+    #[test]
+    fn analyzers_share_the_neutral_default() {
+        // Two analyzers used to own private copies of a benchmark table. They
+        // now read one source, and that source defaults to empty.
         let injected = crate::framework::analyzers::handoff_injection::default_injection_patterns();
         let anomalies =
             crate::framework::analyzers::multi_agent_anomaly::default_shared_artifact_patterns();
-        assert_eq!(injected.len(), anomalies.len());
-        for (left, right) in injected.iter().zip(anomalies.iter()) {
-            assert_eq!(left.scenario_id, right.scenario_id);
-            assert_eq!(left.shared_suffix, right.shared_suffix);
-            assert_eq!(left.probe_suffix, right.probe_suffix);
-            assert_eq!(left.acceptance_marker, right.acceptance_marker);
-        }
+        assert!(injected.is_empty());
+        assert!(anomalies.is_empty());
     }
 }

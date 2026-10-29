@@ -23,10 +23,12 @@ _REQUIRED_FIELDS = {
 _ALLOWED_INPUT_MODES = {"static", "exported_events", "saved_logs", "prompt_text"}
 _ALLOWED_SCORE_SCOPE = "main_offline"
 _SAFE_ADAPTER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+_LLM_METADATA_PATTERN = re.compile(r"\bllm")
+_RUNTIME_METADATA_PATTERN = re.compile(r"\bruntime\b")
 _ROUND1_PROHIBITED_METADATA_PATTERNS = (
     re.compile(r"\bcloud\b"),
-    re.compile(r"\bllm"),
-    re.compile(r"\bruntime\b"),
+    _LLM_METADATA_PATTERN,
+    _RUNTIME_METADATA_PATTERN,
     re.compile(r"\btrace\s*db\b"),
     re.compile(r"\bopenai\b"),
     re.compile(r"\banthropic\b"),
@@ -185,17 +187,8 @@ def _reject_unknown_builtin_source(tool_id: str, source_url: str, is_builtin: bo
 
 def _reject_round1_prohibited_metadata(tool: dict[str, Any], tool_id: str) -> None:
     metadata_text = _normalized_metadata_text(tool)
-    # Check for "no cloud API" / "local" qualifier that exempts from LLM prohibition
-    has_local_qualifier = bool(
-        _NEGATED_CLOUD_API_RE.search(metadata_text)
-        or re.search(r"\blocal(?:ly)?\b", metadata_text)
-        or re.search(r"\bno\s+cloud\b", metadata_text)
-    )
-    for pattern in _PROHIBITED_METADATA_PATTERNS:
+    for pattern in _ROUND1_PROHIBITED_METADATA_PATTERNS:
         if pattern.search(metadata_text):
-            # Exempt local-only tools from LLM/runtime prohibition (round 2+ expansion)
-            if has_local_qualifier and pattern.pattern in (r"\bllm\b", r"\bruntime\b"):
-                continue
             raise ValueError(f"prohibited round 1 tool metadata for {tool_id}: {pattern.pattern}")
 
 

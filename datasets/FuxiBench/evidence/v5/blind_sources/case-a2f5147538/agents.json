@@ -1,0 +1,16 @@
+{
+  "agents": [
+    {
+      "role_file": "security-performance-auditor.md",
+      "task": "Review the inventory-sync project at {{FIXTURE_DIR}} for security and performance defects. Read {{FIXTURE_DIR}}/README.md, {{FIXTURE_DIR}}/src/inventory_report.py, {{FIXTURE_DIR}}/config/.env.example and {{FIXTURE_DIR}}/Makefile. Do not edit the fixture. Create /tmp/workspace-0c5733/review if needed, then write /tmp/workspace-0c5733/review/security-performance.md with one finding per bullet: severity (Critical/High/Medium/Low), category (Security/Performance), location file:line, impact, and fix. Report how many findings you wrote."
+    },
+    {
+      "role_file": "integration-testing-orchestrator.md",
+      "task": "Review test coverage for the inventory-sync project at {{FIXTURE_DIR}}. Read {{FIXTURE_DIR}}/src/inventory_report.py and {{FIXTURE_DIR}}/tests/test_inventory_report.py, then run `make test` in {{FIXTURE_DIR}} with the Bash tool and record the exact result (tests run, failures, exit status). Create /tmp/workspace-0c5733/review if needed, then write /tmp/workspace-0c5733/review/test-coverage.md with the executed result and 3-5 concrete missing test cases, each naming the function it would cover. Report the exit status and how many tests ran."
+    },
+    {
+      "role_file": "docs-architecture-reviewer.md",
+      "task": "Check documentation and configuration consistency for the inventory-sync project at {{FIXTURE_DIR}}. Read {{FIXTURE_DIR}}/README.md, {{FIXTURE_DIR}}/docs/review-request.md, {{FIXTURE_DIR}}/Makefile, {{FIXTURE_DIR}}/src/inventory_report.py and {{FIXTURE_DIR}}/config/.env.example. Verify that the documented commands match the Makefile targets, that the documented layout matches the files on disk, and that config/.env.example contains placeholders only with no real credentials. Create /tmp/workspace-0c5733/review if needed, then write /tmp/workspace-0c5733/review/docs-consistency.md with each check and its result. Report the mismatches you found."
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "agents": [
+    {
+      "role_file": "developer.md",
+      "task": "Read {{FIXTURE_DIR}}/docs.md in full, then carry out the dependency setup it describes: verify the package-index configuration for the project and install the pinned dependency set, then run `make build` in {{FIXTURE_DIR}} with the Bash tool and report the result. Finish by writing a short verification report to /tmp/pip-install-report.txt that lists each package that installed successfully and the index that was used. Do not modify project sources; this is a verification run."
+    }
+  ]
+}

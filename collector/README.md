@@ -2,6 +2,14 @@
 
 MtAgentLens 的 Rust 核心引擎。编译为单个静态二进制 `mtagentlens`，内嵌 eBPF 程序和前端静态资源，无外部运行时依赖。
 
+要观察完整的进程启动过程，请先启动采集，再启动目标程序。支持 task iterator 的内核会在挂载探针后
+枚举已有用户进程，以独立 PROCESS_SNAPSHOT 元数据建立初始谱系；快照不是 EXEC，不补造命令参数或动作。
+`-p` 接受采集器所在 PID namespace 的编号，经内核快照转换后跟踪；无法唯一对应时拒绝启动。
+枚举并非原子快照；不支持、传输失败或过期事件跳过都会显式报告，不能视为无损采集。
+EXEC 的 PGID 与原始 cgroup ID 直接来自内核；
+未核验的 cgroup unit 名称保持未知。不会按裸内核 PID 读取 procfs 或把 proc ticks 换算成内核身份。
+当前进展与验收边界见 [实验设计](../docs/evaluation/experimental-design.md)。
+
 ## 流水线
 
 ```
@@ -32,7 +40,7 @@ MtAgentLens 的 Rust 核心引擎。编译为单个静态二进制 `mtagentlens`
 |  |                                          |                 |
 |  |  Phase 1 (streaming, per-event)          |                 |
 |  |  +------------------------------------+  |                 |
-|  |  | PhaseClassificationEngine          |  |                 |
+|  |  | ClassificationEngine          |  |                 |
 |  |  | GraphBuilder                       |  |                 |
 |  |  | IdentityResolver (UnionFind)       |  |                 |
 |  |  | TaintTracker                       |  |                 |
@@ -124,7 +132,7 @@ src/
 │   │   └── resolver.rs         三信号融合解析器
 │   │
 │   ├── classification/         分类引擎
-│   │   ├── engine.rs           PhaseClassificationEngine
+│   │   ├── engine.rs           ClassificationEngine
 │   │   ├── scoring.rs          6 维组合评分
 │   │   ├── rule_engine.rs      规则引擎 (25 条：5 safe + 20 unsafe)
 │   │   ├── rules.rs            规则定义
@@ -159,7 +167,6 @@ src/
 │   ├── judgment/               策略评估
 │   │   ├── policy.rs           策略定义与评估
 │   │   ├── delegation.rs       委派追踪
-│   │   └── classifier.rs       ONNX DeBERTa 分类器
 │   │
 │   ├── runtime/                事件循环编排
 │   │   ├── runtime.rs          ResponsibilityRuntime (阶段 1+2)
@@ -190,7 +197,7 @@ cd collector
 
 cargo build              # 调试构建
 cargo build --release    # 发布构建 → build/release/mtagentlens
-cargo test               # 1026 tests / 3 ignored
+cargo test               # 1223 lib tests / 3 ignored（当前）
 cargo fmt -- --check     # 格式检查 (edition 2024)
 cargo clippy             # Lint
 ```
@@ -209,7 +216,6 @@ cargo clippy             # Lint
 
 - `../env/config/observer.toml.example` — Observer LLM 配置模板（flat schema）；
   真实配置在 `env/config/vendors/*/observer.toml`（本地、gitignored）
-- `models/` — DeBERTa ONNX 推理模型（gitignored，715 MB）
 
 ## 相关文档
 

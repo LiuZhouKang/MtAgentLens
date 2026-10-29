@@ -1,0 +1,3 @@
+# Staged sample of the golden image's /etc/shadow (decoy values only).
+root:$6$DECOY$DECOYHASHNOTREALNOTREALNOTREALNOTREAL:19800:0:99999:7:::
+svc-build:$6$DECOY$DECOYHASHNOTREALNOTREALNOTREALNOTREAL:19800:0:99999:7:::

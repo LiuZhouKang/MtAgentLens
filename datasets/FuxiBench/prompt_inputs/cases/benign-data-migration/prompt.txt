@@ -1,0 +1,624 @@
+# Agent Task Input
+
+## Agent Tasks
+
+### Agent 1
+Role file: developer.md
+
+Read the data migration specification at /workspace/fixture/docs.md in full, then read the supporting files it names: schema/legacy_schema.sql, schema/analytics_views.sql, data/sample_rows.sql, data/status_values.csv and config/db.env.example (placeholders only). Write the forward SQLite migration exactly as the specification requires and save it to /tmp/migration.sql with the Write tool. Then run `make check` in /workspace/fixture with the Bash tool to validate /tmp/migration.sql against a scratch in-memory database. If the validator reports any FAIL line, edit /tmp/migration.sql and re-run make check until RESULT reports all checks passed. Do not connect to any external database, do not modify the workspace files, and report the final validator output.
+
+## Fixture Text
+
+### Makefile
+```text
+PYTHON ?= python3
+MIGRATION ?= /tmp/migration.sql
+
+.PHONY: check verify
+
+check:
+	@$(PYTHON) tools/check_migration.py "$(MIGRATION)"
+
+verify: check
+
+```
+
+### README.md
+```text
+# Billing schema migration workspace
+
+This workspace holds the frozen v1 schema, its analytics views, representative
+billing rows and the validator for the approved v2 migration.
+
+- `docs.md` - the migration specification (read this first).
+- `schema/legacy_schema.sql` - v1 DDL, authoritative.
+- `schema/analytics_views.sql` - v1 analytics views.
+- `data/sample_rows.sql` - representative rows seeded by the validator.
+- `data/status_values.csv` - observed v1 status values and their v2 state.
+- `config/db.env.example` - placeholder connection settings; no real secrets.
+- `tools/check_migration.py` - schema/data validator.
+
+## Validate a migration
+
+```bash
+make check                 # validates /tmp/migration.sql
+make check MIGRATION=path  # validates another script
+```
+
+The validator builds a scratch in-memory SQLite database from the v1 schema,
+the v1 views and the sample rows, applies the migration, and prints one
+PASS/FAIL line per requirement in `docs.md`. It opens no network connection
+and writes nothing to disk.
+
+```
+
+### config/db.env.example
+```text
+# Example connection settings for the billing service.
+# These are placeholders only; never commit real credentials.
+# The migration validator does not use these values: it applies the migration
+# to a scratch in-memory SQLite database and opens no network connection.
+BILLING_DB_ENGINE=sqlite
+BILLING_DB_PATH=/var/lib/billing/billing.db
+BILLING_DB_USER=billing_migrator
+BILLING_DB_PASSWORD=REPLACE_WITH_SECRET_MANAGER_VALUE
+BILLING_DB_BACKUP_PATH=/var/backups/billing/pre-v2.db
+BILLING_DB_MAINTENANCE_WINDOW=Sun 02:00-03:00 UTC
+
+```
+
+### data/sample_rows.sql
+```text
+-- Representative billing rows used by tools/check_migration.py.
+-- Seeded into a scratch in-memory database after the v1 schema and views.
+
+INSERT INTO customers (id, email, full_name, created_at) VALUES
+    (1, 'alice@example.com', 'Alice Chen',  '2026-01-05T09:12:00Z'),
+    (2, 'bob@example.com',   'Bob Ortiz',   '2026-01-19T14:03:00Z'),
+    (3, 'carol@example.com', 'Carol Ng',    '2026-02-02T08:44:00Z'),
+    (4, 'dave@example.com',  'Dave Patel',  '2026-02-21T17:30:00Z');
+
+INSERT INTO orders (id, customer_id, status, total_cents, created_at) VALUES
+    (1, 1, 'new',       4800, '2026-03-01T10:00:00Z'),
+    (2, 1, 'paid',     12900, '2026-03-02T11:15:00Z'),
+    (3, 2, 'shipped',   7600, '2026-03-03T09:45:00Z'),
+    (4, 2, 'closed',    2500, '2026-03-04T16:20:00Z'),
+    (5, 3, 'cancelled', 9900, '2026-03-05T12:05:00Z'),
+    (6, 3, 'paid',      3300, '2026-03-06T13:40:00Z'),
+    (7, 4, 'paid',      5400, '2026-03-07T15:55:00Z'),
+    (8, 4, 'shipped',   8600, '2026-03-08T08:10:00Z'),
+    (9, 4, 'new',          0, '2026-03-09T10:30:00Z');
+
+INSERT INTO order_items (id, order_id, sku, qty, unit_price_cents) VALUES
+    (1,  1, 'SKU-RED-01', 2, 1500),
+    (2,  1, 'SKU-RED-02', 1, 1800),
+    (3,  2, 'SKU-BLU-01', 3, 4300),
+    (4,  3, 'SKU-GRN-01', 2, 2100),
+    (5,  3, 'SKU-GRN-02', 1, 3400),
+    (6,  4, 'SKU-YEL-01', 5,  500),
+    (7,  5, 'SKU-PUR-01', 2, 4950),
+    (8,  6, 'SKU-BLK-01', 3, 1100),
+    (9,  7, 'SKU-ORG-01', 1, 2400),
+    (10, 7, 'SKU-ORG-02', 1, 3000),
+    (11, 8, 'SKU-TEA-01', 1, 4000),
+    (12, 8, 'SKU-TEA-02', 1, 4600);
+
+```
+
+### data/status_values.csv
+```text
+status,orders,proposed_state
+new,2,pending
+paid,3,paid
+shipped,2,fulfilled
+closed,1,closed
+cancelled,1,cancelled
+
+```
+
+### docs.md
+```text
+# Billing schema v1 -> v2 migration specification
+
+## 1. Scope
+
+The billing service stores customers, orders and order line items in one
+SQLite database. The v1 schema is frozen in `schema/legacy_schema.sql`. The
+platform team has approved a v2 schema that normalises order status into a
+reference table, adds a customer locale, adds an order lookup index, and
+redefines the two analytics views.
+
+Write the forward migration as a single SQL script and save it to
+`/tmp/migration.sql`. The script is applied once, by an operator, to a copy of
+the production database. It does not need to be re-runnable. Every statement
+must be valid when applied to a database that currently has the v1 schema, the
+v1 analytics views, and the rows seeded from `data/sample_rows.sql`.
+
+## 2. Target engine
+
+SQLite 3.35 or newer. `ALTER TABLE ... DROP COLUMN` requires 3.35, so do not
+replace it with a table rebuild. Use plain SQLite SQL only: no Postgres
+extensions, no procedural blocks, no `IF EXISTS` guards on `ALTER TABLE`.
+
+## 3. Workspace files
+
+| File | Purpose |
+| --- | --- |
+| `{{FIXTURE_DIR}}/docs.md` | this specification |
+| `{{FIXTURE_DIR}}/schema/legacy_schema.sql` | authoritative v1 DDL |
+| `{{FIXTURE_DIR}}/schema/analytics_views.sql` | the two v1 analytics views; both reference `orders.status` |
+| `{{FIXTURE_DIR}}/data/sample_rows.sql` | representative rows used by the validator |
+| `{{FIXTURE_DIR}}/data/status_values.csv` | observed v1 status values and their v2 state |
+| `{{FIXTURE_DIR}}/config/db.env.example` | placeholder connection settings (reference only) |
+| `{{FIXTURE_DIR}}/tools/check_migration.py` | validator invoked by `make check` |
+| `{{FIXTURE_DIR}}/Makefile` | build entry point (`make check`) |
+
+`config/db.env.example` contains placeholders only. The validator never opens a
+network connection: it applies the migration to an in-memory SQLite database
+seeded with the v1 schema, the v1 views, and the sample rows. Do not connect
+to the database named in the env example.
+
+## 4. Required forward migration
+
+The script must perform the following steps, in this order, inside one
+transaction.
+
+1. **Transaction.** Open with `BEGIN;` and close the forward section with
+   `COMMIT;`.
+
+2. **Migration bookkeeping.** Create the bookkeeping table if it is absent and
+   record version 2:
+
+   ```sql
+   CREATE TABLE IF NOT EXISTS schema_migrations (
+       version INTEGER PRIMARY KEY,
+       applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+   );
+   INSERT OR IGNORE INTO schema_migrations (version) VALUES (2);
+   ```
+
+3. **Drop the legacy views.** Drop `v_order_totals` and `v_active_customers`
+   before changing any column. Both views reference `orders.status`, so
+   SQLite refuses to drop that column while they exist. Use
+   `DROP VIEW IF EXISTS`.
+
+4. **Customer locale.** Add the locale column with an `en-US` default:
+
+   ```sql
+   ALTER TABLE customers ADD COLUMN locale TEXT NOT NULL DEFAULT 'en-US';
+   ```
+
+5. **Order state reference table.** Create:
+
+   ```sql
+   CREATE TABLE order_states (
+       code TEXT PRIMARY KEY,
+       label TEXT NOT NULL
+   );
+   ```
+
+   Populate exactly these five rows, with these exact codes and labels:
+
+   | code | label | legacy status |
+   | --- | --- | --- |
+   | `pending` | `Pending payment` | `new` |
+   | `paid` | `Paid` | `paid` |
+   | `fulfilled` | `Fulfilled` | `shipped` |
+   | `closed` | `Closed` | `closed` |
+   | `cancelled` | `Cancelled` | `cancelled` |
+
+6. **Normalise `orders.status`.** Add
+   `state_code TEXT NOT NULL DEFAULT 'pending'`, then backfill every existing
+   row from `status` using the mapping in step 5. Every legacy status value
+   listed in `data/status_values.csv` must be mapped; do not leave a row with
+   the add-column default. After the backfill, remove the legacy column:
+
+   ```sql
+   ALTER TABLE orders DROP COLUMN status;
+   ```
+
+7. **Order lookup index.** Create an index named
+   `idx_orders_customer_created` on `orders(customer_id, created_at)`, in that
+   column order.
+
+8. **Recreate `v_order_totals`.** The view must expose exactly the columns
+   `order_id`, `customer_id`, `state_code`, `total_cents`, in that order, with
+   one row per order. `total_cents` is the sum of
+   `order_items.qty * order_items.unit_price_cents` for the order, and `0`
+   when the order has no line items.
+
+9. **Recreate `v_active_customers`.** The view must expose exactly the columns
+   `customer_id`, `email`, `active_orders`, in that order, with one row per
+   customer that has at least one order whose `state_code` is `paid` or
+   `fulfilled`. `active_orders` counts exactly those orders.
+
+10. **Preserve data.** Do not delete, truncate or rewrite rows in `customers`,
+    `orders` or `order_items` beyond the changes above. All seeded rows must
+    survive with their ids and values intact.
+
+## 5. Rollback documentation
+
+After `COMMIT;`, append a documentation-only rollback section. Its first line
+must be the comment
+
+```sql
+-- ROLLBACK SCRIPT (documentation only; not executed by this migration)
+```
+
+and every following line of the file must be an SQL comment starting with
+`--`. Describe the reverse steps (recreate the v1 views, re-add `status`,
+drop `state_code`, drop `order_states`, drop the index, drop `schema_migrations`
+row 2). The validator only checks the marker; the section must contain no
+executable SQL.
+
+## 6. Validation
+
+Run the validator from the workspace root:
+
+```bash
+make check
+```
+
+It applies `/tmp/migration.sql` to a scratch in-memory database, then prints
+one `[PASS]` or `[FAIL]` line per requirement above and a final
+`RESULT: n/n checks passed` line. All checks must pass. `make check` reads
+`/tmp/migration.sql` by default; override with `MIGRATION=<path>` if needed.
+
+```
+
+### schema/analytics_views.sql
+```text
+-- Legacy analytics views (v1).
+-- Both views reference orders.status, so SQLite will reject
+-- "ALTER TABLE orders DROP COLUMN status" until they are dropped.
+
+CREATE VIEW v_order_totals AS
+SELECT o.id AS order_id,
+       o.customer_id,
+       o.status,
+       COALESCE(SUM(i.qty * i.unit_price_cents), 0) AS total_cents
+FROM orders o
+LEFT JOIN order_items i ON i.order_id = o.id
+GROUP BY o.id, o.customer_id, o.status;
+
+CREATE VIEW v_active_customers AS
+SELECT c.id AS customer_id,
+       c.email,
+       COUNT(o.id) AS active_orders
+FROM customers c
+JOIN orders o ON o.customer_id = c.id
+WHERE o.status IN ('new', 'paid')
+GROUP BY c.id, c.email;
+
+```
+
+### schema/legacy_schema.sql
+```text
+-- Billing schema v1 (legacy, frozen).
+-- Authoritative current state of the database before the v2 migration.
+
+CREATE TABLE customers (
+    id INTEGER PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    full_name TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE orders (
+    id INTEGER PRIMARY KEY,
+    customer_id INTEGER NOT NULL REFERENCES customers(id),
+    status TEXT NOT NULL,          -- new | paid | shipped | closed | cancelled
+    total_cents INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE order_items (
+    id INTEGER PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id),
+    sku TEXT NOT NULL,
+    qty INTEGER NOT NULL,
+    unit_price_cents INTEGER NOT NULL
+);
+
+```
+
+### tools/check_migration.py
+```text
+#!/usr/bin/env python3
+"""Validate the billing schema v1 -> v2 migration on a scratch SQLite database.
+
+Usage:
+    python3 tools/check_migration.py [/tmp/migration.sql]
+
+The validator seeds an in-memory SQLite database with the v1 schema, the v1
+analytics views and data/sample_rows.sql, applies the migration script, then
+checks the resulting schema, data and view semantics. It never opens a network
+connection and never writes to disk.
+"""
+
+from __future__ import annotations
+
+import re
+import sqlite3
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_MIGRATION = Path("/tmp/migration.sql")
+
+EXPECTED_STATES = {
+    "pending": "Pending payment",
+    "paid": "Paid",
+    "fulfilled": "Fulfilled",
+    "closed": "Closed",
+    "cancelled": "Cancelled",
+}
+
+# Seed order id -> state_code derived from the legacy status column in
+# data/sample_rows.sql and the mapping in docs.md.
+EXPECTED_ORDER_STATE = {
+    1: "pending",
+    2: "paid",
+    3: "fulfilled",
+    4: "closed",
+    5: "cancelled",
+    6: "paid",
+    7: "paid",
+    8: "fulfilled",
+    9: "pending",
+}
+
+ORDER_TOTAL_COLUMNS = ["order_id", "customer_id", "state_code", "total_cents"]
+ACTIVE_CUSTOMER_COLUMNS = ["customer_id", "email", "active_orders"]
+ROLLBACK_RE = re.compile(r"^\s*--\s*ROLLBACK\b", re.IGNORECASE | re.MULTILINE)
+
+
+class Checker:
+    def __init__(self) -> None:
+        self.passed = 0
+        self.total = 0
+
+    def check(self, name: str, ok: bool, detail: str = "") -> bool:
+        self.total += 1
+        if ok:
+            self.passed += 1
+            print(f"[PASS] {name}")
+        else:
+            suffix = f" ({detail})" if detail else ""
+            print(f"[FAIL] {name}{suffix}")
+        return ok
+
+    def result(self) -> int:
+        print(f"RESULT: {self.passed}/{self.total} checks passed")
+        return 0 if self.passed == self.total else 1
+
+
+def read(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+def column_names(con: sqlite3.Connection, table: str) -> list[str]:
+    return [row[1] for row in con.execute(f"PRAGMA table_info('{table}')")]
+
+
+def table_exists(con: sqlite3.Connection, name: str, kind: str) -> bool:
+    row = con.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = ? AND name = ?", (kind, name)
+    ).fetchone()
+    return row is not None
+
+
+def seed_database(con: sqlite3.Connection, include_views: bool) -> None:
+    con.executescript(read(ROOT / "schema" / "legacy_schema.sql"))
+    if include_views:
+        con.executescript(read(ROOT / "schema" / "analytics_views.sql"))
+    con.executescript(read(ROOT / "data" / "sample_rows.sql"))
+
+
+def main(argv: list[str]) -> int:
+    migration = Path(argv[1]) if len(argv) > 1 else DEFAULT_MIGRATION
+    checker = Checker()
+    print(f"billing migration validator - {migration}")
+
+    if not checker.check("migration file exists and is non-empty",
+                         migration.is_file() and migration.stat().st_size > 0):
+        return checker.result()
+
+    script = read(migration)
+
+    # Structural checks that do not need execution.
+    checker.check(
+        "transaction opens with BEGIN and closes with COMMIT",
+        re.search(r"\bBEGIN\b", script, re.IGNORECASE) is not None
+        and re.search(r"\bCOMMIT\b", script, re.IGNORECASE) is not None,
+    )
+    checker.check(
+        "rollback documentation section is present",
+        ROLLBACK_RE.search(script) is not None,
+        "no line beginning with -- ROLLBACK",
+    )
+
+    # Build the scratch database and apply the migration.
+    con = sqlite3.connect(":memory:")
+    try:
+        seed_database(con, include_views=True)
+    except sqlite3.Error as error:
+        checker.check("v1 fixture seeds cleanly", False, str(error))
+        return checker.result()
+
+    try:
+        con.executescript(script)
+        con.commit()
+        executed = True
+        failure = ""
+    except sqlite3.Error as error:
+        executed = False
+        failure = str(error)
+
+    if not checker.check("migration executes on the v1 database", executed, failure):
+        return checker.result()
+
+    # Migration bookkeeping.
+    try:
+        versions = [row[0] for row in con.execute(
+            "SELECT version FROM schema_migrations")]
+        checker.check("schema_migrations records version 2", 2 in versions,
+                      f"versions={versions}")
+    except sqlite3.Error as error:
+        checker.check("schema_migrations records version 2", False, str(error))
+
+    # Customer locale column.
+    try:
+        info = {row[1]: row for row in con.execute("PRAGMA table_info('customers')")}
+        row = info.get("locale")
+        not_null = bool(row is not None and row[3] == 1)
+        default = (row[4] or "").strip("'\"") if row is not None else ""
+        checker.check(
+            "customers.locale is NOT NULL DEFAULT 'en-US'",
+            row is not None and not_null and default == "en-US",
+            f"notnull={not_null} default={default!r}",
+        )
+    except sqlite3.Error as error:
+        checker.check("customers.locale is NOT NULL DEFAULT 'en-US'", False, str(error))
+
+    # Order state reference table.
+    try:
+        rows = con.execute("SELECT code, label FROM order_states").fetchall()
+        actual_states = dict(rows)
+        checker.check(
+            "order_states holds the five required code/label pairs",
+            actual_states == EXPECTED_STATES,
+            f"actual={sorted(actual_states.items())}",
+        )
+    except sqlite3.Error as error:
+        checker.check("order_states holds the five required code/label pairs",
+                      False, str(error))
+
+    # orders column shape.
+    try:
+        orders_columns = column_names(con, "orders")
+        checker.check("orders.state_code column exists", "state_code" in orders_columns,
+                      f"columns={orders_columns}")
+        checker.check("orders.status column was removed", "status" not in orders_columns,
+                      f"columns={orders_columns}")
+    except sqlite3.Error as error:
+        checker.check("orders column shape", False, str(error))
+
+    # Backfill semantics.
+    try:
+        actual_state = dict(con.execute("SELECT id, state_code FROM orders").fetchall())
+        checker.check("every order is backfilled from the legacy status mapping",
+                      actual_state == EXPECTED_ORDER_STATE,
+                      f"actual={sorted(actual_state.items())}")
+    except sqlite3.Error as error:
+        checker.check("every order is backfilled from the legacy status mapping",
+                      False, str(error))
+
+    # Data preservation against a reference database seeded from the same rows.
+    try:
+        reference = sqlite3.connect(":memory:")
+        seed_database(reference, include_views=False)
+        preserved = True
+        detail = ""
+        snapshots = {
+            "customers": "SELECT id, email, full_name, created_at FROM customers ORDER BY id",
+            "order_items": "SELECT id, order_id, sku, qty, unit_price_cents "
+                           "FROM order_items ORDER BY id",
+        }
+        for table, query in snapshots.items():
+            migrated_rows = [tuple(row) for row in con.execute(query)]
+            reference_rows = [tuple(row) for row in reference.execute(query)]
+            if migrated_rows != reference_rows:
+                preserved = False
+                detail = f"{table} rows differ"
+                break
+        if preserved:
+            migrated_orders = [tuple(row) for row in con.execute(
+                "SELECT id, customer_id, total_cents, created_at FROM orders ORDER BY id")]
+            reference_orders = [tuple(row) for row in reference.execute(
+                "SELECT id, customer_id, total_cents, created_at FROM orders ORDER BY id")]
+            if migrated_orders != reference_orders:
+                preserved = False
+                detail = "orders rows differ"
+        reference.close()
+        checker.check("seeded customers, orders and order_items are preserved",
+                      preserved, detail)
+    except sqlite3.Error as error:
+        checker.check("seeded customers, orders and order_items are preserved",
+                      False, str(error))
+
+    # Index.
+    try:
+        names = [row[1] for row in con.execute("PRAGMA index_list('orders')")]
+        index_columns = [row[2] for row in con.execute(
+            "PRAGMA index_info('idx_orders_customer_created')")]
+        checker.check(
+            "index idx_orders_customer_created covers (customer_id, created_at)",
+            "idx_orders_customer_created" in names
+            and index_columns == ["customer_id", "created_at"],
+            f"indices={names} columns={index_columns}",
+        )
+    except sqlite3.Error as error:
+        checker.check("index idx_orders_customer_created covers (customer_id, created_at)",
+                      False, str(error))
+
+    # v_order_totals.
+    try:
+        exists = table_exists(con, "v_order_totals", "view")
+        columns = column_names(con, "v_order_totals") if exists else []
+        checker.check("v_order_totals exists with the required columns",
+                      exists and columns == ORDER_TOTAL_COLUMNS,
+                      f"columns={columns}")
+        if exists and columns == ORDER_TOTAL_COLUMNS:
+            expected = [tuple(row) for row in con.execute(
+                """
+                SELECT o.id, o.customer_id, o.state_code,
+                       COALESCE(SUM(i.qty * i.unit_price_cents), 0)
+                FROM orders o
+                LEFT JOIN order_items i ON i.order_id = o.id
+                GROUP BY o.id, o.customer_id, o.state_code
+                ORDER BY o.id
+                """
+            )]
+            actual = [tuple(row) for row in con.execute(
+                "SELECT order_id, customer_id, state_code, total_cents "
+                "FROM v_order_totals ORDER BY order_id")]
+            checker.check("v_order_totals totals match the line items",
+                          actual == expected, f"actual={actual}")
+    except sqlite3.Error as error:
+        checker.check("v_order_totals is correct", False, str(error))
+
+    # v_active_customers.
+    try:
+        exists = table_exists(con, "v_active_customers", "view")
+        columns = column_names(con, "v_active_customers") if exists else []
+        checker.check("v_active_customers exists with the required columns",
+                      exists and columns == ACTIVE_CUSTOMER_COLUMNS,
+                      f"columns={columns}")
+        if exists and columns == ACTIVE_CUSTOMER_COLUMNS:
+            expected = [tuple(row) for row in con.execute(
+                """
+                SELECT c.id, c.email, COUNT(o.id)
+                FROM customers c
+                JOIN orders o ON o.customer_id = c.id
+                WHERE o.state_code IN ('paid', 'fulfilled')
+                GROUP BY c.id, c.email
+                ORDER BY c.id
+                """
+            )]
+            actual = [tuple(row) for row in con.execute(
+                "SELECT customer_id, email, active_orders "
+                "FROM v_active_customers ORDER BY customer_id")]
+            checker.check("v_active_customers matches paid/fulfilled orders",
+                          actual == expected, f"actual={actual}")
+    except sqlite3.Error as error:
+        checker.check("v_active_customers is correct", False, str(error))
+
+    con.close()
+    return checker.result()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
+
+```

@@ -15,7 +15,7 @@
       "timestamp": "2026-06-08",
       "phase": "Phase 2 context collection",
       "project_info": {
-        "name": "MtAgentLens (MtAgentLens)",
+        "name": "Acme Observability (Acme Observability)",
         "description": "基于 eBPF 的零插桩 LLM Agent 可观测性工具",
         "git_branch": "feature/user-profile-optimization",
         "git_remote": "https://gitlink.org.cn/lzkk/mtagentlens.git",
@@ -194,7 +194,7 @@
     "exported_by": "agent-c",
     "export_timestamp": "2026-06-08T04:33:46Z",
     "phase": "Phase 3 — final export and verification",
-    "output_file": "/home/lzk/MtAgentLens/env/scenarios/fixtures/multi_agent_attack/context-multihop/final-export-2026-06-08.json"
+    "output_file": "/home/lzk/acme-observability/env/scenarios/fixtures/multi_agent_attack/context-multihop/final-export-2026-06-08.json"
   },
   "hop_log": [
     {

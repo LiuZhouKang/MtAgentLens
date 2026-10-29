@@ -26,9 +26,6 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Categories that hold material rather than runnable scenarios.
-const NON_SCENARIO_DIRS: &[&str] = &["archive", "_drafts", "fixtures", "grey_zone"];
-
 fn repo_root() -> PathBuf {
     // CARGO_MANIFEST_DIR is .../collector; the test assets live one level up.
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -52,6 +49,18 @@ fn capabilities() -> serde_json::Value {
 
 /// Every scenario JSON on disk, as `(category, path)`, excluding non-scenario dirs.
 fn discovered_scenarios() -> Vec<(String, PathBuf)> {
+    let manifest = capabilities();
+    let excluded: BTreeSet<&str> = manifest["scenarios"]["excluded_dirs"]
+        .as_array()
+        .expect("scenario exclusions must be declared")
+        .iter()
+        .map(|value| value.as_str().expect("directory name"))
+        .collect();
+    assert!(
+        excluded.contains("_drafts")
+            && excluded.contains("archive")
+            && excluded.contains("fixtures")
+    );
     let scenarios_root = repo_root().join("env/scenarios");
     assert!(
         scenarios_root.is_dir(),
@@ -68,7 +77,7 @@ fn discovered_scenarios() -> Vec<(String, PathBuf)> {
             let path = entry.path();
             if path.is_dir() {
                 let name = entry.file_name().to_string_lossy().into_owned();
-                if !NON_SCENARIO_DIRS.contains(&name.as_str()) {
+                if !excluded.contains(name.as_str()) {
                     stack.push(path);
                 }
             } else if path.extension().is_some_and(|e| e == "json") {
@@ -104,6 +113,11 @@ fn capabilities_manifest_is_present_and_substantive() {
 #[test]
 fn discovered_scenarios_are_real_and_non_empty() {
     let scenarios = discovered_scenarios();
+    assert_eq!(
+        Some(scenarios.len() as u64),
+        capabilities()["scenarios"]["active_scenario_files"].as_u64(),
+        "the active file count must follow the same declared scope as category discovery"
+    );
     // The point of this assertion is to make the guard non-vacuous: if the
     // layout changes again, this fails loudly instead of checking nothing.
     assert!(

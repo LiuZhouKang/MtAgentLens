@@ -38,7 +38,7 @@ describe('investigation-labels —— 告警专业中文标签层', () => {
 
   it('声明类型：全部 6 类 → 中文', () => {
     expect(claimTypeLabel('PolicyViolation').label).toBe('策略违规');
-    expect(claimTypeLabel('AccountabilityAnomaly').label).toBe('责任异常');
+    expect(claimTypeLabel('ResponsibilityAnomaly').label).toBe('责任异常');
     expect(claimTypeLabel('SuspiciousDelegation').label).toBe('可疑委派');
     expect(claimTypeLabel('TaintedContextUse').label).toBe('污染上下文使用');
     expect(claimTypeLabel('UnauthorizedCapabilityUse').label).toBe('越权能力使用');

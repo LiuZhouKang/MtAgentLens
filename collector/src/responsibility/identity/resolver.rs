@@ -8,20 +8,25 @@
 //   Confidence is low because the picture is incomplete.
 //
 // Phase 2 (batch, post-hoc):
-//   resolve_authoritative() — runs the full three-signal union-find
+//   resolve_authoritative_with_delegations() — runs constrained resolution
 //   algorithm on a frozen snapshot. Produces deterministic, hash-based
 //   AgentIds and refines Phase 1 assignments.
 //
 // The module also exports the IdentityProvider trait, consumed by graph/
 // to look up agent assignments without depending on resolver internals.
 
+use crate::responsibility::identity::policy::IdentityBoundaryPolicy;
 use crate::responsibility::signals::SignalSnapshot;
 #[cfg(test)]
 use crate::responsibility::signals::signal_snapshot::ProcessExecInfo;
-use crate::responsibility::types::{AgentId, IdentitySignal, ProcessId, ProvisionalIdentity};
+use crate::responsibility::types::{
+    AgentId, IdentitySignal, Intent, MessageId, ProcessId, ProvisionalIdentity,
+};
 use std::collections::{HashMap, HashSet};
 
-use super::union_find::{AuthoritativeResolution, run_authoritative_resolution};
+use super::union_find::AuthoritativeResolution;
+#[cfg(test)]
+use super::union_find::run_authoritative_resolution;
 
 // ─── IdentityProvider Trait ─────────────────────────────────────────────
 
@@ -32,6 +37,24 @@ use super::union_find::{AuthoritativeResolution, run_authoritative_resolution};
 pub trait IdentityProvider {
     /// Which agent owns the given process, if known.
     fn agent_for_process(&self, process_id: ProcessId) -> Option<AgentId>;
+
+    /// Which agent owns the given message, if the resolution explicitly bound
+    /// that message to an agent.
+    ///
+    /// Providers without message-level evidence return `None`; they must not
+    /// infer an agent from the message's process.
+    fn agent_for_message(&self, _message_id: MessageId) -> Option<AgentId> {
+        None
+    }
+
+    /// Which agent owns the given intent, if known.
+    ///
+    /// An explicit message binding wins; only a provider without message
+    /// evidence for that message falls back to the intent's process.
+    fn agent_for_intent(&self, intent: &Intent) -> Option<AgentId> {
+        self.agent_for_message(intent.message_id.clone())
+            .or_else(|| self.agent_for_process(intent.process_id))
+    }
 
     /// All current (provisional or authoritative) assignments.
     fn all_assignments(&self) -> HashMap<ProcessId, AgentId>;
@@ -229,8 +252,37 @@ impl IdentityResolver {
     ///
     /// Returns the authoritative identities plus refinements linking them
     /// to the Phase 1 provisional assignments.
+    // Tests compare the no-delegation baseline. Production must explicitly
+    // supply its context instead of silently discarding observed delegations.
+    #[cfg(test)]
     pub fn resolve_authoritative(&self, snapshot: &SignalSnapshot) -> AuthoritativeResolution {
         run_authoritative_resolution(snapshot, &self.provisional_map)
+    }
+
+    /// Resolve with explicit process-spawn delegations as `(parent, child)`
+    /// pairs: neither endpoint may share a component with the other.
+    pub fn resolve_authoritative_with_delegations(
+        &self,
+        snapshot: &SignalSnapshot,
+        delegated_pairs: &HashSet<(ProcessId, ProcessId)>,
+    ) -> AuthoritativeResolution {
+        let policy = IdentityBoundaryPolicy::active();
+        self.resolve_authoritative_with_delegations_and_policy(snapshot, delegated_pairs, &policy)
+    }
+
+    /// Resolve with a policy frozen before resolution.
+    pub fn resolve_authoritative_with_delegations_and_policy(
+        &self,
+        snapshot: &SignalSnapshot,
+        delegated_pairs: &HashSet<(ProcessId, ProcessId)>,
+        policy: &IdentityBoundaryPolicy,
+    ) -> AuthoritativeResolution {
+        super::union_find::run_authoritative_resolution_with_policy(
+            snapshot,
+            &self.provisional_map,
+            delegated_pairs,
+            policy,
+        )
     }
     pub fn provisional_identities(&self) -> Vec<ProvisionalIdentity> {
         self.provisional_map.values().cloned().collect()
@@ -483,6 +535,57 @@ mod tests {
     }
 
     #[test]
+    fn process_only_provider_has_no_message_lookup() {
+        let resolver = IdentityResolver::new();
+        assert_eq!(
+            resolver.agent_for_message(crate::responsibility::types::MessageId::from("msg-1")),
+            None
+        );
+    }
+
+    #[test]
+    fn process_only_provider_intent_falls_back_to_the_process_owner() {
+        let mut g = SignalGraph::new();
+        let p = pid(101, 1);
+        g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        g.observe_tls(p, tls("sess-intent"), 10);
+        let snap = g.snapshot();
+
+        let mut resolver = IdentityResolver::new();
+        let agent = resolver.resolve_provisional(p, &snap).agent_id;
+        let intent = crate::responsibility::types::Intent {
+            intent_id: crate::responsibility::types::IntentId::new(),
+            process_id: p,
+            message_id: crate::responsibility::types::MessageId::from("msg-unbound"),
+            tool_name: "Bash".into(),
+            tool_args: Vec::new(),
+            intent_class: crate::responsibility::types::IntentClass::SideEffect,
+            parse_state: crate::responsibility::types::IntentParseState::Complete,
+            primary_matching_eligible: true,
+            authority_source:
+                crate::responsibility::types::IntentAuthoritySource::RequestHistoryAssistantToolUse,
+            timestamp_ns: 1,
+            native_tool_call: None,
+            declared_conversation_id: None,
+        };
+
+        assert_eq!(
+            resolver.agent_for_intent(&intent),
+            Some(agent),
+            "a provisional provider has no message anchors, so it keeps its process assignment"
+        );
+    }
+
+    #[test]
     fn test_resolve_authoritative_integration() {
         let mut g = SignalGraph::new();
         let claude = pid(100, 1);
@@ -520,5 +623,131 @@ mod tests {
         // Phase 2
         let result = resolver.resolve_authoritative(&snap);
         assert_eq!(result.agents.len(), 1);
+    }
+
+    #[test]
+    fn one_process_with_two_conversations_is_ambiguous_not_merged() {
+        // E5 topologies T2/T3: a single process that carried two conversations
+        // cannot belong to one logical agent. The resolver must refuse the merge
+        // and report the ambiguity instead of silently crediting both sessions.
+        let mut g = SignalGraph::new();
+        let process = pid(120, 1);
+        g.observe_exec(
+            process,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        g.observe_conversation(process, "conv-a", 2);
+        g.observe_conversation(process, "conv-b", 3);
+        let snap = g.snapshot();
+        let mut resolver = IdentityResolver::new();
+        resolver.resolve_provisional(process, &snap);
+        let resolution = resolver.resolve_authoritative(&snap);
+        assert!(
+            resolution.agents.is_empty(),
+            "ambiguous session must stay unassigned"
+        );
+        assert!(
+            resolution.unresolved.iter().any(|item| {
+                item.process_id == process
+                    && matches!(
+                        item.reason,
+                        crate::responsibility::types::UnresolvedReason::AmbiguousMultipleSessions
+                    )
+            }),
+            "ambiguity must be reported: {:?}",
+            resolution.unresolved
+        );
+    }
+
+    #[test]
+    fn one_process_with_one_conversation_stays_assigned() {
+        let mut g = SignalGraph::new();
+        let process = pid(121, 1);
+        g.observe_exec(
+            process,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        g.observe_conversation(process, "conv-a", 2);
+        let snap = g.snapshot();
+        let mut resolver = IdentityResolver::new();
+        resolver.resolve_provisional(process, &snap);
+        let resolution = resolver.resolve_authoritative(&snap);
+        assert_eq!(resolution.agents.len(), 1);
+    }
+
+    #[test]
+    fn multi_session_process_gets_one_conversation_agent_per_session() {
+        // E5 T2/T3: the shared process stays unassigned for actions, but each
+        // conversation is attributed to its own logical agent.
+        let mut g = SignalGraph::new();
+        let process = pid(130, 1);
+        g.observe_exec(
+            process,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        g.observe_conversation(process, "conv-a", 2);
+        g.observe_conversation(process, "conv-b", 3);
+        let snap = g.snapshot();
+        let mut resolver = IdentityResolver::new();
+        resolver.resolve_provisional(process, &snap);
+        let resolution = resolver.resolve_authoritative(&snap);
+        let mut conversations: Vec<&str> = resolution
+            .conversation_agents
+            .iter()
+            .map(|identity| identity.conversation_id.as_str())
+            .collect();
+        conversations.sort_unstable();
+        assert_eq!(conversations, vec!["conv-a", "conv-b"]);
+        let distinct: std::collections::HashSet<_> = resolution
+            .conversation_agents
+            .iter()
+            .map(|identity| identity.agent_id.clone())
+            .collect();
+        assert_eq!(distinct.len(), 2, "each conversation needs its own agent");
+        assert!(
+            resolution.agents.is_empty(),
+            "the shared process stays unassigned"
+        );
+    }
+
+    #[test]
+    fn single_session_process_has_no_conversation_agents() {
+        let mut g = SignalGraph::new();
+        let process = pid(131, 1);
+        g.observe_exec(
+            process,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        g.observe_conversation(process, "conv-a", 2);
+        let snap = g.snapshot();
+        let mut resolver = IdentityResolver::new();
+        resolver.resolve_provisional(process, &snap);
+        let resolution = resolver.resolve_authoritative(&snap);
+        assert!(resolution.conversation_agents.is_empty());
+        assert_eq!(resolution.agents.len(), 1);
     }
 }

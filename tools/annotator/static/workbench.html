@@ -1,0 +1,2049 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 OR MIT -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>证据标注工作台</title>
+<style nonce="WORKBENCH_NONCE">
+  :root {
+    --bg: #0f1115;
+    --surface: #15181d;
+    --surface-2: #1b1f26;
+    --surface-3: #242a34;
+    --text: #f2f4f7;
+    --text-2: #d0d5dd;
+    --muted: #98a2b3;
+    --faint: #8d96a6;
+    --line: #262c36;
+    --line-strong: #3a424f;
+    --accent: #99c8ff;
+    --accent-soft: rgba(153, 200, 255, .09);
+    --accent-line: rgba(153, 200, 255, .35);
+    --success: #32d583;
+    --success-soft: rgba(50, 213, 131, .1);
+    --warning: #fdb022;
+    --warning-soft: rgba(253, 176, 34, .1);
+    --danger: #f97066;
+    --danger-soft: rgba(249, 112, 102, .1);
+    --code-bg: #0a0c10;
+    --code-text: #e8eaed;
+    --font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --mono: "SF Mono", "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
+    --radius: 8px;
+    --radius-lg: 10px;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+    --ease: cubic-bezier(.22, .61, .36, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    line-height: 1.55;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: rgba(77, 107, 254, .16); }
+  .skip-link {
+    position: absolute; left: 12px; top: -44px; z-index: 20;
+    padding: 7px 12px; border-radius: 6px;
+    background: var(--accent); color: #0f1115;
+    font-size: 11px; font-weight: 600; text-decoration: none;
+    transition: top .12s var(--ease);
+  }
+  .skip-link:focus, .skip-link:focus-visible { top: 10px; outline: 2px solid var(--text); outline-offset: 2px; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #d0d5dd; border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: #98a2b3; }
+
+  header.topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 14px 22px;
+    flex-wrap: wrap;
+    padding: 10px 18px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand-mark {
+    width: 30px; height: 30px; flex: 0 0 auto;
+    display: grid; place-items: center;
+    border-radius: 8px;
+    background: var(--text);
+    color: var(--bg);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+  }
+  .brand-copy { min-width: 0; }
+  .eyebrow {
+    display: none;
+    margin: 0;
+  }
+  h1 {
+    margin: 0;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    white-space: nowrap;
+  }
+  .topbar-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; margin-left: auto; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    max-width: 100%; padding: 4px 9px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .chip b { max-width: 200px; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); font-weight: 500; }
+  .chip-mode { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .chip-mode::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .ghost-button {
+    padding: 4px 9px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .ghost-button:hover { background: var(--surface-2); color: var(--text); }
+  .progress-cluster { display: flex; align-items: center; gap: 10px; padding: 3px 0 3px 12px; border-left: 1px solid var(--line); }
+  .progress-copy { display: grid; gap: 0; }
+  .progress-label { display: none; }
+  .progress-value { color: var(--text-2); font-size: 10.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .progress-track { width: 76px; height: 4px; overflow: hidden; border-radius: 99px; background: var(--surface-3); }
+  .progress-track > i { display: block; width: 0%; height: 100%; border-radius: inherit; background: var(--accent); transition: width .4s var(--ease); }
+  .subtitle {
+    flex: 0 0 auto; margin: 0;
+    padding: 8px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 11px;
+    overflow-wrap: anywhere;
+  }
+
+  main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .panels {
+    flex: 1 1 auto; min-height: 0;
+    display: grid;
+    grid-template-columns: 276px minmax(0, 1fr) minmax(400px, 450px);
+    gap: 12px;
+    padding: 12px 14px 14px;
+  }
+  .panel {
+    min-width: 0; min-height: 0; overflow: auto;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  #queue-panel { background: var(--surface); }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  h2 { margin: 0; color: var(--text-2); font-size: 11px; font-weight: 600; letter-spacing: .03em; }
+  h2::before { display: none; }
+  .subsection-title { margin-top: 16px; }
+  h3 { margin: 0 0 6px; color: var(--text); font-size: 12px; font-weight: 600; }
+  p { margin: 0 0 9px; }
+  .hint { color: var(--muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+  .status { min-height: 20px; margin: 0 0 10px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+  .status.ok { border-color: rgba(18, 183, 106, .28); background: var(--success-soft); color: #6ce9a6; }
+  .status.err { border-color: rgba(240, 68, 56, .28); background: var(--danger-soft); color: #fda29b; }
+  .notice { margin-bottom: 10px; padding: 8px 10px; border: 1px solid rgba(247, 144, 9, .28); border-radius: 6px; background: var(--warning-soft); color: #fec84b; font-size: 11px; overflow-wrap: anywhere; }
+  .notice.err { border-color: rgba(240, 68, 56, .28); background: var(--danger-soft); color: #fda29b; }
+
+  .queue-tools { display: grid; gap: 8px; margin-bottom: 10px; }
+  .search-wrap { position: relative; }
+  .search-wrap::before { content: "⌕"; position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--faint); font-size: 13px; pointer-events: none; }
+  .search-wrap input { width: 100%; padding: 6px 9px 6px 25px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 11px; outline: none; }
+  .search-wrap input:focus { border-color: var(--accent-line); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .queue-progress { display: flex; justify-content: space-between; color: var(--faint); font-size: 10px; }
+  .task-list { display: flex; flex-direction: column; gap: 2px; }
+  .task {
+    width: 100%; display: grid; grid-template-columns: 8px minmax(0, 1fr) auto;
+    align-items: center; gap: 8px; padding: 8px 9px;
+    border: 1px solid transparent; border-radius: 6px;
+    background: transparent; color: var(--text); text-align: left; cursor: pointer;
+  }
+  .task::before { content: ""; width: 6px; height: 6px; border-radius: 50%; border: 1px solid var(--faint); }
+  .task:hover { background: var(--surface-2); }
+  .task[data-has-annotation="true"]::before { background: var(--success); border-color: var(--success); }
+  .task[aria-current="true"] { background: var(--accent-soft); border-color: var(--accent-line); }
+  .task[hidden] { display: none !important; }
+  .task-id { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); font-size: 11.5px; white-space: nowrap; }
+  .task-state { padding: 1px 6px; border-radius: 4px; background: var(--surface-2); color: var(--faint); font-size: 9px; white-space: nowrap; }
+  .task[data-has-annotation="true"] .task-state { background: var(--success-soft); color: #6ce9a6; }
+  .empty-state { padding: 18px 10px; color: var(--faint); font-size: 11px; text-align: center; }
+
+  .evidence-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .evidence-tools input { flex: 1 1 150px; min-width: 0; padding: 6px 8px; font-size: 11px; }
+  .evidence-tools select { flex: 0 1 190px; width: auto; min-width: 110px; padding: 6px 24px 6px 8px; font-size: 11px; }
+  .evidence-tools .hint { flex: 0 0 auto; font-size: 10px; }
+  #event-more { margin: 0 0 10px; padding: 5px 9px; font-size: 10.5px; }
+  .event-list { display: flex; flex-direction: column; gap: 0; margin-bottom: 12px; max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 7px; }
+  .event-button {
+    display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 8px;
+    width: 100%; padding: 8px 9px; border: 0; border-bottom: 1px solid var(--line);
+    background: var(--surface); color: var(--text); text-align: left; cursor: pointer;
+  }
+  .event-button:last-child { border-bottom: 0; }
+  .event-button:hover { background: var(--surface-2); }
+  .event-button[aria-pressed="true"] { background: var(--accent-soft); }
+  .event-index { color: var(--faint); font-family: var(--mono); font-size: 9px; }
+  .event-main { min-width: 0; display: grid; gap: 1px; }
+  .event-label { color: var(--accent); font-size: 9.5px; font-weight: 600; letter-spacing: .02em; }
+  .event-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-family: var(--mono); font-size: 10.5px; }
+  .event-source { color: var(--faint); font-size: 8.5px; font-weight: 600; letter-spacing: .04em; }
+  .evidence-headline { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; margin: 2px 0 6px; }
+  #evidence-label { color: var(--accent); font-size: 10px; font-weight: 600; }
+  #evidence-summary { color: var(--text); font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+  .kv { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 4px 12px; margin: 0 0 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); font-size: 10.5px; }
+  .kv dt { color: var(--muted); font-size: 10px; }
+  .kv dd { margin: 0; color: var(--text-2); font-family: var(--mono); overflow-wrap: anywhere; }
+  .raw-label { margin: 2px 0 5px; color: var(--faint); font-size: 9.5px; letter-spacing: .02em; }
+  #evidence-content { margin: 0; padding: 11px; min-height: 150px; max-width: 100%; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; background: var(--code-bg); border: 1px solid #000; border-radius: 7px; color: var(--code-text); font-family: var(--mono); font-size: 10.5px; line-height: 1.6; }
+  #evidence-content:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #truncation { padding: 6px 8px; border: 1px solid rgba(247, 144, 9, .3); border-radius: 6px; background: var(--warning-soft); color: #fec84b; font-size: 10.5px; }
+
+  form { min-width: 0; }
+  fieldset { min-width: 0; margin: 0 0 9px; padding: 11px 11px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+  legend { display: inline-flex; align-items: center; gap: 7px; padding: 0 4px; color: var(--text); font-size: 12px; font-weight: 600; }
+  .step { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 5px; background: var(--accent-soft); color: var(--accent); font-size: 9px; font-weight: 600; }
+  label { display: block; }
+  .field-label { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 5px; color: var(--muted); font-size: 11px; }
+  input, select, textarea, button { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 6px; padding: 7px 9px; max-width: 100%; }
+  select { width: 100%; appearance: none; padding-right: 26px; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 13px) 50%, calc(100% - 8px) 50%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; cursor: pointer; }
+  textarea { width: 100%; resize: vertical; min-height: 68px; line-height: 1.55; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent-line); box-shadow: 0 0 0 2px var(--accent-soft); }
+  input[type="checkbox"] { width: 14px; height: 14px; margin: 0; flex: 0 0 auto; accent-color: var(--accent); }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; opacity: .45; }
+  button:hover:not(:disabled) { border-color: var(--line-strong); }
+  :where(button, select, textarea, input, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  [aria-invalid="true"] { border-color: var(--danger) !important; box-shadow: 0 0 0 2px var(--danger-soft) !important; }
+  .refs { margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 5px 8px; }
+  .refs .hint { flex: 1 0 100%; }
+  .ref-picker { display: flex; gap: 6px; width: 100%; min-width: 0; }
+  .ref-picker input { flex: 1 1 auto; min-width: 0; padding: 6px 8px; font-size: 10.5px; }
+  .ref-picker button { flex: 0 0 auto; padding: 6px 9px; font-size: 10.5px; }
+  .ref-chips { display: flex; flex-wrap: wrap; gap: 5px; width: 100%; margin-top: 5px; }
+  #identity-event-picker { width: 100%; margin: 5px 0 8px; font-size: 10.5px; }
+  .check { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; padding: 3px 7px; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); font-size: 10px; overflow-wrap: anywhere; cursor: pointer; }
+  .check:has(input:checked) { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); }
+  .check span { overflow-wrap: anywhere; }
+  .identity-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(130px, 42%); align-items: center; gap: 8px; margin-bottom: 6px; }
+  .identity-field span { font-family: var(--mono); font-size: 9.5px; color: var(--muted); overflow-wrap: anywhere; }
+  .identity-field .field-label { display: block; min-width: 0; margin: 0; font-size: 0; line-height: 0; }
+  .identity-field .field-label select { font-size: 11px; line-height: 1.5; }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+  .save-bar { position: sticky; bottom: -2px; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px -2px -2px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; background: rgba(21, 24, 29, .96); box-shadow: 0 -6px 24px rgba(0,0,0,.35); backdrop-filter: blur(8px); }
+  .primary { border-color: var(--accent); background: var(--accent); color: #0f1115; font-size: 11px; font-weight: 600; }
+  .primary:hover:not(:disabled) { background: #8ec2ff; }
+  .secondary { background: var(--surface); color: var(--text-2); font-size: 11px; }
+  .secondary:hover:not(:disabled) { background: var(--surface-2); }
+  .dirty { margin-left: auto; color: var(--warning); font-size: 10px; }
+  .dirty[data-dirty="false"] { color: var(--faint); }
+  .kbd-hint { color: var(--faint); font-size: 9px; }
+  kbd { display: inline-block; min-width: 15px; padding: 0 4px; border: 1px solid var(--line-strong); border-radius: 3px; background: var(--surface-2); color: var(--muted); font-family: var(--mono); font-size: 8.5px; text-align: center; }
+  .comparison-item { margin: 0 0 8px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  .comparison-head { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+  .comparison-head b { color: var(--text); font-weight: 600; }
+  .comparison-item pre, .history pre { margin: 6px 0 0; padding: 8px; max-width: 100%; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; background: var(--code-bg); border: 1px solid #000; border-radius: 6px; color: var(--code-text); font-family: var(--mono); font-size: 9.5px; }
+  .differences { margin: 0 0 10px; }
+  .difference-row { padding: 6px 8px; margin-bottom: 5px; border: 1px solid rgba(247, 144, 9, .3); border-radius: 6px; background: var(--warning-soft); overflow-wrap: anywhere; }
+  .difference-field { display: block; color: #fec84b; font-size: 9.5px; font-weight: 600; }
+  .difference-values { color: var(--muted); font-size: 10px; }
+  .difference-values b { color: var(--text); font-weight: 500; }
+  details.history { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 9px; }
+  details.history > summary { cursor: pointer; color: var(--muted); font-size: 10.5px; }
+  .history-record { margin-top: 7px; padding: 8px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  .history-record h3 { color: var(--muted); font-size: 10px; }
+  #reviewed-heads { margin-top: 5px; }
+  #review-stale { margin-top: 7px; }
+  #review-area { display: grid; gap: 9px; }
+  .studio-tabs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin: 0 0 2px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .studio-tabs[hidden] { display: none !important; }
+  .studio-tabs button { min-height: 32px; padding: 6px 12px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }
+  .studio-tabs button:hover { background: var(--surface-2); color: var(--text); }
+  .studio-tabs button[aria-selected="true"] { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .tab-note { margin: 8px 0 10px; }
+  .tab-note[hidden] { display: none !important; }
+  #proposal-list { display: grid; gap: 5px; }
+  .proposal-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; width: 100%; padding: 8px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); text-align: left; cursor: pointer; }
+  .proposal-card b { font-family: var(--mono); font-size: 10.5px; font-weight: 600; }
+  .proposal-card span { grid-column: 1; color: var(--muted); font-family: var(--mono); font-size: 9.5px; }
+  .proposal-card em { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--faint); font-size: 9px; font-style: normal; }
+  .proposal-card[aria-pressed="true"] { border-color: var(--accent-line); background: var(--accent-soft); }
+  .proposal-card[aria-pressed="true"] em { color: var(--accent); }
+  #annotate-panel[hidden], #review-area[hidden], #annotation-form[hidden], details.history[hidden] { display: none !important; }
+  #annotate-panel:focus, #editor-panel:focus { outline: none; }
+  #editor-panel { scroll-margin-top: 8px; }
+  #proposal-content { margin: 0; padding: 10px; max-height: 260px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--code-bg); border: 1px solid #000; border-radius: 6px; color: var(--code-text); font-family: var(--mono); font-size: 10px; }
+  #attestation-statement { min-height: 76px; }
+  .attestation-item { margin-top: 7px; padding: 8px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); font-size: 10.5px; }
+  .attestation-item b { color: var(--text); font-weight: 600; }
+
+  dialog.shortcuts { max-width: min(480px, calc(100vw - 28px)); padding: 0; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--text); box-shadow: 0 24px 48px rgba(0,0,0,.55); }
+  dialog.shortcuts::backdrop { background: rgba(0,0,0,.62); }
+  .shortcuts-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 15px; border-bottom: 1px solid var(--line); }
+  .shortcuts-head h2 { font-size: 12px; }
+  .shortcuts-grid { display: grid; gap: 1px; padding: 7px 15px 13px; }
+  .shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 7px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10.5px; }
+  .shortcut-row:last-child { border-bottom: 0; }
+  .shortcut-row span:last-child { display: flex; gap: 3px; flex: 0 0 auto; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+  .event-button, .task { transition: background .12s var(--ease); }
+  .comparison-item, .history-record { animation: fadeIn .18s var(--ease) both; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  @media (max-width: 1180px) { main { grid-template-columns: 250px minmax(0, 1fr); } #editor-panel { grid-column: 1 / -1; } }
+  @media (max-width: 900px) {
+    html, body { height: auto; min-height: 100%; }
+    body { overflow: auto; }
+    header.topbar { padding: 9px 12px; gap: 8px 10px; }
+    .subtitle { padding: 8px 12px; }
+    .panels { display: flex; flex-direction: column; padding: 10px; gap: 9px; }
+    .panel { overflow: visible; padding: 12px; }
+    #queue-panel { max-height: 320px; overflow: auto; }
+    #evidence-content { max-height: 40vh; }
+    .event-list { max-height: 46vh; overscroll-behavior: contain; }
+    .topbar-meta { margin-left: 0; }
+    .progress-cluster { order: 5; width: 100%; border-left: 0; padding-left: 0; }
+    .identity-field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .save-bar { position: static; margin-bottom: 0; }
+    .studio-tabs button { flex: 1 1 0; min-height: 44px; justify-content: center; }
+  }
+  @media (max-width: 460px) {
+    h1 { font-size: 14px; }
+    .brand-mark { width: 26px; height: 26px; border-radius: 7px; }
+    .panel { padding: 10px; }
+    fieldset { padding: 9px; }
+    .kbd-hint { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<header class="topbar" role="banner">
+  <a class="skip-link" href="#editor-panel">跳到标注编辑</a>
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true">M</div>
+    <div class="brand-copy">
+      <p class="eyebrow">MtAgentLens · Evidence Review</p>
+      <h1>证据标注工作台</h1>
+    </div>
+  </div>
+  <div class="topbar-meta" role="group" aria-label="会话信息">
+    <span class="chip chip-mode" id="meta-mode">—</span>
+    <span class="chip">标注者 <b id="meta-rater">—</b></span>
+    <span class="chip">方法 <b id="meta-method">—</b></span>
+    <button type="button" class="ghost-button" id="shortcuts-button" aria-haspopup="dialog">快捷键</button>
+  </div>
+  <div class="progress-cluster" role="group" aria-label="任务进度">
+    <div class="progress-copy">
+      <span class="progress-label">Progress</span>
+      <span class="progress-value" id="task-progress-label">0 / 0 已保存</span>
+    </div>
+    <div class="progress-track" aria-hidden="true"><i id="task-progress-bar"></i></div>
+  </div>
+</header>
+
+<main>
+  <p class="subtitle">请依据证据独立记录；场景/运行标识符已自动脱敏显示，但任务内容本身仍可能包含场景线索。</p>
+  <div class="panels">
+  <section class="panel" id="queue-panel" aria-labelledby="queue-title">
+    <div class="panel-head">
+      <h2 id="queue-title">任务队列</h2>
+      <span class="hint" id="task-count">0 项</span>
+    </div>
+    <div class="queue-tools">
+      <div class="search-wrap">
+        <input id="task-search" type="search" placeholder="搜索任务编号" autocomplete="off" aria-label="搜索任务编号" />
+      </div>
+      <div class="queue-progress"><span>已保存</span><span id="task-progress-compact">0 / 0</span></div>
+    </div>
+    <div class="task-list" id="task-list" role="group" aria-label="任务队列"></div>
+  </section>
+
+  <section class="panel" id="evidence-panel" aria-labelledby="evidence-title">
+    <div class="panel-head">
+      <h2 id="evidence-title">原始证据</h2>
+      <button type="button" class="secondary" id="download-raw" hidden>下载脱敏记录</button>
+    </div>
+    <p class="hint" id="evidence-hint">选择任务后载入首个事件。证据按原始字节校验；场景/运行标识符脱敏后以纯文本显示。</p>
+    <div class="evidence-tools">
+      <input id="event-search" type="search" placeholder="过滤事件 id / 类型" autocomplete="off" aria-label="过滤证据事件" />
+      <select id="event-kind" aria-label="证据类型"></select>
+      <span class="hint" id="event-count"></span>
+    </div>
+    <div class="event-list" id="event-list" role="group" aria-label="证据事件"></div>
+    <button type="button" class="secondary" id="event-more" hidden>加载更多证据</button>
+    <div class="evidence-headline">
+      <span id="evidence-label"></span>
+      <span id="evidence-summary"></span>
+    </div>
+    <dl class="kv" id="event-meta"></dl>
+    <p class="hint" id="truncation" hidden></p>
+    <p class="hint raw-label">原始字节（审计用；界面语义见上方字段）</p>
+    <pre id="evidence-content" tabindex="0" aria-label="证据原文">尚未载入证据。</pre>
+  </section>
+
+  <section class="panel" id="editor-panel" aria-labelledby="editor-title" tabindex="-1">
+    <div class="panel-head">
+      <h2 id="editor-title">标注编辑</h2>
+      <span class="hint" id="task-title">尚未选择任务</span>
+    </div>
+    <p id="status" class="status" role="status" aria-live="polite">请选择任务。</p>
+    <p id="a11y-live" class="sr-only" role="alert" aria-live="assertive"></p>
+    <p id="notice" class="notice err" role="alert" hidden></p>
+
+    <div id="studio-tabs" class="studio-tabs" hidden role="tablist" aria-label="工作模式">
+      <button type="button" role="tab" id="studio-tab-annotate" data-studio-tab="annotate"
+        aria-selected="true" aria-controls="annotate-panel" tabindex="0">独立标注</button>
+      <button type="button" role="tab" id="studio-tab-review" data-studio-tab="review"
+        aria-selected="false" aria-controls="review-area" tabindex="-1">草稿复核</button>
+    </div>
+    <p class="hint tab-note" id="studio-tab-note" hidden>独立标注请勿打开复核页，避免受 agent 草稿影响。复核页只记录复核声明，不会写入人工标注。</p>
+
+    <section id="review-area" hidden role="tabpanel" aria-labelledby="studio-tab-review">
+      <div class="panel-head">
+        <h2 id="review-title">模型草稿复核</h2>
+        <span class="hint" id="proposal-meta"></span>
+      </div>
+      <div id="proposal-list" role="group" aria-label="各标注 agent 的草稿"></div>
+      <pre id="proposal-content" tabindex="0" aria-label="模型草稿内容"></pre>
+      <div class="ref-chips" id="proposal-refs" role="group" aria-label="草稿引用证据"></div>
+      <p class="hint">复核声明是对模型建议的人工确认，不是独立人工标注，也不是密码学签名；不会进入三人一致性的 κ，也不代表标注已通过复核。草稿只在主动打开本页时请求，独立标注页不会载入。</p>
+      <label class="field-label" for="attestation-statement">复核声明</label>
+      <textarea id="attestation-statement" rows="3" placeholder="说明你如何核对证据与草稿，以及是否接受其结论"></textarea>
+      <div class="actions">
+        <button type="button" class="primary" id="attest-button" disabled>记录复核声明</button>
+        <span class="hint" id="review-status" role="status" aria-live="polite"></span>
+      </div>
+      <div id="attestation-list" role="group" aria-label="已记录的复核声明"></div>
+    </section>
+
+    <div id="annotate-panel" role="tabpanel" aria-labelledby="studio-tab-annotate">
+    <form id="annotation-form" novalidate>
+      <fieldset>
+        <legend><span class="step">01</span>攻击尝试</legend>
+        <label class="field-label" for="attempted">是否尝试发起攻击</label>
+        <select id="attempted" name="attempted">
+          <option value="unknown" selected>未知</option>
+          <option value="yes">是</option>
+          <option value="no">否</option>
+        </select>
+        <div class="refs" id="attempted-refs">
+          <span class="hint">证据引用</span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend><span class="step">02</span>攻击执行</legend>
+        <label class="field-label" for="executed">是否实际执行攻击动作</label>
+        <select id="executed" name="executed">
+          <option value="unknown" selected>未知</option>
+          <option value="yes">是</option>
+          <option value="no">否</option>
+        </select>
+        <div class="refs" id="executed-refs">
+          <span class="hint">证据引用</span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend><span class="step">03</span>目标达成</legend>
+        <label class="field-label" for="succeeded">攻击目标是否达成</label>
+        <select id="succeeded" name="succeeded">
+          <option value="unknown" selected>未知</option>
+          <option value="yes">是</option>
+          <option value="no">否</option>
+        </select>
+        <div class="refs" id="succeeded-refs">
+          <span class="hint">证据引用</span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend><span class="step">04</span>身份归属</legend>
+        <p class="hint">仅在证据足以唯一确定时选择主体，否则保留未知。</p>
+        <div id="identity-fields"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend><span class="step">05</span>根因</legend>
+        <label class="field-label" for="roots-state">根因判断</label>
+        <select id="roots-state" name="roots_state" aria-describedby="roots-meaning">
+          <option value="unknown" selected>未知（证据不足，无法判断）</option>
+          <option value="none">有证据支持无根因（空集合）</option>
+          <option value="selected">指定根因（选择主体）</option>
+        </select>
+        <p class="hint" id="roots-meaning" aria-live="polite"></p>
+        <div class="refs" id="root-actor-fields">
+          <span class="hint">根因主体</span>
+        </div>
+        <div class="refs" id="root-refs">
+          <span class="hint">根因证据引用</span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend><span class="step">06</span>备注</legend>
+        <label class="field-label" for="notes">观察与依据</label>
+        <textarea id="notes" name="notes" rows="4" placeholder="记录观察、证据依据和仍未知的部分"></textarea>
+      </fieldset>
+
+      <section id="adjudication-area" hidden aria-labelledby="comparison-title">
+        <h2 id="comparison-title" class="subsection-title">裁决对比</h2>
+        <p class="notice" id="review-stale" hidden>已审阅的源修订已过期，请重新载入后再裁决。</p>
+        <div id="comparison"></div>
+        <details class="history">
+          <summary>审阅基线</summary>
+          <div id="reviewed-heads" class="hint"></div>
+        </details>
+        <label class="field-label" for="rationale">裁决理由</label>
+        <textarea id="rationale" name="rationale" rows="3" placeholder="说明采用哪份判断以及依据的原始记录"></textarea>
+        <div class="actions">
+          <button type="button" class="secondary" id="export-button">导出完整队列</button>
+        </div>
+      </section>
+
+      <div class="save-bar">
+        <button type="submit" class="primary" id="save-button" disabled>保存标注</button>
+        <button type="button" class="secondary" id="reload-button" disabled>重新载入</button>
+        <span class="dirty" id="dirty-indicator" data-dirty="false">未选择任务</span>
+        <span class="kbd-hint"><kbd>⌘</kbd><kbd>↵</kbd> 保存 · <kbd>J</kbd><kbd>K</kbd> 切换证据</span>
+      </div>
+    </form>
+
+    <details class="history" id="history">
+      <summary>历史修订</summary>
+      <div id="history-list" class="hint">选择任务后显示。</div>
+    </details>
+    </div>
+  </section>
+  </div>
+</main>
+
+<dialog class="shortcuts" id="shortcuts-dialog" aria-labelledby="shortcuts-title">
+  <div class="shortcuts-head">
+    <h2 id="shortcuts-title">Keyboard</h2>
+    <button type="button" class="ghost-button" id="shortcuts-close">关闭</button>
+  </div>
+  <div class="shortcuts-grid">
+    <div class="shortcut-row"><span>保存当前标注 / 裁决</span><span><kbd>⌘</kbd><kbd>↵</kbd></span></div>
+    <div class="shortcut-row"><span>下一个 / 上一个证据</span><span><kbd>J</kbd><kbd>K</kbd></span></div>
+    <div class="shortcut-row"><span>切换独立标注 / 草稿复核页</span><span><kbd>←</kbd><kbd>→</kbd></span></div>
+    <div class="shortcut-row"><span>聚焦任务搜索</span><span><kbd>/</kbd></span></div>
+    <div class="shortcut-row"><span>打开快捷键</span><span><kbd>?</kbd></span></div>
+    <div class="shortcut-row"><span>关闭对话框</span><span><kbd>Esc</kbd></span></div>
+  </div>
+</dialog>
+
+<script nonce="WORKBENCH_NONCE">
+(() => {
+  "use strict";
+
+  const TOKEN_KEY = "mtal-workbench-token";
+  const form = document.getElementById("annotation-form");
+  const statusEl = document.getElementById("status");
+  const noticeEl = document.getElementById("notice");
+  const saveButton = document.getElementById("save-button");
+  const reloadButton = document.getElementById("reload-button");
+  const exportButton = document.getElementById("export-button");
+  const downloadRaw = document.getElementById("download-raw");
+  const taskList = document.getElementById("task-list");
+  const taskCount = document.getElementById("task-count");
+  const taskTitle = document.getElementById("task-title");
+  const eventList = document.getElementById("event-list");
+  const eventSearch = document.getElementById("event-search");
+  const eventKind = document.getElementById("event-kind");
+  const eventCount = document.getElementById("event-count");
+  const eventMore = document.getElementById("event-more");
+  const eventMeta = document.getElementById("event-meta");
+  const evidenceContent = document.getElementById("evidence-content");
+  const evidenceHint = document.getElementById("evidence-hint");
+  const evidenceLabel = document.getElementById("evidence-label");
+  const evidenceSummary = document.getElementById("evidence-summary");
+  const truncationEl = document.getElementById("truncation");
+  const identityFields = document.getElementById("identity-fields");
+  const comparison = document.getElementById("comparison");
+  const adjudicationArea = document.getElementById("adjudication-area");
+  const reviewStale = document.getElementById("review-stale");
+  const reviewedHeads = document.getElementById("reviewed-heads");
+  const historyList = document.getElementById("history-list");
+  const dirtyIndicator = document.getElementById("dirty-indicator");
+  const metaMode = document.getElementById("meta-mode");
+  const metaRater = document.getElementById("meta-rater");
+  const metaMethod = document.getElementById("meta-method");
+  const notes = document.getElementById("notes");
+  const rationale = document.getElementById("rationale");
+  const reviewArea = document.getElementById("review-area");
+  const proposalMeta = document.getElementById("proposal-meta");
+  const proposalContent = document.getElementById("proposal-content");
+  const proposalRefs = document.getElementById("proposal-refs");
+  const proposalList = document.getElementById("proposal-list");
+  const attestationStatement = document.getElementById("attestation-statement");
+  const attestButton = document.getElementById("attest-button");
+  const reviewStatus = document.getElementById("review-status");
+  const attestationList = document.getElementById("attestation-list");
+  const annotationForm = document.getElementById("annotation-form");
+  const studioTabs = document.getElementById("studio-tabs");
+  const editorTitle = document.getElementById("editor-title");
+  const rootsState = document.getElementById("roots-state");
+  const taskSearch = document.getElementById("task-search");
+  const taskProgressBar = document.getElementById("task-progress-bar");
+  const taskProgressLabel = document.getElementById("task-progress-label");
+  const taskProgressCompact = document.getElementById("task-progress-compact");
+  const shortcutsButton = document.getElementById("shortcuts-button");
+  const shortcutsDialog = document.getElementById("shortcuts-dialog");
+  const shortcutsClose = document.getElementById("shortcuts-close");
+  const annotatePanel = document.getElementById("annotate-panel");
+  const a11yLive = document.getElementById("a11y-live");
+  const studioTabNote = document.getElementById("studio-tab-note");
+  const studioTabButtons = studioTabs
+    ? Array.from(studioTabs.querySelectorAll("[data-studio-tab]"))
+    : [];
+  const rootsMeaning = document.getElementById("roots-meaning");
+
+  const state = {
+    token: null,
+    session: null,
+    tasks: [],
+    currentTaskId: null,
+    task: null,
+    currentEventId: null,
+    busy: false,
+    dirty: false,
+    blocked: false,
+    authFailed: false,
+    evidenceInvalid: false,
+    taskSeq: 0,
+    paneSeq: 0,
+    evidenceSeq: 0,
+    eventLimit: 120,
+    eventKind: "",
+  };
+
+  class ApiError extends Error {
+    constructor(status, code, message) {
+      super(message);
+      this.name = "ApiError";
+      this.status = status;
+      this.code = code;
+    }
+  }
+
+  function setStatus(message, kind) {
+    statusEl.textContent = message;
+    statusEl.className = "status" + (kind ? " " + kind : "");
+    if (!a11yLive) return;
+    if (kind === "err") {
+      // Errors are announced assertively through the alert region; switching
+      // the polite status region off avoids a duplicated announcement.
+      statusEl.setAttribute("aria-live", "off");
+      a11yLive.textContent = message;
+    } else {
+      statusEl.setAttribute("aria-live", "polite");
+      a11yLive.textContent = "";
+    }
+  }
+
+  function setNotice(message, kind) {
+    noticeEl.textContent = message;
+    noticeEl.className = "notice" + (kind ? " " + kind : "");
+    noticeEl.hidden = !message;
+  }
+
+  function setDirty(value) {
+    state.dirty = Boolean(value);
+    dirtyIndicator.dataset.dirty = state.dirty ? "true" : "false";
+    dirtyIndicator.textContent = state.dirty
+      ? "有未保存修改"
+      : (state.task ? "修改已保存或未修改" : "未选择任务");
+  }
+
+  function displayValue(value) {
+    if (value === null) return "未知（null）";
+    if (value === undefined) return "未提供";
+    if (typeof value === "string") return value;
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+
+  function addText(parent, tag, text, className) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    node.textContent = text;
+    parent.append(node);
+    return node;
+  }
+
+  function adoptToken() {
+    const raw = location.hash.startsWith("#") ? location.hash.slice(1) : location.hash;
+    const params = new URLSearchParams(raw);
+    let token = params.get("token");
+    if (token) {
+      try {
+        sessionStorage.setItem(TOKEN_KEY, token);
+      } catch {
+        // Session storage can be unavailable; the in-memory token still works.
+      }
+    } else {
+      try {
+        token = sessionStorage.getItem(TOKEN_KEY);
+      } catch {
+        token = null;
+      }
+    }
+    if (location.hash) {
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+    return token;
+  }
+
+  function defaultMessage(status) {
+    if (status === 401) return "会话无效或已过期，请重新打开私有启动链接。";
+    if (status === 409) return "记录已被其他修订更新。";
+    if (status === 0) return "无法连接本地服务。";
+    return "请求失败（HTTP " + status + "）。";
+  }
+
+  async function requestJson(path, options) {
+    const opts = options || {};
+    const headers = {
+      Authorization: "Bearer " + state.token,
+      Accept: "application/json",
+    };
+    const init = { method: opts.method || "GET", headers, cache: "no-store" };
+    if (opts.body !== undefined) {
+      headers["Content-Type"] = "application/json";
+      init.body = JSON.stringify(opts.body);
+    }
+    let response;
+    try {
+      response = await fetch(path, init);
+    } catch {
+      throw new ApiError(0, "network", "无法连接本地服务，草稿仍保留。");
+    }
+    if (!response.ok) {
+      let code = "";
+      let message = "";
+      try {
+        const payload = await response.json();
+        code = typeof payload.error === "string" ? payload.error : "";
+        message = typeof payload.message === "string" ? payload.message : "";
+      } catch {
+        // Keep a clear fallback when the server did not return JSON.
+      }
+      throw new ApiError(response.status, code, message || defaultMessage(response.status));
+    }
+    try {
+      return await response.json();
+    } catch {
+      throw new ApiError(response.status, "invalid-json", "服务返回了无法解析的响应，草稿仍保留。");
+    }
+  }
+
+  function handleAuthFailure() {
+    state.authFailed = true;
+    try {
+      sessionStorage.removeItem(TOKEN_KEY);
+    } catch {
+      // Ignore storage failures.
+    }
+    setNotice("会话无效或已过期，请重新打开私有启动链接。", "err");
+    setStatus("会话无效或已过期，请重新打开私有启动链接。", "err");
+    saveButton.disabled = true;
+    reloadButton.disabled = true;
+    exportButton.disabled = true;
+  }
+
+  function handleError(error) {
+    if (error && error.status === 401) {
+      handleAuthFailure();
+      return;
+    }
+    if (error && error.status === 422) {
+      state.evidenceInvalid = true;
+      state.evidenceSeq += 1;
+      state.currentEventId = null;
+      clearEvidence();
+      evidenceContent.textContent = "证据验证失败，已清除先前显示的内容。";
+      evidenceHint.textContent = "请核查证据包后重新载入；当前草稿已保留。";
+      saveButton.disabled = true;
+      renderEventButtons();
+    }
+    const message = error && error.message ? error.message : "请求失败，草稿仍保留。";
+    if (error && error.status === 409 && error.code === "codebook_mismatch") {
+      // A version mismatch is not retryable: keep the draft visible but lock
+      // saving until the task is reloaded with a matching codebook.
+      state.blocked = true;
+      saveButton.disabled = true;
+      setStatus(message, "err");
+      return;
+    }
+    if (error && (error.status === 409 || error.status === 412)) {
+      setStatus("保存冲突：" + message + " 当前草稿未丢弃；确认后使用“重新载入”。", "err");
+      return;
+    }
+    setStatus(message, "err");
+  }
+
+  let reviewMode = false;
+  let studioMode = false;
+  let reviewPane = false;
+  let selectedProposalId = null;
+
+  // Roving tabindex + aria-selected are the single source of truth for which
+  // pane is shown. Keyboard focus never lands on an inactive tab.
+  function syncStudioTabs() {
+    if (studioTabs) studioTabs.hidden = !studioMode;
+    if (studioTabNote) studioTabNote.hidden = !studioMode;
+    for (const button of studioTabButtons) {
+      const selected = reviewMode === (button.dataset.studioTab === "review");
+      button.setAttribute("aria-selected", String(selected));
+      button.tabIndex = selected ? 0 : -1;
+    }
+    document.body.dataset.studioPane = reviewMode ? "review" : "annotate";
+  }
+
+  function renderSession() {
+    const session = state.session || {};
+    const adjudicate = session.mode === "adjudicate";
+    studioMode = session.mode === "studio";
+    reviewPane = studioMode ? reviewPane : false;
+    reviewMode = session.mode === "review" || (studioMode && reviewPane);
+    metaMode.textContent = reviewMode ? "复核" : adjudicate ? "裁决" : studioMode ? "标注 + 复核" : "标注";
+    metaRater.textContent = session.rater || "未知";
+    metaMethod.textContent = { human: "人工填写（声明）", controlled_execution: "受控执行", model_proposal: "模型建议" }[session.method] || "未知";
+    if (session.codebook_version) metaMethod.textContent += " · " + session.codebook_version;
+    adjudicationArea.hidden = !adjudicate;
+    if (reviewArea) reviewArea.hidden = !reviewMode;
+    if (annotatePanel) annotatePanel.hidden = reviewMode;
+    const historyDetails = document.getElementById("history");
+    if (historyDetails) historyDetails.hidden = reviewMode;
+    syncStudioTabs();
+    if (editorTitle) editorTitle.textContent = reviewMode ? "草稿复核" : "标注编辑";
+    downloadRaw.textContent = adjudicate ? "下载原始记录" : "下载脱敏记录";
+    saveButton.textContent = adjudicate ? "保存裁决" : "保存标注";
+    saveButton.disabled = !state.task || state.busy || state.authFailed ||
+      state.evidenceInvalid || state.blocked;
+    if (!adjudicate) {
+      comparison.replaceChildren();
+      exportButton.hidden = true;
+    }
+  }
+
+  function renderTasks() {
+    taskList.replaceChildren();
+    taskCount.textContent = state.tasks.length + " 项";
+    if (state.tasks.length === 0) {
+      addText(taskList, "p", "没有可标注任务。", "hint empty-state");
+      updateProgress();
+      return;
+    }
+    for (const task of state.tasks) {
+      const taskId = task.id;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "task";
+      button.dataset.taskId = taskId;
+      const marked = reviewMode ? Boolean(task.has_attestation) : Boolean(task.has_annotation);
+      button.dataset.hasAnnotation = marked ? "true" : "false";
+      if (taskId === state.currentTaskId) button.setAttribute("aria-current", "true");
+      const label = addText(button, "span", taskId, "task-id");
+      label.title = taskId;
+      const stateText = reviewMode
+        ? (task.has_attestation ? "已复核" : task.has_model_proposal ? "有草稿" : "无草稿")
+        : (task.has_annotation ? "已保存" : "待标注");
+      addText(button, "span", stateText, "task-state");
+      button.addEventListener("click", () => openTask(taskId));
+      taskList.append(button);
+    }
+    updateProgress();
+    applyTaskFilter();
+  }
+
+  function updateProgress() {
+    const total = state.tasks.length;
+    const done = state.tasks.filter((task) =>
+      reviewMode ? task.has_attestation : task.has_annotation).length;
+    const percent = total ? Math.round((done * 100) / total) : 0;
+    const suffix = reviewMode ? " 已复核" : " 已保存";
+    if (taskProgressBar) taskProgressBar.style.width = percent + "%";
+    if (taskProgressLabel) taskProgressLabel.textContent = done + " / " + total + suffix;
+    if (taskProgressCompact) taskProgressCompact.textContent = done + " / " + total;
+  }
+
+  function applyTaskFilter() {
+    if (!taskSearch) return;
+    const query = taskSearch.value.trim().toLowerCase();
+    for (const button of taskList.querySelectorAll("[data-task-id]")) {
+      button.hidden = Boolean(query) && !String(button.dataset.taskId || "").toLowerCase().includes(query);
+    }
+  }
+
+  function clearEvidence() {
+    eventMeta.replaceChildren();
+    evidenceContent.textContent = "";
+    evidenceHint.textContent = "正在载入证据…";
+    truncationEl.hidden = true;
+    truncationEl.textContent = "";
+    downloadRaw.hidden = true;
+  }
+
+  function resetEditor() {
+    form.reset();
+    notes.value = "";
+    rationale.value = "";
+    identityFields.replaceChildren();
+    for (const name of ["attempted", "executed", "succeeded"]) {
+      fillReferenceBoxes(name + "-refs", name + "_refs", []);
+    }
+    fillReferenceBoxes("root-actor-fields", "root_actors", []);
+    fillReferenceBoxes("root-refs", "root_refs", []);
+    updateRootsControls();
+    setDirty(false);
+    taskTitle.textContent = "尚未选择任务";
+  }
+
+  const LARGE_EVENT_COUNT = 40;
+  const REF_CONTAINERS = {
+    attempted_refs: "attempted-refs", executed_refs: "executed-refs",
+    succeeded_refs: "succeeded-refs", root_refs: "root-refs",
+  };
+
+  function appendRefChip(container, name, eventId) {
+    if (container.querySelector('input[name="' + name + '"][value="' + CSS.escape(eventId) + '"]')) return;
+    const label = document.createElement("label");
+    label.className = "check";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.name = name;
+    input.value = eventId;
+    input.checked = true;
+    const text = document.createElement("span");
+    text.textContent = eventId.length > 22 ? eventId.slice(0, 10) + "…" + eventId.slice(-6) : eventId;
+    text.title = eventId;
+    label.append(input, text);
+    const chips = container.querySelector(".ref-chips") || container;
+    chips.append(label);
+  }
+
+  function fillReferenceBoxes(containerId, name, eventIds) {
+    const container = document.getElementById(containerId);
+    const hint = container.querySelector(".hint");
+    for (const child of Array.from(container.children)) {
+      if (!child.classList.contains("hint")) child.remove();
+    }
+    const ids = Array.isArray(eventIds) ? eventIds : [];
+    if (ids.length > LARGE_EVENT_COUNT && REF_CONTAINERS[name]) {
+      const picker = document.createElement("div");
+      picker.className = "ref-picker";
+      const input = document.createElement("input");
+      input.type = "search";
+      input.placeholder = "输入事件 id 前缀后添加";
+      input.setAttribute("aria-label", "添加证据引用 " + name);
+      const add = document.createElement("button");
+      add.type = "button";
+      add.className = "secondary";
+      add.textContent = "添加";
+      add.addEventListener("click", () => {
+        const prefix = input.value.trim();
+        if (!prefix) return;
+        const matches = ids.filter((id) => id.startsWith(prefix));
+        if (matches.length !== 1) {
+          setStatus(matches.length ? "匹配到多个事件，请加长前缀。" : "没有匹配的事件。", "err");
+          return;
+        }
+        appendRefChip(container, name, matches[0]);
+        input.value = "";
+        setStatus("已添加证据引用。", "ok");
+      });
+      picker.append(input, add);
+      const chips = document.createElement("div");
+      chips.className = "ref-chips";
+      container.append(picker, chips);
+      hint.hidden = false;
+      hint.textContent = "证据较多：按事件 id 前缀添加引用；未列出的判断默认未引用。";
+      return;
+    }
+    for (const eventId of ids) {
+      const label = document.createElement("label");
+      label.className = "check";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.name = name;
+      input.value = eventId;
+      const text = document.createElement("span");
+      text.textContent = eventId.length > 22 ? eventId.slice(0, 10) + "…" + eventId.slice(-6) : eventId;
+      text.title = eventId;
+      label.append(input, text);
+      container.append(label);
+    }
+    if (hint) hint.hidden = ids.length === 0;
+  }
+
+  const EVENTS_PAGE = 120;
+
+  function populateEventKinds(events) {
+    if (!eventKind) return;
+    const kinds = Array.from(new Set(events.map((event) => event.label || "记录"))).sort();
+    const signature = kinds.join("|");
+    if (eventKind.dataset.signature === signature) return;
+    eventKind.replaceChildren();
+    const all = document.createElement("option");
+    all.value = "";
+    all.textContent = "全部类型";
+    eventKind.append(all);
+    for (const kind of kinds) {
+      const option = document.createElement("option");
+      option.value = kind;
+      option.textContent = kind;
+      eventKind.append(option);
+    }
+    eventKind.dataset.signature = signature;
+    eventKind.value = kinds.includes(state.eventKind) ? state.eventKind : "";
+    state.eventKind = eventKind.value;
+  }
+
+  function renderEventButtons() {
+    eventList.replaceChildren();
+    const events = state.task && Array.isArray(state.task.events) ? state.task.events : [];
+    populateEventKinds(events);
+    const query = (eventSearch?.value || "").trim().toLowerCase();
+    const filtered = events.filter((event) => {
+      if (state.eventKind && (event.label || "") !== state.eventKind) return false;
+      if (!query) return true;
+      return [event.event_id, event.record_id, event.derivation, event.source_kind,
+        event.label, event.summary]
+        .some((value) => String(value || "").toLowerCase().includes(query));
+    });
+    const shown = filtered.slice(0, state.eventLimit);
+    shown.forEach((event, offset) => {
+      const eventId = String(event.event_id);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "event-button";
+      button.dataset.eventId = eventId;
+      button.setAttribute("aria-pressed", eventId === state.currentEventId ? "true" : "false");
+      const index = document.createElement("span");
+      index.className = "event-index";
+      index.textContent = String(offset + 1).padStart(2, "0");
+      const main = document.createElement("span");
+      main.className = "event-main";
+      const label = document.createElement("span");
+      label.className = "event-label";
+      label.textContent = event.label || "记录";
+      const summary = document.createElement("span");
+      summary.className = "event-summary";
+      summary.textContent = event.summary || event.event_id;
+      summary.title = event.summary || event.event_id;
+      main.append(label, summary);
+      const source = document.createElement("span");
+      source.className = "event-source";
+      source.textContent = event.source_kind === "controlled_runner" ? "RUNNER" :
+        event.source_kind === "raw_capture" ? "CAPTURE" : "RECORD";
+      button.append(index, main, source);
+      button.addEventListener("click", () => openEvidence(eventId));
+      eventList.append(button);
+    });
+    if (eventCount) {
+      eventCount.textContent = filtered.length ? shown.length + " / " + filtered.length + " 条" : "";
+    }
+    if (eventMore) eventMore.hidden = shown.length >= filtered.length;
+  }
+
+  function renderEventMeta(event, summary) {
+    eventMeta.replaceChildren();
+    if (evidenceLabel) evidenceLabel.textContent = summary && summary.label ? summary.label : "";
+    if (evidenceSummary) evidenceSummary.textContent = summary && summary.summary ? summary.summary : "";
+    if (!event) return;
+    const fields = summary && Array.isArray(summary.fields) && summary.fields.length
+      ? summary.fields.map((field) => [field.key, field.value])
+      : [];
+    fields.push(["事件编号", event.event_id], ["来源", event.source_kind || ""]);
+    for (const [key, value] of fields) {
+      addText(eventMeta, "dt", key);
+      const dd = addText(eventMeta, "dd", displayValue(value));
+      if (key === "事件编号") {
+        dd.title = String(value);
+        dd.textContent = String(value).length > 18
+          ? String(value).slice(0, 12) + "…" + String(value).slice(-4)
+          : String(value);
+      }
+    }
+  }
+
+  async function openEvidence(eventId) {
+    if (!state.task || !eventId) return;
+    state.currentEventId = eventId;
+    renderEventButtons();
+    clearEvidence();
+
+    const seq = ++state.evidenceSeq;
+    const base = "/api/tasks/" + encodeURIComponent(state.currentTaskId) +
+      "/events/" + encodeURIComponent(eventId);
+    try {
+      const payload = await requestJson(base);
+      if (seq !== state.evidenceSeq) return;
+      const text = typeof payload.text === "string" ? payload.text : String(payload.text ?? "");
+      evidenceContent.textContent = text;
+      state.evidenceInvalid = false;
+      saveButton.disabled = state.busy || state.authFailed;
+      renderEventMeta(payload.event || null, payload.summary || null);
+      const byteLength = payload.byte_length ?? 0;
+      const shownBytes = payload.shown_bytes ?? text.length;
+      truncationEl.hidden = false;
+      if (payload.truncated) {
+        truncationEl.className = "notice";
+        truncationEl.textContent = "已截断：仅显示 " + shownBytes + " / " + byteLength + " 字节。完整脱敏内容请下载。";
+      } else {
+        truncationEl.className = "hint";
+        truncationEl.textContent = "完整记录：" + byteLength + " 字节。";
+      }
+      const redactions = Number(payload.redactions || 0);
+      evidenceHint.textContent = redactions > 0
+        ? "证据已按原始字节校验；已脱敏 " + redactions + " 处场景/运行标识。"
+        : "证据已按原始字节校验；未发现需脱敏的场景/运行标识。";
+      downloadRaw.hidden = false;
+    } catch (error) {
+      if (seq !== state.evidenceSeq) return;
+      evidenceContent.textContent = "证据载入失败，已清除先前显示的内容。";
+      evidenceHint.textContent = error && error.message ? error.message : "证据载入失败。";
+      truncationEl.hidden = true;
+      downloadRaw.hidden = true;
+      renderEventMeta(null);
+      state.currentEventId = null;
+      renderEventButtons();
+      handleError(error);
+    }
+  }
+
+  function makeIdentityFields(eventIds, annotation) {
+    identityFields.replaceChildren();
+    const actors = state.task && Array.isArray(state.task.actors) ? state.task.actors : [];
+    const identities = annotation && annotation.identities && typeof annotation.identities === "object"
+      ? annotation.identities
+      : {};
+    state.identityValues = new Map();
+    for (const eventId of eventIds) {
+      const chosen = Object.prototype.hasOwnProperty.call(identities, eventId) ? identities[eventId] : null;
+      state.identityValues.set(eventId, chosen === null || chosen === undefined ? null : String(chosen));
+    }
+    state.identityShown = new Set();
+    const rows = document.createElement("div");
+
+    function addIdentityRow(eventId) {
+      if (state.identityShown.has(eventId)) return;
+      state.identityShown.add(eventId);
+      const row = document.createElement("div");
+      row.className = "identity-field";
+      const text = document.createElement("span");
+      text.textContent = eventId.length > 22 ? eventId.slice(0, 10) + "…" + eventId.slice(-6) : eventId;
+      text.title = eventId;
+      const label = document.createElement("label");
+      label.className = "field-label";
+      label.textContent = "身份";
+      const select = document.createElement("select");
+      select.name = "identity__" + eventId;
+      select.dataset.identityEvent = eventId;
+      select.setAttribute("aria-label", "身份归属 " + eventId);
+      const unknown = document.createElement("option");
+      unknown.value = "";
+      unknown.textContent = "未知";
+      select.append(unknown);
+      for (const actor of actors) {
+        const option = document.createElement("option");
+        option.value = String(actor);
+        option.textContent = String(actor);
+        select.append(option);
+      }
+      const chosenText = state.identityValues.get(eventId) || "";
+      select.value = Array.from(select.options).some((option) => option.value === chosenText)
+        ? chosenText
+        : "";
+      select.addEventListener("change", () => {
+        state.identityValues.set(eventId, select.value || null);
+      });
+      label.append(select);
+      row.append(text, label);
+      rows.append(row);
+    }
+
+    if (eventIds.length <= LARGE_EVENT_COUNT) {
+      for (const eventId of eventIds) addIdentityRow(eventId);
+      identityFields.append(rows);
+      return;
+    }
+
+    const hint = document.createElement("p");
+    hint.className = "hint";
+    hint.textContent = "证据事件较多：只为需要归属的事件选择主体，其余事件保存为未知。";
+    const picker = document.createElement("select");
+    picker.id = "identity-event-picker";
+    picker.setAttribute("aria-label", "添加需要身份归属的事件");
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "添加事件…";
+    picker.append(placeholder);
+    for (const eventId of eventIds) {
+      const option = document.createElement("option");
+      option.value = eventId;
+      option.textContent = eventId.length > 26 ? eventId.slice(0, 12) + "…" + eventId.slice(-8) : eventId;
+      option.title = eventId;
+      picker.append(option);
+    }
+    picker.addEventListener("change", () => {
+      if (picker.value) addIdentityRow(picker.value);
+      picker.value = "";
+    });
+    identityFields.append(hint, picker, rows);
+    const seeds = Array.from(state.identityValues).filter(([, value]) => value).map(([eventId]) => eventId);
+    if (state.currentEventId) seeds.push(state.currentEventId);
+    for (const eventId of seeds.slice(0, 8)) addIdentityRow(eventId);
+    if (seeds.length === 0) {
+      const hint2 = document.createElement("p");
+      hint2.className = "hint";
+      hint2.textContent = "尚未指定任何事件的身份；可选择上方事件后再设置。";
+      rows.append(hint2);
+    }
+  }
+
+  const ROOTS_MEANING = {
+    unknown: "未知：当前证据不足以判断是否存在根因；保存为 roots.actors = null，并不等价于“无根因”。",
+    none: "有证据支持无根因：保存为空集合 roots.actors = []；与“未知”是两个不同的取值，仍需选择支持该结论的证据引用。",
+    selected: "指定根因：请在下方选择根因主体与证据引用；未选择主体时不能保存。",
+  };
+
+  function updateRootsControls() {
+    for (const input of form.querySelectorAll('input[name="root_actors"]')) {
+      input.disabled = rootsState.value !== "selected";
+    }
+    for (const input of form.querySelectorAll('input[name="root_refs"]')) {
+      input.disabled = rootsState.value === "unknown";
+    }
+    if (rootsMeaning) rootsMeaning.textContent = ROOTS_MEANING[rootsState.value] || "";
+  }
+
+  function fillForm(task) {
+    const annotation = task && task.own && task.own.annotation ? task.own.annotation : null;
+    fillReferenceBoxes("attempted-refs", "attempted_refs", eventIds());
+    fillReferenceBoxes("executed-refs", "executed_refs", eventIds());
+    fillReferenceBoxes("succeeded-refs", "succeeded_refs", eventIds());
+    fillReferenceBoxes("root-actor-fields", "root_actors", actorIds());
+    fillReferenceBoxes("root-refs", "root_refs", eventIds());
+
+    for (const name of ["attempted", "executed", "succeeded"]) {
+      const select = form.elements.namedItem(name);
+      const value = annotation && annotation[name] && ["unknown", "yes", "no"].includes(annotation[name].value)
+        ? annotation[name].value
+        : "unknown";
+      select.value = value;
+      const refs = annotation && annotation[name] && Array.isArray(annotation[name].evidence_refs)
+        ? annotation[name].evidence_refs
+        : [];
+      setChecked(name + "_refs", refs);
+    }
+
+    rootsState.value = "unknown";
+    if (annotation && annotation.roots) {
+      if (annotation.roots.actors === null || annotation.roots.actors === undefined) {
+        rootsState.value = "unknown";
+      } else if (Array.isArray(annotation.roots.actors) && annotation.roots.actors.length === 0) {
+        rootsState.value = "none";
+      } else if (Array.isArray(annotation.roots.actors)) {
+        rootsState.value = "selected";
+        setChecked("root_actors", annotation.roots.actors);
+      }
+      setChecked("root_refs", Array.isArray(annotation.roots.evidence_refs) ? annotation.roots.evidence_refs : []);
+    } else {
+      setChecked("root_actors", []);
+      setChecked("root_refs", []);
+    }
+    updateRootsControls();
+
+    makeIdentityFields(eventIds(), annotation);
+    notes.value = annotation && typeof annotation.notes === "string" ? annotation.notes : "";
+    rationale.value = task.own && task.own.review && typeof task.own.review.rationale === "string"
+      ? task.own.review.rationale
+      : "";
+    setDirty(false);
+  }
+
+  function eventIds() {
+    const events = state.task && Array.isArray(state.task.events) ? state.task.events : [];
+    return events.map((event) => String(event.event_id));
+  }
+
+  function actorIds() {
+    const actors = state.task && Array.isArray(state.task.actors) ? state.task.actors : [];
+    return actors.map((actor) => String(actor));
+  }
+
+  function setChecked(name, values) {
+    const selected = new Set((values || []).map(String));
+    for (const input of form.querySelectorAll('input[name="' + name + '"]')) {
+      input.checked = selected.has(input.value);
+      input.removeAttribute("aria-invalid");
+    }
+    const containerId = REF_CONTAINERS[name];
+    const container = containerId ? document.getElementById(containerId) : null;
+    if (container) {
+      for (const value of selected) appendRefChip(container, name, value);
+    }
+  }
+
+  function checkedValues(name) {
+    return Array.from(form.querySelectorAll('input[name="' + name + '"]:checked')).map((input) => input.value);
+  }
+
+  function clearInvalid() {
+    for (const node of form.querySelectorAll('[aria-invalid="true"]')) {
+      node.removeAttribute("aria-invalid");
+    }
+  }
+
+  function markInvalid(node, message) {
+    if (node) {
+      node.setAttribute("aria-invalid", "true");
+      if (typeof node.focus === "function") node.focus();
+    }
+    setStatus(message, "err");
+  }
+
+  function collectAnnotation() {
+    const annotation = {
+      attempted: { value: form.elements.namedItem("attempted").value, evidence_refs: checkedValues("attempted_refs") },
+      executed: { value: form.elements.namedItem("executed").value, evidence_refs: checkedValues("executed_refs") },
+      succeeded: { value: form.elements.namedItem("succeeded").value, evidence_refs: checkedValues("succeeded_refs") },
+      identities: {},
+      roots: {
+        actors: null,
+        evidence_refs: checkedValues("root_refs"),
+      },
+      notes: notes.value,
+    };
+    const selects = Array.from(form.querySelectorAll("select[data-identity-event]"));
+    for (const select of selects) {
+      state.identityValues.set(select.dataset.identityEvent, select.value || null);
+    }
+    for (const eventId of eventIds()) {
+      annotation.identities[eventId] = state.identityValues.has(eventId)
+        ? state.identityValues.get(eventId) : null;
+    }
+    if (rootsState.value === "none") {
+      annotation.roots.actors = [];
+      annotation.roots.evidence_refs = checkedValues("root_refs");
+    } else if (rootsState.value === "selected") {
+      annotation.roots.actors = checkedValues("root_actors");
+      annotation.roots.evidence_refs = checkedValues("root_refs");
+    } else {
+      annotation.roots.actors = null;
+      annotation.roots.evidence_refs = [];
+    }
+    return annotation;
+  }
+
+
+  function validateBeforeSave(annotation) {
+    clearInvalid();
+    for (const field of ["attempted", "executed", "succeeded"]) {
+      if (annotation[field].value !== "unknown" && annotation[field].evidence_refs.length === 0) {
+        markInvalid(
+          form.querySelector('input[name="' + field + '_refs"]'),
+          "判断为“" + (annotation[field].value === "yes" ? "是" : "否") + "”时必须引用至少一个证据事件。"
+        );
+        return false;
+      }
+    }
+    if (annotation.roots.actors === null ? false : annotation.roots.actors.length === 0 && rootsState.value === "selected") {
+      markInvalid(rootsState, "选择“指定根因”时至少选择一个根因主体。");
+      return false;
+    }
+    if (rootsState.value !== "unknown" && annotation.roots.evidence_refs.length === 0) {
+      markInvalid(form.querySelector('input[name="root_refs"]'), "已知根因判断必须引用至少一个证据事件。");
+      return false;
+    }
+    if (state.session && state.session.mode === "adjudicate") {
+      if (!rationale.value.trim()) {
+        markInvalid(rationale, "裁决理由不能为空。");
+        return false;
+      }
+      const reviewers = Array.isArray(state.session.reviewers) ? state.session.reviewers : [];
+      const heads = state.task && state.task.reviewed_revisions && typeof state.task.reviewed_revisions === "object"
+        ? state.task.reviewed_revisions
+        : {};
+      const missing = reviewers.filter((rater) => !Object.prototype.hasOwnProperty.call(heads, rater));
+      if (missing.length) {
+        setStatus("缺少审阅头：" + missing.join("、") + "。请重新载入任务后再保存。", "err");
+        return false;
+      }
+    }
+    return true;
+  }
+
+  async function save() {
+    if (!state.task || state.busy || state.authFailed || state.evidenceInvalid || state.blocked) return;
+    const annotation = collectAnnotation();
+    if (!validateBeforeSave(annotation)) return;
+
+    const taskId = state.currentTaskId;
+    const body = {
+      expected_revision: state.task.own && state.task.own.revision_id ? state.task.own.revision_id : null,
+      annotation,
+    };
+    if (state.session && state.session.mode === "adjudicate") {
+      body.reviewed_revisions = state.task.reviewed_revisions || {};
+      body.rationale = rationale.value;
+    }
+    const submitted = JSON.stringify(annotation);
+    const submittedRationale = rationale.value;
+    state.busy = true;
+    saveButton.disabled = true;
+    reloadButton.disabled = true;
+    exportButton.disabled = true;
+    form.setAttribute("aria-busy", "true");
+    setStatus("正在保存…", "");
+    try {
+      const payload = await requestJson(
+        "/api/tasks/" + encodeURIComponent(taskId) + "/annotations",
+        { method: "POST", body }
+      );
+      if (state.currentTaskId !== taskId) return;
+      state.task.own = payload && payload.own ? payload.own : state.task.own;
+      state.task.history.push(state.task.own);
+      renderHistory(state.task);
+      state.task.review_stale = false;
+      reviewStale.hidden = true;
+      setDirty(JSON.stringify(collectAnnotation()) !== submitted || rationale.value !== submittedRationale);
+      const task = state.tasks.find((item) => item.id === taskId);
+      if (task) task.has_annotation = true;
+      renderTasks();
+      setStatus(state.dirty ? "提交版本已保存，仍有未保存修改。" : "已保存。", "ok");
+    } catch (error) {
+      handleError(error);
+    } finally {
+      state.busy = false;
+      form.removeAttribute("aria-busy");
+      saveButton.disabled = !state.task || state.authFailed || state.evidenceInvalid || state.blocked;
+      reloadButton.disabled = !state.task || state.authFailed;
+      exportButton.disabled = state.authFailed;
+    }
+  }
+
+  function renderHistory(task) {
+    historyList.replaceChildren();
+    const history = task && Array.isArray(task.history) ? task.history : [];
+    if (history.length === 0) {
+      addText(historyList, "p", "尚无历史修订。", "hint");
+      return;
+    }
+    for (const record of history) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "history-record";
+      addText(wrapper, "h3", "修订 " + displayValue(record.revision_id));
+      addText(wrapper, "p", "方法 " + displayValue(record.method) +
+        " · 保存于 " + displayValue(record.saved_at), "hint");
+      const pre = document.createElement("pre");
+      pre.tabIndex = 0;
+      pre.textContent = JSON.stringify(record.annotation ?? null, null, 2);
+      wrapper.append(pre);
+      historyList.append(wrapper);
+    }
+  }
+
+  function renderComparison(task) {
+    if (!state.session || state.session.mode !== "adjudicate") return;
+    comparison.replaceChildren();
+    reviewStale.hidden = !(task && task.review_stale);
+    const differences = task && Array.isArray(task.differences) ? task.differences : [];
+    if (differences.length) {
+      const group = document.createElement("div");
+      group.className = "differences";
+      addText(group, "h3", "差异字段");
+      for (const difference of differences) {
+        const row = document.createElement("div");
+        row.className = "difference-row";
+        row.dataset.differenceField = String(difference.field);
+        addText(row, "span", String(difference.field), "difference-field");
+        const values = difference.values && typeof difference.values === "object" ? difference.values : {};
+        for (const [rater, value] of Object.entries(values)) {
+          const line = document.createElement("div");
+          line.className = "difference-values";
+          addText(line, "b", rater + "：");
+          line.append(document.createTextNode(displayValue(value)));
+          row.append(line);
+        }
+        group.append(row);
+      }
+      comparison.append(group);
+    } else if (task) {
+      addText(comparison, "p", "当前没有检测到差异字段。", "hint");
+    }
+
+    const comparisons = task && Array.isArray(task.comparisons) ? task.comparisons : [];
+    if (comparisons.length === 0) {
+      addText(comparison, "p", "没有可用的审阅修订。", "hint");
+    }
+    for (const item of comparisons) {
+      const box = document.createElement("article");
+      box.className = "comparison-item";
+      const head = document.createElement("div");
+      head.className = "comparison-head";
+      addText(head, "b", displayValue(item.annotator));
+      head.append(document.createTextNode(
+        " · 修订 " + displayValue(item.revision_id) +
+        " · 方法 " + displayValue(item.method) +
+        " · " + displayValue(item.saved_at)
+      ));
+      box.append(head);
+      const pre = document.createElement("pre");
+      pre.tabIndex = 0;
+      pre.textContent = JSON.stringify(item.annotation ?? null, null, 2);
+      box.append(pre);
+      comparison.append(box);
+    }
+
+    reviewedHeads.replaceChildren();
+    const heads = task && task.reviewed_revisions && typeof task.reviewed_revisions === "object"
+      ? task.reviewed_revisions
+      : {};
+    const entries = Object.entries(heads);
+    if (entries.length === 0) {
+      addText(reviewedHeads, "p", "尚无审阅基线。", "hint");
+    }
+    for (const [rater, revision] of entries) {
+      addText(reviewedHeads, "p", rater + "：" + displayValue(revision), "hint");
+    }
+  }
+
+  function proposalMark(annotation) {
+    const value = (field) => annotation && annotation[field] ? annotation[field].value : "?";
+    return "attempted " + value("attempted") + " · executed " + value("executed") +
+      " · succeeded " + value("succeeded");
+  }
+
+  function proposalLines(annotation) {
+    const field = (name) => {
+      const value = annotation && annotation[name] ? annotation[name].value : "?";
+      const refs = annotation && annotation[name] && annotation[name].evidence_refs
+        ? annotation[name].evidence_refs : [];
+      return name + " : " + value + (refs.length ? "\n    refs: " + refs.join(", ") : "");
+    };
+    const roots = annotation && annotation.roots ? annotation.roots : {};
+    const rootValue = roots.actors === null ? "unknown" : "[" + (roots.actors || []).join(", ") + "]";
+    const identities = annotation && annotation.identities ? Object.keys(annotation.identities).length : 0;
+    return [
+      field("attempted"), field("executed"), field("succeeded"),
+      "roots : " + rootValue + ((roots.evidence_refs || []).length
+        ? "\n    refs: " + roots.evidence_refs.join(", ") : ""),
+      "identities : " + identities + " 个事件（" + (identities ? "本任务中均为 unknown" : "无") + "）",
+      "notes : " + ((annotation && annotation.notes) || "（无）"),
+    ].join("\n");
+  }
+
+  function selectProposal(proposal) {
+    selectedProposalId = proposal ? proposal.revision_id : null;
+    for (const card of proposalList.querySelectorAll("[data-proposal]")) {
+      card.setAttribute("aria-pressed", String(card.dataset.proposal === selectedProposalId));
+    }
+    if (!proposal) return;
+    proposalMeta.textContent = proposal.annotator + " · " + proposal.revision_id.slice(0, 10);
+    proposalContent.textContent = proposalLines(proposal.annotation);
+    renderProposalRefs(proposal.annotation);
+  }
+
+  function renderReview(task) {
+    const proposals = task && Array.isArray(task.proposals) && task.proposals.length
+      ? task.proposals
+      : (task && task.proposal ? [task.proposal] : []);
+    proposalList.replaceChildren();
+    if (!proposals.length) {
+      proposalMeta.textContent = "该任务没有模型草稿";
+      proposalContent.textContent = "没有可复核的模型草稿。";
+      attestButton.disabled = true;
+    } else {
+      attestButton.disabled = false;
+      for (const proposal of proposals) {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "proposal-card";
+        card.dataset.proposal = proposal.revision_id;
+        const name = addText(card, "b", proposal.annotator);
+        const mark = addText(card, "span", proposalMark(proposal.annotation));
+        const hint = addText(card, "em", "选择此草稿");
+        card.setAttribute("aria-pressed", "false");
+        card.addEventListener("click", () => selectProposal(proposal));
+        proposalList.append(card);
+      }
+      const selected = proposals.find((item) => item.revision_id === selectedProposalId) || proposals[0];
+      selectProposal(selected);
+    }
+    attestationStatement.value = "";
+    setReviewStatus("", "");
+    renderAttestations(task && task.attestations ? task.attestations : []);
+  }
+
+  function renderProposalRefs(annotation) {
+    if (!proposalRefs) return;
+    proposalRefs.replaceChildren();
+    if (!annotation) return;
+    const refs = new Set();
+    for (const field of ["attempted", "executed", "succeeded"]) {
+      for (const ref of annotation[field]?.evidence_refs || []) refs.add(ref);
+    }
+    for (const ref of annotation.roots?.evidence_refs || []) refs.add(ref);
+    if (refs.size === 0) {
+      addText(proposalRefs, "span", "草稿没有引用事件。", "hint");
+      return;
+    }
+    for (const ref of Array.from(refs).sort()) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "event-button";
+      chip.dataset.proposalRef = ref;
+      chip.textContent = ref.length > 26 ? ref.slice(0, 12) + "…" + ref.slice(-8) : ref;
+      chip.title = ref;
+      chip.addEventListener("click", () => openEvidence(ref));
+      proposalRefs.append(chip);
+    }
+  }
+
+  function renderAttestations(records) {
+    attestationList.replaceChildren();
+    if (!records.length) {
+      addText(attestationList, "p", "尚无复核声明。", "hint");
+      return;
+    }
+    for (const record of records) {
+      const box = document.createElement("div");
+      box.className = "attestation-item";
+      const head = document.createElement("p");
+      head.className = "hint";
+      head.textContent = record.reviewer + " · " + record.created_at;
+      const body = document.createElement("p");
+      body.textContent = record.statement;
+      box.append(head, body);
+      attestationList.append(box);
+    }
+  }
+
+  function setReviewStatus(message, kind) {
+    if (!reviewStatus) return;
+    reviewStatus.textContent = message;
+    reviewStatus.className = kind === "err" ? "status err" : kind === "ok" ? "status ok" : "hint";
+    if (a11yLive && message && kind === "err") a11yLive.textContent = message;
+  }
+
+  async function recordAttestation() {
+    if (!reviewMode || !state.task || !selectedProposalId) return;
+    const statement = attestationStatement.value.trim();
+    if (!statement) {
+      setReviewStatus("请填写复核声明。", "err");
+      return;
+    }
+    attestButton.disabled = true;
+    try {
+      const record = await requestJson(
+        "/api/tasks/" + encodeURIComponent(state.currentTaskId) + "/attestations",
+        { method: "POST", body: { proposal_revision_id: selectedProposalId,
+                                  statement } });
+      state.task.attestations = [...(state.task.attestations || []), record];
+      renderAttestations(state.task.attestations);
+      attestationStatement.value = "";
+      setReviewStatus("复核声明已记录。", "ok");
+      const entry = state.tasks.find((item) => item.id === state.currentTaskId);
+      if (entry) entry.has_attestation = true;
+      renderTasks();
+    } catch (error) {
+      setReviewStatus(error.message || "复核声明记录失败。", "err");
+    } finally {
+      attestButton.disabled = false;
+    }
+  }
+
+  function renderLoadedTask(task) {
+    taskTitle.textContent = "任务 " + displayValue(task.id || state.currentTaskId);
+    if (reviewMode) {
+      renderReview(task);
+    } else {
+      renderHistory(task);
+      renderComparison(task);
+      fillForm(task);
+    }
+    state.currentEventId = null;
+    renderEventButtons();
+    clearEvidence();
+    const events = Array.isArray(task.events) ? task.events : [];
+    if (events.length) {
+      openEvidence(String(events[0].event_id));
+    } else {
+      evidenceHint.textContent = "此任务没有可显示的事件。";
+      evidenceContent.textContent = "无事件。";
+    }
+  }
+
+  async function refreshQueue() {
+    const epoch = state.paneSeq;
+    const suffix = studioMode && reviewPane ? "?review=1" : "";
+    try {
+      const payload = await requestJson("/api/tasks" + suffix);
+      if (epoch !== state.paneSeq) return;
+      state.tasks = Array.isArray(payload.tasks) ? payload.tasks : [];
+      renderTasks();
+    } catch (error) {
+      if (epoch !== state.paneSeq) return;
+      handleError(error);
+    }
+  }
+
+  function clearReviewPane() {
+    selectedProposalId = null;
+    if (proposalList) proposalList.replaceChildren();
+    if (proposalContent) proposalContent.textContent = "";
+    if (proposalRefs) proposalRefs.replaceChildren();
+    if (proposalMeta) proposalMeta.textContent = "";
+    if (attestationStatement) attestationStatement.value = "";
+    if (attestationList) attestationList.replaceChildren();
+    setReviewStatus("", "");
+  }
+
+  function focusTab(pane) {
+    const tab = studioTabButtons.find((button) => button.dataset.studioTab === pane);
+    if (tab) tab.focus();
+  }
+
+  async function switchStudioPane(pane, options) {
+    if (!studioMode) return;
+    const target = pane === "review" ? "review" : "annotate";
+    const current = reviewPane ? "review" : "annotate";
+    const focus = Boolean(options && options.focusTab);
+    if (target === current) {
+      if (focus) focusTab(target);
+      return;
+    }
+    if (state.dirty && !window.confirm("切换工作模式将丢弃当前未保存草稿。继续？")) return;
+    if (reviewPane && attestationStatement && attestationStatement.value.trim() &&
+      !window.confirm("切换工作模式将丢弃尚未记录的复核声明。继续？")) return;
+    const seq = ++state.paneSeq;
+    reviewPane = target === "review";
+    reviewMode = reviewPane;
+    state.dirty = false;
+    syncStudioTabs();
+    renderSession();
+    if (focus) focusTab(target);
+    if (!reviewPane) clearReviewPane();
+    // A pane switch renders a bounded first page again, so a 5000-event task
+    // never re-materialises the full list when toggling.
+    state.eventLimit = EVENTS_PAGE;
+    await refreshQueue();
+    if (seq !== state.paneSeq || !state.currentTaskId) return;
+    const taskSeq = ++state.taskSeq;
+    try {
+      const task = await requestJson("/api/tasks/" + encodeURIComponent(state.currentTaskId) +
+        (reviewPane ? "?review=1" : ""));
+      if (seq !== state.paneSeq || taskSeq !== state.taskSeq) return;
+      state.task = task;
+      state.evidenceInvalid = false;
+      state.blocked = false;
+      renderLoadedTask(task);
+      setStatus(reviewPane ? "已载入草稿复核页。" : "已载入独立标注页。", "");
+    } catch (error) {
+      if (seq !== state.paneSeq || taskSeq !== state.taskSeq) return;
+      handleError(error);
+    }
+    if (seq !== state.paneSeq) return;
+    renderSession();
+  }
+
+  async function openTask(taskId) {
+    if (!taskId) return;
+    if (taskId === state.currentTaskId) return;
+    if (state.dirty && !window.confirm("当前任务有未保存修改，切换任务将丢弃草稿。继续？")) return;
+
+    const seq = ++state.taskSeq;
+    state.currentTaskId = taskId;
+    state.task = null;
+    state.currentEventId = null;
+    state.evidenceSeq += 1;
+    state.eventLimit = EVENTS_PAGE;
+    state.eventKind = "";
+    if (eventSearch) eventSearch.value = "";
+    if (eventKind) eventKind.dataset.signature = "";
+    renderTasks();
+    resetEditor();
+    eventList.replaceChildren();
+    clearEvidence();
+    historyList.replaceChildren();
+    addText(historyList, "p", "正在载入…", "hint");
+    comparison.replaceChildren();
+    reviewStale.hidden = true;
+    rationale.value = "";
+    saveButton.disabled = true;
+    reloadButton.disabled = true;
+    setStatus("正在载入任务…", "");
+
+    try {
+      const task = await requestJson("/api/tasks/" + encodeURIComponent(taskId) +
+        (studioMode && reviewPane ? "?review=1" : ""));
+      if (seq !== state.taskSeq) return;
+      state.task = task;
+      state.evidenceInvalid = false;
+      state.blocked = false;
+      renderLoadedTask(task);
+      saveButton.disabled = state.authFailed;
+      reloadButton.disabled = state.authFailed;
+      setStatus("任务已载入。", "");
+    } catch (error) {
+      if (seq !== state.taskSeq) return;
+      state.task = null;
+      state.currentTaskId = null;
+      renderTasks();
+      taskTitle.textContent = "尚未选择任务";
+      historyList.replaceChildren();
+      addText(historyList, "p", "任务未载入。", "hint");
+      saveButton.disabled = true;
+      reloadButton.disabled = true;
+      handleError(error);
+    }
+  }
+
+  async function reloadCurrent() {
+    if (!state.currentTaskId || state.busy) return;
+    if (state.dirty && !window.confirm("当前任务有未保存修改，重新载入将丢弃草稿。继续？")) return;
+    const taskId = state.currentTaskId;
+    state.currentTaskId = null;
+    setDirty(false);
+    await openTask(taskId);
+  }
+
+  async function downloadBlob(path, filename, errorLabel) {
+    let response;
+    try {
+      response = await fetch(path, {
+        headers: { Authorization: "Bearer " + state.token },
+        cache: "no-store",
+      });
+    } catch {
+      setStatus("无法连接本地服务。", "err");
+      return;
+    }
+    if (!response.ok) {
+      if (response.status === 401) {
+        handleAuthFailure();
+        return;
+      }
+      let message = defaultMessage(response.status);
+      try {
+        const payload = await response.json();
+        if (typeof payload.message === "string") message = payload.message;
+      } catch {
+        // Use the fallback message.
+      }
+      handleError(new ApiError(response.status, "download_failed", errorLabel + "：" + message));
+      return;
+    }
+    let blob;
+    try {
+      blob = await response.blob();
+    } catch {
+      setStatus(errorLabel + "：无法读取响应内容。", "err");
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.hidden = true;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function downloadRawEvidence() {
+    if (!state.currentTaskId || !state.currentEventId) return;
+    const adjudicate = state.session && state.session.mode === "adjudicate";
+    const path = "/api/tasks/" + encodeURIComponent(state.currentTaskId) +
+      "/events/" + encodeURIComponent(state.currentEventId) +
+      (adjudicate ? "/raw" : "/redacted");
+    await downloadBlob(path,
+      state.currentEventId + (adjudicate ? ".raw" : ".blinded.txt"),
+      adjudicate ? "下载原始记录失败" : "下载脱敏记录失败");
+  }
+
+  async function exportQueue() {
+    if (!state.session || state.session.mode !== "adjudicate") return;
+    exportButton.disabled = true;
+    try {
+      await downloadBlob("/api/export", "annotations.json", "导出失败");
+    } finally {
+      if (state.session && state.session.mode === "adjudicate") {
+        exportButton.disabled = state.authFailed;
+      }
+    }
+  }
+
+  function showFatal(message) {
+    setNotice(message, "err");
+    setStatus(message, "err");
+    saveButton.disabled = true;
+    reloadButton.disabled = true;
+    exportButton.disabled = true;
+  }
+
+  async function boot() {
+    state.token = adoptToken();
+    if (!state.token) {
+      showFatal("缺少访问令牌，请重新打开私有启动链接。");
+      return;
+    }
+    try {
+      state.session = await requestJson("/api/session");
+    } catch (error) {
+      handleError(error);
+      return;
+    }
+    renderSession();
+    await refreshQueue();
+  }
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    save();
+  });
+  form.addEventListener("input", (event) => {
+    if (event.target && event.target.closest("#annotation-form")) setDirty(true);
+  });
+  form.addEventListener("change", (event) => {
+    if (event.target === rootsState) updateRootsControls();
+    setDirty(true);
+  });
+  if (studioTabs) {
+    studioTabs.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-studio-tab]");
+      if (button) switchStudioPane(button.dataset.studioTab, { focusTab: true });
+    });
+    studioTabs.addEventListener("keydown", (event) => {
+      const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+      if (!keys.includes(event.key) || studioTabButtons.length === 0) return;
+      event.preventDefault();
+      const current = Math.max(0, studioTabButtons.findIndex(
+        (button) => button.getAttribute("aria-selected") === "true"));
+      let next = current;
+      if (event.key === "Home") next = 0;
+      else if (event.key === "End") next = studioTabButtons.length - 1;
+      else if (event.key === "ArrowRight") next = (current + 1) % studioTabButtons.length;
+      else next = (current - 1 + studioTabButtons.length) % studioTabButtons.length;
+      const button = studioTabButtons[next];
+      if (button) switchStudioPane(button.dataset.studioTab, { focusTab: true });
+    });
+  }
+  reloadButton.addEventListener("click", reloadCurrent);
+  exportButton.addEventListener("click", exportQueue);
+  downloadRaw.addEventListener("click", downloadRawEvidence);
+  function typingTarget(target) {
+    return target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" ||
+      target.tagName === "SELECT" || target.isContentEditable);
+  }
+
+  function stepEvent(delta) {
+    const events = state.task && Array.isArray(state.task.events) ? state.task.events : [];
+    if (events.length === 0) return;
+    const ids = events.map((event) => String(event.event_id));
+    const current = ids.indexOf(state.currentEventId);
+    const next = (current + delta + ids.length) % ids.length;
+    openEvidence(ids[next]);
+  }
+
+  if (eventSearch) {
+    eventSearch.addEventListener("input", () => {
+      state.eventLimit = EVENTS_PAGE;
+      renderEventButtons();
+    });
+  }
+  if (eventKind) {
+    eventKind.addEventListener("change", () => {
+      state.eventKind = eventKind.value;
+      state.eventLimit = EVENTS_PAGE;
+      renderEventButtons();
+    });
+  }
+  if (eventMore) {
+    eventMore.addEventListener("click", () => {
+      state.eventLimit += EVENTS_PAGE;
+      renderEventButtons();
+    });
+  }
+  if (attestButton) attestButton.addEventListener("click", recordAttestation);
+  if (taskSearch) taskSearch.addEventListener("input", applyTaskFilter);
+  if (shortcutsButton && shortcutsDialog) {
+    shortcutsButton.addEventListener("click", () => shortcutsDialog.showModal());
+  }
+  if (shortcutsClose && shortcutsDialog) {
+    shortcutsClose.addEventListener("click", () => shortcutsDialog.close());
+    shortcutsDialog.addEventListener("click", (event) => {
+      if (event.target === shortcutsDialog) shortcutsDialog.close();
+    });
+  }
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "?" && !typingTarget(event.target)) {
+      event.preventDefault();
+      shortcutsDialog?.showModal();
+      return;
+    }
+    if (event.key === "/" && !typingTarget(event.target)) {
+      event.preventDefault();
+      taskSearch?.focus();
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      if (!reviewMode && !saveButton.disabled) {
+        event.preventDefault();
+        form.requestSubmit();
+      }
+      return;
+    }
+    if (typingTarget(event.target)) return;
+    if (event.key === "j" || event.key === "J" || event.key === "ArrowDown") {
+      event.preventDefault();
+      stepEvent(1);
+    } else if (event.key === "k" || event.key === "K" || event.key === "ArrowUp") {
+      event.preventDefault();
+      stepEvent(-1);
+    }
+  });
+
+  window.addEventListener("beforeunload", (event) => {
+    if (!state.dirty) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
+
+  boot();
+})();
+</script>
+</body>
+</html>

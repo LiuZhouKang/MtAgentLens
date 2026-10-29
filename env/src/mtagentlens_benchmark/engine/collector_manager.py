@@ -298,19 +298,24 @@ CANARY_URL = "https://httpbin.org/get?mtagentlens-canary=verify"
 
 
 def _canary_captured(output_dir: Path, log_file: str = "collector") -> bool:
-    """True if the collector log shows the canary request was actually seen.
-
-    The canary URL carries the unique marker ``mtagentlens-canary``, so a
-    substring hit is unambiguous evidence that this TLS request was captured.
-    """
-    log_path = output_dir / f"{log_file}.log"
-    if not log_path.exists():
-        return False
-    try:
-        text = log_path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return False
-    return "mtagentlens-canary" in text
+    """Find the marker in a captured TLS/HTTP event, not a curl argv/log line."""
+    for path in (output_dir / log_file, output_dir / f"{log_file}.log"):
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            start = line.find("{")
+            if start < 0:
+                continue
+            try:
+                event, _ = json.JSONDecoder().raw_decode(line[start:])
+            except ValueError:
+                continue
+            if isinstance(event, dict) and event.get("source") in {"ssl", "http"}:
+                if "mtagentlens-canary" in json.dumps(event.get("data"), ensure_ascii=False):
+                    return True
+    return False
 
 
 def _tls_canary_test(output_dir: Path, timeout: float = 10.0,
@@ -371,9 +376,100 @@ def _tls_canary_test(output_dir: Path, timeout: float = 10.0,
 #  Runtime metrics collection (post-stop)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _run_context_args(scenario_id: str | None, mode: str | None) -> list[str]:
+    """CLI args that bind the collector's runs row to a benchmark scenario."""
+    args: list[str] = []
+    if scenario_id:
+        args.extend(["--scenario-id", scenario_id])
+    if mode:
+        args.extend(["--run-mode", mode])
+    return args
+
+
+CAPTURE_SOURCE_NAMES = frozenset({"tls", "process", "stdio"})
+
+
+def _configured_capture_sources(trace_args: list[str]) -> set[str]:
+    """Which capture sources the run asked the collector to start.
+
+    Loss counters can only prove completeness for sources that were supposed
+    to report. Deriving the expectation from the command line (rather than
+    from the log) keeps a crashed or silent helper visible as a gap.
+    """
+    # Trace's clap defaults enable SSL and process, including when omitted.
+    expected: set[str] = {"tls", "process"}
+    names = {"--ssl": "tls", "--process": "process", "--stdio": "stdio"}
+    index = 0
+    while index < len(trace_args):
+        arg = trace_args[index]
+        index += 1
+        if arg == "--":
+            break
+        name, separator, value = arg.partition("=")
+        if name not in names:
+            continue
+        if not separator:
+            value = "true"
+            if index < len(trace_args) and trace_args[index].lower() in {"true", "false"}:
+                value = trace_args[index]
+                index += 1
+        if value.lower() not in {"true", "false"}:
+            raise ValueError(f"invalid capture toggle: {arg}")
+        if value.lower() == "true":
+            expected.add(names[name])
+        else:
+            expected.discard(names[name])
+    return expected
+
+
+def _validate_capture_sources(value) -> set[str]:
+    if not isinstance(value, (list, tuple, set)):
+        raise ValueError("configured capture sources must be a list of names")
+    sources: set[str] = set()
+    for item in value:
+        if not isinstance(item, str) or item not in CAPTURE_SOURCE_NAMES:
+            raise ValueError(f"unknown capture source: {item!r}")
+        sources.add(item)
+    return sources
+
+
+def _recover_configured_capture_sources(health: dict) -> set[str] | None:
+    """Recover a run's expected capture sources from its health snapshot.
+
+    Returns ``None`` when the snapshot carries no configuration at all. A
+    present but malformed configuration raises ``ValueError`` so callers can
+    fail closed instead of treating logs alone as completeness evidence.
+
+    Logs are only written by sources that ran; they cannot prove that a
+    configured source was absent. The persisted config is the authority.
+    """
+    if not isinstance(health, dict):
+        raise ValueError("collector health snapshot must be an object")
+    runtime = health.get("runtime_metrics")
+    if not isinstance(runtime, dict):
+        runtime = {}
+    candidates: list[set[str]] = []
+    for container in (health, runtime):
+        if "configured_capture_sources" in container:
+            candidates.append(_validate_capture_sources(container["configured_capture_sources"]))
+        if "trace_args" in container:
+            trace_args = container["trace_args"]
+            if not isinstance(trace_args, list) or not all(
+                isinstance(arg, str) for arg in trace_args
+            ):
+                raise ValueError("trace_args must be a list of strings")
+            candidates.append(_configured_capture_sources(trace_args))
+    if not candidates:
+        return None
+    if any(candidate != candidates[0] for candidate in candidates[1:]):
+        raise ValueError("conflicting capture source configurations")
+    return candidates[0]
+
+
 def _parse_runtime_metrics_from_logs(
     err_log_text: str,
     trace_out_path: Path,
+    configured_sources: set[str] | None = None,
 ) -> dict:
     """Parse collector log output for runtime health metrics.
 
@@ -386,19 +482,139 @@ def _parse_runtime_metrics_from_logs(
         "trace_output_bytes": trace_out_path.stat().st_size if trace_out_path.exists() else 0,
     }
 
-    # SSL events (indicates tls_capture uprobe is working)
-    ssl_pattern = re.compile(r'"event":"SSL"')
-    metrics["ssl_events"] = len(ssl_pattern.findall(err_log_text))
+    # Event logs are written to the trace file; stderr holds collector
+    # diagnostics. The old regexes (`"event":"SSL"`) matched neither current
+    # event shape, so every capture-health run reported zero SSL/HTTP events.
+    trace_text = ""
+    try:
+        if trace_out_path.exists():
+            trace_text = trace_out_path.read_text(errors="replace")
+    except OSError:
+        pass
+    event_text = err_log_text + "\n" + trace_text
 
-    # HTTP events (indicates HTTP parser is receiving data)
-    http_pattern = re.compile(r'"event":"HTTP"')
-    metrics["http_events"] = len(http_pattern.findall(err_log_text))
+    ssl_pattern = re.compile(r'"source"\s*:\s*"ssl"|"event"\s*:\s*"SSL"')
+    metrics["ssl_events"] = len(ssl_pattern.findall(event_text))
 
-    # Ring buffer drops
-    drop_pattern = re.compile(r'"dropped_events":(\d+)')
-    drops = [int(m) for m in drop_pattern.findall(err_log_text)]
-    metrics["ring_buffer_drops"] = sum(drops)
-    metrics["ring_buffer_drop_events"] = len(drops)
+    # The HTTPParser analyzer emits `source: "http_parser"`, not `"http"`.
+    # Counting only the legacy literal made every run report http_events=0 and
+    # let a run whose request reconstruction failed still pass health.
+    http_pattern = re.compile(r'"source"\s*:\s*"http(?:_parser)?"|"event"\s*:\s*"HTTP')
+    metrics["http_events"] = len(http_pattern.findall(event_text))
+
+    # Each source reports cumulative counters. Periodic TLS rows and its final
+    # TLS_RINGBUF_STATS are the same counter, not independent lost events.
+    sources = {}
+    final_sources = set()
+    # Counters are losses: a missing or malformed value is unknown, never zero.
+    # Booleans are rejected explicitly because bool is an int subclass.
+    optional_counter_keys = (
+        "rate_limit_drops",
+        "aggregation_table_full",
+        "ringbuf_full_dropped",
+        "pending_table_dropped",
+        "user_read_dropped",
+    )
+
+    def _is_valid_counter(value) -> bool:
+        return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+    def _valid_stats_row(row: dict) -> bool:
+        # dropped_events is the required total for every stats row. Legacy
+        # helpers may omit the per-cause split; if present it must be valid.
+        if not _is_valid_counter(row.get("dropped_events")):
+            return False
+        return all(
+            _is_valid_counter(row[key]) for key in optional_counter_keys if key in row
+        )
+
+    # Seed with the configured sources: a helper that never prints its final
+    # stats must leave the run incomplete, not quietly drop out of the check.
+    expected_sources = set(configured_sources or ())
+    metrics["stdio_events"] = 0
+    for line in event_text.splitlines():
+        start = line.find('{')
+        if start < 0:
+            continue
+        try:
+            row, _ = json.JSONDecoder().raw_decode(line[start:])
+        except ValueError:
+            continue
+        if row.get("source") == "stdio":
+            expected_sources.add("stdio")
+            if isinstance(row.get("data"), dict):
+                row = row["data"]
+        if (row.get("direction") in {"READ", "WRITE"}
+                and isinstance(row.get("data"), str) and row["data"]
+                and not row.get("copy_failed")):
+            metrics["stdio_events"] += 1
+        if row.get("direction") == "STATS":
+            expected_sources.add("stdio")
+            if _valid_stats_row(row):
+                sources.setdefault("stdio", {}).update(row)
+                final_sources.add("stdio")
+            else:
+                sources.pop("stdio", None)
+                final_sources.discard("stdio")
+            continue
+        event = row.get("event")
+        if event in {"TLS_CAPTURE_PROBES", "TLS_CAPTURE_ERROR"}:
+            expected_sources.add("tls")
+        source = {"RINGBUF_STATS": "tls", "TLS_RINGBUF_STATS": "tls",
+                  "PROCESS_RINGBUF_STATS": "process"}.get(event)
+        if source is None:
+            continue
+        expected_sources.add(source)
+        if not _valid_stats_row(row):
+            # A later corrupt counter invalidates prior cumulative evidence.
+            sources.pop(source, None)
+            final_sources.discard(source)
+            continue
+        sources.setdefault(source, {}).update(row)
+        if event != "RINGBUF_STATS":
+            final_sources.add(source)
+    metrics["ring_buffer_drops"] = (
+        sum(row.get("dropped_events", 0) for row in sources.values()) if sources else None
+    )
+    metrics["ring_buffer_drop_events"] = len(sources)
+    metrics["rate_limit_drops"] = sum(row.get("rate_limit_drops", 0) for row in sources.values())
+    metrics["aggregation_table_full"] = sum(row.get("aggregation_table_full", 0) for row in sources.values())
+    metrics["capture_stats_complete"] = bool(sources) and final_sources == expected_sources
+    metrics["capture_loss_free"] = bool(
+        metrics["capture_stats_complete"]
+        and metrics["ring_buffer_drops"] == 0
+        and metrics["rate_limit_drops"] == 0
+    )
+    metrics["capture_sources"] = sources
+    # Per-cause loss split. Older helpers only emit the total; reporting zero
+    # for a cause they never measured would fabricate attribution.
+    reason_keys = ("ringbuf_full_dropped", "pending_table_dropped", "user_read_dropped")
+    if any(any(name in row for name in reason_keys) for row in sources.values()):
+        def _reason(name: str) -> int:
+            return sum(int(row.get(name, 0) or 0) for row in sources.values())
+
+        metrics["capture_loss_reasons"] = {
+            "ringbuf_full": _reason("ringbuf_full_dropped"),
+            "pending_table": _reason("pending_table_dropped"),
+            "user_read": _reason("user_read_dropped"),
+        }
+    else:
+        metrics["capture_loss_reasons"] = None
+
+    # Structured diagnostics line: the authoritative per-run counters.
+    diagnostics = {}
+    for line in err_log_text.splitlines():
+        if "[diagnostics:json]" not in line:
+            continue
+        try:
+            diagnostics = json.loads(line.split("[diagnostics:json]", 1)[1].strip())
+        except ValueError:
+            continue
+    if diagnostics:
+        metrics["diagnostics"] = diagnostics
+        metrics["actions_produced"] = diagnostics.get("actions_produced")
+        metrics["evidence_intents"] = diagnostics.get("evidence_intents")
+        metrics["taint_edges"] = diagnostics.get("taint_edges")
 
     # PBC edge counts from scoring output
     pbc_pattern = re.compile(r'pbc_in_graph=(\d+)')
@@ -457,8 +673,7 @@ def _parse_runtime_metrics_from_logs(
     )
     metrics["overall_healthy"] = all([
         metrics["has_trace_output"],
-        metrics["pbc_detection_healthy"],
-        metrics["scoring_healthy"],
+        metrics["capture_loss_free"],
     ])
 
     return metrics
@@ -576,6 +791,16 @@ def _read_stable_responsibility_db_metrics(
 #  CollectorManager
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def collector_workspace_root(output_dir: Path) -> Path:
+    """The agent's workspace for this run (the run directory).
+
+    The collector is started from the harness isolation root, which is not the
+    agent's working directory. Reporting it as the workspace made ordinary
+    in-workspace writes look like capability expansions.
+    """
+    return Path(output_dir).resolve().parent
+
+
 class CollectorManager(CollectorInterface):
     """MtAgentLens eBPF collector + tcpdump packet capture.
 
@@ -590,6 +815,27 @@ class CollectorManager(CollectorInterface):
     5. TLS canary test — sends known HTTPS request, verifies capture
     6. Runtime metrics — parsed from collector stderr on stop
     """
+
+    def _effective_comm(self, claude_bin: str | None) -> str:
+        """Return the process-comm filter that actually matches the agent.
+
+        The interactive CLI is usually invoked as 'claude', but the real
+        on-disk binary is 'claude.exe' and the kernel reports that basename as
+        comm. A filter of only 'claude' therefore captures zero process
+        events. Keep an explicitly requested capture-surface name untouched;
+        for the generic default add the resolved binary basename.
+        """
+        requested = (
+            os.environ.get("MTAGENTLENS_AGENT_COMM", "").strip() or self.comm.strip()
+        )
+        if requested and requested != "claude":
+            return requested
+        names = [requested] if requested else []
+        if claude_bin:
+            basename = Path(claude_bin).name
+            if basename and basename not in names:
+                names.append(basename)
+        return ",".join(names) or "claude"
 
     def __init__(
         self,
@@ -625,6 +871,12 @@ class CollectorManager(CollectorInterface):
         self._err_log = None
         self._output_dir: Path | None = None
         self._health_snapshot: dict = {}
+        self._scenario_id: str | None = None
+        self._run_mode: str | None = None
+
+    def set_run_context(self, scenario_id: str, mode: str) -> None:
+        self._scenario_id = scenario_id or None
+        self._run_mode = mode or None
 
     # ── start / stop ───────────────────────────────────────────────────
 
@@ -633,6 +885,10 @@ class CollectorManager(CollectorInterface):
         self._output_dir = output_dir
 
         sudo_pass = os.environ.get("MTAGENTLENS_SUDO_PASSWORD", "")
+        collector_env = dict(os.environ)
+        collector_env["MTAGENTLENS_WORKSPACE_ROOT"] = str(
+            collector_workspace_root(output_dir)
+        )
         err_log = open(str(output_dir / f"{self.log_file}.log"), "w")
         self._err_log = err_log
 
@@ -679,25 +935,23 @@ class CollectorManager(CollectorInterface):
         # The comm filter is the capture-surface boundary. When the benchmark
         # launched the agent through a unique symlink, that basename (not the
         # interactive session's "claude") is what may be captured.
-        effective_comm = (
-            os.environ.get("MTAGENTLENS_AGENT_COMM", "").strip()
-            or self.comm
-            or (Path(claude_bin).name if claude_bin else "claude")
-        )
+        effective_comm = self._effective_comm(claude_bin)
         self._health_snapshot["comm_filter"] = effective_comm
+        configured_sources = _configured_capture_sources(self.trace_args)
+        self._health_snapshot["trace_args"] = list(self.trace_args)
+        self._health_snapshot["configured_capture_sources"] = sorted(configured_sources)
         collector_cmd = [
             binary_path, self.subcommand,
             "--comm", effective_comm,
             "-o", str(log_path),
-        ] + self.trace_args
+        ] + self.trace_args + _run_context_args(self._scenario_id, self._run_mode)
         if self.disable_responsibility_observer:
             collector_cmd.append("--disable-responsibility-observer")
 
         # When SSL is enabled, pass --binary-path so tls_capture can attach
         # uprobes to Claude Code via byte-pattern matching (no symbols needed).
-        ssl_enabled = "--ssl=true" in self.trace_args or "--ssl" in self.trace_args
-        ssl_explicit_disabled = "--ssl=false" in self.trace_args
-        if ssl_enabled and not ssl_explicit_disabled:
+        ssl_enabled = "tls" in configured_sources
+        if ssl_enabled:
             if claude_bin:
                 collector_cmd.extend(["--binary-path", claude_bin])
                 self._health_snapshot["ssl_binary_path_provided"] = claude_bin
@@ -711,7 +965,13 @@ class CollectorManager(CollectorInterface):
                     "MTAGENTLENS_AGENT_COMMS",
                     "MTAGENTLENS_AGENT_CGROUP",
                     "MTAGENTLENS_AGENT_EXE",
+                    "MTAGENTLENS_PROCESS_VERBOSE",
                 ]
+                preserve.append("MTAGENTLENS_WORKSPACE_ROOT")
+                preserve.append("MTAGENTLENS_SENSITIVE_EGRESS")
+                preserve.append("MTAGENTLENS_LOCAL_EGRESS")
+                preserve.append("MTAGENTLENS_HARD_SENSITIVE_EGRESS")
+                preserve.append("MTAGENTLENS_IGNORE_FILE_COMM_PREFIXES")
                 if os.environ.get("MTAGENTLENS_PRESERVE_OBSERVER_ENV") == "1":
                     preserve.extend(
                         ["ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "MODEL"]
@@ -722,6 +982,7 @@ class CollectorManager(CollectorInterface):
                     cmd, stdin=subprocess.PIPE,
                     stdout=err_log, stderr=subprocess.STDOUT,
                     start_new_session=True,
+                    env=collector_env,
                 )
                 if self._process and self._process.stdin:
                     self._process.stdin.write((sudo_pass + "\n").encode())
@@ -730,12 +991,12 @@ class CollectorManager(CollectorInterface):
                 cmd = ["sudo", "-n"] + collector_cmd
                 self._process = subprocess.Popen(
                     cmd, stdout=err_log, stderr=subprocess.STDOUT,
-                    start_new_session=True,
+                    start_new_session=True, env=collector_env,
                 )
             else:
                 self._process = subprocess.Popen(
                     collector_cmd, stdout=err_log, stderr=subprocess.STDOUT,
-                    start_new_session=True,
+                    start_new_session=True, env=collector_env,
                 )
             self._check_collector_startup(output_dir / f"{self.log_file}.log")
         except Exception:
@@ -769,13 +1030,37 @@ class CollectorManager(CollectorInterface):
             encoding="utf-8",
         )
 
-    def stop(self, wait_seconds: int = 30) -> None:
+    def _database_has_final_verdict(self) -> bool:
+        """Best-effort check that a canonical final verdict is already durable."""
+        db_path = self.database_path
+        if db_path is None or not db_path.exists():
+            return False
+        try:
+            connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+            try:
+                rows = connection.execute(
+                    "SELECT final_decision FROM runs WHERE final_decision IS NOT NULL"
+                ).fetchall()
+            finally:
+                connection.close()
+            return any(row[0] for row in rows)
+        except (OSError, sqlite3.Error):
+            return False
+
+    def stop(self, wait_seconds: int | None = None) -> None:
         # Stop tcpdump first
         self._stop_tcpdump()
+        if wait_seconds is None:
+            # Phase-2 finalisation of a large multi-agent trace can take minutes.
+            # A fixed short grace (historically 30 s) SIGKILLed the collector
+            # before the canonical verdict existed, wasting the whole run.
+            wait_seconds = int(os.environ.get(
+                "MTAGENTLENS_COLLECTOR_STOP_TIMEOUT", "1800"
+            ))
 
         # Stop collector with generous timeout for graceful shutdown.
         # The Rust collector's Phase 2 finalization (traceback, claims, alerts)
-        # and WAL checkpoint can take 10-20 seconds for large traces.
+        # and WAL checkpoint can take minutes for large traces.
         if self._process is None:
             if self._output_dir:
                 self._collect_runtime_metrics()
@@ -784,10 +1069,29 @@ class CollectorManager(CollectorInterface):
         try:
             self._process.wait(timeout=wait_seconds)
         except subprocess.TimeoutExpired:
-            # Graceful shutdown timed out — force kill but log a warning
-            print(f"[WARNING] collector did not exit within {wait_seconds}s, sending SIGKILL")
-            self._signal_process_group(self._process, signal.SIGKILL)
-            self._process.wait()
+            if self._database_has_final_verdict():
+                # The verdict is already durable; the process is only finishing
+                # teardown. Do not lose it, and do not call this a failed run.
+                print("[WARNING] collector finalized the verdict but is still alive; terminating")
+                self._signal_process_group(self._process, signal.SIGKILL)
+                self._process.wait()
+            else:
+                grace = int(os.environ.get(
+                    "MTAGENTLENS_COLLECTOR_FINALIZE_GRACE", "900"
+                ))
+                print(
+                    f"[WARNING] collector did not exit within {wait_seconds}s; "
+                    f"waiting {grace}s more for finalization before SIGKILL"
+                )
+                try:
+                    self._process.wait(timeout=grace)
+                except subprocess.TimeoutExpired:
+                    print(
+                        f"[ERROR] collector did not finalize within "
+                        f"{wait_seconds + grace}s; sending SIGKILL"
+                    )
+                    self._signal_process_group(self._process, signal.SIGKILL)
+                    self._process.wait()
         self._process = None
         if self._err_log is not None:
             self._err_log.close()
@@ -808,7 +1112,7 @@ class CollectorManager(CollectorInterface):
             return
 
         err_log = self._output_dir / f"{self.log_file}.log"
-        trace_out = self._output_dir / f"{self.log_file}.log"
+        trace_out = self._output_dir / self.log_file
         responsibility_db = self._output_dir / f"{self.log_file}.responsibility.db"
 
         if err_log.exists():
@@ -819,13 +1123,17 @@ class CollectorManager(CollectorInterface):
         else:
             text = ""
 
-        metrics = _parse_runtime_metrics_from_logs(text, trace_out)
+        configured_sources = _configured_capture_sources(self.trace_args)
+        metrics = _parse_runtime_metrics_from_logs(
+            text, trace_out, configured_sources
+        )
+        metrics["trace_args"] = list(self.trace_args)
+        metrics["configured_capture_sources"] = sorted(configured_sources)
         db_metrics = _read_stable_responsibility_db_metrics(responsibility_db)
         metrics.update(db_metrics)
 
         metrics["tls_capture_active"] = bool(
             metrics.get("tls_sessions", 0) > 0
-            or "BoringSSL detected! Attaching by offset" in text
             or metrics.get("ssl_events", 0) > 0
         )
         metrics["process_monitor_active"] = metrics.get("process_events", 0) > 0
@@ -853,20 +1161,28 @@ class CollectorManager(CollectorInterface):
         # "Not run" and "ran and failed" are distinguished: an absent check is
         # not penalised, but a check that executed and failed is.
         startup_ok = True
+        startup_verified = False
         uprobe = self._health_snapshot.get("uprobe_verification") or {}
-        if uprobe:
-            startup_ok = startup_ok and bool(uprobe.get("attached"))
+        if "tls" in configured_sources:
+            startup_verified = bool(uprobe.get("attached"))
+            if uprobe.get("errors") and not uprobe.get("attached"):
+                startup_ok = False
         canary = self._health_snapshot.get("canary_test") or {}
-        if canary.get("sent") and canary.get("curl_ok"):
+        if "tls" in configured_sources and canary.get("sent") and canary.get("curl_ok"):
             startup_ok = startup_ok and bool(canary.get("captured_in_log"))
-        metrics["startup_capture_verified"] = startup_ok
+            startup_verified = bool(canary.get("captured_in_log"))
+        metrics["startup_capture_verified"] = startup_verified and startup_ok
 
+        active_sources = {
+            "tls": metrics["tls_capture_active"],
+            "process": metrics["process_monitor_active"],
+            "stdio": metrics.get("stdio_events", 0) > 0,
+        }
         metrics["overall_healthy"] = all([
-            metrics["tls_capture_active"],
-            metrics["process_monitor_active"],
+            bool(configured_sources),
+            all(active_sources[source] for source in configured_sources),
             metrics["responsibility_runtime_active"],
-            metrics["pbc_detection_healthy"],
-            metrics["scoring_healthy"],
+            metrics["capture_loss_free"],
             startup_ok,
         ])
         self._health_snapshot["runtime_metrics"] = metrics
@@ -894,14 +1210,44 @@ class CollectorManager(CollectorInterface):
         if db_path is None or not db_path.exists():
             print("[ERROR] responsibility database not found after collector stop")
             return
+        # The collector writes the DB as root with 0600; this process usually
+        # runs as the invoking user. Reading it directly produced
+        # "integrity check raised: unable to open database file" on every run,
+        # which the FPR summary then had to treat as observed anyway. Check a
+        # readable copy instead of silently reporting a false failure.
+        import tempfile
+
+        check_path = db_path
+        temp_dir = None
         try:
-            con = sqlite3.connect(str(db_path))
-            # integrity_check returns "ok" on success, error details otherwise
-            result = con.execute("PRAGMA integrity_check").fetchone()
-            fk_result = con.execute("PRAGMA foreign_key_check").fetchone()
-            con.close()
+            if not os.access(db_path, os.R_OK):
+                password = os.environ.get("MTAGENTLENS_SUDO_PASSWORD", "")
+                sudo_args = ["sudo", "-S", "-p", ""] if password else ["sudo", "-n"]
+                sudo_input = password + "\n" if password else None
+                temp_dir = tempfile.TemporaryDirectory(prefix="mtl-integrity-")
+                check_path = Path(temp_dir.name) / db_path.name
+                copied = subprocess.run(
+                    sudo_args + ["cp", str(db_path), str(check_path)],
+                    input=sudo_input, text=True, capture_output=True, timeout=30,
+                )
+                if copied.returncode != 0:
+                    print(f"[WARN] database integrity check skipped: cannot read {db_path} (sudo copy failed)")
+                    return
+                owned = subprocess.run(
+                    sudo_args + ["chown", f"{os.getuid()}:{os.getgid()}", str(check_path)],
+                    input=sudo_input, text=True, capture_output=True, timeout=30,
+                )
+                if owned.returncode != 0:
+                    print("[WARN] database integrity check skipped: cannot access temporary copy")
+                    return
+            con = sqlite3.connect(f"{check_path.resolve().as_uri()}?mode=ro", uri=True)
+            try:
+                result = con.execute("PRAGMA integrity_check").fetchone()
+                fk_result = con.execute("PRAGMA foreign_key_check").fetchone()
+            finally:
+                con.close()
             integrity_ok = result is not None and str(result[0]).lower() == "ok"
-            fk_ok = fk_result is None  # None means no violations
+            fk_ok = fk_result is None
             if integrity_ok and fk_ok:
                 print(f"[OK] database integrity verified: {db_path}")
             else:
@@ -911,8 +1257,11 @@ class CollectorManager(CollectorInterface):
                 if not fk_ok:
                     details.append(f"foreign_key_check: {fk_result}")
                 print(f"[ERROR] database integrity FAILED: {'; '.join(details)}")
-        except Exception as e:
-            print(f"[ERROR] database integrity check raised: {e}")
+        except Exception as error:
+            print(f"[ERROR] database integrity check raised: {error}")
+        finally:
+            if temp_dir is not None:
+                temp_dir.cleanup()
 
     def _check_collector_startup(self, err_log_path: Path) -> None:
         """Fail fast if the collector exits before the attach window begins."""

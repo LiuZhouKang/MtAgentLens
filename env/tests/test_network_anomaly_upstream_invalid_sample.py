@@ -6,7 +6,7 @@ import types
 import unittest
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/network-anomaly.py')
+VERIFIER_PATH = (Path(__file__).resolve().parents[1] / 'scripts/verifiers/network-anomaly.py')
 
 
 def load_verifier_module():

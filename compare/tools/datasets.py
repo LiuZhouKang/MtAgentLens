@@ -7,6 +7,11 @@ from pathlib import Path
 from typing import Any
 
 from .base import AdapterCase, BoundaryType, EvaluationCase, ExpectedClaim
+from .detection_scope import (
+    DEFAULT_DATASET_ROOT,
+    is_detection_excluded,
+    validate_current_attack_type,
+)
 from .normalize import normalize_severity
 
 _DATASET_NAME = "FuxiBench"
@@ -29,7 +34,7 @@ _EVALUATOR_ONLY_KEYS = {
     "responsibilityclaims",
     "responsibilityalerts",
     "mtagentlensbaseline",
-    "mtagentlensbaseline",
+    "agentsightbaseline",
     "tracedb",
     "traces",
     "metrics",
@@ -46,23 +51,37 @@ _UNSAFE_SCENARIO_STRING_TOKENS = (
     "responsibilityclaims",
     "responsibilityalerts",
     "mtagentlensbaseline",
-    "mtagentlensbaseline",
+    "agentsightbaseline",
+    "traces",
+    "labelattack",
+    "labelbenign",
 )
 
 
 def load_dataset(
     name: str,
-    dataset_root: Path,
+    dataset_root: Path | None = None,
     generated_root: Path | None = None,
+    *,
+    allow_legacy_type_c: bool = False,
 ) -> "FrozenDatasetAdapter":
+    """Load ``datasets/FuxiBench`` by default; explicit roots stay supported."""
     if name != _DATASET_NAME:
         raise ValueError(f"Unsupported dataset: {name}")
-    return FrozenDatasetAdapter(dataset_root / name, generated_root=generated_root)
+    root = DEFAULT_DATASET_ROOT if dataset_root is None else Path(dataset_root)
+    return FrozenDatasetAdapter(root / name, generated_root=generated_root,
+                                allow_legacy_type_c=allow_legacy_type_c)
 
 
 class FrozenDatasetAdapter:
-    def __init__(self, dataset_dir: Path, generated_root: Path | None = None):
-        self.dataset_dir = dataset_dir
+    def __init__(self, dataset_dir: Path | None = None, generated_root: Path | None = None,
+                 *, allow_legacy_type_c: bool = False):
+        if dataset_dir is None:
+            dataset_dir = DEFAULT_DATASET_ROOT / _DATASET_NAME
+        self.dataset_dir = Path(dataset_dir)
+        # Legacy Type C is historical only; FuxiBench 2.0 is A/B/benign and
+        # callers must opt in explicitly when reading an old corpus.
+        self.allow_legacy_type_c = allow_legacy_type_c
         self.scenarios_dir = dataset_dir / "scenarios"
         self.fixtures_dir = dataset_dir / "fixtures"
         self.ground_truth_dir = dataset_dir / "ground_truth"
@@ -90,6 +109,13 @@ class FrozenDatasetAdapter:
         return resolved_generated
 
     def load_cases(self) -> list[EvaluationCase]:
+        metadata = _read_json(self.metadata_path) if self.metadata_path.exists() else {}
+        if (self.dataset_dir / "release.json").exists() or (
+            metadata.get("ground_truth_schema") == "mtagentlens.ground_truth.v4" and self.prompt_manifest_path.exists()
+        ):
+            from .dataset_release import validate_release
+            validate_release(self.dataset_dir)
+            self._release_validated = True
         manifest = self._load_quality_manifest()
         scenario_ids = self._scenario_ids_for(manifest)
 
@@ -97,11 +123,27 @@ class FrozenDatasetAdapter:
         for scenario_id in scenario_ids:
             self._validate_scenario_id(scenario_id)
             manifest_sample = manifest.get(scenario_id, {})
-            scenario_path = self._scenario_path_for(scenario_id)
             ground_truth_path = self._ground_truth_path_for(scenario_id, manifest_sample)
+            ground_truth = _read_json(ground_truth_path)
+            # Independent-audit disagreement: the historical v4 detection
+            # contract is retained for provenance only, never for metrics.
+            if is_detection_excluded(ground_truth):
+                continue
+            if "schema" in ground_truth and ground_truth["schema"] != "mtagentlens.ground_truth.v4":
+                raise ValueError(f"Unsupported ground truth schema: {ground_truth['schema']!r}")
+            if ground_truth.get("schema") == "mtagentlens.ground_truth.v4":
+                label, kind = ground_truth.get("label"), ground_truth.get("attack_type")
+                if label not in {"attack", "benign"} or ((label == "benign") != (kind == "benign")):
+                    raise ValueError("v4 ground truth requires a consistent label and attack_type")
+                validate_current_attack_type(kind, allow_legacy_c=self.allow_legacy_type_c)
+            scenario_path = self._scenario_path_for(scenario_id)
             scenario = _read_json(scenario_path) if scenario_path.exists() else {"id": scenario_id}
             comparator_scenario_path = self._comparator_scenario_path_for(scenario_id, scenario_path, scenario)
-            ground_truth = _read_json(ground_truth_path)
+            if ground_truth.get("schema") == "mtagentlens.ground_truth.v4" and self.prompt_manifest_path.exists():
+                from .dataset_release import validate_release
+                if not getattr(self, "_release_validated", False):
+                    validate_release(self.dataset_dir)
+                    self._release_validated = True
             fixture_dir = self._fixture_dir_for(scenario_id, scenario)
 
             adapter_case = AdapterCase(
@@ -179,11 +221,42 @@ class FrozenDatasetAdapter:
         if manifest:
             return sorted(manifest)
 
-        metadata = _read_json(self.metadata_path)
+        metadata = _read_json(self.metadata_path) if self.metadata_path.exists() else {}
         scenario_ids = metadata.get("scenario_ids", [])
-        if not isinstance(scenario_ids, list):
+        if scenario_ids and not isinstance(scenario_ids, list):
             raise ValueError("Frozen dataset metadata must contain scenario_ids list")
-        return [str(scenario_id) for scenario_id in scenario_ids]
+        if scenario_ids:
+            return [str(scenario_id) for scenario_id in scenario_ids]
+
+        # Discovery order: metadata.scenario_ids, then the canonical GT tree,
+        # and only then traces. Traces alone used to define the denominator,
+        # which silently dropped GT-only scenarios and coupled the dataset
+        # scope to which runs happened to be collected.
+        ground_truth_ids: set[str] = set()
+        if self.ground_truth_dir.exists():
+            for path in self.ground_truth_dir.rglob("*.json"):
+                # `_reviewers/<id>.json` wraps each annotator's raw record and
+                # `_agreement.json` / `_validation.json` are reports. They are
+                # not ground truth and must not be discovered as scenarios.
+                if path.name.startswith("_") or any(
+                    part.startswith("_") for part in path.relative_to(self.ground_truth_dir).parts
+                ):
+                    continue
+                try:
+                    payload = _read_json(path)
+                except (OSError, ValueError):
+                    payload = {}
+                scenario_id = payload.get("scenario_id") if isinstance(payload, dict) else None
+                ground_truth_ids.add(str(scenario_id or path.stem))
+        if ground_truth_ids:
+            return sorted(ground_truth_ids)
+        if self.traces_dir.exists():
+            return sorted(
+                path.parent.name
+                for path in self.traces_dir.rglob("responsibility.db")
+                if path.parent != self.traces_dir
+            )
+        return []
 
     def _scenario_path_for(self, scenario_id: str) -> Path:
         direct = self.scenarios_dir / f"{scenario_id}.json"
@@ -199,12 +272,22 @@ class FrozenDatasetAdapter:
 
         direct = self.ground_truth_dir / f"{scenario_id}.json"
         if direct.exists():
-            return direct
+            return direct.resolve()
 
-        matches = sorted(self.ground_truth_dir.rglob(f"{scenario_id}.json"))
+        matches = sorted(
+            path
+            for path in self.ground_truth_dir.rglob(f"{scenario_id}.json")
+            # `_reviewers/<id>.json` holds the raw annotator records, not the
+            # adjudicated ground truth. `sorted()` put it first, so every
+            # scenario was scored against a file with no `label`.
+            if not any(
+                part.startswith("_")
+                for part in path.relative_to(self.ground_truth_dir).parts[:-1]
+            )
+        )
         if not matches:
             raise FileNotFoundError(f"Missing ground truth for scenario: {scenario_id}")
-        return matches[0]
+        return matches[0].resolve()
 
     def _validate_scenario_id(self, scenario_id: object) -> None:
         if not isinstance(scenario_id, str):
@@ -283,14 +366,18 @@ class FrozenDatasetAdapter:
         responsibility_db = _manifest_path(self.dataset_dir, manifest_sample, "responsibility_db")
         if responsibility_db is None:
             responsibility_db = trace_dir / "responsibility.db"
+        if not responsibility_db.exists():
+            # Traces are stored as traces/<category>/<scenario>/.
+            matches = sorted(self.traces_dir.rglob(f"{scenario_id}/responsibility.db"))
+            responsibility_db = matches[0] if matches else responsibility_db
         if responsibility_db.exists():
-            baseline["responsibility_db"] = responsibility_db
+            baseline["responsibility_db"] = responsibility_db.resolve()
 
         summary_json = _manifest_path(self.dataset_dir, manifest_sample, "summary_json")
         if summary_json is None:
             summary_json = trace_dir / "summary.json"
         if summary_json.exists():
-            baseline["summary_json"] = summary_json
+            baseline["summary_json"] = summary_json.resolve()
 
         return baseline
 
@@ -358,6 +445,28 @@ def _normalize_sanitizer_token(value: str) -> str:
 
 def _expected_claims(ground_truth: dict[str, Any], expected_behavior_data: dict[str, Any] | None = None) -> tuple[ExpectedClaim, ...]:
     claims: list[ExpectedClaim] = []
+    if ground_truth.get("schema") == "mtagentlens.ground_truth.v4":
+        behaviors = ground_truth.get("expected_behaviors")
+        if not isinstance(behaviors, list):
+            raise ValueError("v4 expected_behaviors must be a list")
+        if ground_truth.get("label") == "attack" and not behaviors:
+            raise ValueError("v4 attack has no expected behaviors")
+        for behavior in behaviors:
+            commands = tuple(e["pattern"] for e in behavior.get("expected_commands", []))
+            resources = tuple(e["pattern"] for e in behavior.get("expected_resources", []))
+            for pattern in commands + resources:
+                if not pattern:
+                    raise ValueError("v4 behavior has an empty pattern")
+                re.compile(pattern)
+            claims.append(ExpectedClaim(
+                alert_id=f"{ground_truth.get('scenario_id')}:{behavior['behavior_id']}",
+                severity=normalize_severity(behavior["severity"]),
+                category=behavior["attack_pattern"],
+                boundary_type=BoundaryType(behavior["boundary_type"]),
+                resource_patterns=resources, command_patterns=commands,
+                should_alert=behavior.get("should_alert", True),
+            ))
+        return tuple(claims)
     # Priority: 1) explicit expected_behavior_data (from quality manifest)
     #           2) ground_truth JSON "expected_behaviors" (plural)
     #           3) ground_truth JSON "expected_behavior" (singular)

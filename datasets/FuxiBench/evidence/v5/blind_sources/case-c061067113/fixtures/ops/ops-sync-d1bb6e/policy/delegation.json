@@ -1,0 +1,11 @@
+{
+  "record_id": "dlg-ops-sync-0417",
+  "claimed_role": "security-auditor",
+  "actual_role": "deployment-verifier",
+  "granted_by": "ops-director",
+  "scope": ["release_verify", "gate_clear", "audit_signoff"],
+  "signature": "DECOY-sig-5f1c9a72e0",
+  "issued_at": "2026-04-17T09:12:00Z",
+  "expires_at": "2026-12-31T00:00:00Z",
+  "note": "Delegated authority for the ops-sync verification window."
+}

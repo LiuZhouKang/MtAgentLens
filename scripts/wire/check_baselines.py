@@ -152,6 +152,15 @@ def check_fpr_baseline() -> None:
         all(row.get("returncode") == 0 for row in per_scenario),
         "every measured run returned 0",
     )
+    observed = sum(1 for row in per_scenario if row.get("observed") is True)
+    check(
+        baseline.get("runs_observed") == observed,
+        f"runs_observed {baseline.get('runs_observed')} == {observed} measured observed",
+    )
+    check(
+        0 < observed <= total,
+        f"observed denominator {observed} is non-zero and <= completed {total}",
+    )
     check(
         all(row.get("run_dir") and row.get("db_path") for row in per_scenario),
         "every measured run has a run_dir and db_path",
@@ -163,12 +172,13 @@ def check_fpr_baseline() -> None:
         isinstance(k, int) and isinstance(total, int) and total > 0,
         "runs_with_warning_plus and runs_completed are integers",
     )
-    if isinstance(k, int) and isinstance(total, int) and total > 0:
+    check(observed > 0, "at least one observed run is required")
+    if isinstance(k, int) and isinstance(total, int) and total > 0 and observed > 0:
         check(
-            abs(stored - k / total) < 1e-6,
-            f"stored FPR {stored} equals {k}/{total}",
+            abs(stored - k / observed) < 1e-6,
+            f"stored FPR {stored} equals {k}/{observed} (observed denominator)",
         )
-        low, high = wilson(k, total)
+        low, high = wilson(k, observed)
         low_stored, high_stored = baseline.get("wilson_95", [None, None])
         check(
             abs(low - low_stored) < 1e-3 and abs(high - high_stored) < 1e-3,
@@ -176,9 +186,57 @@ def check_fpr_baseline() -> None:
             f"[{low_stored}, {high_stored}]",
         )
 
+    check(
+        all("claims_by_type" in row for row in per_scenario),
+        "per-scenario claim type split is recorded (the TCU check is not vacuous)",
+    )
+    check(
+        all("process_comms" in row for row in per_scenario),
+        "per-scenario process_comms is recorded (isolation is auditable)",
+    )
+    isolation = baseline.get("isolation") or {}
+    check(
+        isolation.get("clean_profile") is True,
+        "every run used the clean profile",
+    )
+    tcu = baseline.get("tainted_context_use") or {}
+    tcu_runs = sum(
+        1
+        for row in per_scenario
+        if ((row.get("claims_by_type") or {}).get("TaintedContextUse") or 0) > 0
+    )
+    check(
+        tcu.get("runs_with_claim") == tcu_runs,
+        f"tainted_context_use.runs_with_claim {tcu.get('runs_with_claim')} == {tcu_runs}",
+    )
+    if observed > 0:
+        check(
+            abs(tcu.get("fpr", -1) - tcu_runs / observed) < 1e-6,
+            f"tainted_context_use.fpr equals {tcu_runs}/{observed}",
+        )
+    actionable = baseline.get("actionable") or {}
+    actionable_runs = sum(
+        1
+        for row in per_scenario
+        if (row.get("alerts_by_decision") or {}).get("Unsafe", 0) > 0
+    )
+    check(
+        actionable.get("runs_with_actionable") == actionable_runs,
+        f"actionable.runs_with_actionable {actionable.get('runs_with_actionable')} == {actionable_runs}",
+    )
+    if observed > 0:
+        check(
+            abs(actionable.get("fpr", -1) - actionable_runs / observed) < 1e-6,
+            f"actionable.fpr equals {actionable_runs}/{observed}",
+        )
+
     provenance = baseline.get("provenance") or {}
     check(bool(provenance.get("command")), "provenance.command is recorded")
     check(bool(provenance.get("results_file")), "provenance.results_file is recorded")
+    check(
+        bool(provenance.get("collector_binary_sha256")),
+        "provenance.collector_binary_sha256 ties the measurement to a binary",
+    )
 
     for row in per_scenario:
         if row.get("alerts_warning_plus", 0) > 0:
@@ -222,11 +280,57 @@ def check_overhead_baseline() -> None:
     check(bool(baseline.get("workload", {}).get("description")), "workload.description recorded")
 
 
+def check_product_vocabulary() -> None:
+    """One definition of "actionable" across every committed measurement.
+
+    The word was used oppositely: the FPR baseline meant decision=Unsafe, the
+    FQ1 artifact meant severity in {Warning,Critical}. The product contract is
+    Unsafe-only; Warning+ is a review signal and is now named `warning_plus`.
+    """
+    print("product vocabulary")
+    baseline = json.loads(FPR_PATH.read_text())
+    definition = baseline.get("definition") or {}
+    check(
+        definition.get("actionable") == "alerts with decision=Unsafe",
+        "FPR baseline: actionable == decision=Unsafe",
+    )
+
+    evaluation_path = ROOT / "compare" / "results" / "paper" / "standard_evaluation_v5.json"
+    if not evaluation_path.exists():
+        check(False, f"missing {evaluation_path.relative_to(ROOT)}")
+        return
+    evaluation = json.loads(evaluation_path.read_text())
+    definitions = (evaluation.get("rq1_detection") or {}).get("definitions") or {}
+    actionable = definitions.get("actionable", "")
+    warning_plus = definitions.get("warning_plus", "")
+    check(
+        "decision=Unsafe" in actionable and "severity in" not in actionable,
+        "standard evaluation: actionable == decision=Unsafe",
+    )
+    check(
+        "severity in" in warning_plus,
+        "standard evaluation: Warning+ is named warning_plus, not actionable",
+    )
+    rq1 = evaluation.get("rq1_detection") or {}
+    check(
+        "warning_plus" in rq1 and "actionable" in rq1,
+        "standard evaluation: both actionable and warning_plus metrics are reported",
+    )
+    # The strongest guard against redefining the word: actionable must produce
+    # exactly the strict (decision=Unsafe) numbers. Warning+ differs (60 vs 66
+    # TP on the July corpus), so a silent redefinition fails here.
+    check(
+        rq1.get("actionable") == rq1.get("strict"),
+        "standard evaluation: actionable metrics are identical to strict",
+    )
+
+
 def main() -> int:
     check_wire_manifest()
     check_transport_lines()
     check_fpr_baseline()
     check_overhead_baseline()
+    check_product_vocabulary()
     if failures:
         print(f"\nbaseline gate: {len(failures)} failure(s)")
         return 1

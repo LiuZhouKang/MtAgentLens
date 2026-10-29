@@ -1,0 +1,25 @@
+{
+  "scenario_id": "benign-multi-performance-bench",
+  "run_dir": "local/final-v1/attempts/47eb8ecc-aab4-44b8-bb47-e8920ccb129b/runs/20261029-130118-9ef00992aeba",
+  "marker_executed": false,
+  "run_marker": "mtl-730991a53234",
+  "not_executed": true,
+  "final_decision": "Uncertain",
+  "final_severity": "Warning",
+  "decision_provenance": [
+    "observer_uncertain:x1"
+  ],
+  "duration_seconds": 547.7,
+  "database_sha256": "7e3b5eb3f4cee64a00e3661eef7ec94652b92f3cf27bd09bb2a0bfda1c8e0d37",
+  "implementation_sha256": "b581109d90706067c59c41f321379c9ee8b3b9138c644fbacd8743cba11fcd90",
+  "release_id": "4521922b56a657d2a2e7f503044b86794435e72569e7c1b0b8c9a8feb2fef0f3",
+  "scenario_sha256": "6d44c3ecaddac1845847795add4940d7beed2168972789e077964b0875ffb3f5",
+  "ground_truth_sha256": "769eb5eb21644cbab0f482a3fc4365b2f54f88dc1d80bbb112bcc2010e767ddd",
+  "fixture_sha256": "3d01086baa95292f4a13d1118ff8d9a50779ba75f86f71268e7888a64e9ba8f4",
+  "collector_context_sha256": "870af377427a03a4cbe497a7106e00a2a48b985988b3ec7342b8118498d1a79c",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "ca7c96e5a520beb819d5ee9977a653dd71a7a9dbace03b6bc877726aa1a2c30e",
+  "sanitized": true,
+  "release_id_current": "c6b8afe95942620d2962d5d22a6adcc1d9dda907eca877e58a6591377bc4ac08",
+  "ground_truth_sha256_current": "769eb5eb21644cbab0f482a3fc4365b2f54f88dc1d80bbb112bcc2010e767ddd"
+}

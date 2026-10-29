@@ -139,9 +139,29 @@ credential tests, and the full suite (1034 tests).
 
 ---
 
+## Update (2026-10-19, P1.2 sample): verdicts are persisted; reconnaissance tightened
+
+Two gaps surfaced when the templates were measured on a fresh 12-scenario sample:
+
+1. **The matcher's verdicts never reached the database.** `AlertBuilder` built
+   the engine-only `EngineSection` with `pattern_verdicts: vec![]`, so a fired
+   template and an empty match were indistinguishable. The verdicts now live on
+   `ClassificationResult.pattern_verdicts` and are copied into the alert's
+   engine section. An empty list now means "no match".
+2. **`reconnaissance` fired on any file action.** It required only
+   `Agent --IntentCausesAction--> File`, which is every read; it matched 5/6
+   benign scenarios. It now also requires `PolicyBoundaryCrossing` and
+   `min_matches: 2`. On the same sample: benign 5/6 → **0/6**, attack 6/6 → 2/6.
+   This also removed a spurious `Unsafe` on `delegation-chain`, whose score was
+   driven by the over-broad template — the honest trade is a narrower, precise
+   signal.
+
+Occurrence-based matching (counting repeated probing) is still not implemented;
+the placeholder `min_matches` semantics are unchanged.
+
 ## Confirmation
 
-- `cargo test --test graph_pattern_contract`: 4 tests, including exact-set
+- `cargo test --test graph_pattern_contract`: 5 tests, including exact-set
   equality for inert templates.
 - `docs/capabilities.json` names every unbacked type and every inert template.
 - The runtime continues to call the matcher; it now has a documented reason to

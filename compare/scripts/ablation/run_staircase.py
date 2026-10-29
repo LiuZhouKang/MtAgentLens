@@ -23,8 +23,8 @@ from pathlib import Path
 import numpy as np
 
 PROJECT = Path(__file__).resolve().parents[3]
-TRACES = PROJECT / "compare/Dataset/FuxiBench/traces"
-MANIFEST = PROJECT / "compare/Dataset/FuxiBench/prompt_inputs/manifest.json"
+TRACES = PROJECT / "datasets/FuxiBench/traces"
+MANIFEST = PROJECT / "datasets/FuxiBench/prompt_inputs/manifest.json"
 OUTPUT_DIR = PROJECT / "compare/results/paper"
 DEBERTA_OFFLINE = OUTPUT_DIR / "deberta_offline_scores.json"
 CSV_DIR = OUTPUT_DIR / "tables"

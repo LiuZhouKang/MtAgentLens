@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 eunomia-bpf org.
 
-use crate::framework::analyzers::pipeline_contract::{PipelineStage, StageMetrics};
+use crate::framework::analyzers::stage_metrics::{PipelineStage, StageMetrics};
 use crate::framework::core::Event;
 use crate::responsibility::persistence::schema::open_db_read_only;
 use crate::responsibility::types::alert_types::ResponsibilityAlert;
@@ -11,7 +11,7 @@ use crate::server::api_types::{
 use crate::server::assets::FrontendAssets;
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Full, StreamBody};
-use hyper::body::{Body as _, Frame};
+use hyper::body::Frame;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode, body::Bytes};
@@ -38,6 +38,7 @@ pub struct HealthState {
     pub started_at: Instant,
     /// Whether the pipeline has processed at least one event.
     pub ready: bool,
+    pub terminal: Option<Arc<Mutex<crate::framework::health::TerminalHealth>>>,
 }
 
 impl HealthState {
@@ -46,7 +47,16 @@ impl HealthState {
             stage_metrics,
             started_at: Instant::now(),
             ready: false,
+            terminal: None,
         }
+    }
+
+    pub fn with_terminal(
+        mut self,
+        terminal: Arc<Mutex<crate::framework::health::TerminalHealth>>,
+    ) -> Self {
+        self.terminal = Some(terminal);
+        self
     }
 }
 
@@ -146,6 +156,18 @@ impl WebServer {
                     // 实时 SSE 走独立的流式服务；其余请求保持原样（Full body 收口 boxed）。
                     // service_fn 是 FnMut，必须在闭包内 clone 捕获值，再移入 async 块。
                     let is_live_events = req.uri().path() == "/api/live/events";
+                    // The streaming endpoint used to be dispatched before
+                    // `handle_request`, which is where the Host allow-list
+                    // lives. That left the decrypted-plaintext stream as the
+                    // one endpoint reachable through DNS rebinding. Check it
+                    // here too (and only allow the method a stream makes
+                    // sense for).
+                    let live_host_ok = host_is_allowed(
+                        req.headers()
+                            .get(hyper::header::HOST)
+                            .and_then(|v| v.to_str().ok()),
+                    );
+                    let live_method_ok = req.method() == Method::GET;
                     let assets = assets.clone();
                     let event_sender = event_sender.clone();
                     let log_file = log_file.clone();
@@ -153,6 +175,28 @@ impl WebServer {
                     let alert_sender = alert_sender.clone();
                     async move {
                         if is_live_events {
+                            if !live_host_ok {
+                                return Ok(boxed_full(
+                                    Response::builder()
+                                        .status(StatusCode::FORBIDDEN)
+                                        .header("Content-Type", "application/json")
+                                        .body(Full::new(Bytes::from_static(
+                                            br#"{"error":"forbidden_host"}"#,
+                                        )))
+                                        .unwrap(),
+                                ));
+                            }
+                            if !live_method_ok {
+                                return Ok(boxed_full(
+                                    Response::builder()
+                                        .status(StatusCode::METHOD_NOT_ALLOWED)
+                                        .header("Content-Type", "application/json")
+                                        .body(Full::new(Bytes::from_static(
+                                            br#"{"error":"method_not_allowed"}"#,
+                                        )))
+                                        .unwrap(),
+                                ));
+                            }
                             serve_live_events_api(event_sender, alert_sender).await
                         } else {
                             handle_request(req, assets, event_sender, log_file, hs)
@@ -218,9 +262,36 @@ async fn handle_request(
     health_state: Option<Arc<Mutex<HealthState>>>,
 ) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
     let path = req.uri().path();
+    // `/alerts?lean=1` asks for the list without the per-alert graph snapshot.
+    // The parameter used to be accepted by the frontend and ignored here, so
+    // the "cheap" path transferred megabytes of snapshots it never used.
+    let lean_alerts = req
+        .uri()
+        .query()
+        .is_some_and(|query| query.split('&').any(|pair| pair == "lean=1"));
+
+    // DNS rebinding: a page on any origin can resolve its own hostname to
+    // 127.0.0.1 and read the loopback API. CORS does not stop the initial
+    // request; validate the Host header instead. When the operator explicitly
+    // binds a non-loopback address, that address is the trust boundary.
+    let host = req
+        .headers()
+        .get(hyper::header::HOST)
+        .and_then(|value| value.to_str().ok());
+    if !host_is_allowed(host) {
+        return Ok(Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from(
+                serde_json::json!({ "error": "host_not_allowed" }).to_string(),
+            )))
+            .unwrap());
+    }
+
+    let is_read_method = |method: &Method| matches!(*method, Method::GET | Method::HEAD);
 
     // Health probe endpoints — fastest path, no DB/asset I/O
-    if req.method() == Method::GET {
+    if is_read_method(req.method()) {
         match path {
             "/health" | "/api/health" => {
                 return Ok(serve_health(health_state.as_ref()));
@@ -237,8 +308,15 @@ async fn handle_request(
 
     log::info!("📨 {} {}", req.method(), path);
 
-    if req.method() == Method::GET {
+    if is_read_method(req.method()) {
         if path == "/api/runs/active" {
+            // A `record`/`trace` process writes `<log_file>.responsibility.db`
+            // in the working directory and serves it from here. That artifact
+            // *is* the active run; without it the frontend can never leave
+            // replay mode (LIVE-01/LIVE-03).
+            if let Some(summary) = live_run_summary_value(log_file.as_deref()) {
+                return Ok(json_response(summary));
+            }
             let response = match resolve_active_run_dir() {
                 Ok(Some((run_id, run_dir))) => serve_run_summary_api(&run_dir, &run_id).await,
                 // 无活跃 run 返回 200 {data:null}（而非 404）——前端 fetchJson 解析为
@@ -253,20 +331,32 @@ async fn handle_request(
         }
 
         if let Some(run_route) = match_run_route(path) {
-            let response = match resolve_run_dir(run_route.run_id) {
-                Ok(run_dir) => match run_route.resource {
-                    RunResource::Summary => serve_run_summary_api(&run_dir, run_route.run_id).await,
-                    RunResource::Evaluation => serve_run_evaluation_api(&run_dir).await,
-                    RunResource::Alerts => serve_alerts_api(&run_dir).await,
-                    RunResource::Events => serve_run_events_api(&run_dir).await,
-                    RunResource::Snapshots => serve_run_snapshots_api(&run_dir).await,
-                    RunResource::Db => serve_run_db_api(&run_dir).await,
-                },
-                Err(_) => Ok(not_found_json(json_error(
-                    "run_not_found",
-                    run_route.run_id,
-                    "run",
-                ))),
+            // `live` is the synthetic run id for the process's own artifacts;
+            // it has no `env/runs/<id>` directory.
+            let response = if run_route.run_id == LIVE_RUN_ID {
+                serve_live_resource(run_route.resource, log_file.as_deref()).await
+            } else {
+                match resolve_run_dir(run_route.run_id) {
+                    Ok(run_dir) => match run_route.resource {
+                        RunResource::Summary => {
+                            serve_run_summary_api(&run_dir, run_route.run_id).await
+                        }
+                        RunResource::Evaluation => serve_run_evaluation_api(&run_dir).await,
+                        RunResource::Alerts => {
+                            serve_alerts_api(&run_dir, run_route.run_id, lean_alerts).await
+                        }
+                        RunResource::Events => serve_run_events_api(&run_dir).await,
+                        RunResource::Snapshots => serve_run_snapshots_api(&run_dir).await,
+                        RunResource::Db => serve_run_db_api(&run_dir).await,
+                        RunResource::Graph => serve_run_graph_api(&run_dir).await,
+                        RunResource::Evidence => serve_run_evidence_api(&run_dir).await,
+                    },
+                    Err(_) => Ok(not_found_json(json_error(
+                        "run_not_found",
+                        run_route.run_id,
+                        "run",
+                    ))),
+                }
             };
             return response;
         }
@@ -280,7 +370,9 @@ async fn handle_request(
         (&Method::GET, "/api/assets") => serve_assets_list(assets).await,
 
         // Serve static assets (catch-all for GET requests)
-        (&Method::GET, _) => serve_asset(assets, path).await,
+        (&Method::GET, _) => serve_asset(assets, path, false).await,
+        // Next.js prefetch probes pages with HEAD; answer like GET without a body.
+        (&Method::HEAD, _) => serve_asset(assets, path, true).await,
 
         // 404 for non-GET methods
         _ => {
@@ -294,17 +386,51 @@ async fn handle_request(
     }
 }
 
+fn host_is_allowed(host: Option<&str>) -> bool {
+    let bind = std::env::var("MTAGENTLENS_BIND").unwrap_or_else(|_| "127.0.0.1".to_string());
+    if bind != "127.0.0.1" && bind != "::1" && bind != "localhost" {
+        // The operator chose a network-visible bind; host allow-listing is
+        // their network policy, not ours.
+        return true;
+    }
+    let Some(host) = host else {
+        // HTTP/1.0 clients may omit Host; they cannot be DNS-rebound.
+        return true;
+    };
+    let host = host
+        .rsplit_once(':')
+        .map(|(name, _)| name)
+        .unwrap_or(host)
+        .trim_matches(['[', ']']);
+    matches!(host, "127.0.0.1" | "localhost" | "::1")
+}
+
 async fn serve_asset(
     assets: Arc<FrontendAssets>,
     path: &str,
+    head_only: bool,
 ) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
     if let Some(content) = assets.get(path) {
         let content_type = assets.get_content_type(path);
+        let length = content.len();
         log::info!("✅ Serving asset: {} ({})", path, content_type);
+        let body = if head_only {
+            Bytes::new()
+        } else {
+            Bytes::from(content.to_vec())
+        };
+        // HTML is the routing shell: a one-year cache kept serving deleted
+        // routes after an upgrade. Hashed assets can be immutable.
+        let cache = if path.ends_with(".html") || path == "/" {
+            "no-cache"
+        } else {
+            "public, max-age=31536000, immutable"
+        };
         Ok(Response::builder()
             .header("Content-Type", content_type)
-            .header("Cache-Control", "public, max-age=31536000")
-            .body(Full::new(Bytes::from(content.to_vec())))
+            .header("Cache-Control", cache)
+            .header("Content-Length", length.to_string())
+            .body(Full::new(body))
             .unwrap())
     } else {
         log::info!("❌ Asset not found: {}", path);
@@ -428,10 +554,13 @@ async fn serve_runs_index_api() -> std::result::Result<Response<Full<Bytes>>, In
         entries.push(run_summary_value(&run_dir, run_id, &summary));
     }
 
+    // Run ids start with a timestamp, so descending order is newest first —
+    // the order the frontend's "first run with data" picker expects.
     entries.sort_by(|left, right| {
-        left.get("run_id")
+        right
+            .get("run_id")
             .and_then(Value::as_str)
-            .cmp(&right.get("run_id").and_then(Value::as_str))
+            .cmp(&left.get("run_id").and_then(Value::as_str))
     });
 
     Ok(json_response(Value::Array(entries)))
@@ -521,6 +650,10 @@ enum RunResource {
     /// Raw SQLite artifact (collector.responsibility.db) — the frontend loads
     /// it directly with sql.js, so the backend just streams the file.
     Db,
+    /// Latest responsibility graph snapshot (nodes+edges).
+    Graph,
+    /// Correlation evidence + intents + actions + non-link diagnostics.
+    Evidence,
 }
 
 struct RunRoute<'a> {
@@ -531,6 +664,13 @@ struct RunRoute<'a> {
 fn match_run_route(path: &str) -> Option<RunRoute<'_>> {
     let trimmed = path.trim_matches('/');
     let segments: Vec<&str> = trimmed.split('/').collect();
+    // Never let a URL segment resolve outside env/runs (path traversal).
+    if segments
+        .iter()
+        .any(|segment| *segment == ".." || *segment == ".")
+    {
+        return None;
+    }
     match segments.as_slice() {
         ["api", "runs", run_id] if !run_id.is_empty() => Some(RunRoute {
             run_id,
@@ -555,6 +695,14 @@ fn match_run_route(path: &str) -> Option<RunRoute<'_>> {
         ["api", "runs", run_id, "snapshots"] if !run_id.is_empty() => Some(RunRoute {
             run_id,
             resource: RunResource::Snapshots,
+        }),
+        ["api", "runs", run_id, "graph"] if !run_id.is_empty() => Some(RunRoute {
+            run_id,
+            resource: RunResource::Graph,
+        }),
+        ["api", "runs", run_id, "evidence"] if !run_id.is_empty() => Some(RunRoute {
+            run_id,
+            resource: RunResource::Evidence,
         }),
         _ => None,
     }
@@ -602,7 +750,18 @@ fn resolve_active_run_dir() -> std::io::Result<Option<(String, PathBuf)>> {
             Ok(bytes) => bytes,
             Err(_) => continue,
         };
-        if serde_json::from_slice::<Value>(&summary_bytes).is_err() {
+        let Ok(summary) = serde_json::from_slice::<Value>(&summary_bytes) else {
+            continue;
+        };
+        // A run is active only when it says so. Picking the lexicographically
+        // largest completed archive made every installed system look "live"
+        // forever (LIVE-01).
+        let state = summary
+            .get("state")
+            .or_else(|| summary.get("run_status"))
+            .or_else(|| summary.get("status"))
+            .and_then(Value::as_str);
+        if !matches!(state, Some("running") | Some("active")) {
             continue;
         }
 
@@ -615,6 +774,97 @@ fn resolve_active_run_dir() -> std::io::Result<Option<(String, PathBuf)>> {
     }
 
     Ok(candidate)
+}
+
+/// Synthetic run id for the artifacts this process is writing right now.
+const LIVE_RUN_ID: &str = "live";
+
+/// The responsibility DB a `record`/`trace` process writes next to its log.
+fn live_db_path(log_file: Option<&str>) -> Option<PathBuf> {
+    let log = log_file?;
+    let candidate = PathBuf::from(format!("{log}.responsibility.db"));
+    candidate.is_file().then_some(candidate)
+}
+
+fn live_events_path(log_file: Option<&str>) -> Option<PathBuf> {
+    let log = log_file?;
+    let path = PathBuf::from(log);
+    path.is_file().then_some(path)
+}
+
+/// Summary for the in-process live run, or `None` when nothing is being
+/// written. `started_at_ns` comes from the DB's own `runs` row, so the
+/// frontend's run clock has a real anchor instead of a missing field.
+fn live_run_summary_value(log_file: Option<&str>) -> Option<Value> {
+    let db = live_db_path(log_file);
+    let events = live_events_path(log_file);
+    if db.is_none() && events.is_none() {
+        return None;
+    }
+    let started_at_ns = db.as_ref().and_then(|path| {
+        crate::responsibility::persistence::schema::open_responsibility_db_read_only(
+            &path.to_string_lossy(),
+        )
+        .ok()
+        .and_then(|conn| {
+            conn.query_row(
+                "SELECT started_at_ns FROM runs ORDER BY started_at_ns DESC LIMIT 1",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .ok()
+        })
+    });
+    Some(serde_json::json!({
+        "run_id": LIVE_RUN_ID,
+        "state": "running",
+        "run_status": "running",
+        "started_at_ns": started_at_ns,
+        "scenario_ids": [],
+        "artifact_availability": {
+            "evaluation": false,
+            "alerts": db.is_some(),
+            "correlation_evidence": db.is_some(),
+            "events": events.is_some(),
+            "database": db.is_some()
+        }
+    }))
+}
+
+async fn serve_live_resource(
+    resource: RunResource,
+    log_file: Option<&str>,
+) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
+    let Some(db_path) = live_db_path(log_file) else {
+        return Ok(not_found_json(json_error(
+            "artifact_unavailable",
+            LIVE_RUN_ID,
+            "responsibility_db",
+        )));
+    };
+    match resource {
+        RunResource::Summary => Ok(json_response(
+            live_run_summary_value(log_file).unwrap_or_else(|| serde_json::json!({ "data": null })),
+        )),
+        RunResource::Evaluation => Ok(not_found_json(json_error(
+            "artifact_unavailable",
+            LIVE_RUN_ID,
+            "evaluation",
+        ))),
+        RunResource::Alerts => serve_alerts_from_db(&db_path, LIVE_RUN_ID, false).await,
+        RunResource::Events => match live_events_path(log_file) {
+            Some(path) => serve_events_file(&path, LIVE_RUN_ID).await,
+            None => Ok(not_found_json(json_error(
+                "artifact_unavailable",
+                LIVE_RUN_ID,
+                "events",
+            ))),
+        },
+        RunResource::Snapshots => serve_snapshots_from_db(&db_path, LIVE_RUN_ID).await,
+        RunResource::Db => serve_db_file(&db_path, LIVE_RUN_ID).await,
+        RunResource::Graph => serve_graph_from_db(&db_path, LIVE_RUN_ID).await,
+        RunResource::Evidence => serve_evidence_from_db(&db_path, LIVE_RUN_ID).await,
+    }
 }
 
 async fn serve_run_summary_api(
@@ -645,6 +895,51 @@ async fn serve_run_summary_api(
     Ok(json_response(run_summary_value(run_dir, run_id, &summary)))
 }
 
+/// The run's canonical verdict (schema v3), if recorded.
+///
+/// The UI must show this rather than "the first alert row": a run can carry a
+/// provisional Unsafe and a final Safe, and only one of them is the answer.
+fn read_final_verdict(run_dir: &Path, run_id: &str) -> Option<Value> {
+    let db_path = resolve_responsibility_db_path(run_dir)?;
+    let conn = crate::responsibility::persistence::schema::open_responsibility_db_read_only(
+        &db_path.to_string_lossy(),
+    )
+    .ok()?;
+    // A run directory is named by the collector/benchmark, while `runs.run_id`
+    // is the runtime UUID. With exactly one run in the database the directory
+    // name is an alias, not a different run; with several runs the requested
+    // id must match one exactly, otherwise the verdict is unknown (never
+    // borrowed from another run).
+    let target = {
+        let mut stmt = conn.prepare("SELECT run_id FROM runs").ok()?;
+        let ids: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .ok()?
+            .filter_map(Result::ok)
+            .collect();
+        match ids.as_slice() {
+            [] => return None,
+            [only] => only.clone(),
+            many if many.iter().any(|id| id == run_id) => run_id.to_string(),
+            _ => return None,
+        }
+    };
+    let mut stmt = conn
+        .prepare(
+            "SELECT final_decision, final_severity, final_authority, final_alert_id \
+             FROM runs WHERE run_id = ?1 AND final_decision IS NOT NULL LIMIT 1",
+        )
+        .ok()?;
+    let mut rows = stmt.query([target]).ok()?;
+    let row = rows.next().ok()??;
+    Some(serde_json::json!({
+        "decision": row.get::<_, String>(0).ok()?,
+        "severity": row.get::<_, Option<String>>(1).ok()?,
+        "authority": row.get::<_, Option<String>>(2).ok()?,
+        "alert_id": row.get::<_, Option<String>>(3).ok()?,
+    }))
+}
+
 fn run_summary_value(run_dir: &Path, run_id: &str, summary: &Value) -> Value {
     let scenario_ids = summary
         .get("scenario_ids")
@@ -654,7 +949,26 @@ fn run_summary_value(run_dir: &Path, run_id: &str, summary: &Value) -> Value {
         .get("status")
         .cloned()
         .or_else(|| summary.get("run_status").cloned())
+        .or_else(|| summary.get("state").cloned())
         .unwrap_or_else(|| Value::String("unknown".to_string()));
+    let state = summary
+        .get("state")
+        .cloned()
+        .unwrap_or_else(|| run_status.clone());
+    let started_at_ns = resolve_responsibility_db_path(run_dir).and_then(|path| {
+        crate::responsibility::persistence::schema::open_responsibility_db_read_only(
+            &path.to_string_lossy(),
+        )
+        .ok()
+        .and_then(|conn| {
+            conn.query_row(
+                "SELECT started_at_ns FROM runs ORDER BY started_at_ns DESC LIMIT 1",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .ok()
+        })
+    });
 
     // Availability must describe what the endpoints can actually serve. The
     // causal artifacts are no longer produced by the collector, so they do not
@@ -680,10 +994,15 @@ fn run_summary_value(run_dir: &Path, run_id: &str, summary: &Value) -> Value {
         .as_ref()
         .is_some_and(|path| table_is_queryable(path, "correlation_evidence"));
 
+    let final_verdict = read_final_verdict(run_dir, run_id);
+
     let payload = serde_json::json!({
         "run_id": run_id,
         "scenario_ids": scenario_ids,
+        "state": state,
         "run_status": run_status,
+        "started_at_ns": started_at_ns,
+        "final_verdict": final_verdict,
         "artifact_availability": {
             "evaluation": run_dir.join("evaluation.json").exists(),
             "alerts": live_alerts_available,
@@ -770,6 +1089,18 @@ async fn serve_run_snapshots_api(
             "responsibility_db",
         )));
     };
+    serve_snapshots_from_db(&db_path, run_id).await
+}
+
+async fn serve_snapshots_from_db(
+    db_path: &Path,
+    run_id: &str,
+) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
+    let selected = match resolved_run_id(db_path, run_id) {
+        Ok(id) => id,
+        Err(response) => return Ok(response),
+    };
+    let run_id = selected.as_str();
     let conn = match open_db_read_only(&db_path.to_string_lossy()) {
         Ok(conn) => conn,
         Err(err) => {
@@ -779,30 +1110,29 @@ async fn serve_run_snapshots_api(
         }
     };
 
-    // One run per database: all 301 archived collector databases carry exactly
-    // one `runs` row, so "all snapshots in this file" is "this run's snapshots".
-    let mut stmt = match conn.prepare(
-        "SELECT snapshot_id, timestamp_ns, nodes_json, edges_json, metrics_json
+    // Reusing `-o <log>` appends a second run to the same database. Without
+    // the filter the timeline merged both runs, so a replay showed the
+    // previous run's graph as if it belonged to this one. The fallback keeps
+    // pre-v3 archives (one run, NULL run_id) readable.
+    let sql = "SELECT snapshot_id, timestamp_ns, nodes_json, edges_json, metrics_json
          FROM graph_snapshots
-         ORDER BY timestamp_ns ASC, snapshot_id ASC",
-    ) {
-        Ok(stmt) => stmt,
-        Err(err) => {
-            return Ok(internal_error_json(format!(
-                "snapshots_schema_error: {err}"
-            )));
-        }
+         WHERE run_id = ?1
+         ORDER BY timestamp_ns ASC, snapshot_id ASC";
+    let collect = |sql: &str, params: &[&dyn rusqlite::ToSql]| {
+        conn.prepare(sql).and_then(|mut stmt| {
+            let rows = stmt.query_map(params, |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                ))
+            })?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()
+        })
     };
-
-    let rows = match stmt.query_map([], |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, i64>(1)?,
-            row.get::<_, String>(2)?,
-            row.get::<_, String>(3)?,
-            row.get::<_, String>(4)?,
-        ))
-    }) {
+    let mut all = match collect(sql, &[&run_id]) {
         Ok(rows) => rows,
         Err(err) => {
             return Ok(internal_error_json(format!(
@@ -810,17 +1140,33 @@ async fn serve_run_snapshots_api(
             )));
         }
     };
+    if all.is_empty() {
+        // Legacy archive: exactly one run, snapshots may carry a NULL run_id.
+        let single_run: i64 = conn
+            .query_row("SELECT COUNT(*) FROM runs", [], |row| row.get(0))
+            .unwrap_or(0);
+        // 0 runs: a pre-v2 artifact with snapshots but no run header.
+        // 1 run: an archive whose snapshot rows predate the run_id column.
+        // 2+: a database that really holds several runs — never mix them.
+        if single_run <= 1 {
+            all = match collect(
+                "SELECT snapshot_id, timestamp_ns, nodes_json, edges_json, metrics_json
+                 FROM graph_snapshots ORDER BY timestamp_ns ASC, snapshot_id ASC",
+                &[],
+            ) {
+                Ok(rows) => rows,
+                Err(err) => {
+                    return Ok(internal_error_json(format!(
+                        "snapshots_schema_error: {err}"
+                    )));
+                }
+            };
+        }
+    }
+    let rows = all;
 
     let mut snapshots = Vec::new();
-    for row in rows {
-        let (snapshot_id, timestamp_ns, nodes_json, edges_json, metrics_json) = match row {
-            Ok(row) => row,
-            Err(err) => {
-                return Ok(internal_error_json(format!(
-                    "snapshots_schema_error: {err}"
-                )));
-            }
-        };
+    for (snapshot_id, timestamp_ns, nodes_json, edges_json, metrics_json) in rows {
         // Malformed JSON in our own artifact is corruption, not "no data".
         let parse = |raw: &str, what: &str| {
             serde_json::from_str::<serde_json::Value>(raw)
@@ -851,6 +1197,236 @@ async fn serve_run_snapshots_api(
     Ok(json_response(serde_json::Value::Array(snapshots)))
 }
 
+async fn serve_run_graph_api(
+    run_dir: &Path,
+) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
+    let run_id = run_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown-run");
+    let Some(db_path) = resolve_responsibility_db_path(run_dir) else {
+        return Ok(not_found_json(json_error(
+            "artifact_unavailable",
+            run_id,
+            "responsibility_db",
+        )));
+    };
+    serve_graph_from_db(&db_path, run_id).await
+}
+
+async fn serve_run_evidence_api(
+    run_dir: &Path,
+) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
+    let run_id = run_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown-run");
+    let Some(db_path) = resolve_responsibility_db_path(run_dir) else {
+        return Ok(not_found_json(json_error(
+            "artifact_unavailable",
+            run_id,
+            "responsibility_db",
+        )));
+    };
+    serve_evidence_from_db(&db_path, run_id).await
+}
+
+/// Latest responsibility graph for one run.
+///
+/// The snapshot table is the same source the frontend's sql.js path reads;
+/// `graph_nodes` is empty in ~14% of archived DBs, so it is only a fallback.
+async fn serve_graph_from_db(
+    db_path: &Path,
+    requested_run_id: &str,
+) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
+    let selected = match resolved_run_id(db_path, requested_run_id) {
+        Ok(id) => id,
+        Err(response) => return Ok(response),
+    };
+    let requested_run_id = selected.as_str();
+    let conn = match open_db_read_only(&db_path.to_string_lossy()) {
+        Ok(conn) => conn,
+        Err(err) => return Ok(internal_error_json(format!("graph_schema_error: {err}"))),
+    };
+    let latest = {
+        let mut stmt = match conn.prepare(
+            "SELECT nodes_json, edges_json FROM graph_snapshots
+             WHERE run_id = ?1
+             ORDER BY timestamp_ns DESC, snapshot_id DESC LIMIT 1",
+        ) {
+            Ok(stmt) => stmt,
+            Err(err) => return Ok(internal_error_json(format!("graph_schema_error: {err}"))),
+        };
+        let mut rows = match stmt.query([requested_run_id]) {
+            Ok(rows) => rows,
+            Err(err) => return Ok(internal_error_json(format!("graph_schema_error: {err}"))),
+        };
+        match rows.next() {
+            Ok(Some(row)) => match (row.get::<_, String>(0), row.get::<_, String>(1)) {
+                (Ok(nodes), Ok(edges)) => Some((nodes, edges)),
+                (Err(err), _) | (_, Err(err)) => {
+                    return Ok(internal_error_json(format!("graph_schema_error: {err}")));
+                }
+            },
+            Ok(None) => None,
+            Err(err) => return Ok(internal_error_json(format!("graph_schema_error: {err}"))),
+        }
+    };
+
+    // Legacy archive: one run (or none) and snapshot rows whose run_id does
+    // not match the requested id. Only then may the unfiltered query run; a
+    // multi-run database must never be mixed.
+    let latest = match latest {
+        Some(found) => Some(found),
+        None => {
+            let runs: i64 = conn
+                .query_row("SELECT COUNT(*) FROM runs", [], |row| row.get(0))
+                .unwrap_or(0);
+            if runs <= 1 {
+                conn.query_row(
+                    "SELECT nodes_json, edges_json FROM graph_snapshots
+                     ORDER BY timestamp_ns DESC, snapshot_id DESC LIMIT 1",
+                    [],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                )
+                .ok()
+            } else {
+                None
+            }
+        }
+    };
+
+    if let Some((nodes_json, edges_json)) = latest {
+        let parse = |raw: &str, what: &str| {
+            serde_json::from_str::<Value>(raw)
+                .map_err(|err| format!("graph_schema_error: {what}: {err}"))
+        };
+        let nodes = match parse(&nodes_json, "nodes_json") {
+            Ok(value) => value,
+            Err(err) => return Ok(internal_error_json(err)),
+        };
+        let edges = match parse(&edges_json, "edges_json") {
+            Ok(value) => value,
+            Err(err) => return Ok(internal_error_json(err)),
+        };
+        return Ok(json_response(serde_json::json!({
+            "nodes": nodes,
+            "edges": edges,
+        })));
+    }
+
+    // No snapshot yet (very short run): fall back to the node/edge tables.
+    let reader = match crate::responsibility::persistence::PersistenceReader::open(
+        &db_path.to_string_lossy(),
+    ) {
+        Ok(reader) => reader,
+        Err(err) => return Ok(internal_error_json(format!("graph_schema_error: {err}"))),
+    };
+    let run_id = match resolve_db_run_id(&reader, requested_run_id) {
+        Ok(Some(run_id)) => run_id,
+        Ok(None) => requested_run_id.to_string(),
+        Err(response) => return Ok(response),
+    };
+    match reader.get_graph(&run_id) {
+        Ok((nodes, edges)) => {
+            let (nodes, edges) = match (serde_json::to_value(nodes), serde_json::to_value(edges)) {
+                (Ok(nodes), Ok(edges)) => (nodes, edges),
+                (Err(err), _) | (_, Err(err)) => {
+                    return Ok(internal_error_json(format!("graph_schema_error: {err}")));
+                }
+            };
+            Ok(json_response(serde_json::json!({
+                "nodes": nodes,
+                "edges": edges,
+            })))
+        }
+        Err(err) => Ok(internal_error_json(format!("graph_schema_error: {err}"))),
+    }
+}
+
+/// Resolve the same run for every resource. A single-run archive may use a
+/// directory alias; a multi-run database requires an exact id or `live`.
+fn resolve_db_run_id(
+    reader: &crate::responsibility::persistence::PersistenceReader,
+    requested_run_id: &str,
+) -> Result<Option<String>, Response<Full<Bytes>>> {
+    let runs = reader
+        .list_runs()
+        .map_err(|e| internal_error_json(format!("run_schema_error: {e}")))?;
+    let ids = if runs.is_empty() {
+        reader
+            .list_alert_run_ids()
+            .map_err(|e| internal_error_json(format!("run_schema_error: {e}")))?
+    } else {
+        runs.into_iter().map(|r| r.run_id).collect::<Vec<_>>()
+    };
+    match ids.as_slice() {
+        [] => Ok(None),
+        [only] => Ok(Some(only.clone())),
+        many if requested_run_id == LIVE_RUN_ID => Ok(Some(many[0].clone())),
+        many if many.iter().any(|id| id == requested_run_id) => {
+            Ok(Some(requested_run_id.to_owned()))
+        }
+        many => Err(structured_error_json(
+            StatusCode::CONFLICT,
+            "ambiguous_run",
+            "The requested run does not identify one run in this database".to_owned(),
+            serde_json::json!({"requested_run_id": requested_run_id, "run_ids": many}),
+        )),
+    }
+}
+
+fn resolved_run_id(db_path: &Path, requested: &str) -> Result<String, Response<Full<Bytes>>> {
+    let reader =
+        crate::responsibility::persistence::PersistenceReader::open(&db_path.to_string_lossy())
+            .map_err(|e| internal_error_json(format!("run_schema_error: {e}")))?;
+    Ok(resolve_db_run_id(&reader, requested)?.unwrap_or_else(|| requested.to_owned()))
+}
+
+async fn serve_evidence_from_db(
+    db_path: &Path,
+    requested_run_id: &str,
+) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
+    let reader = match crate::responsibility::persistence::PersistenceReader::open(
+        &db_path.to_string_lossy(),
+    ) {
+        Ok(reader) => reader,
+        Err(err) => return Ok(internal_error_json(format!("evidence_schema_error: {err}"))),
+    };
+    let run_id = match resolve_db_run_id(&reader, requested_run_id) {
+        Ok(Some(run_id)) => run_id,
+        Ok(None) => requested_run_id.to_string(),
+        Err(response) => return Ok(response),
+    };
+    let evidence = match reader.get_evidence(&run_id) {
+        Ok(value) => value,
+        Err(err) => return Ok(internal_error_json(format!("evidence_schema_error: {err}"))),
+    };
+    let intents = match reader.get_intents(&run_id) {
+        Ok(value) => value,
+        Err(err) => return Ok(internal_error_json(format!("evidence_schema_error: {err}"))),
+    };
+    let actions = match reader.get_actions(&run_id) {
+        Ok(value) => value,
+        Err(err) => return Ok(internal_error_json(format!("evidence_schema_error: {err}"))),
+    };
+    let non_links = match reader.get_non_link_diagnostics(&run_id) {
+        Ok(value) => value,
+        Err(err) => return Ok(internal_error_json(format!("evidence_schema_error: {err}"))),
+    };
+    match serde_json::to_value(serde_json::json!({
+        "evidence": evidence,
+        "intents": intents,
+        "actions": actions,
+        "non_links": non_links,
+    })) {
+        Ok(value) => Ok(json_response(value)),
+        Err(err) => Ok(internal_error_json(format!(
+            "evidence_serialization_error: {err}"
+        ))),
+    }
+}
+
 async fn serve_run_events_api(
     run_dir: &Path,
 ) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
@@ -866,7 +1442,14 @@ async fn serve_run_events_api(
         )));
     };
 
-    let content = match tokio::fs::read_to_string(&events_path).await {
+    serve_events_file(&events_path, run_id).await
+}
+
+async fn serve_events_file(
+    events_path: &Path,
+    run_id: &str,
+) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
+    let content = match tokio::fs::read_to_string(events_path).await {
         Ok(content) => content,
         Err(err) => {
             return Ok(internal_error_json(format!(
@@ -917,6 +1500,8 @@ async fn serve_run_events_api(
 
 async fn serve_alerts_api(
     run_dir: &Path,
+    requested_run_id: &str,
+    lean: bool,
 ) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
     let db_path = resolve_db_for_alerts(run_dir);
     let Some(db_path) = db_path else {
@@ -930,6 +1515,14 @@ async fn serve_alerts_api(
         )));
     };
 
+    serve_alerts_from_db(&db_path, requested_run_id, lean).await
+}
+
+async fn serve_alerts_from_db(
+    db_path: &Path,
+    requested_run_id: &str,
+    lean: bool,
+) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
     let reader = match crate::responsibility::persistence::PersistenceReader::open(
         &db_path.to_string_lossy(),
     ) {
@@ -941,9 +1534,38 @@ async fn serve_alerts_api(
         }
     };
 
-    match reader.get_alerts_all() {
+    let target_run_id = match resolve_db_run_id(&reader, requested_run_id) {
+        Ok(id) => id,
+        Err(response) => return Ok(response),
+    };
+
+    let alerts = match target_run_id {
+        Some(run_id) => reader.get_alerts_desc(&run_id),
+        None => Ok(Vec::new()),
+    };
+    match alerts {
         Ok(alerts) => match serde_json::to_value(alerts) {
-            Ok(value) => Ok(json_response(value)),
+            Ok(mut value) => {
+                if lean && let Some(rows) = value.as_array_mut() {
+                    for row in rows {
+                        if let Some(object) = row.as_object_mut() {
+                            // Keep the field (the wire type requires it) but
+                            // drop the bulk: the caller already has the graph.
+                            object.insert(
+                                "graph_snapshot".to_string(),
+                                serde_json::json!({
+                                    "snapshot_id": "",
+                                    "timestamp_ns": 0,
+                                    "nodes": [],
+                                    "edges": [],
+                                    "metrics": {}
+                                }),
+                            );
+                        }
+                    }
+                }
+                Ok(json_response(value))
+            }
             Err(error) => Ok(internal_error_json(format!(
                 "alerts_serialization_error: {error}"
             ))),
@@ -1002,16 +1624,99 @@ async fn serve_run_db_api(
         )));
     };
 
-    match tokio::fs::read(&db_path).await {
-        Ok(bytes) => Ok(Response::builder()
+    serve_db_file(&db_path, run_id).await
+}
+
+fn export_run_snapshot(db_path: &Path, requested: &str) -> Result<Vec<u8>, Response<Full<Bytes>>> {
+    use rusqlite::backup::{Backup, StepResult};
+    let source = open_db_read_only(&db_path.to_string_lossy())
+        .map_err(|e| internal_error_json(format!("database_snapshot_error: {e}")))?;
+    let output = tempfile::NamedTempFile::new()
+        .map_err(|e| internal_error_json(format!("database_snapshot_error: {e}")))?;
+    let snapshot_result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        let mut destination = rusqlite::Connection::open(output.path())?;
+        // Freeze the source read transaction across backup steps, including WAL.
+        source.execute_batch("BEGIN DEFERRED; SELECT count(*) FROM sqlite_schema;")?;
+        {
+            let backup = Backup::new(&source, &mut destination)?;
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+            loop {
+                if std::time::Instant::now() >= deadline {
+                    return Err("snapshot backup deadline exceeded".into());
+                }
+                match backup.step(256)? {
+                    StepResult::Done => break,
+                    StepResult::More => {}
+                    StepResult::Busy | StepResult::Locked => {
+                        std::thread::sleep(std::time::Duration::from_millis(10))
+                    }
+                    _ => return Err("unsupported backup status".into()),
+                }
+            }
+        }
+        destination.execute_batch("PRAGMA journal_mode=DELETE;")?;
+        Ok(())
+    })();
+    snapshot_result.map_err(|e| internal_error_json(format!("database_snapshot_error: {e}")))?;
+    // Resolve against the frozen copy, so selection and export cannot race a
+    // concurrent RunStart on the live database.
+    let selected = resolved_run_id(output.path(), requested)?;
+    let conn = rusqlite::Connection::open(output.path())
+        .map_err(|e| internal_error_json(format!("database_snapshot_error: {e}")))?;
+    let prune = (|| -> rusqlite::Result<()> {
+        conn.execute_batch("PRAGMA foreign_keys=OFF; PRAGMA secure_delete=ON; BEGIN IMMEDIATE;")?;
+        let tables = conn
+            .prepare(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+            )?
+            .query_map([], |r| r.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let multiple_runs: bool =
+            conn.query_row("SELECT COUNT(*) > 1 FROM runs", [], |r| r.get(0))?;
+        for table in tables {
+            let quoted = format!("\"{}\"", table.replace('"', "\"\""));
+            let has_run_id = conn
+                .prepare(&format!("PRAGMA table_info({quoted})"))?
+                .query_map([], |r| r.get::<_, String>(1))?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+                .iter()
+                .any(|c| c == "run_id");
+            if has_run_id {
+                conn.execute(
+                    &format!("DELETE FROM {quoted} WHERE run_id <> ?1 OR (?2 AND run_id IS NULL)"),
+                    rusqlite::params![&selected, multiple_runs],
+                )?;
+            }
+        }
+        if conn.prepare("PRAGMA foreign_key_check")?.exists([])? {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        conn.execute_batch("COMMIT; PRAGMA foreign_keys=ON; VACUUM;")?;
+        Ok(())
+    })();
+    prune.map_err(|e| internal_error_json(format!("database_snapshot_error: {e}")))?;
+    drop(conn);
+    std::fs::read(output.path())
+        .map_err(|e| internal_error_json(format!("database_snapshot_error: {e}")))
+}
+
+async fn serve_db_file(
+    db_path: &Path,
+    run_id: &str,
+) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
+    let path = db_path.to_path_buf();
+    let requested = run_id.to_owned();
+    match tokio::task::spawn_blocking(move || export_run_snapshot(&path, &requested)).await {
+        Ok(Ok(bytes)) => Ok(Response::builder()
             .status(StatusCode::OK)
             .header("Content-Type", "application/x-sqlite3")
             .header("Content-Length", bytes.len().to_string())
             .header("X-MtAgentLens-Artifact", "collector.responsibility.db")
             .body(Full::new(Bytes::from(bytes)))
             .unwrap()),
+        Ok(Err(response)) => Ok(response),
         Err(err) => Ok(internal_error_json(format!(
-            "failed to read responsibility db: {err}"
+            "database_snapshot_error: {err}"
         ))),
     }
 }
@@ -1054,7 +1759,17 @@ fn resolve_artifact_from_summary(run_dir: &Path, key: &str) -> Option<PathBuf> {
     let value: serde_json::Value = serde_json::from_str(&summary).ok()?;
     let artifact = value.get("artifacts")?.get(key)?.as_str()?;
     let path = PathBuf::from(artifact);
-    if path.exists() { Some(path) } else { None }
+    // A run summary is data, not code. A denylist of system directories is
+    // not a boundary: `~/.ssh/id_rsa` is neither forbidden nor inside the
+    // run. Allow only files inside this run's directory, after resolution
+    // (which also rejects a symlink pointing elsewhere).
+    let run_root = run_dir.canonicalize().ok()?;
+    let canonical = path.canonicalize().ok()?;
+    if canonical.starts_with(&run_root) && canonical.is_file() {
+        Some(canonical)
+    } else {
+        None
+    }
 }
 
 fn resolve_events_artifact_path(run_dir: &Path) -> Option<PathBuf> {
@@ -1104,10 +1819,33 @@ fn serve_live() -> Response<Full<Bytes>> {
 /// Returns HTTP 200 when the pipeline has processed at least one event.
 /// Returns HTTP 503 (Service Unavailable) during initial startup or drain.
 fn serve_ready(health_state: Option<&Arc<Mutex<HealthState>>>) -> Response<Full<Bytes>> {
-    let ready = health_state
-        .and_then(|hs| hs.lock().ok())
-        .map(|guard| guard.ready)
-        .unwrap_or(false);
+    // No producer means readiness cannot be asserted. Answering 200 with
+    // `pipeline_metrics: unavailable` told every orchestrator "ready" while
+    // nothing had been observed; the honest answer is 503 + the reason.
+    let (ready, metrics) = match health_state.and_then(|hs| hs.lock().ok()) {
+        Some(guard) => match &guard.terminal {
+            Some(terminal) => (
+                terminal.lock().is_ok_and(|terminal| terminal.is_ready()),
+                "terminal_consumer",
+            ),
+            None => (guard.ready, "available"),
+        },
+        None => {
+            return Response::builder()
+                .status(StatusCode::SERVICE_UNAVAILABLE)
+                .header("Content-Type", "application/json")
+                .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                .body(Full::new(Bytes::from(
+                    serde_json::json!({
+                        "status": "unavailable",
+                        "pipeline_metrics": "unavailable",
+                        "reason": "no StageMetrics producer is wired"
+                    })
+                    .to_string(),
+                )))
+                .unwrap();
+        }
+    };
 
     if ready {
         Response::builder()
@@ -1115,7 +1853,8 @@ fn serve_ready(health_state: Option<&Arc<Mutex<HealthState>>>) -> Response<Full<
             .header("Content-Type", "application/json")
             .header("Cache-Control", "no-cache, no-store, must-revalidate")
             .body(Full::new(Bytes::from(
-                serde_json::json!({"status": "ready"}).to_string(),
+                serde_json::json!({"status": "ready", "pipeline_metrics": metrics,
+                    "capture_quality": crate::framework::runners::common::capture_health_snapshot()}).to_string(),
             )))
             .unwrap()
     } else {
@@ -1124,7 +1863,8 @@ fn serve_ready(health_state: Option<&Arc<Mutex<HealthState>>>) -> Response<Full<
             .header("Content-Type", "application/json")
             .header("Cache-Control", "no-cache, no-store, must-revalidate")
             .body(Full::new(Bytes::from(
-                serde_json::json!({"status": "not_ready", "reason": "pipeline has not processed any events yet"})
+                serde_json::json!({"status": "not_ready", "reason": "terminal consumer has not processed events, is stopping, or its metrics are unavailable",
+                    "capture_quality": crate::framework::runners::common::capture_health_snapshot()})
                     .to_string(),
             )))
             .unwrap()
@@ -1171,45 +1911,45 @@ fn serve_health(health_state: Option<&Arc<Mutex<HealthState>>>) -> Response<Full
             }
         }
         None => {
-            // No health state configured — return baseline (all stages idle)
-            let mut stages_map = HashMap::new();
-            for stage in &[
-                "Preprocessing",
-                "CausalLinking",
-                "InjectionDetection",
-                "AnomalyDetection",
-                "AlertEnrichment",
-                "Output",
-            ] {
-                stages_map.insert(
-                    stage.to_string(),
-                    StageMetricsSnapshot {
-                        events_processed: 0,
-                        events_emitted: 0,
-                        errors: 0,
-                        avg_latency_us: 0,
-                        p99_latency_us: 0,
-                        buffer_size: 0,
-                        status: "idle".to_string(),
-                    },
-                );
-            }
-
+            // No producer is wired for StageMetrics. Reporting idle stages and
+            // `Healthy` would be fabricated health; say so explicitly.
             HealthResponse {
                 schema_version: HEALTH_SCHEMA_VERSION.to_string(),
-                status: HealthStatus::Healthy,
+                status: HealthStatus::Degraded,
                 uptime_seconds: 0,
                 version: build_version,
                 degraded_stages: None,
-                warnings: None,
-                stages: stages_map,
+                warnings: Some(vec![
+                    "pipeline metrics unavailable: no StageMetrics producer is wired".to_string(),
+                ]),
+                stages: HashMap::new(),
             }
         }
     };
 
-    json_response(serde_json::to_value(&response).unwrap_or_else(|_| {
+    let mut response = serde_json::to_value(&response).unwrap_or_else(|_| {
         serde_json::json!({"error": "serialization_failed", "schema_version": HEALTH_SCHEMA_VERSION})
-    }))
+    });
+    let capture_quality = crate::framework::runners::common::capture_health_snapshot();
+    response["capture_quality"] = capture_quality.clone();
+    let terminal = health_state
+        .and_then(|state| state.lock().ok())
+        .and_then(|state| state.terminal.clone())
+        .and_then(|terminal| terminal.lock().ok().map(|terminal| terminal.snapshot()));
+    response["terminal"] = terminal.unwrap_or(serde_json::Value::Null);
+    if response["terminal"].is_null()
+        || response["terminal"]["errors"].as_u64().unwrap_or(0) > 0
+        || response["terminal"]["stopped"] == true
+        || capture_quality["status"] != "healthy"
+    {
+        if response["status"] == "healthy" {
+            response["status"] = "degraded".into();
+        }
+        response["warnings"] = serde_json::json!([
+            "Only terminal routing is measured; upstream stage metrics, queue lag, and terminal p99 are unavailable. Source completeness remains unknown until final diagnostics are received."
+        ]);
+    }
+    json_response(response)
 }
 
 /// Compute overall pipeline health status from per-stage metrics.
@@ -1218,7 +1958,7 @@ fn serve_health(health_state: Option<&Arc<Mutex<HealthState>>>) -> Response<Full
 /// - `degraded` if any other stage is degraded/error.
 /// - `healthy` otherwise.
 fn compute_overall_status(state: &HealthState) -> HealthStatus {
-    use crate::framework::analyzers::pipeline_contract::StageStatus;
+    use crate::framework::analyzers::stage_metrics::StageStatus;
 
     let mut any_degraded = false;
 
@@ -1303,9 +2043,9 @@ fn json_error(error: &str, run_id: &str, artifact: &str) -> serde_json::Value {
 mod tests {
     use super::{
         handle_request, match_run_route, resolve_responsibility_db_path, resolve_run_dir,
-        serve_alerts_api, serve_events_api, serve_live_events_api, serve_run_db_api,
-        serve_run_evaluation_api, serve_run_events_api, serve_run_snapshots_api,
-        serve_run_summary_api, serve_runs_index_api,
+        serve_alerts_api, serve_asset, serve_events_api, serve_live_events_api, serve_run_db_api,
+        serve_run_evaluation_api, serve_run_events_api, serve_run_evidence_api,
+        serve_run_graph_api, serve_run_snapshots_api, serve_run_summary_api, serve_runs_index_api,
     };
     use crate::server::assets::FrontendAssets;
     use http_body_util::{BodyExt, Empty};
@@ -1319,6 +2059,87 @@ mod tests {
     use tempfile::{NamedTempFile, TempDir};
     use tokio::io::duplex;
     use tokio::sync::broadcast;
+    #[tokio::test]
+    async fn readiness_uses_terminal_work_and_health_preserves_unknown_metrics() {
+        use super::{HealthState, serve_health, serve_ready};
+        use std::collections::HashMap;
+        let terminal = Arc::new(Mutex::new(
+            crate::framework::health::TerminalHealth::default(),
+        ));
+        let state = Arc::new(Mutex::new(
+            HealthState::new(HashMap::new()).with_terminal(terminal.clone()),
+        ));
+        assert_eq!(
+            serve_ready(Some(&state)).status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        terminal
+            .lock()
+            .unwrap()
+            .record_processed(std::time::Duration::from_micros(20), 0, 0);
+        assert_eq!(serve_ready(Some(&state)).status(), StatusCode::OK);
+        let body = serve_health(Some(&state))
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["terminal"]["events_processed"], 1);
+        assert_eq!(body["terminal"]["avg_processing_us"], 20.0);
+        assert!(body["terminal"]["p99_processing_us"].is_null());
+        assert!(body["terminal"]["queue_lag"].is_null());
+        assert_eq!(body["stages"], serde_json::json!({}));
+        assert!(body["capture_quality"]["sources"].is_object());
+        terminal.lock().unwrap().stopped = true;
+        assert_eq!(
+            serve_ready(Some(&state)).status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+    }
+
+    #[test]
+    fn summary_artifacts_must_live_inside_the_run_directory() {
+        use std::fs;
+
+        let temp = TempDir::new().unwrap();
+        let run = temp.path();
+        // A secret outside the run directory is rejected even though it is
+        // readable and is not on any "system directory" denylist.
+        let outside = NamedTempFile::new().unwrap();
+        let summary = json!({
+            "artifacts": {
+                "responsibility_db": outside.path().to_string_lossy(),
+                "trace_log": run.join("trace.log").to_string_lossy(),
+            }
+        });
+        fs::write(run.join("summary.json"), summary.to_string()).unwrap();
+        assert!(
+            super::resolve_artifact_from_summary(run, "responsibility_db").is_none(),
+            "a summary must not point the server at an arbitrary local file"
+        );
+        fs::write(run.join("trace.log"), b"log").unwrap();
+        assert!(super::resolve_artifact_from_summary(run, "trace_log").is_some());
+    }
+
+    #[test]
+    fn host_header_is_loopback_only_by_default() {
+        assert!(super::host_is_allowed(Some("127.0.0.1:7395")));
+        assert!(super::host_is_allowed(Some("localhost:7395")));
+        assert!(super::host_is_allowed(Some("[::1]:7395")));
+        assert!(!super::host_is_allowed(Some("evil.example")));
+        assert!(!super::host_is_allowed(Some("127.0.0.1.evil.example")));
+    }
+
+    #[tokio::test]
+    async fn head_asset_returns_headers_without_a_body() {
+        let assets = Arc::new(FrontendAssets::new().unwrap());
+        let response = serve_asset(assets, "/console.html", true).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(response.headers().get("content-length").is_some());
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert!(body.is_empty(), "HEAD must not send a body");
+    }
     #[tokio::test]
     async fn serve_live_events_api_streams_raw_event_frames() {
         use crate::framework::core::Event;
@@ -1546,6 +2367,9 @@ mod tests {
                     "run_id": "test-run",
                     "scenario_ids": ["scenario-a", "scenario-b"],
                     "run_status": "completed",
+                    "state": "completed",
+                    "started_at_ns": null,
+                "final_verdict": null,
                     "artifact_availability": {
                         "evaluation": true,
                         "alerts": true,
@@ -1601,6 +2425,29 @@ mod tests {
         assert_run_bound_payload_is_not_legacy_sample_data(&body);
     }
     #[tokio::test]
+    async fn runs_index_lists_newest_first() {
+        let older = RunFixture::new("20260101-000000-aaaa");
+        older.write_summary(json!({
+            "run_id": "20260101-000000-aaaa",
+            "scenario_ids": [],
+            "state": "completed"
+        }));
+        let newer = RunFixture::new_in_repo(&older.repo_root, "20260102-000000-bbbb");
+        newer.write_summary(json!({
+            "run_id": "20260102-000000-bbbb",
+            "scenario_ids": [],
+            "state": "completed"
+        }));
+        let _test_lock = test_env_lock();
+        let _guard = older.enter_repo_root();
+
+        let response = issue_get("/api/runs").await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = read_json_body(response).await;
+        assert_eq!(body[0]["run_id"], "20260102-000000-bbbb");
+        assert_eq!(body[1]["run_id"], "20260101-000000-aaaa");
+    }
+    #[tokio::test]
     async fn handle_request_routes_runs_index_skips_malformed_run_summaries() {
         let valid = RunFixture::new("valid-run");
         valid.write_summary(json!({
@@ -1622,6 +2469,9 @@ mod tests {
                     "run_id": "valid-run",
                     "scenario_ids": ["scenario-a"],
                     "run_status": "completed",
+                    "state": "completed",
+                    "started_at_ns": null,
+                "final_verdict": null,
                     "artifact_availability": {
                         "evaluation": false,
                         "alerts": false,
@@ -1677,6 +2527,20 @@ mod tests {
         assert!(match_run_route("/api/events").is_none());
         assert!(match_run_route("/api/runs/test-run").is_some());
         assert!(match_run_route("/api/runs/test-run/events").is_some());
+        assert_eq!(
+            match_run_route("/api/runs/test-run/graph")
+                .map(|route| matches!(route.resource, super::RunResource::Graph)),
+            Some(true)
+        );
+        assert_eq!(
+            match_run_route("/api/runs/test-run/evidence")
+                .map(|route| matches!(route.resource, super::RunResource::Evidence)),
+            Some(true)
+        );
+        assert!(match_run_route("/api/runs/test-run/graph/extra").is_none());
+        // Path traversal is not a run id.
+        assert!(match_run_route("/api/runs/../alerts").is_none());
+        assert!(match_run_route("/api/runs/./alerts").is_none());
     }
     #[test]
     fn db_route_is_distinct_from_collection_routes() {
@@ -1707,12 +2571,116 @@ mod tests {
         assert!(resolve_responsibility_db_path(fixture.run_dir()).is_none());
     }
     #[tokio::test]
-    async fn serve_run_db_api_streams_the_raw_responsibility_db() {
+    async fn run_evidence_and_graph_do_not_fall_back_to_a_different_run() {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path().to_string_lossy();
+        let conn =
+            crate::responsibility::persistence::schema::open_responsibility_db(&path).unwrap();
+        conn.execute_batch("INSERT INTO runs(run_id,started_at_ns) VALUES('old',1),('new',2);
+            INSERT INTO graph_nodes(node_id,node_type,timestamp_ns,phase,run_id) VALUES('new-only','Agent',1,'Authoritative','new');
+            INSERT INTO intents(intent_id,pid,process_start_time_ns,message_id,tool_name,intent_class,parse_state,authority_source,timestamp_ns,run_id) VALUES('new-intent',1,1,'m','Read','SideEffect','Complete','HttpResponseToolUse',1,'new');").unwrap();
+        let graph = read_json_body(
+            super::serve_graph_from_db(file.path(), "old")
+                .await
+                .unwrap(),
+        )
+        .await;
+        assert!(graph["nodes"].as_array().unwrap().is_empty());
+        let evidence = read_json_body(
+            super::serve_evidence_from_db(file.path(), "old")
+                .await
+                .unwrap(),
+        )
+        .await;
+        assert!(evidence["intents"].as_array().unwrap().is_empty());
+        for response in [
+            super::serve_graph_from_db(file.path(), "unknown")
+                .await
+                .unwrap(),
+            super::serve_evidence_from_db(file.path(), "unknown")
+                .await
+                .unwrap(),
+            super::serve_snapshots_from_db(file.path(), "unknown")
+                .await
+                .unwrap(),
+        ] {
+            assert_eq!(response.status(), StatusCode::CONFLICT);
+        }
+    }
+
+    #[tokio::test]
+    async fn database_download_excludes_unowned_legacy_rows_only_for_multi_run_files() {
+        for multi_run in [false, true] {
+            let file = NamedTempFile::new().unwrap();
+            let conn = crate::responsibility::persistence::schema::open_responsibility_db(
+                &file.path().to_string_lossy(),
+            )
+            .unwrap();
+            conn.execute_batch(
+                "INSERT INTO runs(run_id,started_at_ns) VALUES('selected',1);
+                CREATE TABLE legacy_aux(run_id TEXT, payload TEXT);
+                INSERT INTO legacy_aux VALUES(NULL,'UNOWNED_LEGACY_SYNTHETIC_SENTINEL');",
+            )
+            .unwrap();
+            if multi_run {
+                conn.execute_batch("INSERT INTO runs(run_id,started_at_ns) VALUES('other',2)")
+                    .unwrap();
+            }
+            let response = super::serve_db_file(file.path(), "selected").await.unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let bytes = response.into_body().collect().await.unwrap().to_bytes();
+            let sentinel_present = bytes
+                .windows(b"UNOWNED_LEGACY_SYNTHETIC_SENTINEL".len())
+                .any(|part| part == b"UNOWNED_LEGACY_SYNTHETIC_SENTINEL");
+            assert_eq!(sentinel_present, !multi_run);
+        }
+    }
+
+    #[tokio::test]
+    async fn database_download_includes_committed_wal_and_only_the_selected_run() {
+        let file = NamedTempFile::new().unwrap();
+        let conn = crate::responsibility::persistence::schema::open_responsibility_db(
+            &file.path().to_string_lossy(),
+        )
+        .unwrap();
+        conn.execute_batch("PRAGMA wal_autocheckpoint=0; PRAGMA wal_checkpoint(TRUNCATE);
+            INSERT INTO runs(run_id,started_at_ns) VALUES('old',1),('new',2);
+            INSERT INTO process_events(pid,start_time_ns,comm,timestamp_ns,run_id) VALUES(1,1,'OTHER_RUN_SYNTHETIC_PRIVATE_SENTINEL',1,'new');").unwrap();
+        let response = super::serve_db_file(file.path(), "old").await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        assert!(
+            !bytes
+                .windows(b"OTHER_RUN_SYNTHETIC_PRIVATE_SENTINEL".len())
+                .any(|w| w == b"OTHER_RUN_SYNTHETIC_PRIVATE_SENTINEL"),
+            "another run must not remain in the SQLite freelist"
+        );
+        let download = NamedTempFile::new().unwrap();
+        std::fs::write(download.path(), bytes).unwrap();
+        let snapshot = rusqlite::Connection::open(download.path()).unwrap();
+        let rows: Vec<String> = snapshot
+            .prepare("SELECT run_id FROM runs")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(rows, vec!["old"]);
+    }
+
+    #[tokio::test]
+    async fn serve_run_db_api_streams_a_valid_responsibility_snapshot() {
         let fixture = RunFixture::new("run-db-api");
         let collector_dir = fixture.run_dir().join("collector");
         std::fs::create_dir_all(&collector_dir).unwrap();
-        let db_bytes = b"SQLite format 3\x00fake-db-content-abc123";
-        std::fs::write(collector_dir.join("collector.responsibility.db"), db_bytes).unwrap();
+        let conn = crate::responsibility::persistence::schema::open_responsibility_db(
+            &collector_dir
+                .join("collector.responsibility.db")
+                .to_string_lossy(),
+        )
+        .unwrap();
+        conn.execute_batch("INSERT INTO runs(run_id,started_at_ns) VALUES('actual-run',1)")
+            .unwrap();
 
         let response = serve_run_db_api(fixture.run_dir()).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -1725,7 +2693,14 @@ mod tests {
             "collector.responsibility.db"
         );
         let body = response.into_body().collect().await.unwrap().to_bytes();
-        assert_eq!(&body[..], db_bytes);
+        assert!(body.starts_with(b"SQLite format 3\x00"));
+        let file = NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), &body).unwrap();
+        let snapshot = rusqlite::Connection::open(file.path()).unwrap();
+        let run: String = snapshot
+            .query_row("SELECT run_id FROM runs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(run, "actual-run");
     }
     #[tokio::test]
     async fn serve_run_db_api_404s_when_no_db_is_present() {
@@ -1788,6 +2763,9 @@ mod tests {
                 "run_id": "test-run",
                 "scenario_ids": ["scenario-a", "scenario-b"],
                 "run_status": "completed",
+                "state": "completed",
+                "started_at_ns": null,
+                "final_verdict": null,
                 "artifact_availability": {
                     "evaluation": true,
                     "alerts": true,
@@ -1805,7 +2783,7 @@ mod tests {
         fixture.write_summary(json!({
             "run_id": "run-2026-04-28-b",
             "scenario_ids": ["scenario-b"],
-            "status": "completed"
+            "state": "running"
         }));
         fixture.write_evaluation(json!({"ok": true}));
         fixture.write_alerts_db(&[]);
@@ -1835,7 +2813,10 @@ mod tests {
             json!({
                 "run_id": "run-2026-04-28-b",
                 "scenario_ids": ["scenario-b"],
-                "run_status": "completed",
+                "state": "running",
+                "run_status": "running",
+                "started_at_ns": null,
+                "final_verdict": null,
                 "artifact_availability": {
                     "evaluation": true,
                     "alerts": true,
@@ -1865,7 +2846,7 @@ mod tests {
         fixture.write_summary(json!({
             "run_id": "real-run",
             "scenario_ids": ["scenario-real"],
-            "status": "completed"
+            "state": "running"
         }));
 
         let reserved = RunFixture::new_in_repo(&fixture.repo_root, "active");
@@ -1885,7 +2866,10 @@ mod tests {
             json!({
                 "run_id": "real-run",
                 "scenario_ids": ["scenario-real"],
-                "run_status": "completed",
+                "state": "running",
+                "run_status": "running",
+                "started_at_ns": null,
+                "final_verdict": null,
                 "artifact_availability": {
                     "evaluation": false,
                     "alerts": false,
@@ -1969,7 +2953,9 @@ mod tests {
             }),
         ]);
 
-        let response = serve_alerts_api(fixture.run_dir()).await.unwrap();
+        let response = serve_alerts_api(fixture.run_dir(), "test-run", false)
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
             response.headers().get("content-type").unwrap(),
@@ -1990,6 +2976,281 @@ mod tests {
         assert_eq!(alerts[0]["authority"], "Authoritative");
         assert!(alerts[0].get("phase").is_some());
         assert!(alerts[0].get("involved_agents").is_some());
+    }
+    /// ARCH-06 primary path: the route names an `env/runs/<dir>` directory,
+    /// while alerts are keyed by the collector's UUID. The DB's single `runs`
+    /// row is the only reliable mapping, so a directory name must still work.
+    #[tokio::test]
+    async fn get_run_alerts_resolves_directory_to_db_run_uuid() {
+        let fixture = RunFixture::new("20260716-020833-690cf50f");
+        fixture.write_summary(json!({
+            "run_id": "20260716-020833-690cf50f",
+            "scenario_ids": [],
+            "status": "completed"
+        }));
+        let db_path = fixture
+            .run_dir()
+            .join("collector")
+            .join("collector.responsibility.db");
+        std::fs::create_dir_all(db_path.parent().unwrap()).unwrap();
+        {
+            let conn = crate::responsibility::persistence::open_responsibility_db(
+                &db_path.to_string_lossy(),
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO runs (run_id, started_at_ns, scenario_id, mode, collector_version)
+                 VALUES ('89de8320-29b7-4297-a5c3-fb89c5f3fb5e', 1784138915394460690,
+                         NULL, 'record', 'test')",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO responsibility_alerts (
+                    alert_id, timestamp_ns, display_profile, decision, severity, confidence,
+                    authority, reasoning, title, summary, action_hint, primary_agent_id,
+                    involved_agents_json, engine_section_json, timeline_json,
+                    graph_metrics_json, phase, provisional_ref, run_id
+                ) VALUES ('alert-1', 100, 'ObserverJudged', 'Unsafe', 'Warning', 0.8,
+                    'Authoritative', '', 't', '', '', 'agent-1', '[]', '{}',
+                    '{\"steps\":[],\"total_duration_ms\":0}', '{}',
+                    'Provisional { timestamp_ns: 0 }', NULL,
+                    '89de8320-29b7-4297-a5c3-fb89c5f3fb5e')",
+                [],
+            )
+            .unwrap();
+        }
+
+        let response = serve_alerts_api(fixture.run_dir(), "20260716-020833-690cf50f", false)
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = read_json_body(response).await;
+        let alerts = body.as_array().expect("alerts response must be an array");
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0]["alert_id"], "alert-1");
+    }
+    /// ARCH-06: the route names a run directory, alerts are keyed by the
+    /// collector run UUID. A DB holding two runs must answer with exactly the
+    /// requested run's alerts, never with a merged list.
+    #[tokio::test]
+    async fn get_run_alerts_filters_by_run_id_when_db_holds_several_runs() {
+        let fixture = RunFixture::new("multi-run");
+        fixture.write_summary(json!({
+            "run_id": "multi-run",
+            "scenario_ids": [],
+            "status": "completed"
+        }));
+        let db_path = fixture
+            .run_dir()
+            .join("collector")
+            .join("collector.responsibility.db");
+        std::fs::create_dir_all(db_path.parent().unwrap()).unwrap();
+        {
+            let conn = crate::responsibility::persistence::open_responsibility_db(
+                &db_path.to_string_lossy(),
+            )
+            .unwrap();
+            let insert = |alert_id: &str, run_id: &str, timestamp_ns: i64| {
+                conn.execute(
+                    "INSERT INTO responsibility_alerts (
+                        alert_id, timestamp_ns, display_profile, decision, severity, confidence,
+                        authority, reasoning, title, summary, action_hint, primary_agent_id,
+                        involved_agents_json, engine_section_json, timeline_json,
+                        graph_metrics_json, phase, provisional_ref, run_id
+                    ) VALUES (?1, ?2, 'ObserverJudged', 'Unsafe', 'Warning', 0.8,
+                        'Authoritative', '', ?3, '', '', 'agent-1', '[]', '{}',
+                        '{\"steps\":[],\"total_duration_ms\":0}', '{}',
+                        'Provisional { timestamp_ns: 0 }', NULL, ?4)",
+                    rusqlite::params![alert_id, timestamp_ns, alert_id, run_id],
+                )
+                .unwrap();
+            };
+            insert("alert-a", "run-a", 100);
+            insert("alert-b", "run-b", 200);
+        }
+
+        let response = serve_alerts_api(fixture.run_dir(), "run-a", false)
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = read_json_body(response).await;
+        let alerts = body.as_array().expect("alerts response must be an array");
+        assert_eq!(alerts.len(), 1, "must not mix runs: {body}");
+        assert_eq!(alerts[0]["alert_id"], "alert-a");
+
+        // An unknown directory cannot be mapped to either run: refuse loudly
+        // instead of serving a mixture.
+        // `live` always means the newest run in the file.
+        let response = serve_alerts_api(fixture.run_dir(), "live", false)
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = read_json_body(response).await;
+        let alerts = body.as_array().expect("alerts response must be an array");
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0]["alert_id"], "alert-b");
+
+        let response = serve_alerts_api(fixture.run_dir(), "unknown-dir", false)
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+        let body = read_json_body(response).await;
+        assert_eq!(body["error"], "ambiguous_run");
+        let run_ids = body["details"]["run_ids"].as_array().unwrap();
+        assert_eq!(run_ids.len(), 2);
+    }
+    fn seed_responsibility_db(fixture: &RunFixture, run_id: &str) -> rusqlite::Connection {
+        let db_path = fixture
+            .run_dir()
+            .join("collector")
+            .join("collector.responsibility.db");
+        std::fs::create_dir_all(db_path.parent().unwrap()).unwrap();
+        let conn =
+            crate::responsibility::persistence::open_responsibility_db(&db_path.to_string_lossy())
+                .unwrap();
+        conn.execute(
+            "INSERT INTO runs (run_id, started_at_ns) VALUES (?1, 100)",
+            rusqlite::params![run_id],
+        )
+        .unwrap();
+        conn
+    }
+    #[tokio::test]
+    async fn graph_api_returns_latest_snapshot_nodes_and_edges() {
+        let fixture = RunFixture::new("graph-run");
+        let conn = seed_responsibility_db(&fixture, "uuid-graph");
+        conn.execute(
+            "INSERT INTO graph_snapshots (snapshot_id, timestamp_ns, nodes_json, edges_json, metrics_json, run_id)
+             VALUES ('snap-old', 100, '[{\"id\":\"old\"}]', '[]', '{}', 'uuid-graph')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO graph_snapshots (snapshot_id, timestamp_ns, nodes_json, edges_json, metrics_json, run_id)
+             VALUES ('snap-new', 200, '[{\"id\":\"new-1\"},{\"id\":\"new-2\"}]', '[{\"id\":\"e1\"}]', '{}', 'uuid-graph')",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let response = serve_run_graph_api(fixture.run_dir()).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = read_json_body(response).await;
+        assert_eq!(body["nodes"].as_array().unwrap().len(), 2);
+        assert_eq!(body["nodes"][0]["id"], "new-1");
+        assert_eq!(body["edges"].as_array().unwrap().len(), 1);
+    }
+    #[tokio::test]
+    async fn evidence_api_returns_evidence_intents_actions_and_non_links() {
+        let fixture = RunFixture::new("evidence-run");
+        let conn = seed_responsibility_db(&fixture, "uuid-evidence");
+        conn.execute(
+            "INSERT INTO intents (intent_id, pid, process_start_time_ns, message_id, tool_name,
+                tool_args_json, intent_class, parse_state, primary_matching_eligible,
+                authority_source, timestamp_ns, run_id)
+             VALUES ('i1', 7, 1, 'm1', 'Read', '[]', 'ReadOnly', 'Parsed', 1,
+                     'Assistant', 100, 'uuid-evidence')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO actions (action_id, pid, process_start_time_ns, action_type,
+                normalized_args_json, derivation_mode, signal_class, timestamp_ns, run_id)
+             VALUES ('a1', 7, 1, 'FileRead', '[]', 'Direct', 'File', 110, 'uuid-evidence')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO correlation_evidence (evidence_id, intent_id, action_id, match_level,
+                confidence, matched_fields_json, derivation_mode, phase, timestamp_ns, run_id)
+             VALUES ('e1', 'i1', 'a1', 'L1Exact', 0.9, '{}', 'Direct', 'Provisional', 120,
+                     'uuid-evidence')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO non_link_diagnostics (diagnostic_id, intent_id, action_id, reason,
+                timestamp_ns, run_id)
+             VALUES ('n1', 'i1', NULL, 'NoCandidate', 130, 'uuid-evidence')",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let response = serve_run_evidence_api(fixture.run_dir()).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = read_json_body(response).await;
+        assert_eq!(body["evidence"].as_array().unwrap().len(), 1);
+        assert_eq!(body["intents"].as_array().unwrap().len(), 1);
+        assert_eq!(body["actions"].as_array().unwrap().len(), 1);
+        assert_eq!(body["non_links"].as_array().unwrap().len(), 1);
+        assert_eq!(body["evidence"][0]["evidence_id"], "e1");
+    }
+    #[tokio::test]
+    async fn completed_archive_is_not_reported_as_active() {
+        let fixture = RunFixture::new("finished-run");
+        fixture.write_summary(json!({
+            "run_id": "finished-run",
+            "scenario_ids": [],
+            "state": "completed"
+        }));
+        let _test_lock = test_env_lock();
+        let _guard = fixture.enter_repo_root();
+
+        let response = issue_get("/api/runs/active").await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(read_json_body(response).await, json!({ "data": null }));
+    }
+    #[tokio::test]
+    async fn live_run_is_active_and_serves_its_alerts() {
+        let fixture = RunFixture::new("live-fixture");
+        let _test_lock = test_env_lock();
+        let _guard = fixture.enter_repo_root();
+        // `record` writes both artifacts in the working directory.
+        std::fs::write(fixture.repo_root.join("record.log"), "{\"timestamp\":1}\n").unwrap();
+        let db_path = fixture.repo_root.join("record.log.responsibility.db");
+        let conn =
+            crate::responsibility::persistence::open_responsibility_db(&db_path.to_string_lossy())
+                .unwrap();
+        conn.execute(
+            "INSERT INTO runs (run_id, started_at_ns) VALUES ('uuid-live', 1784138915394460690)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO responsibility_alerts (
+                alert_id, timestamp_ns, display_profile, decision, severity, confidence,
+                authority, reasoning, title, summary, action_hint, primary_agent_id,
+                involved_agents_json, engine_section_json, timeline_json,
+                graph_metrics_json, phase, provisional_ref, run_id
+            ) VALUES ('live-alert', 100, 'ObserverJudged', 'Unsafe', 'Warning', 0.8,
+                'Authoritative', '', 't', '', '', 'agent-1', '[]', '{}',
+                '{\"steps\":[],\"total_duration_ms\":0}', '{}',
+                'Provisional { timestamp_ns: 0 }', NULL, 'uuid-live')",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let summary = super::live_run_summary_value(Some("record.log")).expect("live run");
+        assert_eq!(summary["run_id"], "live");
+        assert_eq!(summary["state"], "running");
+        assert_eq!(summary["started_at_ns"], 1784138915394460690i64);
+        assert_eq!(summary["artifact_availability"]["alerts"], true);
+
+        let response = super::serve_live_resource(super::RunResource::Alerts, Some("record.log"))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let alerts = read_json_body(response).await;
+        assert_eq!(alerts.as_array().unwrap().len(), 1);
+        assert_eq!(alerts[0]["alert_id"], "live-alert");
+
+        // Once the artifacts are gone the run is no longer active.
+        std::fs::remove_file(fixture.repo_root.join("record.log")).unwrap();
+        std::fs::remove_file(&db_path).unwrap();
+        assert!(super::live_run_summary_value(Some("record.log")).is_none());
     }
     #[tokio::test]
     async fn get_run_alerts_returns_500_on_live_schema_mismatch() {
@@ -2014,7 +3275,9 @@ mod tests {
         .unwrap();
         drop(conn);
 
-        let response = serve_alerts_api(fixture.run_dir()).await.unwrap();
+        let response = serve_alerts_api(fixture.run_dir(), "test-run-bad-alerts", false)
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
         let body = read_json_body(response).await;
         assert!(
@@ -2108,6 +3371,54 @@ mod tests {
         assert!(frames[1]["edges"].is_array());
         assert_eq!(frames[1]["metrics"]["agent_count"], 1);
     }
+    #[tokio::test]
+    async fn snapshots_are_scoped_to_the_resolved_run() {
+        let fixture = RunFixture::new("run-a");
+        fixture
+            .write_summary(json!({"run_id": "run-a", "scenario_ids": [], "status": "completed"}));
+        let db_path = fixture
+            .run_dir()
+            .join("collector")
+            .join("collector.responsibility.db");
+        std::fs::create_dir_all(db_path.parent().unwrap()).unwrap();
+        let conn = crate::responsibility::persistence::schema::open_responsibility_db(
+            &db_path.to_string_lossy(),
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO runs (run_id, started_at_ns) VALUES ('run-a', 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO runs (run_id, started_at_ns) VALUES ('run-b', 2)",
+            [],
+        )
+        .unwrap();
+        for (snapshot_id, run_id, timestamp_ns) in
+            [("frame-a", "run-a", 10i64), ("frame-b", "run-b", 20i64)]
+        {
+            conn.execute(
+                "INSERT INTO graph_snapshots
+                 (snapshot_id, timestamp_ns, nodes_json, edges_json, metrics_json, run_id)
+                 VALUES (?1, ?2, '[]', '[]', '{}', ?3)",
+                rusqlite::params![snapshot_id, timestamp_ns, run_id],
+            )
+            .unwrap();
+        }
+        drop(conn);
+
+        let response = serve_run_snapshots_api(fixture.run_dir()).await.unwrap();
+        let body = read_json_body(response).await;
+        let frames = body.as_array().expect("snapshots must be an array");
+        assert_eq!(
+            frames.len(),
+            1,
+            "a multi-run database must not merge timelines: {frames:?}"
+        );
+        assert_eq!(frames[0]["snapshot_id"], "frame-a");
+    }
+
     #[tokio::test]
     async fn test_snapshots_api_returns_empty_array_when_the_live_table_is_empty() {
         let fixture = RunFixture::new("test-run-no-snap");
@@ -2249,7 +3560,7 @@ mod tests {
     #[tokio::test]
     async fn get_run_events_reads_summary_declared_trace_log_artifact() {
         let fixture = RunFixture::new("test-run-summary-trace-log");
-        let external_trace_log = fixture.repo_root.join("external-trace.log");
+        let external_trace_log = fixture.run_dir().join("external-trace.log");
         std::fs::write(
             &external_trace_log,
             format!(
@@ -2284,6 +3595,9 @@ mod tests {
                 "run_id": "test-run-summary-trace-log",
                 "scenario_ids": ["scenario-a"],
                 "run_status": "completed",
+                "state": "completed",
+                "started_at_ns": null,
+                "final_verdict": null,
                 "artifact_availability": {
                     "evaluation": false,
                     "alerts": false,
@@ -2313,7 +3627,7 @@ mod tests {
     #[tokio::test]
     async fn get_run_alerts_reads_summary_declared_alerts_db_artifact() {
         let fixture = RunFixture::new("test-run-summary-alerts-db");
-        let external_alerts_db = fixture.repo_root.join("external.alerts.db");
+        let external_alerts_db = fixture.run_dir().join("external.alerts.db");
         fixture.write_summary(json!({
             "run_id": "test-run-summary-alerts-db",
             "scenario_ids": ["scenario-a"],
@@ -2350,6 +3664,9 @@ mod tests {
                 "run_id": "test-run-summary-alerts-db",
                 "scenario_ids": ["scenario-a"],
                 "run_status": "completed",
+                "state": "completed",
+                "started_at_ns": null,
+                "final_verdict": null,
                 "artifact_availability": {
                     "evaluation": false,
                     "alerts": true,
@@ -2360,7 +3677,9 @@ mod tests {
             })
         );
 
-        let response = serve_alerts_api(fixture.run_dir()).await.unwrap();
+        let response = serve_alerts_api(fixture.run_dir(), "test-run-summary-alerts-db", false)
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         let body = read_json_body(response).await;
         let alerts = body.as_array().expect("alerts response must be an array");
@@ -2437,6 +3756,9 @@ mod tests {
                 "run_id": "test-run",
                 "scenario_ids": ["scenario-a", "scenario-b"],
                 "run_status": "completed",
+                "state": "completed",
+                "started_at_ns": null,
+                "final_verdict": null,
                 "artifact_availability": {
                     "evaluation": true,
                     "alerts": true,
@@ -2447,6 +3769,74 @@ mod tests {
             })
         );
     }
+    /// A run summary must report its own verdict. The query used to ignore the
+    /// requested run id and return the first non-null decision in the database,
+    /// so an imported multi-run database attributed one run's verdict to another.
+    #[test]
+    fn final_verdict_is_scoped_to_the_requested_run() {
+        let fixture = RunFixture::new("run-b");
+        let _test_lock = test_env_lock();
+        let _guard = fixture.enter_repo_root();
+        let db_path = fixture
+            .run_dir()
+            .join("collector")
+            .join("collector.responsibility.db");
+        std::fs::create_dir_all(db_path.parent().unwrap()).unwrap();
+        let conn =
+            crate::responsibility::persistence::open_responsibility_db(&db_path.to_string_lossy())
+                .unwrap();
+        conn.execute(
+            "INSERT INTO runs (run_id, started_at_ns, final_decision, final_severity, \
+             final_authority, final_alert_id) VALUES ('run-a', 1, 'Unsafe', 'Critical', \
+             'Authoritative', 'alert-a')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO runs (run_id, started_at_ns, final_decision, final_severity, \
+             final_authority, final_alert_id) VALUES ('run-b', 2, 'Safe', 'Info', \
+             'Authoritative', 'alert-b')",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let verdict = super::read_final_verdict(fixture.run_dir(), "run-b").expect("verdict");
+        assert_eq!(verdict["decision"], "Safe");
+        assert_eq!(verdict["alert_id"], "alert-b");
+        assert!(
+            super::read_final_verdict(fixture.run_dir(), "missing-run").is_none(),
+            "an unknown run id must not borrow another run's verdict"
+        );
+
+        // Archived runs are addressed by their directory name, while the DB
+        // stores the runtime UUID. With exactly one run the directory alias
+        // must resolve instead of returning "unknown".
+        let single = RunFixture::new("archived-dir");
+        let single_db = single
+            .run_dir()
+            .join("collector")
+            .join("collector.responsibility.db");
+        std::fs::create_dir_all(single_db.parent().unwrap()).unwrap();
+        let single_conn = crate::responsibility::persistence::open_responsibility_db(
+            &single_db.to_string_lossy(),
+        )
+        .unwrap();
+        single_conn
+            .execute(
+                "INSERT INTO runs (run_id, started_at_ns, final_decision, final_severity, \
+                 final_authority, final_alert_id) VALUES ('db-uuid', 3, 'Unsafe', 'Critical', \
+                 'Authoritative', 'alert-single')",
+                [],
+            )
+            .unwrap();
+        drop(single_conn);
+        let aliased =
+            super::read_final_verdict(single.run_dir(), "archived-dir").expect("aliased verdict");
+        assert_eq!(aliased["decision"], "Unsafe");
+        assert_eq!(aliased["alert_id"], "alert-single");
+    }
+
     #[test]
     fn resolve_run_dir_maps_run_id_to_env_runs_directory() {
         let fixture = RunFixture::new("test-run");

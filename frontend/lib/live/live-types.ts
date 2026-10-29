@@ -32,7 +32,7 @@ export interface LiveStats {
 
 /** 一条原始实时事件（/api/live/events 的 `event: event` 载荷）。 */
 export interface LiveRawEvent {
-  /** 后端单调 seq（重连去重用）。 */
+  /** 后端单调 seq（仅记录，用于诊断；重连不回填缺口，缺口由服务端 lag 事件上报）。 */
   id: string;
   timestampMs: number;
   timestampNs: number;

@@ -181,7 +181,13 @@ fn adopting_a_v1_database_stamps_the_header_and_preserves_data() {
     assert_eq!(application_id, APPLICATION_ID);
 
     let after = (table_row_counts(&conn), identity_multiset(&conn));
-    assert_eq!(before.0, after.0, "adoption must not add or drop rows");
+    let mut expected_counts = before.0;
+    expected_counts.push(("analysis_checkpoints".into(), 0));
+    expected_counts.sort();
+    assert_eq!(
+        expected_counts, after.0,
+        "adoption must preserve every legacy row and add only the empty checkpoint table"
+    );
     assert_eq!(before.1, after.1, "identity mappings must survive adoption");
 
     // v2 surface: the belief table is authoritative and the old name is a
@@ -258,4 +264,62 @@ fn read_only_open_does_not_modify_a_v1_database() {
 
     let after = std::fs::read(&path).unwrap();
     assert_eq!(before, after, "read-only open must not write the file");
+}
+
+#[test]
+fn migration_v5_adds_native_columns_and_preserves_old_intents() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = copy_fixture(&dir);
+    let before: Vec<(String, String, i64)> = {
+        let conn = Connection::open(&path).unwrap();
+        conn.prepare("SELECT intent_id, tool_name, timestamp_ns FROM intents ORDER BY intent_id")
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .unwrap()
+            .map(|row| row.unwrap())
+            .collect()
+    };
+    assert!(!before.is_empty(), "the v1 fixture must carry old intents");
+
+    let conn = open_responsibility_db(&path).unwrap();
+    let version: i64 = conn
+        .query_row(
+            "SELECT version FROM schema_version ORDER BY version DESC LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(version, LATEST_SCHEMA_VERSION);
+
+    let cols = columns(&conn, "intents");
+    for expected in ["native_tool_call_json", "declared_conversation_id"] {
+        assert!(
+            cols.iter().any(|(name, _, _)| name == expected),
+            "missing migrated column {expected}"
+        );
+    }
+    let after: Vec<(String, String, i64)> = conn
+        .prepare("SELECT intent_id, tool_name, timestamp_ns FROM intents ORDER BY intent_id")
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .unwrap()
+        .map(|row| row.unwrap())
+        .collect();
+    assert_eq!(after, before, "old intent rows must survive the upgrade");
+
+    let native_nulls: Vec<(Option<String>, Option<String>)> = conn
+        .prepare(
+            "SELECT native_tool_call_json, declared_conversation_id FROM intents ORDER BY intent_id",
+        )
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .map(|row| row.unwrap())
+        .collect();
+    assert!(
+        native_nulls
+            .iter()
+            .all(|(native, conversation)| { native.is_none() && conversation.is_none() }),
+        "old rows must read as absent native references, never synthesised ids"
+    );
 }

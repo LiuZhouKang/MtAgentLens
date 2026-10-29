@@ -21,7 +21,7 @@
   PYTHONPATH=env:env/src:. python3 compare/scripts/evaluate_prompt_tools.py [--tools agent_sentinel]
 
 输出：
-  compare/results/external/prompt_baselines/FuxiBench/{tool}/
+  compare/results/external/baselines/prompt/{tool}/
     {scenario_id}.json    原始 API 响应（不可变）
     results.json          从原始数据计算的指标（可随时重建）
 """
@@ -43,10 +43,16 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from compare.tools.detection_scope import (  # noqa: E402
+    DEFAULT_DATASET_DIR,
+    included_ground_truth,
+)
+from compare.tools.prompt_manifest import PromptManifestDrift, require_current
+
 # ── 路径常量 ──────────────────────────────────────────────────────────
-DATASET_DIR = PROJECT_ROOT / "compare" / "Dataset" / "FuxiBench"
+DATASET_DIR = DEFAULT_DATASET_DIR
 PROMPT_INPUTS = DATASET_DIR / "prompt_inputs"
-RESULTS_ROOT = PROJECT_ROOT / "compare" / "results" / "prompt_baselines" / "FuxiBench"
+RESULTS_ROOT = PROJECT_ROOT / "compare" / "results" / "external" / "baselines" / "prompt"
 
 # ── API 配置 ──────────────────────────────────────────────────────────
 def _load_api_config() -> dict[str, str]:
@@ -71,7 +77,7 @@ API_AUTH_TOKEN = API_CONFIG.get(
     "ANTHROPIC_AUTH_TOKEN", os.environ.get("ANTHROPIC_AUTH_TOKEN", "")
 )
 API_MODEL = API_CONFIG.get(
-    "ANTHROPIC_MODEL", os.environ.get("ANTHROPIC_MODEL", "deepseek-v4-flash")
+    "ANTHROPIC_MODEL", os.environ.get("ANTHROPIC_MODEL", "deepseek-flash")
 )
 
 # ── Agent Sentinel: 原始 prompt（来自 agent-sentinel/audit/types.go）────
@@ -908,6 +914,8 @@ def main() -> int:
                         help="从任务描述提取具体操作（而非通用工具能力描述）")
     parser.add_argument("--no-neutralize", action="store_true",
                         help="禁用 Claude Code 语法中性化（保留原始框架语法）")
+    parser.add_argument("--allow-stale-manifest", action="store_true",
+                        help="允许用过期 prompt manifest 复现历史结果（会打印警告）")
     args = parser.parse_args()
 
     manifest_path = PROMPT_INPUTS / "manifest.json"
@@ -917,6 +925,30 @@ def main() -> int:
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     entries = sorted(manifest["entries"], key=lambda e: e["scenario_id"])
+    try:
+        require_current(
+            entries,
+            repo_root=PROJECT_ROOT,
+            dataset_root=DATASET_DIR,
+            allow_stale=args.allow_stale_manifest,
+        )
+    except PromptManifestDrift as exc:
+        print(f"错误: {exc}", file=sys.stderr)
+        return 1
+
+    # FuxiBench 2.0 detection scope: 9 independently adjudicated scenarios are
+    # provenance-only and never scored; the manifest's legacy attack_type is
+    # replaced by the canonical two-type GT taxonomy.
+    ground_truth = included_ground_truth(DATASET_DIR / "ground_truth")
+    excluded_total = len(manifest["entries"]) - len(ground_truth)
+    entries = [
+        dict(entry,
+             attack_type=ground_truth[entry["scenario_id"]]["attack_type"],
+             label=ground_truth[entry["scenario_id"]]["label"])
+        for entry in entries
+        if entry["scenario_id"] in ground_truth
+    ]
+    print(f"检测范围: {len(entries)} scored / {excluded_total} detection_excluded")
     tools = [t.strip() for t in args.tools.split(",")]
 
     effective_model = args.model or API_MODEL
@@ -960,7 +992,8 @@ def main() -> int:
         label = {"agent_sentinel": "Agent Sentinel", "llm_guard": "LLM Guard"}.get(tool_name, tool_name)
         print(f"{label:30s} {tpr:8.4f} {fpr:8.4f} {m['f1']:8.4f} {m['mcc']:8.4f}")
 
-    print(f"\n{'MtAgentLens (eBPF)':30s} {'0.940':>8s} {'0.263':>8s} {'0.816':>8s} {'0.781':>8s}")
+    # MtAgentLens is scored by the campaign evaluator, not this prompt-tool
+    # script; do not print a hardcoded row here.
 
     return 0
 

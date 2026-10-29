@@ -8,7 +8,7 @@ describe('deriveTracebackEdgeIds', () => {
     expect(edgeIds).toEqual(expect.arrayContaining(['e-taint', 'e-boundary']));
   });
 
-  it('falls back to policy boundary edges when evidence refs are absent', () => {
+  it('does not present unrelated boundary edges as an evidence path', () => {
     const alert = {
       ...demoAlerts[0],
       timeline: { ...demoAlerts[0].timeline, steps: [] },
@@ -22,10 +22,10 @@ describe('deriveTracebackEdgeIds', () => {
     };
 
     const edgeIds = deriveTracebackEdgeIds(alert, demoGraph.edges);
-    expect(edgeIds).toContain('e-boundary');
+    expect(edgeIds).toEqual([]);
   });
 
-  it('falls back to primary agent adjacency when no evidence or boundary edges are available', () => {
+  it('does not invent an evidence path from primary agent adjacency', () => {
     const edges = demoGraph.edges.filter((edge) => edge.edge_type !== 'PolicyBoundaryCrossing');
     const alert = {
       ...demoAlerts[0],
@@ -40,6 +40,6 @@ describe('deriveTracebackEdgeIds', () => {
     };
 
     const edgeIds = deriveTracebackEdgeIds(alert, edges);
-    expect(edgeIds).toEqual(expect.arrayContaining(['e-delegate', 'e-taint']));
+    expect(edgeIds).toEqual([]);
   });
 });

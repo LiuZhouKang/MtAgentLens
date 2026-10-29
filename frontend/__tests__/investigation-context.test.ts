@@ -7,6 +7,13 @@ import {
 } from '@/lib/investigation-context';
 
 describe('investigation context', () => {
+  it('retains the alert identity when the live store has stripped its snapshot', () => {
+    const { graph_snapshot: _snapshot, ...lean } = demoAlerts[0];
+    const context = buildInvestigationContextFromAlert(lean as typeof demoAlerts[0]);
+    expect(context.activeIncidentId).toBe(lean.alert_id);
+    expect(context.activeAgentId).toBe(lean.primary_agent.agent_id);
+    expect(context.highlightedPathEdgeIds).toEqual([]);
+  });
   it('derives a shared drilldown focus from an alert', () => {
     const alert = demoAlerts[0];
 
@@ -15,7 +22,7 @@ describe('investigation context', () => {
     expect(context.activeIncidentId).toBe(alert.alert_id);
     expect(context.activeAgentId).toBe(alert.primary_agent.agent_id);
     expect(context.highlightedPathEdgeIds).toEqual(
-      alert.graph_snapshot.edges.map((edge) => edge.edge_id),
+      ['e-delegate', 'e-taint', 'e-boundary'],
     );
     expect(context.graphFocus.reason).toBe('incident');
     expect(context.graphFocus.label).toContain(alert.title);

@@ -18,7 +18,7 @@ use crate::responsibility::types::{
     AgentId, EdgeId, GraphMetrics, NodeId, ResponsibilityEdge, ResponsibilityEdgeType,
     ResponsibilityNode, ResponsibilityNodeType,
 };
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 
 // ─── ResponsibilityGraph ───────────────────────────────────────────────────
 
@@ -122,10 +122,29 @@ impl ResponsibilityGraph {
 
     /// Update an existing node (replaces in-place).
     /// Returns the old node if it existed, None otherwise.
-    pub fn update_node(&mut self, node: ResponsibilityNode) -> Option<ResponsibilityNode> {
-        let node_id = node.node_id.clone();
 
-        self.nodes.insert(node_id, node)
+    /// Reassign a node's agent while keeping the agent index consistent.
+    ///
+    /// Phase 2 resolves authoritative identities, but the graph was built with
+    /// phase-1 provisional ids. Without this remap, claims and alerts name an
+    /// agent that does not exist in `agent_identities`, so responsibility can
+    /// never be joined to the identity table.
+    pub fn reassign_agent(&mut self, node_id: &NodeId, new_agent: &AgentId) {
+        let Some(node) = self.nodes.get_mut(node_id) else {
+            return;
+        };
+        let old_agent = node.agent_id.clone();
+        node.agent_id = Some(new_agent.clone());
+        if let Some(old) = old_agent
+            && old != *new_agent
+            && let Some(ids) = self.agent_nodes.get_mut(&old)
+        {
+            ids.retain(|id| id != node_id);
+        }
+        let ids = self.agent_nodes.entry(new_agent.clone()).or_default();
+        if !ids.contains(node_id) {
+            ids.push(node_id.clone());
+        }
     }
 
     /// Remove a node and all its incident edges.
@@ -208,36 +227,6 @@ impl ResponsibilityGraph {
 
     /// Merge two nodes: reassign all edges from `remove` to `keep`,
     /// then remove `remove`.
-    pub fn merge_nodes(&mut self, keep: NodeId, remove: NodeId) {
-        // Reassign outgoing edges.
-        if let Some(out_edges) = self.outgoing_edges.remove(&remove) {
-            for edge_id in &out_edges {
-                if let Some(edge) = self.edges.get_mut(edge_id) {
-                    edge.source = keep.clone();
-                }
-            }
-            self.outgoing_edges
-                .entry(keep.clone())
-                .or_default()
-                .extend(out_edges);
-        }
-
-        // Reassign incoming edges.
-        if let Some(in_edges) = self.incoming_edges.remove(&remove) {
-            for edge_id in &in_edges {
-                if let Some(edge) = self.edges.get_mut(edge_id) {
-                    edge.target = keep.clone();
-                }
-            }
-            self.incoming_edges
-                .entry(keep.clone())
-                .or_default()
-                .extend(in_edges);
-        }
-
-        // Remove the merged node.
-        self.remove_node(remove);
-    }
 
     // ── Edge operations ───────────────────────────────────────────────
 
@@ -338,163 +327,20 @@ impl ResponsibilityGraph {
     ///
     /// Returns layers: each layer is a vector of (node_id, edge_id_that_led_here).
     /// The first layer contains only the start node with no incoming edge.
-    pub fn bfs_from(&self, start: NodeId, max_depth: usize) -> Vec<Vec<(NodeId, Option<EdgeId>)>> {
-        let mut layers: Vec<Vec<(NodeId, Option<EdgeId>)>> = Vec::new();
-        let mut visited: HashSet<NodeId> = HashSet::new();
-        let mut queue: VecDeque<(NodeId, Option<EdgeId>, usize)> = VecDeque::new();
-
-        visited.insert(start.clone());
-        queue.push_back((start.clone(), None, 0));
-
-        let mut current_layer: Vec<(NodeId, Option<EdgeId>)> = Vec::new();
-        let mut current_depth = 0;
-
-        while let Some((node_id, edge_id, depth)) = queue.pop_front() {
-            if depth > max_depth {
-                break;
-            }
-
-            if depth != current_depth {
-                layers.push(std::mem::take(&mut current_layer));
-                current_depth = depth;
-            }
-
-            current_layer.push((node_id.clone(), edge_id));
-
-            // Enqueue neighbors via outgoing edges.
-            if let Some(out_edges) = self.outgoing_edges.get(&node_id) {
-                for out_edge_id in out_edges {
-                    if let Some(edge) = self.edges.get(out_edge_id)
-                        && !visited.contains(&edge.target)
-                    {
-                        visited.insert(edge.target.clone());
-                        queue.push_back((
-                            edge.target.clone(),
-                            Some(out_edge_id.clone()),
-                            depth + 1,
-                        ));
-                    }
-                }
-            }
-        }
-
-        if !current_layer.is_empty() {
-            layers.push(current_layer);
-        }
-
-        layers
-    }
 
     /// Walk backward from a node, following incoming edges.
     ///
     /// Returns a list of (node_id, edge_id) pairs in reverse causal order
     /// (most recent first, root cause last).
-    pub fn walk_backward(&self, start: NodeId, max_depth: usize) -> Vec<(NodeId, EdgeId)> {
-        let mut path: Vec<(NodeId, EdgeId)> = Vec::new();
-        let mut visited: HashSet<NodeId> = HashSet::new();
-        let mut current = start;
-
-        visited.insert(current.clone());
-
-        for _ in 0..max_depth {
-            // Find the first incoming edge from an unvisited node.
-            let incoming = self.incoming_edges.get(&current);
-            let next = incoming.and_then(|edges| {
-                edges.iter().find_map(|edge_id| {
-                    self.edges.get(edge_id).and_then(|edge| {
-                        if !visited.contains(&edge.source) {
-                            Some((edge.source.clone(), edge_id.clone()))
-                        } else {
-                            None
-                        }
-                    })
-                })
-            });
-
-            match next {
-                Some((prev_node, edge_id)) => {
-                    path.push((current.clone(), edge_id.clone()));
-                    visited.insert(prev_node.clone());
-                    current = prev_node;
-                }
-                None => break,
-            }
-        }
-
-        // Add the final node (root) without an edge.
-        if !path.is_empty() || visited.len() == 1 {
-            // The last current node is the root.
-        }
-
-        path
-    }
 
     /// Find all agents connected to the given agent via any edge path.
     ///
     /// Performs a BFS following both outgoing and incoming edges to discover
     /// all agents reachable from the given agent's nodes.
-    pub fn connected_agents(&self, agent: &AgentId) -> Vec<AgentId> {
-        let mut connected: Vec<AgentId> = Vec::new();
-        let mut visited_agents: HashSet<AgentId> = HashSet::new();
-        let mut visited_nodes: HashSet<NodeId> = HashSet::new();
-
-        // Start from all nodes owned by this agent.
-        let start_nodes = self.agent_nodes.get(agent).cloned().unwrap_or_default();
-
-        for start_node in &start_nodes {
-            if !visited_nodes.insert(start_node.clone()) {
-                continue;
-            }
-
-            let mut queue: VecDeque<NodeId> = VecDeque::new();
-            queue.push_back(start_node.clone());
-
-            while let Some(node_id) = queue.pop_front() {
-                // Check agent for this node.
-                if let Some(node) = self.nodes.get(&node_id)
-                    && let Some(ref node_agent) = node.agent_id
-                    && node_agent != agent
-                    && visited_agents.insert(node_agent.clone())
-                {
-                    connected.push(node_agent.clone());
-                }
-
-                // Follow outgoing edges.
-                if let Some(out_edges) = self.outgoing_edges.get(&node_id) {
-                    for edge_id in out_edges {
-                        if let Some(edge) = self.edges.get(edge_id)
-                            && visited_nodes.insert(edge.target.clone())
-                        {
-                            queue.push_back(edge.target.clone());
-                        }
-                    }
-                }
-
-                // Follow incoming edges (reverse direction for broader connectivity).
-                if let Some(in_edges) = self.incoming_edges.get(&node_id) {
-                    for edge_id in in_edges {
-                        if let Some(edge) = self.edges.get(edge_id)
-                            && visited_nodes.insert(edge.source.clone())
-                        {
-                            queue.push_back(edge.source.clone());
-                        }
-                    }
-                }
-            }
-        }
-
-        connected
-    }
 
     // ── Query helpers ─────────────────────────────────────────────────
 
     /// Get all nodes for a given agent.
-    pub fn nodes_for_agent(&self, agent: &AgentId) -> &[NodeId] {
-        self.agent_nodes
-            .get(agent)
-            .map(|v| v.as_slice())
-            .unwrap_or(&[])
-    }
 
     /// Get all edges incident on a given agent's nodes.
     pub fn edges_for_agent(&self, agent: &AgentId) -> &[EdgeId] {
@@ -806,6 +652,7 @@ mod tests {
         ResponsibilityEdge {
             edge_id: EdgeId::from(id),
             edge_type,
+            operation: None,
             source: NodeId::from(source),
             target: NodeId::from(target),
             evidence_refs: Vec::new(),
@@ -833,7 +680,6 @@ mod tests {
             Some("a1"),
         ));
 
-        assert_eq!(g.nodes_for_agent(&AgentId::from("a1")).len(), 2);
         assert_eq!(g.nodes_of_type(&ResponsibilityNodeType::Agent).len(), 1);
         assert_eq!(g.nodes_of_type(&ResponsibilityNodeType::Resource).len(), 1);
     }
@@ -858,122 +704,6 @@ mod tests {
                 .len(),
             1
         );
-    }
-
-    #[test]
-    fn test_bfs_from() {
-        let mut g = ResponsibilityGraph::with_default_config();
-        g.add_node(make_node("a", ResponsibilityNodeType::Agent, Some("a1")));
-        g.add_node(make_node(
-            "r1",
-            ResponsibilityNodeType::Resource,
-            Some("a1"),
-        ));
-        g.add_node(make_node(
-            "r2",
-            ResponsibilityNodeType::Resource,
-            Some("a1"),
-        ));
-
-        g.add_edge(make_edge(
-            "e1",
-            ResponsibilityEdgeType::IntentCausesAction,
-            "a",
-            "r1",
-        ));
-        g.add_edge(make_edge(
-            "e2",
-            ResponsibilityEdgeType::IntentCausesAction,
-            "a",
-            "r2",
-        ));
-
-        let layers = g.bfs_from(NodeId::from("a"), 2);
-        assert_eq!(layers.len(), 2); // layer 0: a, layer 1: r1, r2
-        assert_eq!(layers[0].len(), 1); // just the start node
-        assert_eq!(layers[1].len(), 2); // two resource nodes
-    }
-
-    #[test]
-    fn test_walk_backward() {
-        let mut g = ResponsibilityGraph::with_default_config();
-        g.add_node(make_node("a", ResponsibilityNodeType::Agent, Some("a1")));
-        g.add_node(make_node("r", ResponsibilityNodeType::Resource, Some("a1")));
-        g.add_edge(make_edge(
-            "e1",
-            ResponsibilityEdgeType::IntentCausesAction,
-            "a",
-            "r",
-        ));
-
-        let path = g.walk_backward(NodeId::from("r"), 5);
-        assert!(!path.is_empty());
-        // First entry should be (r, e1) — walking from r back to a via e1.
-        assert_eq!(path[0].0, NodeId::from("r"));
-        assert_eq!(path[0].1, EdgeId::from("e1"));
-    }
-
-    #[test]
-    fn test_connected_agents() {
-        let mut g = ResponsibilityGraph::with_default_config();
-        g.add_node(make_node(
-            "a1_node",
-            ResponsibilityNodeType::Agent,
-            Some("agent-1"),
-        ));
-        g.add_node(make_node(
-            "a2_node",
-            ResponsibilityNodeType::Agent,
-            Some("agent-2"),
-        ));
-        g.add_node(make_node(
-            "r",
-            ResponsibilityNodeType::Resource,
-            Some("agent-1"),
-        ));
-
-        g.add_edge(make_edge(
-            "e1",
-            ResponsibilityEdgeType::AgentDelegatesTo,
-            "a1_node",
-            "a2_node",
-        ));
-
-        let connected = g.connected_agents(&AgentId::from("agent-1"));
-        assert!(connected.contains(&AgentId::from("agent-2")));
-    }
-
-    #[test]
-    fn test_merge_nodes() {
-        let mut g = ResponsibilityGraph::with_default_config();
-        g.add_node(make_node("keep", ResponsibilityNodeType::Agent, Some("a1")));
-        g.add_node(make_node(
-            "remove",
-            ResponsibilityNodeType::Resource,
-            Some("a1"),
-        ));
-        g.add_node(make_node("target", ResponsibilityNodeType::Resource, None));
-
-        g.add_edge(make_edge(
-            "e1",
-            ResponsibilityEdgeType::IntentCausesAction,
-            "remove",
-            "target",
-        ));
-        g.add_edge(make_edge(
-            "e2",
-            ResponsibilityEdgeType::IntentCausesAction,
-            "keep",
-            "remove",
-        ));
-
-        g.merge_nodes(NodeId::from("keep"), NodeId::from("remove"));
-
-        // "remove" should be gone.
-        assert!(!g.has_node(&NodeId::from("remove")));
-        // Edges should be reassigned to "keep".
-        let outgoing = g.outgoing_from(&NodeId::from("keep"));
-        assert!(!outgoing.is_empty());
     }
 
     #[test]

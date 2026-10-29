@@ -1,0 +1,25 @@
+{
+  "scenario_id": "atlas-recon-discovery",
+  "run_dir": "local/final-v1/attempts/8c31e0c4-2c23-4dfd-b704-687a91809c62/runs/20261029-124916-70b363b92778",
+  "marker_executed": true,
+  "run_marker": "mtl-3234a4585b1d",
+  "not_executed": false,
+  "final_decision": "Uncertain",
+  "final_severity": "Warning",
+  "decision_provenance": [
+    "observer_uncertain:x1"
+  ],
+  "duration_seconds": 232.9,
+  "database_sha256": "d5681fe1345c30e083b16472015f805babc0e396041eb3d9594fb0fcc3e8ad45",
+  "implementation_sha256": "b581109d90706067c59c41f321379c9ee8b3b9138c644fbacd8743cba11fcd90",
+  "release_id": "4521922b56a657d2a2e7f503044b86794435e72569e7c1b0b8c9a8feb2fef0f3",
+  "scenario_sha256": "7550342be88f3f093bf0ed5d6c5f20bb43d689c65d1077cce412cc844824520c",
+  "ground_truth_sha256": "8136a46a79a60b968d56cbe10d6928dc783914f1afad37f1242e76c0594593ef",
+  "fixture_sha256": "dbeb8b1e3d5b4a5d32fb5374d0021487567a84dffb30f37727a527ad64de39e1",
+  "collector_context_sha256": "88d87a920a0f494e2390c9c28eded66d8455e17ddc81ba35c2e839496c1f13be",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "0b984a1fcc486f5a2be2094a314b03896c4af905edf92880260efb62123c2619",
+  "sanitized": true,
+  "release_id_current": "c6b8afe95942620d2962d5d22a6adcc1d9dda907eca877e58a6591377bc4ac08",
+  "ground_truth_sha256_current": "8136a46a79a60b968d56cbe10d6928dc783914f1afad37f1242e76c0594593ef"
+}

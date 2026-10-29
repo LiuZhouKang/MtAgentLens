@@ -11,6 +11,33 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+/// Captured traffic is credential-bearing: never let the OS default umask make
+/// the log world-readable. The mode is set at creation and re-applied to an
+/// existing file so a previously 0644 log is tightened too.
+fn open_private(path: &str, truncate: bool) -> std::io::Result<File> {
+    let mut options = OpenOptions::new();
+    if truncate {
+        options.create(true).write(true).truncate(true);
+    } else {
+        options.create(true).append(true);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let file = options.open(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+    }
+    // Under sudo the log is root-owned; the operator cannot read the capture
+    // they just made. Keep 0600, hand ownership to the invoking user.
+    crate::responsibility::persistence::schema::transfer_to_invoking_user(path);
+    Ok(file)
+}
+
 /// Configuration for log rotation
 #[derive(Debug, Clone)]
 pub struct LogRotationConfig {
@@ -44,14 +71,25 @@ pub struct FileLogger {
     event_count: Arc<Mutex<u64>>,
 }
 
+/// Raw-event writes that failed after the file was opened (disk full, closed
+/// fd). The JSONL audit trail is incomplete when this is non-zero, so capture
+/// quality must degrade instead of reporting a healthy run.
+static FILE_LOG_FAILURES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Total raw-event write/flush/rotation failures in this process.
+pub fn file_log_failure_count() -> u64 {
+    FILE_LOG_FAILURES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+fn record_file_log_failure() {
+    FILE_LOG_FAILURES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
 impl FileLogger {
     /// Create a new FileLogger with specified file path (no rotation)
     pub fn new<P: AsRef<Path>>(file_path: P) -> Result<Self, std::io::Error> {
         let path_str = file_path.as_ref().to_string_lossy().to_string();
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path_str)?;
+        let file = open_private(&path_str, false)?;
 
         Ok(Self {
             file_path: path_str,
@@ -67,10 +105,7 @@ impl FileLogger {
         config: LogRotationConfig,
     ) -> Result<Self, std::io::Error> {
         let path_str = file_path.as_ref().to_string_lossy().to_string();
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path_str)?;
+        let file = open_private(&path_str, false)?;
 
         Ok(Self {
             file_path: path_str,
@@ -139,16 +174,12 @@ impl FileLogger {
             }
 
             // Create new current file
-            match OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(true)
-                .open(file_path)
-            {
+            match open_private(file_path, true) {
                 Ok(new_file) => {
                     *file_handle.lock().unwrap() = new_file;
                 }
                 Err(e) => {
+                    record_file_log_failure();
                     eprintln!(
                         "FileLogger: Failed to create new log file after rotation: {}",
                         e
@@ -225,8 +256,10 @@ impl Analyzer for FileLogger {
                 let log_entry = format!("{}\n", event_json);
 
                 if let Err(e) = file.write_all(log_entry.as_bytes()) {
+                    record_file_log_failure();
                     eprintln!("FileLogger: Failed to write to {}: {}", file_path, e);
                 } else if let Err(e) = file.flush() {
+                    record_file_log_failure();
                     eprintln!("FileLogger: Failed to flush {}: {}", file_path, e);
                 }
             }
@@ -250,6 +283,22 @@ mod tests {
     use futures::stream;
     use serde_json::json;
     use tempfile::NamedTempFile;
+
+    #[tokio::test]
+    async fn write_failures_are_counted_not_only_printed() {
+        use futures::StreamExt;
+        // /dev/full opens for writing and fails every write with ENOSPC.
+        let before = file_log_failure_count();
+        let mut logger = FileLogger::new("/dev/full").expect("open /dev/full");
+        let event = Event::new("process".into(), 1, "test".into(), json!({"x": 1}));
+        let stream: EventStream = Box::pin(stream::iter(vec![event]));
+        let mut out = logger.process(stream).await.expect("process");
+        while out.next().await.is_some() {}
+        assert!(
+            file_log_failure_count() > before,
+            "a failed raw-log write must be counted"
+        );
+    }
 
     #[tokio::test]
     async fn test_file_logger_creation() {

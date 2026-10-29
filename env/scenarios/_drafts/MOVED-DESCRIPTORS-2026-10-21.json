@@ -1,0 +1,75 @@
+{
+  "reason": "Non-executable descriptors; no payload changes; excluded from the frozen published scope",
+  "moves": [
+    {
+      "previous_path": "env/scenarios/behavioral_attacks/behavioral-covert-dns.json",
+      "draft_path": "env/scenarios/_drafts/behavioral_attacks/behavioral-covert-dns.json",
+      "sha256": "9388de41803f093df66beb05f84d9fa78c8b2e42e3e4fba90649bf3e30cd6775"
+    },
+    {
+      "previous_path": "env/scenarios/behavioral_attacks/behavioral-fork-bomb.json",
+      "draft_path": "env/scenarios/_drafts/behavioral_attacks/behavioral-fork-bomb.json",
+      "sha256": "2ddbbe524ddfcc9157ed19e18976c2e3eb7b3077dd921cb6aa6d467e8db93e0b"
+    },
+    {
+      "previous_path": "env/scenarios/behavioral_attacks/behavioral-package-typosquat.json",
+      "draft_path": "env/scenarios/_drafts/behavioral_attacks/behavioral-package-typosquat.json",
+      "sha256": "b4c4297f8e31a26858ca151aece2ed1b4267065abad04ec28acfb05ca0f6f350"
+    },
+    {
+      "previous_path": "env/scenarios/credential_theft/credential-theft-git-history.json",
+      "draft_path": "env/scenarios/_drafts/credential_theft/credential-theft-git-history.json",
+      "sha256": "414bb498a68c01955968d12666f6cd40af2c15711839be484fd1a3eedbe0a5f9"
+    },
+    {
+      "previous_path": "env/scenarios/credential_theft/minimal-footprint-atomic.json",
+      "draft_path": "env/scenarios/_drafts/credential_theft/minimal-footprint-atomic.json",
+      "sha256": "5f8c0c2fd98ba1915a50ad342e3d42b25a2180a8d6548307900e1026905e0c71"
+    },
+    {
+      "previous_path": "env/scenarios/data_exfiltration/cross-cat-recon-steal-exfil.json",
+      "draft_path": "env/scenarios/_drafts/data_exfiltration/cross-cat-recon-steal-exfil.json",
+      "sha256": "33d8820f832daab13806b902568d171e773d4f0c0d5c42cde1e51fd75c1930a6"
+    },
+    {
+      "previous_path": "env/scenarios/data_exfiltration/gradual-data-drip.json",
+      "draft_path": "env/scenarios/_drafts/data_exfiltration/gradual-data-drip.json",
+      "sha256": "c29d11fa1595a1ee08223525623e9425ae1fed54a2ec6324a0020d36a78efd37"
+    },
+    {
+      "previous_path": "env/scenarios/data_exfiltration/needle-in-haystack.json",
+      "draft_path": "env/scenarios/_drafts/data_exfiltration/needle-in-haystack.json",
+      "sha256": "665143c32ec7f073d36d24fe208e28713364163ad1a47177e9f2bb74a8fcb5f1"
+    },
+    {
+      "previous_path": "env/scenarios/defense_evasion/anti-forensics-full.json",
+      "draft_path": "env/scenarios/_drafts/defense_evasion/anti-forensics-full.json",
+      "sha256": "7d6067f74241ef8192c6f3317b40caa59e65ddb987632e616c93eaa870960e38"
+    },
+    {
+      "previous_path": "env/scenarios/defense_evasion/defense-timestamp-smear.json",
+      "draft_path": "env/scenarios/_drafts/defense_evasion/defense-timestamp-smear.json",
+      "sha256": "70bf42913182a3fcafa92d67cf9311ff444c03f1061f6ee0d3d652db24e8b186"
+    },
+    {
+      "previous_path": "env/scenarios/privilege_escalation/privsec-setuid-abuse.json",
+      "draft_path": "env/scenarios/_drafts/privilege_escalation/privsec-setuid-abuse.json",
+      "sha256": "cce4a74e99795d13483fd56feced5e1957fc501f9190a6898dc84887e7cf924b"
+    },
+    {
+      "previous_path": "env/scenarios/prompt_injection/prompt-injection-unicode-bypass.json",
+      "draft_path": "env/scenarios/_drafts/prompt_injection/prompt-injection-unicode-bypass.json",
+      "sha256": "5746dae0aadca0c4adb5ca066fb85960047c6e6b274c30285c5b822a06c13627"
+    },
+    {
+      "previous_path": "env/scenarios/reconnaissance/recon-process-memory.json",
+      "draft_path": "env/scenarios/_drafts/reconnaissance/recon-process-memory.json",
+      "sha256": "6a5a74830a3d44fce20f8f313a9aefdcb967d0260afacdd3cc457103bc361fd5"
+    },
+    {
+      "previous_path": "env/scenarios/supply_chain/supply-chain-postinstall.json",
+      "draft_path": "env/scenarios/_drafts/supply_chain/supply-chain-postinstall.json",
+      "sha256": "78be3286f8c2f4195b694d154a31bed35d51accc8506aae12a8533b7ceba9fea"
+    }
+  ]
+}

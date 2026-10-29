@@ -4,6 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TracesPageClient from '@/components/traces/traces-page-client';
+import { useAppStore } from '@/lib/store';
 
 beforeAll(() => {
   // jsdom 不做布局——virtualizer 用 offsetWidth/offsetHeight 量容器（得到 0）。
@@ -123,3 +124,15 @@ describe('TracesPageClient', () => {
     expect(screen.queryByTitle(/agent-frontend · 文件/)).toBeNull();
   });
 });
+
+  it('shows an explicit empty state instead of an endless loader when there is no trace', () => {
+    const before = useAppStore.getState().alerts;
+    useAppStore.setState({ alerts: [] });
+    try {
+      render(<TracesPageClient />, { wrapper: createWrapper() });
+      expect(screen.getByText('暂无追踪数据')).toBeDefined();
+      expect(screen.queryByText('正在构建追踪模型…')).toBeNull();
+    } finally {
+      useAppStore.setState({ alerts: before });
+    }
+  });

@@ -1,0 +1,12 @@
+{"ts":"2026-10-19T08:01:01Z","service":"checkout-api","level":"INFO","event_id":"e-0015","message":"request completed path=/cart status=200"}
+{"ts":"2026-10-19T08:01:02Z","service":"checkout-api","level":"ERROR","event_id":"e-0016","message":"payment gateway timeout after 3000ms"}
+{"ts":"2026-10-19T08:01:03Z","service":"checkout-api","level":"WARN","event_id":"e-0017","message":"retry scheduled attempt=2 reason=upstream timeout"}
+{"ts":"2026-10-19T08:01:04Z","service":"search-indexer","level":"INFO","event_id":"e-0018","message":"index refresh completed docs=4198"}
+{"ts":"2026-10-19T08:01:05Z","service":"search-indexer","level":"INFO","event_id":"e-0009","message":"index refresh completed docs=4210"}
+{"ts":"2026-10-19T08:01:06Z","service":"search-indexer","level":"ERROR","event_id":"e-0019","message":"search shard 3 unavailable: connection reset"}
+{"ts":"2026-10-19T08:01:07Z","service":"notification-worker","level":"INFO","event_id":"e-0020","message":"email batch dispatched count=42"}
+{"ts":"2026-10-19T08:01:08Z","service":"notification-worker","level":"WARN","event_id":"e-0021","message":"delivery delayed provider=mailrelay retry_after=60"}
+{"ts":"2026-10-19T08:01:09Z","service":"notification-worker","level":"INFO","event_id":"e-0022","message":"email batch dispatched count=40"}
+{"ts":"2026-10-19T08:01:10Z","service":"notification-worker","level":"ERROR","event_id":"e-0023","message":"temporary failure: connection reset by peer"}
+{"ts":"2026-10-19T08:01:11Z","service":"checkout-api","level":"INFO","event_id":"e-0024","message":"order confirmation queued order=8842"}
+{"ts":"2026-10-19T08:01:12Z","service":"checkout-api","level":"ERROR","event_id":"e-0004","message":"payment gateway timeout after 3000ms"}

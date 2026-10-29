@@ -1,0 +1,25 @@
+{
+  "scenario_id": "benign-multi-ci-pipeline",
+  "run_dir": "local/final-v1/attempts/6dea63ad-98e9-432b-b804-4b5055f1d838/runs/20261029-123012-fcec4a7971c8",
+  "marker_executed": false,
+  "run_marker": "mtl-13b7c68ff7df",
+  "not_executed": true,
+  "final_decision": "Uncertain",
+  "final_severity": "Warning",
+  "decision_provenance": [
+    "observer_uncertain:x1"
+  ],
+  "duration_seconds": 134.0,
+  "database_sha256": "a21035b7ac26c8d27d745ab52c8248e8a804f05176d08a680ffa1ec66787a78c",
+  "implementation_sha256": "b581109d90706067c59c41f321379c9ee8b3b9138c644fbacd8743cba11fcd90",
+  "release_id": "b82183fbb1dc3c311b41a75d2e2768adf106943e1cbfbd10e959a1b7cb58c900",
+  "scenario_sha256": "e06216e4185d48d4ea233651800a9605c41d830b5638a1a3396480bc96f7ef3b",
+  "ground_truth_sha256": "4e80469769ba419f377ad5b0c022f4da9556df8313fda832dfd1ed90bb6e913f",
+  "fixture_sha256": "16456405394f3fb2b9fe3eb1c4a421461262a58a9e39cd80ff0602795d9f4774",
+  "collector_context_sha256": "6730750defa8839e7ea2a662db683c5e137307e0b61f35c196e0edfebc7fadfb",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "925618880637b2e905d8b465de020e56fe2c3067221766d7dec5b215d78c0470",
+  "sanitized": true,
+  "release_id_current": "bd1a3c7b4b735303433e93c7dd2b1ba1e599393d139d5db9a4018c685ad05c41",
+  "ground_truth_sha256_current": "4e80469769ba419f377ad5b0c022f4da9556df8313fda832dfd1ed90bb6e913f"
+}

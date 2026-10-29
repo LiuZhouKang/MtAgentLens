@@ -81,7 +81,7 @@
 |---|------|------|
 | TC-1 | 成功注册（已认证） | 201: secret(32 base32), qr_code_uri, 8 个 backup_codes |
 | TC-2 | secret 有效 base32 | 匹配 `/^[A-Z2-7]+=*$/`，长度 32 |
-| TC-3 | QR code URI 格式 | `otpauth://totp/MtAgentLens:USER?secret=...&issuer=MtAgentLens` |
+| TC-3 | QR code URI 格式 | `otpauth://totp/Acme Observability:USER?secret=...&issuer=Acme Observability` |
 | TC-4 | 备份码格式 | 8 个，每位 8 位数字，集合唯一 |
 | TC-5 | 重新注册（未验证前） | 201: 新 secret ≠ 旧 secret |
 | TC-6 | 未认证请求 | 401 |

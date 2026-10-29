@@ -8,27 +8,56 @@ from compare.tools.base import BoundaryType
 from compare.tools.datasets import FrozenDatasetAdapter, load_dataset
 
 
-DATASET_ROOT = Path("compare/Dataset/FuxiBench")
+DATASET_ROOT = Path("datasets/FuxiBench")
 
 
-def test_frozen_dataset_loads_all_ground_truth_cases():
-    adapter = FrozenDatasetAdapter(DATASET_ROOT)
+@pytest.fixture(scope="module")
+def bound_dataset():
+    """Canonical FuxiBench 2.0 package; it ships its own validated release."""
+    from compare.tools.detection_scope import require_dataset_dir
+    return require_dataset_dir()
+
+
+def test_frozen_dataset_loads_all_ground_truth_cases(bound_dataset):
+    adapter = FrozenDatasetAdapter(bound_dataset)
 
     cases = adapter.load_cases()
 
-    assert len(cases) == 67
+    # All 93 frozen GT records are scored: the nine previously excluded records
+    # were re-adjudicated to difficult benign on 2026-10-27 (3 blind annotators
+    # + an independent adjudicator).
+    assert len(cases) == 93
     assert {case.adapter_case.scenario_id for case in cases} >= {
         "prompt-injection",
         "shadow-agent",
-        "network-anomaly",
+        "consensus-split",
     }
-    assert sum(1 for case in cases if case.is_attack) == 54
-    assert sum(1 for case in cases if not case.is_attack) == 13
-    assert all("responsibility_db" in case.mtagentlens_baseline for case in cases)
+    assert sum(1 for case in cases if case.is_attack) == 58
+    assert sum(1 for case in cases if not case.is_attack) == 35
+    assert all(case.adapter_case.fixture_dir.is_dir() for case in cases)
 
 
-def test_adapter_case_excludes_ground_truth_and_mtagentlens_baseline_paths():
-    adapter = FrozenDatasetAdapter(DATASET_ROOT)
+def test_benign_ground_truth_is_not_read_from_the_reviewer_wrapper(bound_dataset):
+    """`_reviewers/<id>.json` sorts before `benign/<id>.json`.
+
+    Loading the wrapper made every scenario look like an attack (`label` was
+    absent, the path contained `ground_truth`) and silently emptied the benign
+    denominator of every baseline comparison.
+    """
+    adapter = FrozenDatasetAdapter(bound_dataset)
+
+    case = next(
+        case for case in adapter.load_cases()
+        if case.adapter_case.scenario_id == "benign-api-doc"
+    )
+
+    assert not case.is_attack
+    assert "_reviewers" not in case.ground_truth_json.parts
+    assert case.ground_truth_json.parent.name == "benign"
+
+
+def test_adapter_case_excludes_ground_truth_and_mtagentlens_baseline_paths(bound_dataset):
+    adapter = FrozenDatasetAdapter(bound_dataset)
     case = next(
         case for case in adapter.load_cases()
         if case.adapter_case.scenario_id == "prompt-injection"
@@ -42,28 +71,27 @@ def test_adapter_case_excludes_ground_truth_and_mtagentlens_baseline_paths():
     assert "responsibility_claims" not in serialized
     assert "responsibility_alerts" not in serialized
     assert case.ground_truth_json is not None
-    assert "responsibility_db" in case.mtagentlens_baseline
+    # The FuxiBench 2.0 package intentionally ships sanitized historical traces;
+    # they stay evaluator-only and are never serialized into the adapter payload.
+    assert all(str(path).startswith(str(bound_dataset.resolve()))
+               for path in case.mtagentlens_baseline.values())
 
 
-def test_quality_manifest_nested_paths_are_loaded_without_exposing_baseline():
-    adapter = FrozenDatasetAdapter(DATASET_ROOT)
+def test_quality_manifest_nested_paths_are_loaded_without_exposing_baseline(bound_dataset):
+    adapter = FrozenDatasetAdapter(bound_dataset)
     case = next(
         case for case in adapter.load_cases()
-        if case.adapter_case.scenario_id == "atlas-recon-discovery"
+        if case.adapter_case.scenario_id == "consensus-split"
     )
 
     payload = case.adapter_case.to_adapter_payload()
     serialized_payload = repr(payload)
 
     assert case.ground_truth_json == (
-        DATASET_ROOT / "ground_truth" / "reconnaissance" / "atlas-recon-discovery.json"
+        bound_dataset / "ground_truth" / "multi_agent_attack" / "consensus-split.json"
     ).resolve()
-    assert (
-        case.mtagentlens_baseline["responsibility_db"]
-        == (
-            DATASET_ROOT / "traces" / "reconnaissance" / "atlas-recon-discovery" / "responsibility.db"
-        ).resolve()
-    )
+    assert all(str(path).startswith(str(bound_dataset.resolve()))
+               for path in case.mtagentlens_baseline.values())  # package-local traces only
     assert "ground_truth" not in serialized_payload
     assert "responsibility.db" not in serialized_payload
     assert case.is_attack
@@ -288,8 +316,8 @@ def test_gt_v2_taint_claim_is_resource_boundary(tmp_path: Path):
     assert case.expected_claims[0].boundary_type == BoundaryType.RESOURCE
 
 
-def test_adapter_case_only_exposes_comparator_visible_artifacts():
-    adapter = FrozenDatasetAdapter(DATASET_ROOT)
+def test_adapter_case_only_exposes_comparator_visible_artifacts(bound_dataset):
+    adapter = FrozenDatasetAdapter(bound_dataset)
     case = next(
         case for case in adapter.load_cases()
         if case.adapter_case.scenario_id == "prompt-injection"
@@ -298,12 +326,12 @@ def test_adapter_case_only_exposes_comparator_visible_artifacts():
     adapter_case = case.adapter_case
 
     assert set(adapter_case.input_artifacts) == {"scenario_json", "prompt_text"}
-    assert adapter_case.fixture_dir is None
+    assert adapter_case.fixture_dir.is_dir()
     assert adapter_case.saved_logs == ()
     assert all("ground_truth" not in str(path) for path in adapter_case.input_artifacts.values())
     assert all("traces" not in str(path) for path in adapter_case.input_artifacts.values())
-    assert "responsibility_db" in case.mtagentlens_baseline
-    assert case.mtagentlens_baseline["responsibility_db"].name == "responsibility.db"
+    assert all(str(path).startswith(str(bound_dataset.resolve()))
+               for path in case.mtagentlens_baseline.values())
 
 
 def test_load_cases_materializes_generated_scenario_json_outside_dataset_when_source_missing(tmp_path: Path):
@@ -741,3 +769,33 @@ def test_network_c2_beacon_expected_claims_capture_expected_resources_and_comman
 def test_unknown_dataset_raises_clear_error():
     with pytest.raises(ValueError, match="Unsupported dataset"):
         load_dataset("missing-dataset", Path("compare/Dataset"))
+
+
+@pytest.mark.parametrize('schema', ['mtagentlens.causal-design-proposal/1', 'invented.v99'])
+def test_nonruntime_schema_cannot_be_selected_as_a_negative_case(synthetic_dataset, schema):
+    source = synthetic_dataset / 'ground_truth/benign-one.json'
+    source.write_text(json.dumps({'schema': schema, 'scenario_id': 'benign-one',
+                                 'eligible_for_runtime_metrics': False}))
+    with pytest.raises(ValueError, match='(?i)(schema|design)'):
+        FrozenDatasetAdapter(synthetic_dataset).load_cases()
+
+
+def test_detection_excluded_ground_truth_is_skipped(tmp_path):
+    """A v5-audit disagreement keeps the v4 contract but leaves the denominator."""
+    import shutil
+
+    from compare.tools.dataset_release import build_release
+
+    gt_copy = tmp_path / "ground_truth"
+    shutil.copytree(DATASET_ROOT / "ground_truth", gt_copy)
+    path = gt_copy / "benign/benign-api-doc.json"
+    payload = json.loads(path.read_text())
+    payload.setdefault("quality", {})["detection_excluded"] = True
+    payload["quality"]["exclusion_reason"] = "unit-test independent-audit disagreement"
+    path.write_text(json.dumps(payload, indent=2) + "\n")
+    release = tmp_path / "release/FuxiBench"
+    build_release(Path("env/scenarios"), gt_copy, release)
+    cases = FrozenDatasetAdapter(release).load_cases()
+    # 93 live non-excluded cases minus the additional synthetic exclusion.
+    assert len(cases) == 92
+    assert all(case.adapter_case.scenario_id != "benign-api-doc" for case in cases)

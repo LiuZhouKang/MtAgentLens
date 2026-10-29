@@ -100,6 +100,13 @@ describe('LiveAlertFeed —— 实时告警流', () => {
     expect(screen.getByText(/暂无告警/)).toBeTruthy();
   });
 
+  it('replay 态空态不宣称实时监控运行中', () => {
+    useAppStore.setState({ appState: 'replay', alerts: [] });
+    render(<LiveAlertFeed />);
+    expect(screen.queryByText(/实时监控运行中/)).toBeNull();
+    expect(screen.getByText(/回放或导入/)).toBeTruthy();
+  });
+
   it('pickRecentAlerts 截取最近 N 条', () => {
     const alerts = [makeAlert('a1', 'A'), makeAlert('a2', 'B'), makeAlert('a3', 'C')];
     expect(pickRecentAlerts(alerts, 2).map((a) => a.alert_id)).toEqual(['a1', 'a2']);

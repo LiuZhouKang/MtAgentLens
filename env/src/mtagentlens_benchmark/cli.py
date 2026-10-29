@@ -103,6 +103,7 @@ def evaluate(dataset: str, output: str, fmt: str) -> None:
     """Evaluate detection results against ground truth."""
     from pathlib import Path
     from glob import glob
+    import sqlite3
     from mtagentlens_benchmark.evaluator.metrics import compute_benchmark_score
     from mtagentlens_benchmark.evaluator.reporter import generate_report
     from mtagentlens_benchmark.annotator.ground_truth import load_ground_truth
@@ -125,6 +126,10 @@ def evaluate(dataset: str, output: str, fmt: str) -> None:
             continue
         for gt_file in sorted(cat_dir.glob("*.json")):
             sid = gt_file.stem
+            if sid in gt_index:
+                raise click.ClickException(
+                    f"ambiguous ground truth for {sid}: {gt_index[sid]} and {gt_file}"
+                )
             gt_index[sid] = gt_file
 
     # Match traces to GT by scenario ID (from .scenario_id file)
@@ -137,13 +142,25 @@ def evaluate(dataset: str, output: str, fmt: str) -> None:
                 continue
             sid_file = run_dir / ".scenario_id"
             if not sid_file.exists():
-                continue
+                raise click.ClickException(f"run has no scenario identity: {run_dir}")
             scenario_id = sid_file.read_text().strip()
-            db_path = next(run_dir.glob("*.db"), None)
-            if db_path and scenario_id in gt_index:
+            if scenario_id not in gt_index:
+                raise click.ClickException(f"run {run_dir} has no ground truth for {scenario_id!r}")
+            databases = sorted(run_dir.glob("*.db"))
+            if len(databases) != 1 or not databases[0].is_file():
+                raise click.ClickException(f"run must have exactly one result database: {run_dir}")
+            try:
                 gt = load_ground_truth(gt_index[scenario_id])
-                results.append((db_path, gt))
-                click.echo(f"  Loaded: {scenario_id} (alerts: {len(gt.alerts)})")
+            except ValueError as exc:
+                raise click.ClickException(
+                    f"invalid ground truth {gt_index[scenario_id]}: {exc}"
+                ) from exc
+            if gt.scenario_id != scenario_id:
+                raise click.ClickException(
+                    f"ground truth scenario identity disagrees with run {run_dir}: {gt.scenario_id!r}"
+                )
+            results.append((databases[0], gt))
+            click.echo(f"  Loaded: {scenario_id} (alerts: {len(gt.alerts)})")
 
     if not results:
         click.echo("No valid result pairs found. Run scenarios with --collector first.")
@@ -151,7 +168,16 @@ def evaluate(dataset: str, output: str, fmt: str) -> None:
         # chains recorded "evaluation succeeded" after evaluating nothing.
         raise SystemExit(1)
 
-    score = compute_benchmark_score(results, [])
+    try:
+        score = compute_benchmark_score(results, [])
+    except ValueError as exc:
+        raise click.ClickException(
+            f"invalid ground truth or evaluation input under {dataset_path}: {exc}"
+        ) from exc
+    except sqlite3.DatabaseError as exc:
+        raise click.ClickException(
+            f"invalid evaluation database under {dataset_path}: {exc}"
+        ) from exc
     report_path = generate_report(score, Path(output), fmt)
     click.echo(f"  Overall Score: {score.overall:.2f}/100")
     click.echo(f"  Report saved: {report_path}")

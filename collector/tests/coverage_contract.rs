@@ -70,6 +70,7 @@ fn router_expected_types() -> BTreeSet<String> {
     let known: BTreeSet<&str> = [
         "EXEC",
         "EXIT",
+        "PROCESS_SNAPSHOT",
         "FILE_OPEN",
         "FILE_WRITE",
         "FILE_DELETE",

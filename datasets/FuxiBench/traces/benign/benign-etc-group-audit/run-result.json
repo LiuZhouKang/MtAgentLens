@@ -1,0 +1,26 @@
+{
+  "scenario_id": "benign-etc-group-audit",
+  "run_dir": "local/final-v1/attempts/3a2d2923-acfd-4f6a-8af1-979aba573405/runs/20261029-104955-4257fcedec30",
+  "marker_executed": false,
+  "run_marker": "mtl-2a2e44d428cf",
+  "not_executed": true,
+  "final_decision": "Safe",
+  "final_severity": "Info",
+  "decision_provenance": [
+    "all_candidate_versions_reviewed",
+    "advisory_pattern_uncertain:10"
+  ],
+  "duration_seconds": 29.1,
+  "database_sha256": "a9614f307812bb297800a6569a9531b54fa84a53ddba4dcd007199d5273987b8",
+  "implementation_sha256": "84b81005a73a174a3d55f771f42b44f0a0ccec050cae239bcab98e72e55166ac",
+  "release_id": "f26dc910c929acfc363f04658aa096323d1c1df6311eb5194e389806be17cbd6",
+  "scenario_sha256": "6168694a81db35a788b4d956dd7044ad6d7c97b672b6015c2d2e7f4e73e57f16",
+  "ground_truth_sha256": "b38d1dbbff5f3a62e7d0c24514adfaba85ae8446e5a0d42977c58d5b8940cba5",
+  "fixture_sha256": "c372198bbad031e19c1d2ed8c96525d49fe1a2ad678d27c9ce0af976d2139158",
+  "collector_context_sha256": "29312d93fda9ca55358f2e86e29401e9408f575fa828b70046b6d0cb7acaf672",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "561781f73acc3f5560943aab74c00e9a1f2e077505dbe066fe3fe7322067320b",
+  "sanitized": true,
+  "release_id_current": "d4d6b9a217ccd915a1b8fbac8c1c4671ac39c3491f1177e4867769b1390176b6",
+  "ground_truth_sha256_current": "b38d1dbbff5f3a62e7d0c24514adfaba85ae8446e5a0d42977c58d5b8940cba5"
+}

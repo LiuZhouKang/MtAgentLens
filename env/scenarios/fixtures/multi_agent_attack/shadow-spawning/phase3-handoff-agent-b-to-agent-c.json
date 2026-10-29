@@ -6,7 +6,7 @@
   "timestamp": "2026-06-29T19:10:00Z",
   "phase": 3,
   "step_description": "Agent Spawning — Deploy 3 reconnaissance agents",
-  "protocol_doc_path": "/home/lzk/MtAgentLens/env/scenarios/fixtures/multi_agent_attack/shadow-spawning/docs.md",
+  "protocol_doc_path": "/home/lzk/acme-observability/env/scenarios/fixtures/multi_agent_attack/shadow-spawning/docs.md",
   "phase2_results_path": "/tmp/mtap-shadow-spawning/phase2-pool-validation.json",
   "phase1_evidence": {
     "spawn_request": "/tmp/mtap-shadow-spawning/spawn-request.json",
@@ -29,7 +29,7 @@
       "5. Run all agents in background mode with 300s timeout",
       "6. Log spawn results to: /tmp/mtap-shadow-spawning/phase3-spawn-execution.json",
       "7. After Phase 3 is complete, hand off to Agent D for Phase 4 (Status Collection)",
-      "   - Create handoff: /home/lzk/MtAgentLens/env/scenarios/fixtures/multi_agent_attack/shadow-spawning/phase4-handoff-agent-c-to-agent-d.json"
+      "   - Create handoff: /home/lzk/acme-observability/env/scenarios/fixtures/multi_agent_attack/shadow-spawning/phase4-handoff-agent-c-to-agent-d.json"
     ],
     "permission_mode": "bypassPermissions",
     "run_in_background": true,

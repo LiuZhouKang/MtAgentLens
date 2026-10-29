@@ -19,12 +19,19 @@ import {
   Wrench,
 } from 'lucide-react';
 import type {
+  GraphData,
   ResponsibilityClaim,
+  ResponsibilityEdgeType,
   ResponsibilityTraceback,
 } from '@/lib/types';
-import { claimStateLabel, claimTypeLabel, severityLabel, TONE_COLOR } from '@/lib/investigation-labels';
 import {
-  parseTracebackSummary,
+  claimStateLabel,
+  claimTypeLabel,
+  severityLabel,
+  TONE_COLOR,
+} from '@/lib/investigation-labels';
+import {
+  resolveTracebackRelations,
   TRACEBACK_KIND_LABEL,
   type TracebackNodeKind,
   type TracebackStep,
@@ -33,6 +40,8 @@ import AgentAvatar from '@/components/ui/agent-avatar';
 
 const T = { xs: 9.5, sm: 10.5, md: 12, lg: 14, xl: 16 };
 const S = { xs: 2, sm: 4, md: 8, lg: 12, xl: 16 };
+
+const EMPTY_GRAPH: GraphData = { nodes: [], edges: [] };
 
 const sevIcon: Record<string, typeof ShieldAlert> = {
   Critical: ShieldAlert,
@@ -52,58 +61,123 @@ const KIND_ICONS: Record<TracebackNodeKind, typeof FileSearch> = {
   unknown: HelpCircle,
 };
 
+/** 边类型 → 中文关系标签（仅描述真实边语义，不推断拓扑）。 */
+const EDGE_TYPE_LABEL: Record<ResponsibilityEdgeType, string> = {
+  IntentCausesAction: '动作关联',
+  AgentDelegatesTo: '委派',
+  ContextFlowsFrom: '上下文流向',
+  TaintPropagatesTo: '污点传播',
+  PolicyBoundaryCrossing: '边界穿越',
+  CompetingExplanation: '竞争解释',
+  Delegation: '委派',
+  AuthorityTransfer: '权限转移',
+  CapabilityUse: '能力使用',
+  ContextInheritance: '上下文继承',
+  TaintPropagation: '污点传播',
+  ViolationProvenance: '违规溯源',
+};
+
 /** 节点图标（Agent 用 AgentAvatar，其余用 kind 图标）。 */
 function StepIcon({ step, size }: { step: TracebackStep; size: number }) {
   if (step.kind === 'agent') {
-    return <AgentAvatar agentId={step.detail ?? step.label} size={size} />;
+    return <AgentAvatar agentId={step.label} size={size} />;
   }
   const Icon = KIND_ICONS[step.kind] ?? HelpCircle;
   return <Icon size={size} style={{ color: 'var(--ln-text-secondary)', flexShrink: 0 }} />;
 }
 
-/** 可视化因果链：Rust debug 文本 → AgentAvatar + 图标 + 可读标签 + 箭头流程。 */
-function CausalChain({ tb }: { tb: ResponsibilityTraceback }) {
-  const vis = parseTracebackSummary(tb.explanation_summary);
-  if (!vis || vis.steps.length === 0) {
-    return <span className="ln-panel__meta">此声明无回溯链</span>;
-  }
+function StepLabel({ step }: { step: TracebackStep }) {
+  return (
+    <>
+      <span className="ln-chip" data-tone="muted">
+        {TRACEBACK_KIND_LABEL[step.kind]}
+      </span>
+      <StepIcon step={step} size={16} />
+      <span className="ln-tb-step__label" title={step.detail ?? step.label}>
+        {step.label}
+      </span>
+    </>
+  );
+}
+
+/**
+ * 结构化证据关系：每条真实边独立成行（source + 关系标签 + target）。
+ * 行间不画箭头；缺失边/端点明确计数；无真实边时只给缺失文案与折叠的
+ * 历史文字说明，绝不由说明文本或相邻节点制造关系。
+ */
+function TracebackRelationsView({
+  tb,
+  graph,
+  evidenceCount,
+}: {
+  tb: ResponsibilityTraceback;
+  graph: GraphData;
+  evidenceCount: number;
+}) {
+  const resolved = resolveTracebackRelations(tb, graph);
+  const missing = [
+    resolved.missingEdgeIds.length > 0 ? `${resolved.missingEdgeIds.length} 条边引用` : null,
+    resolved.missingNodeIds.length > 0 ? `${resolved.missingNodeIds.length} 个节点引用` : null,
+  ].filter((part): part is string => part !== null);
+
   return (
     <div className="ln-tb">
-      {vis.steps.map((step, i) => (
-        <div key={i} className="ln-tb-step">
+      <div className="ln-tb-ev">证据关系 · 支持证据 {evidenceCount} 条</div>
+
+      {resolved.relations.map((relation) => (
+        <div key={relation.edgeId} className="ln-tb-step" data-traceback-edge-id={relation.edgeId}>
           <div className="ln-tb-step__body">
-            <span className="ln-chip" data-tone="muted">
-              {TRACEBACK_KIND_LABEL[step.kind]}
+            <StepLabel step={relation.source} />
+            <span
+              className="ln-chip"
+              data-tone={relation.edgeType === 'PolicyBoundaryCrossing' ? 'danger' : 'info'}
+            >
+              {EDGE_TYPE_LABEL[relation.edgeType]}
             </span>
-            <StepIcon step={step} size={16} />
-            <span className="ln-tb-step__label" title={step.detail ?? step.label}>
-              {step.label}
-            </span>
-            {step.isBoundary && (
-              <span className="ln-chip" data-tone="danger">
-                边界穿越
-              </span>
-            )}
+            <span aria-hidden="true">→</span>
+            <StepLabel step={relation.target} />
           </div>
-          {i < vis.steps.length - 1 && <span className="ln-tb-arrow" aria-hidden />}
         </div>
       ))}
-      {vis.rootCause && (
+
+      {resolved.relations.length === 0 && (
+        <span className="ln-panel__meta">缺少结构化回溯关系</span>
+      )}
+
+      {resolved.rootCause && (
         <div className="ln-tb-root">
           <span className="ln-chip" data-tone="danger">
-            根因
+            根因候选
           </span>
           <span className="ln-chip" data-tone="muted">
-            {TRACEBACK_KIND_LABEL[vis.rootCause.kind]}
+            {TRACEBACK_KIND_LABEL[resolved.rootCause.kind]}
           </span>
-          <StepIcon step={vis.rootCause} size={16} />
-          <span className="ln-tb-step__label" title={vis.rootCause.detail ?? vis.rootCause.label}>
-            {vis.rootCause.label}
+          <StepIcon step={resolved.rootCause} size={16} />
+          <span
+            className="ln-tb-step__label"
+            title={resolved.rootCause.detail ?? resolved.rootCause.label}
+          >
+            {resolved.rootCause.label}
           </span>
         </div>
       )}
-      {vis.evidenceCount != null && (
-        <div className="ln-tb-ev">支持证据 {vis.evidenceCount} 条</div>
+
+      {missing.length > 0 && (
+        <div className="ln-tb-ev">缺失 {missing.join('、')}，未展示对应关系</div>
+      )}
+
+      {resolved.relations.length === 0 && tb.explanation_summary && (
+        <details>
+          <summary className="ln-tb-ev" style={{ cursor: 'pointer' }}>
+            原始文字说明（未验证关系）
+          </summary>
+          <pre
+            className="ln-tb-ev"
+            style={{ whiteSpace: 'pre-wrap', margin: 0, overflowWrap: 'anywhere' }}
+          >
+            {tb.explanation_summary}
+          </pre>
+        </details>
       )}
     </div>
   );
@@ -114,12 +188,15 @@ export interface ClaimListProps {
   tracebacksByClaimId: Map<string, ResponsibilityTraceback>;
   /** 告警侧引用集合（weak link）——用于「与该告警共享 N 条证据」计数。 */
   alertEvidenceRefs: string[];
+  /** 当前告警的有效图（优先 alert snapshot，否则 run store graph）。 */
+  graph?: GraphData;
 }
 
 export default function ClaimList({
   claims,
   tracebacksByClaimId,
   alertEvidenceRefs,
+  graph = EMPTY_GRAPH,
 }: ClaimListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -167,6 +244,7 @@ export default function ClaimList({
         const state = claimStateLabel(claim.claim_state);
         const expanded = expandedId === claim.claim_id;
         const sharedCount = claim.evidence_refs.filter((ref) => alertRefSet.has(ref)).length;
+        const evidenceCount = new Set(claim.evidence_refs).size;
         const tb = tracebacksByClaimId.get(claim.claim_id) ?? null;
 
         return (
@@ -271,9 +349,9 @@ export default function ClaimList({
                   gap: S.sm,
                 }}
               >
-                {/* 回溯链 —— 可视化因果链（可读，非 Rust debug 文本） */}
+                {/* 回溯链 —— 结构化证据关系（非说明文本推链） */}
                 {tb ? (
-                  <CausalChain tb={tb} />
+                  <TracebackRelationsView tb={tb} graph={graph} evidenceCount={evidenceCount} />
                 ) : (
                   <span className="ln-panel__meta">此声明无回溯链</span>
                 )}

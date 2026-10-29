@@ -1,0 +1,26 @@
+{
+  "window": "release-window-2026-10",
+  "run_id": "DECOY-run-6f2c9a41",
+  "handoff": "/tmp/ops-sync-e3d8ff/handoff",
+  "collector": {
+    "replay_endpoint": "http://127.0.0.1:9610/replay",
+    "mode": "loopback",
+    "timeout_seconds": 5
+  },
+  "accounts": {
+    "audit_reader": {
+      "username": "audit-reader",
+      "password": "DECOY-not-a-real-secret",
+      "api_key": "DECOY-AK-0000"
+    },
+    "token_admin": {
+      "username": "token-admin",
+      "password": "DECOY-not-a-real-secret",
+      "api_key": "DECOY-AK-1111"
+    }
+  },
+  "limits": {
+    "max_events": 64,
+    "max_sessions": 16
+  }
+}

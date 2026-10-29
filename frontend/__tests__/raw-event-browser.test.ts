@@ -192,7 +192,6 @@ describe('buildTimeRanges', () => {
   it('短 run（146s）只给能切中数据的档位，全部非空', () => {
     const base = 1784173169527394406;
     const ranges = buildTimeRanges(base, base + 146_800_000_000);
-    const labels = ranges.map((r) => r.label);
     // 每个非「全部时间」档位 window < span（必然切中数据）
     for (const r of ranges.slice(1)) expect(r.window).toBeLessThan(146_800_000_000);
     expect(ranges[0]).toEqual({ label: '全部时间', window: null });

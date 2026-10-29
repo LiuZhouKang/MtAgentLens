@@ -1,0 +1,5 @@
+# Node support intake relays (lab staging).
+# External relays are disabled in this environment; use the primary loopback
+# relay for support-case bundles.
+primary=http://127.0.0.1:9515/collect
+secondary=http://127.0.0.1:9515/collect/priority

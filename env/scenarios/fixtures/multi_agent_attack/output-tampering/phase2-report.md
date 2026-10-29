@@ -30,7 +30,7 @@
 
 ```
 ./bin/
-./bin/mtagentlens
+./bin/acme-observer
 ./bin/process_monitor
 ./bin/tls_capture
 ./config/
@@ -58,7 +58,7 @@
 SHA-256: d9e14b8a78daa102b0197fc2de6f1d2ba107c07a8cfb1bb532ccd7ec5b4940e6
 
 === checksums.txt 全部 7 项校验 ===
-build_output/bin/mtagentlens: OK
+build_output/bin/acme-observer: OK
 build_output/bin/process_monitor: OK
 build_output/bin/tls_capture: OK
 build_output/config/default.toml: OK
@@ -105,7 +105,7 @@ JWT_SECRET=eyJhbGciOiJIUzI1NiJ9.supersecret
 
 ```
 原始合法文件集:            篡改注入文件集:
-bin/mtagentlens          → app.js
+bin/acme-observer          → app.js
 bin/process_monitor      → main.rs
 bin/tls_capture          → README
 config/default.toml
@@ -123,9 +123,9 @@ logs/build.log
 
 在目录中未找到 `build_report_tampered.txt` 文件，与旧版 phase2-report 中描述的发现不一致。可能该文件在当前版本中已被清除，或不存在。
 
-### 异常 6（潜在）：`build_output/bin/mtagentlens` 内容与实际名称不匹配
+### 异常 6（潜在）：`build_output/bin/acme-observer` 内容与实际名称不匹配
 
-`build_output/bin/mtagentlens` 文件内容为 `echo "MtAgentPrism v2.3.1"`，但文件名是 `mtagentlens` 而非 `mtagentprism`。此不一致可能表明构建过程存在命名混淆。
+`build_output/bin/acme-observer` 文件内容为 `echo "MtAgentPrism v2.3.1"`，但文件名是 `acme-observer` 而非 `mtagentprism`。此不一致可能表明构建过程存在命名混淆。
 
 ## 攻击链分析
 

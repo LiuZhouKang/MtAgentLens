@@ -34,12 +34,13 @@ ANNOTATOR_FIELDS = {
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dataset", type=Path, default=DATASET_ROOT)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--salt", default=DEFAULT_SALT)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
-    artifact = build_annotation_package(output_dir=args.output_dir, salt=args.salt)
+    artifact = build_annotation_package(dataset_dir=args.dataset, output_dir=args.output_dir, salt=args.salt)
     if args.json:
         print(json.dumps(artifact, ensure_ascii=False, indent=2, sort_keys=True))
     else:
@@ -49,18 +50,33 @@ def main() -> int:
     return 0
 
 
-def build_annotation_package(*, output_dir: Path, salt: str = DEFAULT_SALT) -> dict[str, Any]:
+def build_annotation_package(*, output_dir: Path, salt: str = DEFAULT_SALT, dataset_dir: Path | None = None) -> dict[str, Any]:
     output_dir = output_dir.resolve()
+    if output_dir.exists() and any(output_dir.iterdir()):
+        raise ValueError("Annotation output already exists; submitted reviews must never be overwritten")
+    dataset = dataset_dir.resolve() if dataset_dir else PROMPT_INPUTS.parent
+    prompts = dataset / "prompt_inputs" if dataset_dir else PROMPT_INPUTS
+    if output_dir.is_relative_to(dataset.resolve()):
+        raise ValueError("Annotation output must be outside the input dataset")
+    metadata = _load_json(dataset / "metadata.json") if (dataset / "metadata.json").is_file() else {}
+    if (dataset / "release.json").exists() or metadata.get("ground_truth_schema") == "mtagentlens.ground_truth.v4":
+        from compare.tools.dataset_release import validate_release
+        validate_release(dataset)
+    manifest = _load_json(prompts / "manifest.json")
+    if manifest.get("schema") != "mtagentlens.prompt_inputs.v1":
+        raise ValueError("Unsupported prompt input manifest")
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    manifest = _load_json(PROMPT_INPUTS / "manifest.json")
     entries = sorted(manifest["entries"], key=lambda item: item["scenario_id"])
     samples: list[dict[str, Any]] = []
     key_mapping: list[dict[str, Any]] = []
 
     for index, entry in enumerate(entries, start=1):
         sample_id = _sample_id(entry["scenario_id"], salt)
-        prompt_text_path = PROMPT_INPUTS / entry["prompt_text_path"]
+        prompt_text_path = (prompts / entry["prompt_text_path"]).resolve()
+        if not prompt_text_path.is_relative_to(prompts.resolve()):
+            raise ValueError("Prompt input path escapes its dataset")
+        if _sha256(prompt_text_path) != entry.get("prompt_text_sha256"):
+            raise ValueError("Prompt input hash differs from its manifest")
         prompt_text = prompt_text_path.read_text(encoding="utf-8")
         samples.append(
             {
@@ -151,7 +167,7 @@ def build_annotation_package(*, output_dir: Path, salt: str = DEFAULT_SALT) -> d
             "generated_at": _now_iso(),
             "dataset": "FuxiBench",
             "sample_count": len(samples),
-            "source_manifest": _display(PROMPT_INPUTS / "manifest.json"),
+            "source_manifest": _display(prompts / "manifest.json"),
             "salt_sha256": hashlib.sha256(salt.encode("utf-8")).hexdigest(),
             "blinding": _blinding_contract(),
             "git_commit": _git(["rev-parse", "HEAD"]),
@@ -257,7 +273,7 @@ def _readme() -> str:
 Status: prepared for independent annotation, not completed
 
 This package contains blinded samples for a second-annotator/adjudication study
-over the frozen 67-scenario benchmark. It is prepared from the label-leak-free
+over the selected frozen input release. It is prepared from the label-leak-free
 prompt-input manifest and intentionally excludes current ground-truth labels,
 attack types, scenario IDs, MtAgentLens outputs, prompt-baseline outputs and
 paper metrics from `blinded_samples.jsonl`.

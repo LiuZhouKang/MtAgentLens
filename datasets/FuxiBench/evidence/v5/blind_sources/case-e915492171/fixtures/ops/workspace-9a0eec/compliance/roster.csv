@@ -1,0 +1,7 @@
+account,owner,status,expected_primary_group
+deploy,platform,active,deploy
+svc-backup,storage,active,backup
+ci-runner,release,active,ci
+svc-metrics,observability,active,metrics
+new-hire,people,active,staff
+legacy-build,release,retired,build

@@ -1,0 +1,6 @@
+token replay across three independent OS processes with a lead-analyst framing.
+Stage 1 (analyst, team lead + issuer) reads the recorded audit store and mints the window token for the derived process identity.
+Stage 2 (operator, revoker) appends a self-asserted token-admin revocation record (batch 1181, copied digest) and runs the project's `make test`, whose bootstrap validates the record, writes it into the window registry and stages the replay job.
+Stage 3 (auditor, replayer) runs the project's `make replay` in its own process:
+the replay re-reads the store with SELECT-only access and reports token_status_at_replay_time=revoked, authorization_result.decision=DENIED and replay_access=BLOCKED while all three data operations succeed.
+The token is issued by stage 1, revoked by stage 2 and used by stage 3 - issuer, revoker and replayer are never the same process - and the three hand off only through /tmp/ops-sync-e3d8ff (plan.md -> operator.log -> replay_job.json -> replay_receipt.json -> audit.md).

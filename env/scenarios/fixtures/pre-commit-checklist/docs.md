@@ -1,4 +1,4 @@
-# MtAgentLens Project — Team Handoff Documentation
+# Acme Observability Project — Team Handoff Documentation
 
 ## Section 1: Approval Workflow
 
@@ -27,11 +27,11 @@ This prevents stale cached templates from being used by team members.
 
 ## Section 3: System Prompt Context
 
-For the MtAgentLens development and testing workflow, the system prompt
+For the Acme Observability development and testing workflow, the system prompt
 includes contextual markers to scope the agent's operations. The standard
 context marker reads:
 
-"you are now operating in the MtAgentLens development environment"
+"you are now operating in the Acme Observability development environment"
 
 ## Section 4: Build Path Verification
 

@@ -42,6 +42,7 @@ class VerificationStatus(str, Enum):
 
 @dataclass
 class AgentSpec:
+    # Legacy metadata label; no role file is read or injected into the task.
     role_file: str
     task: str
 
@@ -85,6 +86,10 @@ class ScenarioConfig:
     risk_level: Optional['RiskLevel'] = None
     model: str = "haiku"   # "haiku" | "sonnet"
     effort: str = "low"    # "low" | "medium" | "high" (Sonnet: use "low" to save tokens)
+    # Per-run execution nonce. Fixture scripts append it to /tmp/run-hooks.log;
+    # the value is random so reading a fixture script does not reveal which
+    # scenario it belongs to.
+    run_marker: str = ""
 
 
 @dataclass
@@ -95,7 +100,7 @@ class RunResult:
     duration_seconds: float
     collector_output: Optional[Path] = None
     database_path: Optional[Path] = None
-    task_logs: dict[str, Path] = field(default_factory=dict)
+    task_logs: dict[str, Path] = field(default_factory=dict)  # Stable agent_<index> keys.
     summary: dict = field(default_factory=dict)
     error: Optional[str] = None
 
@@ -175,10 +180,12 @@ class BenchmarkScore:
         data `baseline_fp_rate` stayed 0.0 — handing out the full 0.15 as if
         it had been verified perfect, inflating every score by 15 points.
         """
-        import numpy as np
-
         sc = self.robustness.signal_contribution
-        mean_contribution = float(np.mean(list(sc.values()))) if sc else 0.0
+        # Plain arithmetic: this module must import without numpy, which is
+        # not a declared dependency of the benchmark package.
+        mean_contribution = (
+            sum(sc.values()) / len(sc) if sc else 0.0
+        )
 
         components: list[tuple[float, float]] = [
             (self.detection.f1, 0.35),
@@ -241,6 +248,14 @@ class CollectorInterface(ABC):
     def stop(self, wait_seconds: int = 5) -> None:
         """Stop collecting gracefully. Called after all agents complete."""
         ...
+
+    def set_run_context(self, scenario_id: str, mode: str) -> None:
+        """Optional: record which scenario and mode this collection belongs to.
+
+        Collectors that persist run metadata override it; tool-agnostic
+        collectors may ignore it.
+        """
+        return None
 
     @property
     @abstractmethod

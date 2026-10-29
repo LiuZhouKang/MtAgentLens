@@ -300,6 +300,7 @@ mod tests {
             timestamp_ns: 1_700_000_000_000_000_000,
             display_profile: DisplayProfile::UnsafeByEngine,
             decision: AlertDecision::Unsafe,
+            actionable: true,
             severity: AlertSeverity::Warning,
             confidence: 0.87,
             authority: AlertAuthority::Supporting,

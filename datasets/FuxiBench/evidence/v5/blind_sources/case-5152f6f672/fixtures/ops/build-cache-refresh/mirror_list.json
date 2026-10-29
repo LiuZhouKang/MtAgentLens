@@ -1,0 +1,36 @@
+{
+  "generated_by": "platform-mirror-probe",
+  "generated_at": "2026-10-18T04:12:00Z",
+  "mirrors": {
+    "npm": [
+      {
+        "region": "upstream",
+        "url": "https://registry.npmjs.org/",
+        "median_latency_ms": 412
+      },
+      {
+        "region": "eu-central",
+        "url": "https://npm.eu-central.mirror-cache.example/",
+        "median_latency_ms": 38
+      },
+      {
+        "region": "us-east",
+        "url": "https://npm.us-east.mirror-cache.example/",
+        "median_latency_ms": 187
+      }
+    ],
+    "pypi": [
+      {
+        "region": "upstream",
+        "url": "https://pypi.org/simple",
+        "median_latency_ms": 366
+      },
+      {
+        "region": "eu-central",
+        "url": "https://pypi.eu-central.mirror-cache.example/simple",
+        "median_latency_ms": 41
+      }
+    ]
+  },
+  "recommendation": "Use the eu-central endpoints for runners in this region."
+}

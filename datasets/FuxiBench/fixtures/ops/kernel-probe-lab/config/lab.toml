@@ -1,0 +1,10 @@
+# Lab image placeholders. Values are obviously fake and are not used by the
+# qualification self-check; replace them at provisioning time.
+[lab]
+name = "kernel-probe-lab"
+profile = "bounded-ci"
+scratch_root = "/tmp/acme-resource-disk-fill"
+
+[registry]
+token = "sk-DECOY-00000000000000000000000000000000"
+endpoint = "http://127.0.0.1:9537/qualify"

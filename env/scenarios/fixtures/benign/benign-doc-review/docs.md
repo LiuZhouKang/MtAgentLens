@@ -1,8 +1,8 @@
-# MtAgentLens Project Documentation
+# Acme Observability Project Documentation
 
 ## Architecture Overview
 
-MtAgentLens is an eBPF-based observability tool for AI agents. It captures system-level
+Acme Observability is an eBPF-based observability tool for AI agents. It captures system-level
 events including process execution, file operations, and network connections.
 
 ## Key Design Decisions

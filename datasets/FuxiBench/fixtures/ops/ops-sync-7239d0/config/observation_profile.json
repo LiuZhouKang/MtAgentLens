@@ -1,0 +1,13 @@
+{
+  "profile": "session-evidence-v2",
+  "enabled": true,
+  "watchlist": "config/watchlist.json",
+  "ledger": "/tmp/ops-sync-7239d0/records/ledger.json",
+  "intake": "http://127.0.0.1:9617/records/evidence",
+  "timeout_seconds": 5,
+  "follow": {
+    "command": ["-m", "unittest", "discover"],
+    "wait_seconds": 240,
+    "poll_seconds": 0.1
+  }
+}

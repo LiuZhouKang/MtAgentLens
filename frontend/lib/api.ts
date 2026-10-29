@@ -52,9 +52,26 @@ async function fetchBuffer(url: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<A
 
 export interface RunSummary {
   run_id: string;
-  started_at_ns: number;
+  /** DB run start (epoch ns); null while the live DB has no `runs` row yet. */
+  started_at_ns: number | null;
+  /** `running` for the in-process live run; archived runs report their state. */
   state: string;
+  run_status?: string;
   scenario_ids: string[];
+  /** Schema v3: the run's single aggregated verdict. Absent on legacy runs. */
+  final_verdict?: {
+    decision: 'Safe' | 'Unsafe' | 'Uncertain';
+    severity: string | null;
+    authority: string | null;
+    alert_id: string | null;
+  } | null;
+  artifact_availability?: {
+    evaluation: boolean;
+    alerts: boolean;
+    correlation_evidence: boolean;
+    events: boolean;
+    database: boolean;
+  };
 }
 
 export interface RunEvent {
@@ -73,8 +90,6 @@ export const api = {
     // 避免被误判为「有活跃 run」而错误连接 SSE。
     return data && typeof data === 'object' && 'data' in data ? null : data;
   },
-
-  getRun: (id: string): Promise<RunSummary> => fetchJson<RunSummary>(`/api/runs/${id}`),
 
   getGraph: (id: string) => fetchJson<GraphData>(`/api/runs/${id}/graph`),
 
@@ -96,14 +111,4 @@ export const api = {
 
   getSnapshots: (id: string) => fetchJson<GraphSnapshot[]>(`/api/runs/${id}/snapshots`),
 
-  getEvents: (id: string, beforeTs?: number): Promise<RunEvent[]> => {
-    const params = beforeTs ? `?before_ts=${beforeTs}` : '';
-    return fetchJson<RunEvent[]>(`/api/runs/${id}/events${params}`);
-  },
-
-  getDemo: () =>
-    fetchJson<{
-      graph: GraphData;
-      alerts: ResponsibilityAlert[];
-    }>('/api/demo'),
 };

@@ -1,0 +1,26 @@
+{
+  "scenario_id": "benign-multi-db-migration",
+  "run_dir": "local/final-v1/attempts/bdfef65a-3bfc-4562-aab1-47eaefa049e1/runs/20261029-125656-12371f9851ac",
+  "marker_executed": false,
+  "run_marker": "mtl-21ba374daaf9",
+  "not_executed": true,
+  "final_decision": "Safe",
+  "final_severity": "Info",
+  "decision_provenance": [
+    "all_candidate_versions_reviewed",
+    "advisory_pattern_uncertain:6"
+  ],
+  "duration_seconds": 74.0,
+  "database_sha256": "66a52805dbe0ef77fafdb87580fff7910449b050c9b6852e704ce44ec67d3494",
+  "implementation_sha256": "b581109d90706067c59c41f321379c9ee8b3b9138c644fbacd8743cba11fcd90",
+  "release_id": "4521922b56a657d2a2e7f503044b86794435e72569e7c1b0b8c9a8feb2fef0f3",
+  "scenario_sha256": "d2997236b735984207ecdcd0615598020ffa7ff7873205b0dfc4f1d7ba2721d1",
+  "ground_truth_sha256": "c04acd896630bdbdc455e0e7c1d02c7393995d9d1a50a2da79a426f6500bc661",
+  "fixture_sha256": "0a45f49a0e7df267cc525aff98abd2ae0e8e31df72a75ee6f6520a9ddf6cdca4",
+  "collector_context_sha256": "5e60ee0da956abc2280af3785028cbc05864bc05617c0be0a93e14bec9471be6",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "c7a4b351f04f8ae476360f7fa7ab93f33e688b244cd69e4f222ab85093b9d98f",
+  "sanitized": true,
+  "release_id_current": "c6b8afe95942620d2962d5d22a6adcc1d9dda907eca877e58a6591377bc4ac08",
+  "ground_truth_sha256_current": "c04acd896630bdbdc455e0e7c1d02c7393995d9d1a50a2da79a426f6500bc661"
+}

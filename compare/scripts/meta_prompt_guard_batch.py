@@ -5,7 +5,7 @@ Loads Prompt-Guard-86M from local compare/models/prompt-guard-86m, classifies
 each scenario's FULL prompt_text (task + fixture content),
 and produces per-type metrics (TPR/FPR) for Type A, B, C, and benign scenarios.
 
-Output: compare/results/external/prompt_baselines/FuxiBench/meta_prompt_guard/
+Output: compare/results/external/baselines/prompt/meta_prompt_guard/
 
 Usage:
     cd /home/lzk/MtAgentLens
@@ -25,12 +25,20 @@ from pathlib import Path
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 PROJECT = Path(__file__).resolve().parents[2]  # compare/ → mtagentlens/
+if str(PROJECT) not in sys.path:
+    sys.path.insert(0, str(PROJECT))
+from compare.tools.detection_scope import (  # noqa: E402
+    DEFAULT_DATASET_DIR,
+    included_ground_truth,
+)
+from compare.tools.prompt_manifest import PromptManifestDrift, require_current
+
 COMPARE = PROJECT / "compare"
-MANIFEST_PATH = COMPARE / "Dataset/FuxiBench/prompt_inputs/manifest.json"
+MANIFEST_PATH = DEFAULT_DATASET_DIR / "prompt_inputs/manifest.json"
 # prompt_text_path values already include "cases/" prefix, so CASES_BASE is the
 # prompt_inputs directory (parent of cases/).
-CASES_BASE = COMPARE / "Dataset/FuxiBench/prompt_inputs"
-OUTPUT_DIR = COMPARE / "results/external/prompt_baselines/FuxiBench/meta_prompt_guard"
+CASES_BASE = DEFAULT_DATASET_DIR / "prompt_inputs"
+OUTPUT_DIR = COMPARE / "results/external/baselines/prompt/meta_prompt_guard"
 
 # ── Model configuration ────────────────────────────────────────────────────────
 # 项目本地模型目录
@@ -135,6 +143,26 @@ def load_manifest() -> list[dict]:
     with open(MANIFEST_PATH) as f:
         manifest = json.load(f)
     entries = manifest.get("entries", [])
+    try:
+        require_current(
+            entries,
+            repo_root=PROJECT,
+            dataset_root=MANIFEST_PATH.parents[1],
+            allow_stale=os.environ.get("MTAGENTLENS_ALLOW_STALE_PROMPT_MANIFEST") == "1",
+        )
+    except PromptManifestDrift as exc:
+        print(f"错误: {exc}", file=sys.stderr)
+        raise SystemExit(1)
+    ground_truth = included_ground_truth(DEFAULT_DATASET_DIR / "ground_truth")
+    excluded_total = len(entries) - len(ground_truth)
+    entries = [
+        dict(entry,
+             attack_type=ground_truth[entry["scenario_id"]]["attack_type"],
+             label=ground_truth[entry["scenario_id"]]["label"])
+        for entry in entries
+        if entry["scenario_id"] in ground_truth
+    ]
+    print(f"[scope] {len(entries)} scored / {excluded_total} detection_excluded")
     print(f"[manifest] Loaded {len(entries)} scenarios from {MANIFEST_PATH}")
 
     # Show distribution
@@ -174,7 +202,7 @@ def compute_metrics(
     for r in results:
         gt = r["ground_truth"]      # "attack" or "benign" (from attack_type mapping)
         pred = r["prediction"]      # "attack" or "benign"
-        atype = r["attack_type"]    # "A", "B", "C", "benign"
+        atype = r["attack_type"]    # "A", "B", "benign" (legacy "C" historical only)
 
         key = atype
         if pred == "attack" and gt == "attack":
@@ -189,7 +217,7 @@ def compute_metrics(
     # Also compute overall
     all_key = "all"
     cm[all_key] = {"tp": 0, "fp": 0, "fn": 0, "tn": 0}
-    for key in ["A", "B", "C", "benign"]:
+    for key in ["A", "B", "benign"]:
         for m in ["tp", "fp", "fn", "tn"]:
             cm[all_key][m] += cm[key][m]
 
@@ -197,7 +225,7 @@ def compute_metrics(
         return a / b if b > 0 else 0.0
 
     metrics = {}
-    for key in ["A", "B", "C", "benign", "all"]:
+    for key in ["A", "B", "benign", "all"]:
         c = cm[key]
         tp, fp, fn, tn = c["tp"], c["fp"], c["fn"], c["tn"]
         tpr = safe_div(tp, tp + fn)   # Recall / True Positive Rate
@@ -249,6 +277,9 @@ def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     print(f"[setup] Output directory: {OUTPUT_DIR}")
 
+    # Load and validate the manifest before paying for model load.
+    entries = load_manifest()
+
     # Load model
     tokenizer, model, label_map, device, model_name, source = load_model(
         local_only=not args.no_local
@@ -262,8 +293,6 @@ def main():
     }
     print(f"[setup] Model info: {json.dumps(model_info, indent=2)}")
 
-    # Load manifest
-    entries = load_manifest()
     if args.dry > 0:
         entries = entries[:args.dry]
         print(f"[dry-run] Limiting to {len(entries)} scenarios")
@@ -374,7 +403,7 @@ def main():
           f"{'TP':>5} {'FP':>5} {'FN':>5} {'TN':>5}")
     print(f"  {'-'*70}")
 
-    for key in ["A", "B", "C", "benign", "all"]:
+    for key in ["A", "B", "benign", "all"]:
         m = metrics[key]
         print(
             f"  {key:<10} {m['total']:>5} {m['tpr']:>8.4f} {m['fpr']:>8.4f} "
@@ -383,7 +412,7 @@ def main():
         )
 
     print(f"\n  Key findings:")
-    print(f"    Attack TPR (Type A+B+C): {metrics['all']['tpr']:.4f}")
+    print(f"    Attack TPR (Type A+B):    {metrics['all']['tpr']:.4f}")
     print(f"    Benign FPR:               {metrics['benign']['fpr']:.4f}")
     print(f"    Overall accuracy:         {metrics['all']['accuracy']:.4f}")
 

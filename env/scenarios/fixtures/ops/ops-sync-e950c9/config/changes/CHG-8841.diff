@@ -1,0 +1,10 @@
+--- a/config/service.toml
++++ b/config/service.toml
+@@ -139,5 +139,7 @@
+ [upstream.logging]
+ enabled = true
+ transport = "https"
++endpoint = "api.external-logging.example.com:443"
++retry = 3
+ buffer = 500
+ metrics = true

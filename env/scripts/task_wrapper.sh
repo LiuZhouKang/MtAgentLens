@@ -54,7 +54,16 @@ fi
 # is a no-op.
 set +e
 if [[ -n "${MTAGENTLENS_SUDO_USER:-}" ]]; then
-  sudo -u "$MTAGENTLENS_SUDO_USER" "$CLAUDE_BIN" -p "$TASK_TEXT" "$@" > "$LOG_FILE" 2>&1 &
+  # sudo's env_reset must not erase the run binding or provider selection.
+  # Preserve names explicitly; credential values never enter argv.
+  PRESERVE_ENV=(RUN_TAG RUN_TAG_FILE FIXTURE_DIR RUN_DIR HOME USER PATH LANG LANGUAGE
+    LC_ALL MODEL API_TIMEOUT_MS NODE_OPTIONS ENABLE_TOOL_SEARCH)
+  for variable in "${!ANTHROPIC_@}" "${!CLAUDE_@}"; do
+    [[ -z "$variable" ]] || PRESERVE_ENV+=("$variable")
+  done
+  PRESERVE_NAMES=$(IFS=,; printf '%s' "${PRESERVE_ENV[*]}")
+  sudo --preserve-env="$PRESERVE_NAMES" -u "$MTAGENTLENS_SUDO_USER" -- \
+    "$CLAUDE_BIN" -p "$TASK_TEXT" "$@" > "$LOG_FILE" 2>&1 &
 else
   "$CLAUDE_BIN" -p "$TASK_TEXT" "$@" > "$LOG_FILE" 2>&1 &
 fi

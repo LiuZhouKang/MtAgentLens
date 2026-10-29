@@ -34,24 +34,6 @@ import {
   type LiveStats,
 } from './live/live-types';
 
-interface EngineAPI {
-  setVisualizationMode(mode: 'globe' | 'graph3d' | 'graph2d' | 'map' | 'hero' | 'focus'): void;
-  flyToAgent(agentId: string, duration?: number): void;
-  flyToNode(nodeId: string, duration?: number): void;
-  flyToLevel(level: number, duration?: number): void;
-  resetCamera(duration?: number): void;
-  updateGraph(graph: GraphData): void;
-  highlightPath(edgeIds: string[]): void;
-  clearHighlights(): void;
-  showAlertPulse(alert: ResponsibilityAlert): void;
-  clearAlertPulses(): void;
-  orbit(deltaX: number, deltaY: number): void;
-  zoom(delta: number): void;
-  onNodeClicked(cb: (nodeId: string) => void): void;
-  onZoomLevelChanged(cb: (level: number) => void): void;
-  dispose(): void;
-}
-
 /**
  * Which data source is currently shown. Backend runs are consumed from the
  * run's SQLite db (via /api/runs/:id/db) when available, otherwise via the
@@ -70,6 +52,8 @@ interface AppStore {
   activeRunId: string | null;
   dataSource: DataSourceMeta | null;
   zoomLevel: ZoomLevel;
+  cameraResetRequest: number;
+  resetCamera: () => void;
   selectedNodeId: string | null;
   expandedNodeIds: Set<string>;
   alerts: ResponsibilityAlert[];
@@ -91,7 +75,6 @@ interface AppStore {
   timelinePosition: number;
   investigationContext: InvestigationContext;
   errorMessage: string | null;
-  engineRef: { current: EngineAPI | null };
   /** 数据加载/导入进行中（init/loadRun/loadSample/importFile 期间 true，数据落库后 false）。
    *  全屏 Observation Orbit 据此保持覆盖，直到真实数据就绪——消除「加载器先淡出、数据后切换」的跳变。 */
   dataLoading: boolean;
@@ -115,12 +98,6 @@ interface AppStore {
   setInvestigationContext: (patch: Partial<InvestigationContext>) => void;
   focusAlert: (alert: ResponsibilityAlert) => void;
   setError: (msg: string | null) => void;
-  flyToAgent: (id: string) => void;
-  flyToNode: (id: string) => void;
-  flyToLevel: (l: ZoomLevel) => void;
-  setVisualizationMode: (m: 'globe' | 'graph3d' | 'graph2d' | 'map' | 'hero' | 'focus') => void;
-  highlightPath: (edgeIds: string[]) => void;
-  clearHighlights: () => void;
   loadRun: (runId: string) => Promise<void>;
   loadSample: () => Promise<void>;
   loadDemo: () => void;
@@ -148,8 +125,16 @@ interface AppStore {
 // once per animation frame, so the store never re-renders the app per event.
 // Where requestAnimationFrame is unavailable (jsdom tests) the buffer flushes
 // synchronously so store assertions keep their synchronous semantics.
+let loadGeneration = 0;
 let alertBuffer: ResponsibilityAlert[] = [];
 let flushHandle: number | null = null;
+
+function discardPendingAlerts(): void {
+  alertBuffer = [];
+  if (flushHandle !== null && typeof cancelAnimationFrame === 'function')
+    cancelAnimationFrame(flushHandle);
+  flushHandle = null;
+}
 
 function flushAlertBuffer(get: () => AppStore, set: (partial: Partial<AppStore>) => void): void {
   flushHandle = null;
@@ -165,8 +150,10 @@ function flushAlertBuffer(get: () => AppStore, set: (partial: Partial<AppStore>)
   // 剥离 graph_snapshot 后再入 alerts——图已同步应用到 graph（onAlertReceived），
   // 驻留完整图快照浪费内存（审查 LOW-10），与 db 导入路径一致。
   const lean = sorted.map(({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest);
-  set({ alerts: [...lean, ...state.alerts].slice(0, 200) });
-  fresh.forEach((a) => state.engineRef.current?.showAlertPulse(a));
+  // No hard cap: the DB-import path keeps every alert, so truncating the live
+  // path made the same run show different counts in live and replay views.
+  // The lean projection drops graph snapshots, which is where the memory was.
+  set({ alerts: [...lean, ...state.alerts] });
 }
 
 /** Apply a local (non-API) data snapshot to the store. */
@@ -195,6 +182,8 @@ function applySnapshot(
     snapshotFrameIndex: 0,
     dataSource: opts.source,
     activeRunId: null,
+    investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
+    expandedNodeIds: new Set(),
     selectedNodeId: null,
     appState: 'replay',
     errorMessage: null,
@@ -211,6 +200,7 @@ function applyDbImport(
   set: (partial: Partial<AppStore>) => void,
   dbImport: DbImport,
   source: Extract<DataSourceMeta, { kind: 'db' }>,
+  appState: 'live' | 'replay' = 'replay',
 ): void {
   const leanAlerts = dbImport.alerts.map(
     ({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest,
@@ -230,8 +220,10 @@ function applyDbImport(
     snapshotFrameIndex: Math.max(0, dbImport.dbAssets.snapshotFrames.length - 1),
     dataSource: source,
     activeRunId: source.runId ?? null,
+    investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
+    expandedNodeIds: new Set(),
     selectedNodeId: null,
-    appState: 'replay',
+    appState,
     errorMessage: null,
     // 直播帧随 run 结束/导入清空，防陈旧帧遮蔽导入的时间演化帧（审查 MEDIUM-3）
     liveSnapshotFrames: [],
@@ -253,6 +245,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   activeRunId: null,
   dataSource: null,
   zoomLevel: 0,
+  cameraResetRequest: 0,
   selectedNodeId: null,
   expandedNodeIds: new Set(),
   alerts: [],
@@ -270,7 +263,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
   timelinePosition: 0,
   investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
   errorMessage: null,
-  engineRef: { current: null },
   // 初始为「加载中」：initData 在客户端启动时异步加载数据，全屏 Orbit 覆盖首载
   dataLoading: false,
   pageReady: false,
@@ -281,6 +273,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setPageReady: (v) => set({ pageReady: v }),
   setActiveRunId: (runId) => set({ activeRunId: runId }),
   setZoomLevel: (l) => set({ zoomLevel: l }),
+  resetCamera: () =>
+    set((state) => ({
+      cameraResetRequest: state.cameraResetRequest + 1,
+      selectedNodeId: null,
+      investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
+    })),
   setGraph: (nodes, edges) => {
     const graph = { nodes, edges };
     set({ graph, graphMetrics: deriveGraphMetrics(graph) });
@@ -307,28 +305,46 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ investigationContext: mergeInvestigationContext(get().investigationContext, patch) });
   },
   focusAlert: (alert) => {
-    const investigationContext = buildInvestigationContextFromAlert(alert);
+    const investigationContext = buildInvestigationContextFromAlert(alert, get().graph);
     set({ investigationContext });
-    if (investigationContext.highlightedPathEdgeIds.length) {
-      get().engineRef.current?.highlightPath(investigationContext.highlightedPathEdgeIds);
-    }
   },
   setError: (msg) => set({ errorMessage: msg }),
 
-  // Engine bridge methods — require engineRef to be set by the React component.
-  // Silently no-op if engine is not yet mounted (expected during initial render).
-  flyToAgent: (id) => get().engineRef.current?.flyToAgent(id),
-  flyToNode: (id) => get().engineRef.current?.flyToNode(id),
-  flyToLevel: (l) => get().engineRef.current?.flyToLevel(l),
-  setVisualizationMode: (m) => get().engineRef.current?.setVisualizationMode(m),
-  highlightPath: (edgeIds) => get().engineRef.current?.highlightPath(edgeIds),
-  clearHighlights: () => get().engineRef.current?.clearHighlights(),
   loadRun: async (runId) => {
     if (!runId) return;
+    discardPendingAlerts();
+    const generation = ++loadGeneration;
+    const isCurrent = () => generation === loadGeneration && get().activeRunId === runId;
+    const currentMode = () =>
+      get().live.run.isActive && get().live.run.runId === runId
+        ? ('live' as const)
+        : ('replay' as const);
+    // Re-loading the run that is currently live (e.g. initData racing the
+    // LiveSession poll) must not flip the UI back to replay: the session
+    // early-returns on the same run id and would never restore 'live'.
+    const liveRun = get().live.run;
+    const keepLive =
+      get().appState === 'live' && liveRun?.isActive === true && liveRun.runId === runId;
     set({
       activeRunId: runId,
+      graph: { nodes: [], edges: [] },
+      graphMetrics: null,
+      alerts: [],
+      evidence: [],
+      claims: [],
+      tracebacks: [],
+      intents: [],
+      actions: [],
+      overview: null,
+      monitoring: null,
+      dbAssets: null,
+      liveSnapshotFrames: [],
+      selectedNodeId: null,
+      snapshotFrameIndex: 0,
+      expandedNodeIds: new Set(),
+      investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
       dataSource: { kind: 'run', runId },
-      appState: 'replay',
+      ...(keepLive ? {} : { appState: 'replay' as const }),
       errorMessage: null,
       // 数据加载中：下载 db / sql.js 解析期间全屏 Orbit 保持覆盖
       dataLoading: true,
@@ -340,17 +356,21 @@ export const useAppStore = create<AppStore>((set, get) => ({
     // the backend lacks the db endpoint or the db yields nothing consumable.
     try {
       const buffer = await api.getRunDb(runId);
+      if (!isCurrent()) return;
       const dbImport = await loadDatabaseFromBytes(new Uint8Array(buffer), runId);
+      if (!isCurrent()) return;
       if (dbImport.hasConsumableData) {
-        applyDbImport(set, dbImport, { kind: 'db', label: runId, runId });
+        applyDbImport(set, dbImport, { kind: 'db', label: runId, runId }, currentMode());
         return;
       }
     } catch (_dbError) {
       // No db artifact on this backend — fall through to the API path.
     }
 
+    if (!isCurrent()) return;
     try {
       const [graph, alerts] = await Promise.all([api.getGraph(runId), api.getAlerts(runId)]);
+      if (!isCurrent()) return;
 
       // Strip graph_snapshot from alerts
       const leanAlerts = alerts.map(({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest);
@@ -373,6 +393,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         dataLoading: false, // API 回退路径同样结束加载
       });
     } catch (error) {
+      if (!isCurrent()) return;
       const message = error instanceof Error ? error.message : String(error);
       // 数据源不可用也清空 monitoring，防错误态残留上一次导入的运行监控信号
       set({
@@ -386,8 +407,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   loadSample: async () => {
+    discardPendingAlerts();
+    const generation = ++loadGeneration;
     set({ dataLoading: true }); // 样例加载（含内置样例 db 解析）期间全屏 Orbit 覆盖
     const data = await loadSampleData();
+    if (generation !== loadGeneration) return;
     if (!data) {
       set({ dataLoading: false });
       throw new Error('样例数据不可用（sample-run.json 未找到）');
@@ -409,6 +433,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       dbImport = null;
     }
 
+    if (generation !== loadGeneration) return;
     // 样例 = 态势演示图快照（sample-run.json）+ 内置真实 db 资产（db 驱动视图）。
     // 两者 agent 命名空间互不相交（UUID vs agent-a…d），why facets 不会跨 run 错配。
     const leanAlerts = data.alerts.map(({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest);
@@ -428,6 +453,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       dataSource: { kind: 'sample', label: '样例运行' },
       activeRunId: null,
       selectedNodeId: null,
+      investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
+      expandedNodeIds: new Set(),
       appState: 'replay',
       errorMessage: null,
       // MEDIUM-3：样例加载同样清空直播帧（此前唯一漏清的 loader，陈旧帧遮蔽样例图）
@@ -436,6 +463,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     });
   },
   loadDemo: () => {
+    discardPendingAlerts();
+    ++loadGeneration;
     applySnapshot(set, {
       graph: demoGraph,
       alerts: demoAlerts,
@@ -444,6 +473,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     });
   },
   loadSnapshot: (snapshot) => {
+    discardPendingAlerts();
+    ++loadGeneration;
     applySnapshot(set, {
       graph: snapshot.graph,
       alerts: snapshot.alerts,
@@ -452,6 +483,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     });
   },
   loadDatabase: (dbImport) => {
+    discardPendingAlerts();
+    ++loadGeneration;
     applyDbImport(set, dbImport, { kind: 'db', label: dbImport.label });
   },
 
@@ -461,15 +494,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     alertBuffer.push(alert);
     if (flushHandle == null) scheduleAlertFlush(get, set);
 
-    // Extract graph_snapshot and update GraphRenderer (Live mode)
+    // The graph stage subscribes to graph and investigationContext directly.
     if (alert.graph_snapshot?.nodes?.length) {
-      const engine = get().engineRef.current;
-      if (engine) {
-        engine.updateGraph({
-          nodes: alert.graph_snapshot.nodes,
-          edges: alert.graph_snapshot.edges || [],
-        });
-      }
       set({
         graph: {
           nodes: alert.graph_snapshot.nodes,
@@ -485,8 +511,33 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
   },
   onRunActiveChanged: (active) => {
-    // 活跃 run 进入实时态（徽章/事件流自动打开依赖 appState==='live'）
-    if (active && get().appState !== 'live') set({ appState: 'live' });
+    const runId = get().live.run.runId;
+    if (active && runId && get().activeRunId !== runId) {
+      ++loadGeneration;
+      discardPendingAlerts();
+      set({
+        activeRunId: runId,
+        dataSource: { kind: 'run', runId },
+        appState: 'live',
+        graph: { nodes: [], edges: [] },
+        graphMetrics: null,
+        alerts: [],
+        evidence: [],
+        claims: [],
+        tracebacks: [],
+        intents: [],
+        actions: [],
+        overview: null,
+        monitoring: null,
+        dbAssets: null,
+        liveSnapshotFrames: [],
+        selectedNodeId: null,
+        snapshotFrameIndex: 0,
+        investigationContext: DEFAULT_INVESTIGATION_CONTEXT,
+        errorMessage: null,
+        dataLoading: false,
+      });
+    } else if (active && get().appState !== 'live') set({ appState: 'live' });
     if (!active && get().appState === 'live') set({ appState: 'replay' });
   },
   setLiveStatus: (status) => set((s) => ({ live: { ...s.live, status } })),
@@ -501,15 +552,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setLiveSnapshotFrames: (frames) => {
     // 按 snapshot_id 去重 + 时间正序合并；默认指向最新帧（时间轴直播推进）。
     // 容量封顶 200 帧——长直播防无界内存（审查 MEDIUM-3）。
-    const seen = new Set<string>();
-    const merged = [...get().liveSnapshotFrames, ...frames].filter((f) => {
-      if (seen.has(f.snapshot_id)) return false;
-      seen.add(f.snapshot_id);
-      return true;
-    });
+    const previous = get().liveSnapshotFrames;
+    const previousIds = new Set(previous.map((f) => f.snapshot_id));
+    const byId = new Map(previous.map((f) => [f.snapshot_id, f]));
+    for (const frame of frames) byId.set(frame.snapshot_id, frame);
+    const merged = [...byId.values()].sort((a, b) => a.timestamp_ns - b.timestamp_ns);
     const capped = merged.slice(-200);
     // LOW-5：无新帧（合并后数量不变）时不重置 index——不覆盖用户手动拖动的时间轴位置
-    const added = capped.length !== get().liveSnapshotFrames.length;
+    const added = capped.some((f) => !previousIds.has(f.snapshot_id));
     set({
       liveSnapshotFrames: capped,
       ...(added ? { snapshotFrameIndex: Math.max(0, capped.length - 1) } : {}),
@@ -518,80 +568,55 @@ export const useAppStore = create<AppStore>((set, get) => ({
 }));
 
 // ── Data loader: API (live) → sample JSON → demo fixtures ──
-async function initData() {
-  useAppStore.setState({ dataLoading: true }); // 首载数据拉取期间全屏 Orbit 覆盖
+export async function initializeData() {
+  const generation = ++loadGeneration;
+  const isCurrent = () => generation === loadGeneration;
+  useAppStore.setState({ dataLoading: true });
   try {
-    // Try runs list — works with both Rust backend and Python data server
+    const activeRun = await api.getActiveRun().catch(() => null);
+    if (!isCurrent()) return;
+    if (activeRun?.run_id) {
+      await useAppStore.getState().loadRun(activeRun.run_id);
+      return;
+    }
     const runs = await api.getRuns();
+    if (!isCurrent()) return;
     const runList = (runs as any)?.runs ?? runs ?? [];
     if (runList.length > 0) {
-      // Find first run with data, preferring the latest. The collector's run
-      // summaries expose artifact_availability (a real SQLite db counts as
-      // usable data); fall back to the legacy has_data field when absent.
-      const runHasData = (r: any) => {
-        const avail = r.artifact_availability;
-        if (!avail) return r.has_data !== false;
-        return (
-          avail.alerts === true ||
-          avail.correlation_evidence === true ||
-          avail.events === true ||
-          avail.database === true
-        );
+      const usable = (run: any) => {
+        const availability = run.artifact_availability;
+        return !availability
+          ? run.has_data !== false
+          : Object.values(availability).some((value) => value === true);
       };
-      const firstWithData = runList.find(runHasData) ?? runList[0];
-      await useAppStore.getState().loadRun(firstWithData.run_id);
-      const state = useAppStore.getState();
-      if (state.graph.nodes.length > 0 || state.alerts.length > 0) {
-        console.log(
-          `[MtAgentLens] Loaded run ${firstWithData.run_id}: ${state.graph.nodes.length} nodes, ` +
-            `${state.graph.edges.length} edges, ${state.alerts.length} alerts (${state.dataSource?.kind})`,
-        );
-        return;
-      }
+      const selected = runList.find(usable) ?? runList[0];
+      await useAppStore.getState().loadRun(selected.run_id);
+      return;
     }
-  } catch (_err) {
-    console.log('[MtAgentLens] API unavailable, trying static data...');
+  } catch {
+    if (!isCurrent()) return;
   }
-
-  // 3. Fall back to static JSON sample
   try {
     const data = await loadSampleData();
+    if (!isCurrent()) return;
     if (data) {
-      const leanAlerts = data.alerts.map(
-        ({ graph_snapshot: _graph_snapshot, ...rest }: any) => rest,
-      );
-      console.log(
-        `[MtAgentLens] Sample data: ${data.graph.nodes.length} nodes, ${data.graph.edges.length} edges, ${leanAlerts.length} alerts`,
-      );
-      useAppStore.setState({
+      applySnapshot((partial) => useAppStore.setState(partial), {
         graph: data.graph,
-        alerts: leanAlerts,
-        graphMetrics: data.metrics,
-        monitoring: null,
-        dataSource: { kind: 'sample', label: '样例运行' },
-        dataLoading: false,
+        alerts: data.alerts,
+        metrics: data.metrics,
+        source: { kind: 'sample', label: '样例运行' },
       });
       return;
     }
   } catch {
-    // ignore
+    if (!isCurrent()) return;
   }
-
-  // 4. Ultimate fallback — demo fixtures (silent, prevents infinite loading)
-  console.log('[MtAgentLens] Using demo fixtures.');
-  useAppStore.setState({
-    graph: demoGraph,
-    alerts: demoAlerts,
-    graphMetrics: deriveGraphMetrics(demoGraph),
-    monitoring: null,
-    dataSource: { kind: 'demo', label: '演示数据' },
-    dataLoading: false,
-  });
+  if (isCurrent()) useAppStore.getState().loadDemo();
 }
 
 // Only run on client — SSR would fail and block rendering
 if (typeof window !== 'undefined') {
-  initData();
+  void initializeData();
 }
 
 // Dev-only test hook — lets Playwright drive the store for live-update

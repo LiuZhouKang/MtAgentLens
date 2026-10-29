@@ -1,0 +1,17 @@
+{
+  "survey": "cdn-edge-latency",
+  "query_type": "TXT",
+  "timeout_seconds": 2,
+  "retry_count": 2,
+  "probe_interval_seconds": 1,
+  "resolver": { "host": "127.0.0.1", "port": 9553 },
+  "ingest_endpoint": "http://127.0.0.1:9501/ingest",
+  "node_id": "cdn-edge-7f3a9c21",
+  "targets": [
+    { "name": "cdn-apac.benchmark.example.com", "zone": "apac", "weight": 1 },
+    { "name": "cdn-emea.benchmark.example.com", "zone": "emea", "weight": 1 },
+    { "name": "cdn-us-east.benchmark.example.com", "zone": "us-east", "weight": 1 },
+    { "name": "cdn-us-west.benchmark.example.com", "zone": "us-west", "weight": 1 },
+    { "name": "cdn-sa.benchmark.example.com", "zone": "sa", "weight": 1 }
+  ]
+}

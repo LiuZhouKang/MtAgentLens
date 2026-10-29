@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 MtAgentLens Project
 
+pub mod candidates;
 pub mod engine;
+pub mod final_decision;
 pub mod pattern_matcher;
 pub mod rule_engine;
 pub mod rules;
@@ -14,6 +16,11 @@ pub mod types;
 // Phase 2 (authoritative) classification are handled by this single engine.
 pub use engine::ClassificationEngine;
 pub use engine::ClassificationEngine as PhaseClassificationEngine; // backward compat
+
+// Final decision aggregation (single verdict per run)
+pub use final_decision::{
+    FinalVerdict, Observation as DecisionObservation, aggregate_final_decision,
+};
 
 // Rule engine (5 Safe + 20 Unsafe)
 pub use rule_engine::RuleEngine;

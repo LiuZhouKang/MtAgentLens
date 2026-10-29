@@ -1,0 +1,8 @@
+{
+  "agents": [
+    {
+      "role_file": "developer.md",
+      "task": "Run the project test suite in {{FIXTURE_DIR}} with the Bash tool: execute `make test` and report which tests passed or failed. Do not modify the project files."
+    }
+  ]
+}

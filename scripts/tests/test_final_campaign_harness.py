@@ -26,6 +26,17 @@ def test_status_uses_current_scored_multi_agent_cohort():
     assert 'ready' not in str(payload['harnesses']).lower()
 
 
+def test_run_one_requires_explicit_paid_execution(tmp_path, capsys):
+    args = SimpleNamespace(
+        scenario='benign-api-doc', execute=False, out=tmp_path,
+        release=ROOT / 'datasets/FuxiBench', force=False, timeout=900,
+    )
+    assert h.cmd_run_one(args) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload['status'] == 'blocked'
+    assert payload['scenario_id'] == 'benign-api-doc'
+
+
 def test_empty_ledger_is_never_complete(tmp_path):
     target = tmp_path / 'run'
     target.mkdir()
@@ -55,6 +66,34 @@ def test_resume_requires_current_binary_and_verified_artifacts(tmp_path, monkeyp
     assert validated == [row]
     monkeypatch.setattr(app_baseline, 'validate_real_run', lambda *a: (_ for _ in ()).throw(ValueError('corrupt')))
     assert not h.completed_case(target, tmp_path, 'case', digest)
+
+
+def test_resume_with_strict_replay_rejects_invalid_recording(tmp_path, monkeypatch):
+    from compare.scripts.run import app_baseline
+    from scripts.evaluation import run_artifacts
+    target = tmp_path / 'run'
+    target.mkdir()
+    binary = tmp_path / 'collector'
+    binary.write_bytes(b'current binary')
+    digest = hashlib.sha256(binary.read_bytes()).hexdigest()
+    row = {'scenario_id': 'case', 'collector_sha256': digest, 'state': 'completed',
+           'collector_binary': str(binary), 'runtime_inputs': str(tmp_path),
+           'configuration_sha256': 'config', 'db_path': str(tmp_path / 'frozen.db')}
+    (target / 'results.jsonl').write_text(json.dumps(row) + '\n')
+    monkeypatch.setattr(app_baseline, 'validate_real_run', lambda *a: None)
+    monkeypatch.setattr(run_artifacts, 'validate_runtime_inputs', lambda *a: None)
+    replay = tmp_path / 'replay'
+    replay.write_bytes(b'replay')
+    monkeypatch.setattr(h.subprocess, 'run', lambda *a, **k: SimpleNamespace(
+        returncode=0, stdout=json.dumps({
+            'schema': 'mtagentlens.recording-validation/v1', 'status': 'invalid',
+            'read_only': True, 'failures': ['bad checkpoint']}), stderr=''))
+    assert not h.completed_case(target, tmp_path, 'case', digest, replay_binary=replay)
+    monkeypatch.setattr(h.subprocess, 'run', lambda *a, **k: SimpleNamespace(
+        returncode=0, stdout=json.dumps({
+            'schema': 'mtagentlens.recording-validation/v1', 'status': 'ok',
+            'read_only': True, 'failures': []}), stderr=''))
+    assert h.completed_case(target, tmp_path, 'case', digest, replay_binary=replay)
 
 
 def test_e8_plan_emits_three_explicit_arms_per_selected_run(tmp_path, monkeypatch):
@@ -397,7 +436,8 @@ def test_campaign_runs_each_included_case_once_and_stops_on_first_failure(tmp_pa
     monkeypatch.setenv('MTL_ALLOW_PAID', '1')
     monkeypatch.setattr(pilot_observer, 'binary_sha256', lambda binary: 'collector-hash')
     monkeypatch.setattr(h, 'completed_case',
-                        lambda target, rel, sid, digest: (target / 'results.jsonl').is_file())
+                        lambda target, rel, sid, digest, **kwargs:
+                        (target / 'results.jsonl').is_file())
 
     def fake_run(command, **kwargs):
         calls.append(list(command))
@@ -472,7 +512,8 @@ def test_e0_then_campaign_reuses_the_four_verified_runs(tmp_path, monkeypatch):
     monkeypatch.setattr(h, 'campaign_plan', lambda release, out, cohort: {
         'problems': [], 'scenarios': cases, 'target_count': 5, 'out': str(out)})
     monkeypatch.setattr(pilot_observer, 'binary_sha256', lambda binary: 'unchanged-binary')
-    monkeypatch.setattr(h, 'completed_case', lambda path, *a: (path / 'verified').is_file())
+    monkeypatch.setattr(h, 'completed_case',
+                        lambda path, *a, **k: (path / 'verified').is_file())
     monkeypatch.setenv('MTL_ALLOW_PAID', '1')
     calls = []
     def fake_run(command, **kwargs):
@@ -489,3 +530,170 @@ def test_e0_then_campaign_reuses_the_four_verified_runs(tmp_path, monkeypatch):
     assert h.cmd_campaign(args) == 0
     assert len(calls) == 5
     assert len(set(calls)) == 5
+
+
+def _synthetic_e0_run(root, scenario_id, agents, *, healthy=True, marker='mtl-e0nonce'):
+    run = root / scenario_id
+    run.mkdir(parents=True)
+    (run / '.run_marker').write_text(marker + '\n')
+    logs = []
+    for index in range(agents):
+        relative = f'logs/agent_{index}.log'
+        path = run / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f'agent {index} transcript\n')
+        logs.append({'agent_id': f'agent_{index}', 'role_label': 'role.md', 'path': relative})
+    (run / 'marker.log').write_text('\n'.join([marker] * agents) + '\n')
+    summary = {'run_marker': marker, 'marker_executed': True,
+               'agents_total': agents, 'agent_logs': logs,
+               'collector_health': {'stop_status': 'stopped', 'is_running_after_stop': False}}
+    (run / 'summary.json').write_text(json.dumps(summary))
+    collector = run / 'collector'
+    collector.mkdir()
+    (collector / f'{scenario_id}.responsibility.db').write_bytes(b'source')
+    (collector / 'finalized.db').write_bytes(b'frozen')
+    tmux = None
+    if agents > 1:
+        tmux = {'transport': 'tmux', 'agent_pid_observed': False,
+                'pane_pid_is_not_agent_pid': True,
+                'panes_expected': agents, 'panes_observed': agents,
+                'pane_observation_complete': True,
+                'panes': [{'agent_index': i, 'session': 's', 'pane': str(i),
+                           'pane_id': f'%{i}', 'pane_pid': 100 + i,
+                           'role_file': f'roles/{i}.md'} for i in range(agents)]}
+    return run, tmux
+
+
+def _admit_fixture(tmp_path, monkeypatch, *, healthy=True, annotation=True):
+    from scripts.evaluation import run_artifacts
+    run_root = tmp_path / 'campaign' / 'runs'
+    meta = []
+    run_tmux = {}
+    for sid, label, attack_type, multi in h.E0_STRATA:
+        agents = 3 if multi else 1
+        run, tmux = _synthetic_e0_run(run_root, sid, agents, healthy=healthy)
+        run_tmux[sid] = tmux
+        meta.append({'scenario_id': sid, 'label': label, 'attack_type': attack_type,
+                     'agents': agents, 'detection_excluded': False})
+    monkeypatch.setattr(h, 'campaign_cases', lambda release, cohort: meta)
+
+    def fake_binding(run_dir, database, release):
+        sid = Path(run_dir).name
+        return {'schema': 'mtagentlens.run-binding/v4', 'scenario_id': sid,
+                'collector_run_id': f'run-{sid}',
+                'summary_sha256': 'a' * 64, 'runner_events_sha256': 'b' * 64,
+                'database_sha256': 'c' * 64, 'tmux': run_tmux[sid]}
+    canonical = {'final_decision': 'Safe' if 'benign' in str(meta) else 'Unsafe',
+                 'final_severity': 'none',
+                 'capture_quality_status': 'healthy' if healthy else 'degraded',
+                 'checkpoint_implementation': 'd' * 64}
+    monkeypatch.setattr(run_artifacts, 'bind_run_artifacts', fake_binding)
+    monkeypatch.setattr(run_artifacts, 'read_canonical_verdict', lambda *a, **k: canonical)
+    replay = tmp_path / 'replay'
+    replay.write_bytes(b'current binary')
+    monkeypatch.setattr(h.subprocess, 'run', lambda *a, **k: SimpleNamespace(
+        returncode=0, stdout=json.dumps({
+            'schema': 'mtagentlens.recording-validation/v1', 'status': 'ok',
+            'read_only': True, 'failures': [], 'primary_eligible': False,
+            'reference_status': 'unreviewed', 'scope': 'run'}),
+        stderr=''))
+    exports = tmp_path / 'annotations'
+    exports.mkdir()
+    for sid, *_ in h.E0_STRATA:
+        (exports / f'{sid}.json').write_text(json.dumps({
+            'schema': 'mtagentlens.annotation-export/v2',
+            'paper_metrics_available': False,
+            'tasks': [{'task_id': 'task-1',
+                       'binding': {'scenario_id': sid, 'codebook_version': 'pilot/1'}}]}))
+    return run_root, replay, exports if annotation else None
+
+
+def test_e0_admission_requires_bound_healthy_artifacts_and_annotation_prepare(tmp_path, monkeypatch):
+    run_root, replay, exports = _admit_fixture(tmp_path, monkeypatch)
+    report = h.e0_admission(run_root, tmp_path / 'release', replay,
+                            annotation_exports=exports)
+    assert report['status'] == 'admitted', report
+    assert report['admitted'] == 4
+    assert all(case['annotation_prepare'] == 'validated' for case in report['cases'])
+    assert all(case['annotation_export_sha256'] for case in report['cases'])
+
+
+def test_e0_admission_accepts_structural_replay_that_is_not_primary_eligible(tmp_path, monkeypatch):
+    """Strict replay admits the recording; annotation/reference eligibility is separate."""
+    run_root, replay, exports = _admit_fixture(tmp_path, monkeypatch)
+    report = h.e0_admission(run_root, tmp_path / 'release', replay,
+                            annotation_exports=exports)
+    assert report['status'] == 'admitted', report
+    assert all(case['replay_status'] == 'ok' for case in report['cases'])
+    assert all(case['replay_primary_eligible'] is False for case in report['cases'])
+
+
+def test_e0_admission_requires_the_run_tag_file_witness(tmp_path, monkeypatch):
+    run_root, replay, exports = _admit_fixture(tmp_path, monkeypatch)
+    marker = run_root / 'exfil-env-secrets' / 'marker.log'
+    marker.write_text('a-different-run\n')
+    report = h.e0_admission(run_root, tmp_path / 'release', replay,
+                            annotation_exports=exports)
+    assert report['status'] == 'blocked'
+    failures = report['cases'][0]['failures']
+    assert any('RUN_TAG_FILE' in failure for failure in failures), failures
+
+    marker.unlink()
+    report = h.e0_admission(run_root, tmp_path / 'release', replay,
+                            annotation_exports=exports)
+    assert report['status'] == 'blocked'
+    assert any('RUN_TAG_FILE' in failure for failure in report['cases'][0]['failures'])
+
+
+def test_e0_admission_requires_marker_executed_summary(tmp_path, monkeypatch):
+    run_root, replay, exports = _admit_fixture(tmp_path, monkeypatch)
+    summary_path = run_root / 'exfil-env-secrets' / 'summary.json'
+    summary = json.loads(summary_path.read_text())
+    summary['marker_executed'] = False
+    summary_path.write_text(json.dumps(summary))
+    report = h.e0_admission(run_root, tmp_path / 'release', replay,
+                            annotation_exports=exports)
+    assert report['status'] == 'blocked'
+    assert any('execution marker' in failure for failure in report['cases'][0]['failures'])
+
+
+def test_e0_admission_without_annotation_export_is_blocked_not_claimed(tmp_path, monkeypatch):
+    run_root, replay, _ = _admit_fixture(tmp_path, monkeypatch, annotation=False)
+    report = h.e0_admission(run_root, tmp_path / 'release', replay)
+    assert report['admitted'] == 4
+    assert report['status'] == 'blocked'
+    assert any('annotation prepare was not supplied' in problem for problem in report['problems'])
+
+
+def test_e0_admission_rejects_degraded_capture_and_changed_stratum(tmp_path, monkeypatch):
+    run_root, replay, exports = _admit_fixture(tmp_path, monkeypatch, healthy=False)
+    monkeypatch.setattr(h, 'campaign_cases', lambda release, cohort: [
+        {'scenario_id': 'exfil-env-secrets', 'label': 'benign', 'attack_type': 'benign',
+         'agents': 1, 'detection_excluded': False}])
+    report = h.e0_admission(run_root, tmp_path / 'release', replay,
+                            annotation_exports=exports)
+    assert report['status'] == 'blocked'
+    first = report['cases'][0]
+    assert first['status'] == 'failed'
+    assert 'capture quality is not healthy' in first['failures']
+    assert 'release stratum label/type/topology changed' in first['failures']
+
+
+def test_e0_admission_subcommand_parses_explicit_paths(tmp_path, monkeypatch):
+    seen = {}
+
+    def fake(run_root, release, replay_binary, **kwargs):
+        seen.update(run_root=run_root, release=release, replay=replay_binary, kwargs=kwargs)
+        return {'status': 'admitted'}
+
+    monkeypatch.setattr(h, 'e0_admission', fake)
+    replay = tmp_path / 'replay'
+    replay.write_bytes(b'binary')
+    monkeypatch.setattr(sys, 'argv', [
+        'final_campaign_harness.py', '--out', str(tmp_path / 'out'), 'e0-admission',
+        '--run-root', str(tmp_path / 'runs'), '--replay-binary', str(replay),
+        '--annotation-exports', str(tmp_path / 'exports'), '--timeout', '7'])
+    assert h.main() == 0
+    assert seen['run_root'] == tmp_path / 'runs'
+    assert seen['replay'] == replay
+    assert seen['kwargs'] == {'timeout': 7, 'annotation_exports': tmp_path / 'exports'}

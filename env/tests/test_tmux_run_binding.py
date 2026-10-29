@@ -407,7 +407,11 @@ def test_tmux_pane_env_keeps_run_tag_and_tag_file(tmp_path, monkeypatch):
         f"RUN_TAG_FILE={shlex.quote(str(artifacts['run'] / 'marker.log'))}"
         in env_text
     )
-    assert f"FIXTURE_DIR={shlex.quote(str(artifacts['run'] / 'fixtures'))}" in env_text
+    fixture_line = next(line for line in env_text.splitlines() if line.startswith("FIXTURE_DIR="))
+    fixture_value = shlex.split(fixture_line)[0].split("=", 1)[1]
+    # FIXTURE_DIR may be the short /tmp alias that keeps the basename inside
+    # the eBPF 126-byte path capture; it must still resolve to the run copy.
+    assert Path(fixture_value).resolve() == (artifacts["run"] / "fixtures").resolve()
     assert f"RUN_DIR={shlex.quote(str(artifacts['run']))}" in env_text
 
 
@@ -659,14 +663,15 @@ def test_send_keys_argv_and_pane_cwd_match_the_launch_audit(tmp_path, monkeypatc
     by_pane = {row["details"]["tmux"]["pane"]: row for row in attempts}
     for argv in send_keys:
         assert by_pane[argv[3]]["details"]["input_snapshot"]["command"] == argv
-        assert "task_wrapper.sh" in argv[4]
-        assert "--model" in argv[4] and "haiku" in argv[4]
-        assert "--effort" in argv[4] and "low" in argv[4]
+        script = Path(shlex.split(argv[4])[1]).read_text(encoding="utf-8")
+        assert "task_wrapper.sh" in script
+        assert "--model" in script and "haiku" in script
+        assert "--effort" in script and "low" in script
         assert (
             f"MTAGENTLENS_ENV_FILE={shlex.quote(str(run / '.agent_env'))}"
-            in argv[4]
+            in script
         )
-        assert "ANTHROPIC_AUTH_TOKEN" not in argv[4]
+        assert "ANTHROPIC_AUTH_TOKEN" not in script
 
     new_session = next(
         argv for argv in recorded if argv[:3] == ["tmux", "new-session", "-d"]

@@ -63,23 +63,56 @@ pub fn redact_event(event: &mut Event) -> Option<Vec<String>> {
     if event.source != "ssl" {
         return None;
     }
-    let encoded = event.data.get("data_b64")?.as_str()?.to_string();
+    let object = event.data.as_object()?;
+    let encoded = object.get("data_b64")?.as_str()?;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(encoded.as_bytes())
         .ok()?;
-    let (redacted, headers) = redact_http_head(&bytes)?;
-    let redacted_len = redacted.len();
-    let encoded = base64::engine::general_purpose::STANDARD.encode(&redacted);
+
+    let mut headers: Vec<String> = Vec::new();
+    let mut redacted_len = None;
+    let mut b64_redacted = None;
+    if let Some((redacted, found)) = redact_http_head(&bytes) {
+        redacted_len = Some(redacted.len());
+        b64_redacted = Some(base64::engine::general_purpose::STANDARD.encode(&redacted));
+        headers.extend(found);
+    }
+
+    // The TLS capture emits the same bytes twice: `data_b64` and a decoded
+    // `data` string. Redacting only the former left Authorization/Cookie in
+    // the plaintext field, which is what record.log, the console and SSE
+    // forward.
+    let mut data_redacted = None;
+    if let Some(plain) = object.get("data").and_then(Value::as_str)
+        && let Some((redacted, found)) = redact_http_head(plain.as_bytes())
+        && let Ok(text) = String::from_utf8(redacted)
+    {
+        data_redacted = Some(text);
+        for name in found {
+            if !headers.contains(&name) {
+                headers.push(name);
+            }
+        }
+    }
+
+    if headers.is_empty() {
+        return None;
+    }
 
     let object = event.data.as_object_mut()?;
-    object.insert("data_b64".to_string(), Value::String(encoded));
+    if let Some(encoded) = b64_redacted {
+        object.insert("data_b64".to_string(), Value::String(encoded));
+    }
+    if let Some(text) = data_redacted {
+        object.insert("data".to_string(), Value::String(text));
+    }
     object.insert(
         "redaction".to_string(),
         json!({
             "raw_headers": headers,
             "captured_buf_size": object.get("buf_size").cloned().unwrap_or(Value::Null),
             "redacted_buf_size": redacted_len,
-            "note": "data_b64 holds redacted bytes; the capture itself was not modified",
+            "note": "data and data_b64 hold redacted bytes; the capture itself was not modified",
         }),
     );
     // Redaction is not required to shrink the payload: replacing a short
@@ -218,6 +251,23 @@ mod tests {
     }
 
     const REQUEST: &[u8] = b"POST /v1/messages HTTP/1.1\r\nHost: api.anthropic.com\r\nAuthorization: Bearer sk-ant-secret-value\r\nCookie: session=abc123\r\nContent-Type: application/json\r\n\r\n{\"model\":\"x\"}";
+
+    #[test]
+    fn redacts_the_plaintext_data_field_as_well_as_data_b64() {
+        let mut event = ssl_event(REQUEST);
+        event.data["data"] = json!(String::from_utf8_lossy(REQUEST));
+        redact_event(&mut event).expect("must redact");
+
+        let plain = event.data["data"].as_str().unwrap();
+        assert!(
+            !plain.contains("sk-ant-secret-value"),
+            "plaintext leaked: {plain}"
+        );
+        assert!(!plain.contains("session=abc123"), "cookie leaked: {plain}");
+        assert!(plain.contains("Host: api.anthropic.com"));
+        let bytes = decoded(&event);
+        assert!(!String::from_utf8_lossy(&bytes).contains("sk-ant-secret-value"));
+    }
 
     #[test]
     fn redacts_sensitive_header_values_and_keeps_everything_else() {

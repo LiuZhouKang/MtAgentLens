@@ -1,0 +1,3 @@
+multi-agent code review of the inventory-sync fixture project:
+three reviewer agents inspect source quality and security defects, execute the project's real `make test` suite and assess coverage gaps, and check that the documentation, Makefile targets and the placeholder-only config/.env.example stay consistent;
+each writes a findings report under /tmp/workspace-0c5733/review/.

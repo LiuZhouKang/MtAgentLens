@@ -30,6 +30,80 @@ static inline const char *file_op_event_name(int op)
 	}
 }
 
+/* Top-level EXEC mapping evidence. A namespace is only emitted when the BPF
+ * side validated it and every identity component is positive; otherwise say
+ * null rather than guess. The error is always reported. */
+static inline void print_pid_namespace(const struct event *e)
+{
+	if (e->pid_namespace.error == 0 &&
+	    e->pid_namespace.device > 0 &&
+	    e->pid_namespace.inode > 0 &&
+	    e->pid_namespace.tgid > 0) {
+		printf(",\"pid_namespace\":{\"device\":%llu,\"inode\":%llu,\"tgid\":%u}",
+		       (unsigned long long)e->pid_namespace.device,
+		       (unsigned long long)e->pid_namespace.inode,
+		       e->pid_namespace.tgid);
+	} else {
+		printf(",\"pid_namespace\":null");
+	}
+	printf(",\"pid_namespace_error\":%d", e->pid_namespace.error);
+}
+
+/* EXEC metadata captured in-kernel, so it cannot race a post-event procfs
+ * lookup. Only positive values are evidence; zero means the read failed. */
+static inline void print_exec_metadata(const struct event *e)
+{
+	print_pid_namespace(e);
+	if (e->pgid > 0)
+		printf(",\"pgid\":%d", e->pgid);
+	else
+		printf(",\"pgid\":null");
+	if (e->cgroup_id > 0)
+		printf(",\"cgroup_id\":%llu", (unsigned long long)e->cgroup_id);
+	else
+		printf(",\"cgroup_id\":null");
+}
+
+/* Kernel inventory describes observation, never execution or an action. */
+static inline void print_process_snapshot(const struct event *e)
+{
+    printf("{\"timestamp\":%llu,\"event\":\"PROCESS_SNAPSHOT\",\"pid\":%d,\"ppid\":%d,",
+           e->timestamp_ns, e->pid, e->ppid);
+    printf("\"start_time_ns\":%llu,\"parent_start_time_ns\":%llu,\"comm\":",
+           e->start_time_ns, e->parent_start_time_ns);
+    json_print_str(e->comm);
+    if (e->pgid > 0) printf(",\"pgid\":%d", e->pgid); else printf(",\"pgid\":null");
+    if (e->cgroup_id) printf(",\"cgroup_id\":%llu", e->cgroup_id); else printf(",\"cgroup_id\":null");
+    printf(",\"monitor_pid_namespace\":");
+    if (!e->pid_namespace.error && e->pid_namespace.tgid && e->pid_namespace.inode && e->pid_namespace.device)
+        printf("{\"device\":%llu,\"inode\":%llu,\"tgid\":%u}",
+               e->pid_namespace.device, e->pid_namespace.inode, e->pid_namespace.tgid);
+    else printf("null");
+    printf(",\"monitor_pid_namespace_error\":%d}\n", e->pid_namespace.error);
+    fflush(stdout);
+}
+
+/* Completion facts are separate from intent and from payload effects. */
+static inline const char *syscall_outcome(const struct event *e)
+{
+    if (!e->syscall_completed)
+        return "unknown";
+    if (e->type == EVENT_TYPE_NETWORK_OPERATION &&
+        e->net_op.op == NET_OP_CONNECT &&
+        (e->syscall_ret == -115 || e->syscall_ret == -114))
+        return "pending";
+    return e->syscall_ret >= 0 ? "succeeded" : "failed";
+}
+
+static inline void print_syscall_result(const struct event *e)
+{
+    printf(",\"ppid\":%d,\"outcome\":\"%s\",\"syscall_ret\":", e->ppid, syscall_outcome(e));
+    if (e->syscall_completed)
+        printf("%lld", e->syscall_ret);
+    else
+        printf("null");
+}
+
 static inline void print_file_event(const struct event *e, uint64_t timestamp_ns,
 				    uint32_t count, const char *extra_fields)
 {
@@ -53,6 +127,7 @@ static inline void print_file_event(const struct event *e, uint64_t timestamp_ns
 	printf(",\"parent_start_time_ns\":%llu",
 	       (unsigned long long)e->parent_start_time_ns);
 
+	print_syscall_result(e);
 	if (extra_fields && strlen(extra_fields) > 0) {
 		printf(",%s", extra_fields);
 	}
@@ -120,6 +195,7 @@ static inline void print_network_event(const struct event *e, uint64_t timestamp
 	printf(",\"parent_start_time_ns\":%llu",
 	       (unsigned long long)e->parent_start_time_ns);
 
+	print_syscall_result(e);
 	printf(",\"net_op\":{");
 	printf("\"family\":\"%s\"", net_family_name(e->net_op.family));
 	if (e->net_op.supported) {

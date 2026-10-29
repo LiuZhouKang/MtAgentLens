@@ -94,6 +94,30 @@ impl TaintTracker {
         }
     }
 
+    /// Rewrite identity references together with graph and delegation state.
+    pub fn remap_agents(&mut self, mapping: &HashMap<AgentId, AgentId>) {
+        for record in self.contaminated_artifacts.values_mut() {
+            if let Some(agent) = mapping.get(&record.source_agent) {
+                record.source_agent = agent.clone();
+            }
+        }
+        self.contaminated_agents = self
+            .contaminated_agents
+            .drain()
+            .map(|agent| mapping.get(&agent).unwrap_or(&agent).clone())
+            .collect();
+        let previous = std::mem::take(&mut self.propagation_edges);
+        for (source, targets) in previous {
+            let canonical = mapping.get(&source).unwrap_or(&source).clone();
+            let entry = self.propagation_edges.entry(canonical).or_default();
+            entry.extend(
+                targets
+                    .into_iter()
+                    .map(|agent| mapping.get(&agent).unwrap_or(&agent).clone()),
+            );
+        }
+    }
+
     // ── Core API (per spec §10.4) ──────────────────────────────────────
 
     /// Mark an artifact as contaminated by a given agent at a given time.
@@ -122,6 +146,14 @@ impl TaintTracker {
         artifact: &str,
         ts: u64,
     ) {
+        // A taint source must be a concrete file. The 2026-07 benign corpus
+        // recorded `/` as the contaminated artifact for 15/19 scenarios;
+        // every later read then looked like cross-agent taint. Sentinel and
+        // directory-shaped strings are routing artifacts, not content.
+        if !is_concrete_file_artifact(artifact) {
+            return;
+        }
+
         let key = artifact.to_string();
 
         if let Some(existing) = self.contaminated_artifacts.get_mut(&key) {
@@ -325,6 +357,20 @@ impl Default for TaintTracker {
     }
 }
 
+/// Whether `path` names a concrete file that content can taint.
+///
+/// Rejects empties, the root `/`, the routing sentinel used when an action
+/// carries no path, and directory-shaped paths. A directory is not a content
+/// artifact: contamination is meaningful per file.
+fn is_concrete_file_artifact(path: &str) -> bool {
+    !path.is_empty()
+        && path != "/"
+        && path != "(unknown path)"
+        && path != "."
+        && path != ".."
+        && !path.ends_with('/')
+}
+
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -446,6 +492,27 @@ mod tests {
         assert_eq!(record.timestamp_ns, 1000);
         assert_eq!(record.source_agent, b);
     }
+    /// Regression for the 2026-07 benign corpus false positives: the tracker
+    /// accepted `/` (and other non-file strings) as an artifact, so every
+    /// later file read looked like a cross-agent taint access. A taint source
+    /// must name a concrete file.
+    #[test]
+    fn non_file_artifacts_are_not_taint_sources() {
+        let mut tracker = TaintTracker::new();
+        let a = agent("agent-a");
+
+        for path in ["", "/", "(unknown path)", "/home/user/dir/", "."] {
+            tracker.mark_contaminated(a.clone(), path, 1_000);
+        }
+
+        assert_eq!(
+            tracker.artifact_count(),
+            0,
+            "non-file paths must not become taint sources: {:?}",
+            tracker.contaminated_artifacts().keys().collect::<Vec<_>>()
+        );
+    }
+
     #[test]
     fn test_same_process_access_is_not_cross_agent_taint() {
         let mut tracker = TaintTracker::new();

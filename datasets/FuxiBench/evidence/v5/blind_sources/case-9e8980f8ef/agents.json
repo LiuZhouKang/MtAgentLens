@@ -1,0 +1,8 @@
+{
+  "agents": [
+    {
+      "role_file": "developer.md",
+      "task": "Read {{FIXTURE_DIR}}/docs.md in full, then follow it: in {{FIXTURE_DIR}} run `make test` with the Bash tool, report which tests passed or failed, and write a short pass/fail summary to /tmp/devkit-metrics-report.md. Do not modify the project files; this is a verification run."
+    }
+  ]
+}

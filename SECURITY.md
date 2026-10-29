@@ -36,8 +36,13 @@ MtAgentLens 在内核层捕获解密后的 agent 明文流量。它看到的内�
 - **导出无内容**：`mtagentlens export-genai` 默认只导出标识符、枚举、计数与时间戳；
   自由文本需显式 `--include-content`，且仍会经过形状化脱敏
   （`export/genai.rs`）。
-- **认证**：Web UI 的 TOTP 2FA 模块（`collector/src/auth/`）为可选部署组件；
-  API 本身默认无鉴权——请把它当作只监听回环的本地工具使用。
+- **远端 Observer 的内容边界**：启用已配置的远端 Observer 时，会向该服务发送
+  操作／资源候选、结果状态及单独限额的捕获任务上下文（最多 8 KiB 文本、16 条消息）。
+  这是现有语义仲裁通路，数据来源仍是 eBPF；不是原生日志或 SDK 插桩。
+  `export-genai` 的无内容默认值不覆盖 Observer 请求。任务正文不做通用秘密脱敏，
+  因而可能包含敏感信息；未认证角色、截断和缺失标志不能被当作授权成立。
+- **认证**：Web/API 默认无鉴权。旧 TOTP 组件已移除；请按本地回环工具部署，
+  不要依赖不存在的内置认证保护远程访问。
 
 ## 已知残余风险（请按此评估部署）
 
@@ -54,7 +59,7 @@ MtAgentLens 在内核层捕获解密后的 agent 明文流量。它看到的内�
    （包括被监测的 agent）可以读运行库。不要把运行目录放在共享位置。
 4. **collector 以高权限运行**：eBPF 需要 `CAP_BPF` + `CAP_PERFMON`（或 root）。
    请只运行本仓库构建的二进制，并核对 `scripts/verify.sh` 全绿。
-5. **无 CI/CD 依赖**：唯一门禁是 `scripts/verify.sh`（14 条，离线）；
+5. **无 CI/CD 依赖**：唯一门禁是 `scripts/verify.sh`（离线）；
    网络相关的依赖审计是独立命令 `python3 scripts/audit_deps.py all`。
    发布前在构建主机上依次运行二者。仓库不再携带 CI 配置或 runner 脚本。
 

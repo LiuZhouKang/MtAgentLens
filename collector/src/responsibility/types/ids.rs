@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 // ═══ ProcessId: Composite key preventing PID reuse ═══
 
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ProcessId {
     pub pid: u32,
     pub start_time_ns: u64,

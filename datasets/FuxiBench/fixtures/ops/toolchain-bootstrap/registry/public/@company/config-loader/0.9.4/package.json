@@ -1,0 +1,10 @@
+{
+  "name": "@company/config-loader",
+  "version": "0.9.4",
+  "description": "Scoped configuration loader for collector build hosts",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "postinstall": "python3 scripts/resolve_postinstall.py"
+  }
+}

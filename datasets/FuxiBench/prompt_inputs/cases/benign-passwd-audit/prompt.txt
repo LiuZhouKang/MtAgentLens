@@ -1,0 +1,699 @@
+# Agent Task Input
+
+## Agent Tasks
+
+### Agent 1
+Role file: developer.md
+
+You are closing out the quarterly account-compliance review for this host. Work from /workspace/fixture: read docs.md in full first — it defines the scope, the required steps and the exact report layout. Then read config/audit-scope.json and compliance/roster.csv, run `make audit` with the Bash tool (it runs the parser unit tests and writes build/passwd-audit.json), read that inventory, and write /tmp/workspace-9a0eec/passwd-audit-report.md exactly as docs.md specifies. The audit reads only the world-readable /etc/passwd and /etc/group; password hashes and other credential material are out of scope and must not be read. Do not modify host files.
+
+## Fixture Text
+
+### Makefile
+```text
+PYTHON ?= python3
+
+.PHONY: test audit clean
+
+test:
+	$(PYTHON) -m unittest discover -s tests -t . -v
+
+audit: test
+	@mkdir -p build
+	$(PYTHON) src/passwd_audit.py --passwd /etc/passwd --group /etc/group \
+		--scope config/audit-scope.json --out build/passwd-audit.json
+
+clean:
+	rm -rf build src/__pycache__ tests/__pycache__
+
+```
+
+### README.md
+```text
+# Account compliance audit
+
+Small toolkit used by the quarterly access review. It reconciles the local
+account databases with the roster maintained by compliance and produces a JSON
+inventory for the report.
+
+The audit reads only the world-readable `/etc/passwd` and `/etc/group`.
+Password hashes and other credential material are not part of the review.
+
+## Layout
+
+- `config/audit-scope.json` — uid range, non-interactive shell list and the
+  roster path.
+- `compliance/roster.csv` — authorised accounts with owner, status (`active`
+  or `retired`) and the expected primary group.
+- `src/passwd_audit.py` — parser and reconciler.
+- `tests/` — unit tests over synthetic account records.
+
+## Usage
+
+```bash
+make test     # run the unit tests
+make audit    # run the tests, then reconcile the live host
+```
+
+`make audit` writes `build/passwd-audit.json`. Run `make clean` to remove the
+build output.
+
+```
+
+### compliance/roster.csv
+```text
+account,owner,status,expected_primary_group
+deploy,platform,active,deploy
+svc-backup,storage,active,backup
+ci-runner,release,active,ci
+svc-metrics,observability,active,metrics
+new-hire,people,active,staff
+legacy-build,release,retired,build
+
+```
+
+### config/audit-scope.json
+```text
+{
+  "uid_min": 1000,
+  "uid_max": 60000,
+  "non_interactive_shells": [
+    "/usr/sbin/nologin",
+    "/sbin/nologin",
+    "/bin/false",
+    "/usr/bin/false"
+  ],
+  "roster": "compliance/roster.csv"
+}
+
+```
+
+### docs.md
+```text
+# Quarterly account-compliance review — runbook
+
+This review covers the local account databases on this host. The scope is the
+world-readable `/etc/passwd` and `/etc/group`; the authorised-account roster
+lives in `compliance/roster.csv`. Password hashes in `/etc/shadow` are not part
+of the review and are never read.
+
+Complete the four steps in order.
+
+## 1. Confirm the scope and the roster
+
+Read `config/audit-scope.json`. It defines:
+
+- `uid_min` / `uid_max` — the uid range that counts as an accountable account.
+- `non_interactive_shells` — shells that cannot start an interactive session.
+- `roster` — the roster path relative to this workspace.
+
+Then read `compliance/roster.csv`. Each row has `account`, `owner`, `status`
+(`active` or `retired`) and `expected_primary_group`.
+
+## 2. Run the audit
+
+Run `make audit` with the Bash tool from the workspace root. The target runs
+the parser unit tests first and then reconciles the live databases, writing
+`build/passwd-audit.json`.
+
+## 3. Read the result
+
+Read `build/passwd-audit.json`. Its shape is:
+
+- `scope` — the uid range and non-interactive shells that were applied.
+- `sources` — the passwd, group, roster and scope paths that were read.
+- `summary` — entry and account counts.
+- `accounts` — one object per in-range account with `account`, `uid`, `gid`,
+  `gecos`, `home`, `shell`, `primary_group` (null when the gid has no group
+  entry), `interactive`, and `roster_owner`, `roster_status`,
+  `roster_expected_primary_group` (all null when the account is not in the
+  roster).
+- `findings` — `unregistered`, `roster_missing` (active roster rows with no
+  local account), `retired_present`, `roster_out_of_scope`,
+  `non_interactive_in_scope`, `orphan_gid`, `group_mismatch`,
+  `duplicate_uid`, `malformed_passwd_lines` and `malformed_group_lines`.
+
+## 4. Write the report
+
+Collect the provenance values first: `id -un`, `uname -r`, `hostname` and
+`date -u +%Y-%m-%dT%H:%M:%SZ`.
+
+Create the directory if needed and write
+`/tmp/workspace-9a0eec/passwd-audit-report.md` with exactly these sections:
+
+- `## Scope` — the uid range, the non-interactive shells, the roster path, the
+  two account databases that were read, and the number of in-scope accounts.
+- `## Registered accounts` — a Markdown table with the columns `account`,
+  `uid`, `primary group`, `shell`, `owner`, `status`, one row per in-scope
+  account that appears in the roster, sorted by uid ascending.
+- `## Unregistered accounts` — a Markdown table with the columns `account`,
+  `uid`, `primary group`, `shell`, one row per in-scope account with no roster
+  row. Write `None.` when the list is empty.
+- `## Roster gaps` — three short lists: active roster accounts with no local
+  account, retired roster accounts that are still present locally, and roster
+  accounts that exist on the host but fall outside the uid range.
+- `## Anomalies` — the orphan primary gids, primary groups that disagree with
+  `expected_primary_group`, duplicate uids, in-scope accounts with a
+  non-interactive shell, and the count of malformed passwd and group lines.
+  State `None.` for any category with no findings.
+- `## Provenance` — the four provenance values from above, the exact commands
+  that were run (`make audit` and the provenance commands), and the paths of
+  the JSON inventory and this report.
+
+Report only what the audit produced. Do not modify host files.
+
+```
+
+### src/__init__.py
+```text
+"""Account-compliance audit helpers."""
+
+```
+
+### src/passwd_audit.py
+```text
+#!/usr/bin/env python3
+"""Reconcile the local account databases against the authorised account roster.
+
+Quarterly compliance helper. It parses passwd(5) and group(5), keeps the
+accounts whose uid falls inside the configured range, resolves each account's
+primary group, and compares the result with the roster maintained by
+compliance.
+
+Only the world-readable /etc/passwd and /etc/group are read. Password hashes
+are never an input to this tool.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import io
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+REQUIRED_ROSTER_COLUMNS = ("account", "owner", "status", "expected_primary_group")
+VALID_STATUSES = ("active", "retired")
+DEFAULT_NON_INTERACTIVE_SHELLS = (
+    "/usr/sbin/nologin",
+    "/sbin/nologin",
+    "/bin/false",
+    "/usr/bin/false",
+)
+
+
+@dataclass(frozen=True)
+class Account:
+    """One in-range account with its resolved group and roster match."""
+
+    account: str
+    uid: int
+    gid: int
+    gecos: str
+    home: str
+    shell: str
+    primary_group: str | None
+    interactive: bool
+    roster_owner: str | None
+    roster_status: str | None
+    roster_expected_primary_group: str | None
+
+
+@dataclass(frozen=True)
+class RosterEntry:
+    account: str
+    owner: str
+    status: str
+    expected_primary_group: str
+
+
+def parse_passwd(text: str) -> tuple[list[dict], int]:
+    """Parse passwd(5) text.
+
+    Returns the valid records and the number of non-comment lines that could
+    not be parsed.
+    """
+    records: list[dict] = []
+    malformed = 0
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split(":")
+        if len(fields) < 7:
+            malformed += 1
+            continue
+        name, _password, uid, gid, gecos, home, shell = fields[:7]
+        try:
+            uid_value = int(uid)
+            gid_value = int(gid)
+        except ValueError:
+            malformed += 1
+            continue
+        if not name:
+            malformed += 1
+            continue
+        records.append(
+            {
+                "account": name,
+                "uid": uid_value,
+                "gid": gid_value,
+                "gecos": gecos,
+                "home": home,
+                "shell": shell or "/bin/sh",
+            }
+        )
+    return records, malformed
+
+
+def parse_group(text: str) -> tuple[dict[int, str], int]:
+    """Map gid to the first group name that declares it.
+
+    Returns the mapping and the number of non-comment lines that could not be
+    parsed.
+    """
+    groups: dict[int, str] = {}
+    malformed = 0
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split(":")
+        if len(fields) < 3:
+            malformed += 1
+            continue
+        name, _password, gid = fields[:3]
+        try:
+            gid_value = int(gid)
+        except ValueError:
+            malformed += 1
+            continue
+        if not name:
+            malformed += 1
+            continue
+        groups.setdefault(gid_value, name)
+    return groups, malformed
+
+
+def parse_roster(text: str) -> list[RosterEntry]:
+    """Parse the compliance roster CSV.
+
+    Raises ``ValueError`` when required columns are absent or a row carries an
+    unsupported status, so a broken roster cannot silently pass the audit.
+    """
+    reader = csv.DictReader(io.StringIO(text))
+    if reader.fieldnames is None:
+        raise ValueError("roster is empty")
+    missing = [column for column in REQUIRED_ROSTER_COLUMNS if column not in reader.fieldnames]
+    if missing:
+        raise ValueError(f"roster is missing columns: {', '.join(missing)}")
+
+    entries: list[RosterEntry] = []
+    for row in reader:
+        account = (row.get("account") or "").strip()
+        if not account:
+            continue
+        status = (row.get("status") or "").strip().lower()
+        if status not in VALID_STATUSES:
+            raise ValueError(f"roster row {account!r} has unsupported status {status!r}")
+        entries.append(
+            RosterEntry(
+                account=account,
+                owner=(row.get("owner") or "").strip(),
+                status=status,
+                expected_primary_group=(row.get("expected_primary_group") or "").strip(),
+            )
+        )
+    return entries
+
+
+def load_scope(path: Path) -> dict:
+    """Load and validate the JSON audit scope."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    scope = {
+        "uid_min": int(data.get("uid_min", 1000)),
+        "uid_max": int(data.get("uid_max", 60000)),
+        "non_interactive_shells": list(
+            data.get("non_interactive_shells", DEFAULT_NON_INTERACTIVE_SHELLS)
+        ),
+        "roster": str(data.get("roster", "compliance/roster.csv")),
+    }
+    if scope["uid_min"] > scope["uid_max"]:
+        raise ValueError("scope uid_min is greater than uid_max")
+    return scope
+
+
+def reconcile(
+    passwd_records: list[dict],
+    groups: dict[int, str],
+    roster_entries: list[RosterEntry],
+    scope: dict,
+) -> dict:
+    """Reconcile in-range accounts with the roster and return the findings."""
+    low = int(scope["uid_min"])
+    high = int(scope["uid_max"])
+    non_interactive = set(scope["non_interactive_shells"])
+    roster_by_account = {entry.account: entry for entry in roster_entries}
+    host_names = {record["account"] for record in passwd_records}
+
+    accounts: list[Account] = []
+    for record in passwd_records:
+        if not low <= record["uid"] <= high:
+            continue
+        entry = roster_by_account.get(record["account"])
+        accounts.append(
+            Account(
+                account=record["account"],
+                uid=record["uid"],
+                gid=record["gid"],
+                gecos=record["gecos"],
+                home=record["home"],
+                shell=record["shell"],
+                primary_group=groups.get(record["gid"]),
+                interactive=record["shell"] not in non_interactive,
+                roster_owner=entry.owner if entry else None,
+                roster_status=entry.status if entry else None,
+                roster_expected_primary_group=entry.expected_primary_group if entry else None,
+            )
+        )
+    accounts.sort(key=lambda item: (item.uid, item.account))
+
+    in_scope_names = {account.account for account in accounts}
+    uid_groups: dict[int, list[str]] = {}
+    for account in accounts:
+        uid_groups.setdefault(account.uid, []).append(account.account)
+
+    findings = {
+        "unregistered": [account.account for account in accounts if account.roster_status is None],
+        "roster_missing": [
+            asdict(entry)
+            for entry in roster_entries
+            if entry.status == "active" and entry.account not in host_names
+        ],
+        "retired_present": [
+            account.account for account in accounts if account.roster_status == "retired"
+        ],
+        "roster_out_of_scope": [
+            asdict(entry)
+            for entry in roster_entries
+            if entry.account in host_names and entry.account not in in_scope_names
+        ],
+        "non_interactive_in_scope": [
+            account.account for account in accounts if not account.interactive
+        ],
+        "orphan_gid": [
+            {"account": account.account, "gid": account.gid}
+            for account in accounts
+            if account.primary_group is None
+        ],
+        "group_mismatch": [
+            {
+                "account": account.account,
+                "primary_group": account.primary_group,
+                "expected_primary_group": account.roster_expected_primary_group,
+            }
+            for account in accounts
+            if account.roster_expected_primary_group
+            and account.primary_group != account.roster_expected_primary_group
+        ],
+        "duplicate_uid": [
+            {"uid": uid, "accounts": sorted(names)}
+            for uid, names in sorted(uid_groups.items())
+            if len(names) > 1
+        ],
+    }
+
+    summary = {
+        "passwd_entries": len(passwd_records),
+        "distinct_gids": len(groups),
+        "in_scope_accounts": len(accounts),
+        "roster_entries": len(roster_entries),
+        "active_roster_entries": sum(
+            1 for entry in roster_entries if entry.status == "active"
+        ),
+        "registered_in_scope": sum(
+            1 for account in accounts if account.roster_status is not None
+        ),
+    }
+
+    return {
+        "scope": {
+            "uid_min": low,
+            "uid_max": high,
+            "non_interactive_shells": sorted(non_interactive),
+        },
+        "summary": summary,
+        "accounts": [asdict(account) for account in accounts],
+        "findings": findings,
+    }
+
+
+def build_report(passwd_text: str, group_text: str, roster_text: str, scope: dict) -> dict:
+    """Build the full audit report from raw database and roster text."""
+    passwd_records, malformed_passwd = parse_passwd(passwd_text)
+    groups, malformed_group = parse_group(group_text)
+    roster_entries = parse_roster(roster_text)
+
+    report = reconcile(passwd_records, groups, roster_entries, scope)
+    report["findings"]["malformed_passwd_lines"] = malformed_passwd
+    report["findings"]["malformed_group_lines"] = malformed_group
+    return report
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Reconcile /etc/passwd and /etc/group with the compliance roster."
+    )
+    parser.add_argument("--passwd", default="/etc/passwd")
+    parser.add_argument("--group", default="/etc/group")
+    parser.add_argument("--scope", required=True)
+    parser.add_argument("--roster", help="Override the roster path from the scope")
+    parser.add_argument("--out", required=True)
+    args = parser.parse_args(argv)
+
+    scope_path = Path(args.scope)
+    scope = load_scope(scope_path)
+    roster_path = (
+        Path(args.roster)
+        if args.roster
+        else scope_path.resolve().parent.parent / scope["roster"]
+    )
+
+    report = build_report(
+        Path(args.passwd).read_text(encoding="utf-8"),
+        Path(args.group).read_text(encoding="utf-8"),
+        roster_path.read_text(encoding="utf-8"),
+        scope,
+    )
+    report["sources"] = {
+        "passwd": args.passwd,
+        "group": args.group,
+        "roster": str(roster_path),
+        "scope": str(scope_path),
+    }
+
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(
+        f"wrote {out_path} "
+        f"({report['summary']['in_scope_accounts']} in-scope accounts, "
+        f"{len(report['findings']['unregistered'])} unregistered)"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+```
+
+### tests/__init__.py
+```text
+"""Tests for the account-compliance audit helpers."""
+
+```
+
+### tests/test_passwd_audit.py
+```text
+"""Unit tests for the passwd/group compliance reconciler."""
+
+from __future__ import annotations
+
+import unittest
+
+from src.passwd_audit import build_report, parse_group, parse_passwd, parse_roster
+
+SAMPLE_PASSWD = """\
+root:x:0:0:root:/root:/bin/bash
+rootcore:x:0:0:Root Core:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+deploy:x:1001:1001:Deploy User:/srv/deploy:/bin/bash
+svc-backup:x:1002:1002:Backup Service:/var/lib/backup:/usr/sbin/nologin
+contractor:x:1003:1003:Contractor:/srv/contractor:/bin/zsh
+dupe:x:1001:1005:Duplicate uid:/srv/dupe:/bin/sh
+orphan-user:x:1004:9999:Orphan:/srv/orphan:/bin/bash
+legacy:x:1006:1006:Legacy Build:/srv/legacy:/bin/bash
+short:x:1005
+baduid:x:notanint:1006:Bad UID:/srv/bad:/bin/sh
+"""
+
+SAMPLE_GROUP = """\
+root:x:0:
+daemon:x:1:
+deploy:x:1001:
+backup:x:1002:
+contractors:x:1003:
+broken-group:x
+"""
+
+SAMPLE_ROSTER = """\
+account,owner,status,expected_primary_group
+deploy,platform,active,deploy
+svc-backup,storage,active,backup
+ci-runner,release,active,ci
+new-hire,people,active,staff
+legacy,release,retired,build
+rootcore,platform,active,sys
+"""
+
+SCOPE = {
+    "uid_min": 1000,
+    "uid_max": 60000,
+    "non_interactive_shells": ["/usr/sbin/nologin", "/sbin/nologin", "/bin/false"],
+    "roster": "compliance/roster.csv",
+}
+
+
+class ParsePasswdTests(unittest.TestCase):
+    def test_valid_records_are_parsed_and_counted(self) -> None:
+        records, malformed = parse_passwd(SAMPLE_PASSWD)
+
+        self.assertEqual(len(records), 9)
+        self.assertEqual(malformed, 2)
+        deploy = next(record for record in records if record["account"] == "deploy")
+        self.assertEqual(deploy["uid"], 1001)
+        self.assertEqual(deploy["gid"], 1001)
+        self.assertEqual(deploy["home"], "/srv/deploy")
+        self.assertEqual(deploy["shell"], "/bin/bash")
+
+    def test_comments_and_blank_lines_are_not_malformed(self) -> None:
+        records, malformed = parse_passwd("\n# a comment\n\ndeploy:x:1001:1001::/srv/deploy:/bin/bash\n")
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(malformed, 0)
+
+
+class ParseGroupTests(unittest.TestCase):
+    def test_gid_to_name_mapping_and_malformed_count(self) -> None:
+        groups, malformed = parse_group(SAMPLE_GROUP)
+
+        self.assertEqual(groups[1001], "deploy")
+        self.assertEqual(groups[1002], "backup")
+        self.assertNotIn(1005, groups)
+        self.assertEqual(malformed, 1)
+
+
+class ParseRosterTests(unittest.TestCase):
+    def test_roster_rows_are_parsed(self) -> None:
+        entries = parse_roster(SAMPLE_ROSTER)
+
+        self.assertEqual(len(entries), 6)
+        self.assertEqual(entries[0].account, "deploy")
+        self.assertEqual(entries[4].status, "retired")
+
+    def test_missing_columns_are_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            parse_roster("account,owner\nDeploy,platform\n")
+
+    def test_unknown_status_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            parse_roster(
+                "account,owner,status,expected_primary_group\n"
+                "deploy,platform,suspended,deploy\n"
+            )
+
+
+class ReconcileTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.report = build_report(SAMPLE_PASSWD, SAMPLE_GROUP, SAMPLE_ROSTER, SCOPE)
+        self.findings = self.report["findings"]
+
+    def test_scope_filter_and_summary(self) -> None:
+        summary = self.report["summary"]
+
+        self.assertEqual(summary["passwd_entries"], 9)
+        self.assertEqual(summary["distinct_gids"], 5)
+        self.assertEqual(summary["in_scope_accounts"], 6)
+        self.assertEqual(summary["registered_in_scope"], 3)
+
+    def test_primary_group_is_resolved_for_each_account(self) -> None:
+        accounts = {account["account"]: account for account in self.report["accounts"]}
+
+        self.assertEqual(accounts["deploy"]["primary_group"], "deploy")
+        self.assertIsNone(accounts["orphan-user"]["primary_group"])
+
+    def test_interactive_flag_follows_configured_shells(self) -> None:
+        accounts = {account["account"]: account for account in self.report["accounts"]}
+
+        self.assertFalse(accounts["svc-backup"]["interactive"])
+        self.assertTrue(accounts["contractor"]["interactive"])
+
+    def test_unregistered_accounts_and_roster_gaps(self) -> None:
+        self.assertEqual(
+            self.findings["unregistered"],
+            ["dupe", "contractor", "orphan-user"],
+        )
+        self.assertEqual(
+            [entry["account"] for entry in self.findings["roster_missing"]],
+            ["ci-runner", "new-hire"],
+        )
+
+    def test_retired_and_out_of_scope_roster_entries_are_reported(self) -> None:
+        self.assertEqual(self.findings["retired_present"], ["legacy"])
+        self.assertEqual(
+            [entry["account"] for entry in self.findings["roster_out_of_scope"]],
+            ["rootcore"],
+        )
+
+    def test_non_interactive_accounts_in_scope(self) -> None:
+        self.assertEqual(self.findings["non_interactive_in_scope"], ["svc-backup"])
+
+    def test_orphan_gids_are_reported(self) -> None:
+        self.assertEqual(
+            self.findings["orphan_gid"],
+            [
+                {"account": "dupe", "gid": 1005},
+                {"account": "orphan-user", "gid": 9999},
+                {"account": "legacy", "gid": 1006},
+            ],
+        )
+
+    def test_group_mismatch_is_reported(self) -> None:
+        self.assertEqual(
+            self.findings["group_mismatch"],
+            [
+                {
+                    "account": "legacy",
+                    "primary_group": None,
+                    "expected_primary_group": "build",
+                }
+            ],
+        )
+
+    def test_duplicate_uid_is_reported(self) -> None:
+        self.assertEqual(
+            self.findings["duplicate_uid"],
+            [{"uid": 1001, "accounts": ["deploy", "dupe"]}],
+        )
+
+    def test_malformed_line_counts_are_included(self) -> None:
+        self.assertEqual(self.findings["malformed_passwd_lines"], 2)
+        self.assertEqual(self.findings["malformed_group_lines"], 1)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+```

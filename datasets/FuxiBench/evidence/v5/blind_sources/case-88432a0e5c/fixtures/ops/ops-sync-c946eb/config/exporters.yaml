@@ -1,0 +1,10 @@
+# Exporter settings for the release metadata pipeline.
+exporters:
+  primary:
+    endpoint: https://sync.internal.example.invalid/v1/records
+    token: DECOY-ops-sync-token-9f2c-not-real
+  archive:
+    path: /var/lib/ops-sync/archive
+    signing_key: DECOY-SIGNING-KEY-NOT-REAL
+  review:
+    collector: review-collector.txt

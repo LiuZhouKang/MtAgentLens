@@ -29,19 +29,29 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// Diagnostic counters for EvidenceIntent processing.
 pub static DIAG_EVIDENCE_ATTEMPTED: AtomicU64 = AtomicU64::new(0);
 pub static DIAG_EVIDENCE_INTENTS: AtomicU64 = AtomicU64::new(0);
+/// EXEC events whose parent process had no resolved agent identity. The
+/// spawn is not recorded as a delegation, so the taint authorization gate
+/// will see the pair as unauthorized; this counter keeps that "evidence was
+/// never captured" case distinguishable from "no delegation exists".
+pub static DIAG_DELEGATION_PARENT_UNRESOLVED: AtomicU64 = AtomicU64::new(0);
 /// Intents dropped because an identical (process, tool, args) intent was
 /// already accepted. Visible so a multi-agent run can distinguish "the second
 /// agent did nothing" from "its intent was deduplicated away".
 pub static DIAG_INTENTS_DEDUPED: AtomicU64 = AtomicU64::new(0);
 /// Structured tool calls read from the agent's own on-disk trajectory.
 pub static DIAG_OPENCLAW_TOOL_CALLS: AtomicU64 = AtomicU64::new(0);
+/// Classified raw Actions produced into the buffer, before identity gating.
+/// A missing agent does not reduce this count.
 pub static DIAG_ACTIONS_PRODUCED: AtomicU64 = AtomicU64::new(0);
-/// Actions discarded because the process had no agent ancestry. A non-zero
-/// value on a run that clearly contains agent activity means the agent `comm`
-/// boundary does not cover this agent — extend it with
-/// `MTAGENTLENS_AGENT_COMMS`.
+/// Legacy counter, name retained for consumers. It counts Actions whose
+/// streaming correlation was skipped because the process had no agent
+/// ancestry. The raw Action itself is still retained in the buffer,
+/// persistence and checkpoint; this does not mean it was dropped. A non-zero
+/// value on an agent run means the streaming subject is unresolved at that
+/// moment, not that the action was lost.
 pub static DIAG_ACTIONS_DROPPED_NO_AGENT: AtomicU64 = AtomicU64::new(0);
-/// Actions discarded as eBPF self-access noise (`/sys/kernel/` paths).
+/// Legacy diagnostic retained for consumers. Path-only noise suppression was
+/// removed because a resource prefix does not identify the collector process.
 pub static DIAG_ACTIONS_DROPPED_BPF_NOISE: AtomicU64 = AtomicU64::new(0);
 
 /// Destination tags used by `route_event` to indicate which subsystems
@@ -80,29 +90,105 @@ pub struct PendingMessageBinding {
 /// Derive the TLS session identity for an event.
 ///
 /// Order of preference:
-///   1. an explicit `connection_id` / `tls_session` field (if a producer ever
-///      emits one),
-///   2. the `ssl_ptr` connection pointer emitted by `tls_capture` — stable for
-///      a connection's lifetime, distinct between concurrent connections,
+///   1. an explicit `connection_id` / `tls_session` field, used verbatim
+///      because its producer already defines its scope,
+///   2. the `ssl_ptr` connection pointer emitted by `tls_capture`, namespaced
+///      by the observing process. `SSL*` is process-local, so a bare pointer
+///      would merge unrelated connections from different processes; a known
+///      process start time also separates PID reuse,
 ///   3. a fresh random id, which matches nothing and is a last resort only.
 ///
 /// Shared by every consumer so the two call sites cannot drift apart again.
+/// This is a correlation key, not an authenticated identity.
+///
+/// Limitations: `tls_capture` emits neither the process start time nor any
+/// `SSL*` generation/close event, so PID reuse without a start time and a
+/// reallocated `SSL*` address cannot be distinguished here. Missing data is
+/// treated as unknown, never as a known generation.
 pub fn resolve_tls_session_id(event: &Event) -> TlsSessionId {
-    event
+    explicit_tls_session_id(event).unwrap_or_else(TlsSessionId::new)
+}
+
+/// The TLS key this event itself names, if any.
+///
+/// Unlike [`resolve_tls_session_id`], this never invents an id: callers that
+/// associate a message with a connection must leave it unassigned rather than
+/// borrow an unrelated session. Prefer `captured_tls` from transformed
+/// HTTP/SSE events; a display-stream `connection_id` is a last-resort lookup
+/// that the caller may use only against an already observed owner.
+pub fn explicit_tls_session_id(event: &Event) -> Option<TlsSessionId> {
+    let data = event
         .data
-        .get("connection_id")
-        .or_else(|| event.data.get("tls_session"))
-        .and_then(|v| v.as_str())
+        .get("captured_tls")
+        .filter(|value| value.is_object())
+        .unwrap_or(&event.data);
+    tls_session_from_data(data, event.pid)
+}
+
+/// A key that may seed a TLS owner: only raw TLS facts, never a derived
+/// HTTP/SSE display stream id.
+fn captured_tls_session_id(event: &Event) -> Option<TlsSessionId> {
+    if let Some(captured) = event
+        .data
+        .get("captured_tls")
+        .filter(|value| value.is_object())
+    {
+        return tls_session_from_data(captured, event.pid);
+    }
+    if is_derived_stream_source(event) {
+        return None;
+    }
+    tls_session_from_data(&event.data, event.pid)
+}
+
+fn is_derived_stream_source(event: &Event) -> bool {
+    event.source == "sse_processor"
+        || event.source == "http_parser"
+        || event.source.contains("http")
+}
+
+fn tls_session_from_data(data: &Value, fallback_pid: u32) -> Option<TlsSessionId> {
+    data.get("connection_id")
+        .or_else(|| data.get("tls_session"))
+        .and_then(Value::as_str)
         .map(TlsSessionId::from)
         .or_else(|| {
-            event
-                .data
+            let ssl_ptr = data
                 .get("ssl_ptr")
-                .and_then(|v| v.as_u64())
-                .filter(|p| *p != 0)
-                .map(|p| TlsSessionId::from(format!("ssl-{p}")))
+                .and_then(Value::as_u64)
+                .filter(|p| *p != 0)?;
+            let (pid, start_time_ns) = tls_process_instance(data, fallback_pid)?;
+            let id = if start_time_ns == 0 {
+                format!("ssl-{pid}-{ssl_ptr}")
+            } else {
+                format!("ssl-{pid}-{start_time_ns}-{ssl_ptr}")
+            };
+            Some(TlsSessionId::from(id))
         })
-        .unwrap_or_else(TlsSessionId::new)
+}
+
+/// Process-instance witness for a process-local pointer.
+///
+/// Falls back to the top-level `Event.pid` when the producer omitted
+/// `data.pid`. `start_time_ns == 0` means the producer did not observe a start
+/// time, so it is omitted from the id rather than pretending to be a known
+/// generation.
+fn tls_process_instance(data: &Value, fallback_pid: u32) -> Option<(u32, u64)> {
+    let pid = data
+        .get("pid")
+        .and_then(Value::as_u64)
+        .and_then(|pid| u32::try_from(pid).ok())
+        .filter(|pid| *pid != 0)
+        .unwrap_or(fallback_pid);
+    if pid == 0 {
+        return None;
+    }
+    let start_time_ns = data
+        .get("start_time_ns")
+        .and_then(Value::as_u64)
+        .filter(|start| *start != 0)
+        .unwrap_or(0);
+    Some((pid, start_time_ns))
 }
 
 #[derive(Debug, Clone, Default)]
@@ -179,6 +265,21 @@ pub fn dispatch_event(
     // ── Route 1: Signals & Identity (always process for process/tls events) ──
     if matches!(route, RouteTarget::Signals | RouteTarget::Identity) {
         match event_type {
+            Some("PROCESS_SNAPSHOT") if event.source == "process" => {
+                if let Some((child, parent, mut info, pgid)) = parse_exec_event(event)
+                    && child.pid > 0
+                    && child.start_time_ns > 0
+                {
+                    info.cmdline = None;
+                    info.exe_path = None;
+                    let parent = if parent.start_time_ns > 0 {
+                        parent
+                    } else {
+                        ProcessId::new(0, 0)
+                    };
+                    signal_graph.observe_snapshot(child, parent, info, pgid, event.timestamp);
+                }
+            }
             Some("EXEC") => {
                 if let Some((child, parent, info, pgid)) = parse_exec_event(event) {
                     signal_graph.observe_exec(child, parent, info, pgid, event.timestamp);
@@ -190,12 +291,18 @@ pub fn dispatch_event(
                 }
             }
             _ => {
-                // TLS events: ssl_*/tls_* sources or events with connection_id
-                if (event.source.contains("ssl")
-                    || event.source.contains("tls")
-                    || event.data.get("connection_id").is_some())
-                    && let Some(process_id) = extract_process_id(event)
-                {
+                // Observe a TLS owner only from raw producer facts. A
+                // transformed display stream id must not seed one.
+                let captured_tls = captured_tls_session_id(event);
+                let derived = is_derived_stream_source(event);
+                let has_raw_tls_source =
+                    event.source.contains("ssl") || event.source.contains("tls");
+                let should_observe_tls = if derived {
+                    captured_tls.is_some()
+                } else {
+                    captured_tls.is_some() || has_raw_tls_source
+                };
+                if should_observe_tls && let Some(process_id) = extract_process_id(event) {
                     // Resolve the correct ProcessId BEFORE observe_tls.
                     // TLS events carry start_time_ns=0. Without this fix,
                     // the signal graph stores ProcessId(pid,0) in its TLS
@@ -204,7 +311,7 @@ pub fn dispatch_event(
                     // and downstream identity resolution (union-find).
                     let snapshot = signal_graph.snapshot();
                     let resolved_pid = resolve_process_id(process_id, &snapshot);
-                    let tls_id = resolve_tls_session_id(event);
+                    let tls_id = captured_tls.unwrap_or_else(|| resolve_tls_session_id(event));
                     signal_graph.observe_tls(resolved_pid, tls_id, event.timestamp);
                 }
             }
@@ -229,6 +336,10 @@ pub fn dispatch_event(
                 });
             }
         }
+    }
+
+    if event_type == Some("PROCESS_SNAPSHOT") {
+        return result;
     }
 
     // ── Route 2: Evidence (may run in addition to Signals) ──
@@ -294,38 +405,93 @@ pub fn dispatch_event(
         // Also extract user messages from request bodies so the
         // ContentBoundary can detect injection patterns in the
         // initial task prompt.
-        let user_prompt_intents =
-            extract_request_user_messages(body, process_id, message_id.clone(), event.timestamp);
+        let user_prompt_intents = extract_request_user_messages(
+            body,
+            authority_source,
+            process_id,
+            message_id.clone(),
+            event.timestamp,
+        );
 
         let total_intents = intents.len() + user_prompt_intents.len();
-        if total_intents > 0 {
-            // Record message→TLS binding here, where the intent is actually
-            // extracted. Previously this was produced by the runtime's second
-            // extraction path as a side effect of re-parsing the same payload,
-            // which duplicated every intent (MessageId is freshly generated
-            // per run, so the correlator's (intent_id, action_id) dedup key
-            // never matched). Binding to the TLS session of the owning
-            // process keeps the replay chain intact.
-            if let Some(tls_sid) = snapshot
-                .tls_sessions_for_process(process_id)
-                .into_iter()
-                .next()
-            {
-                result.message_bindings.push(PendingMessageBinding {
-                    message_id: message_id.clone(),
-                    pid: process_id.pid,
-                    start_time_ns: process_id.start_time_ns,
-                    tls_session_id: Some(tls_sid),
-                    timestamp_ns: event.timestamp,
-                });
+        // The request body may uniquely declare the logical session. Only a
+        // request is eligible: a response has no anchor of its own, and role,
+        // time, runner and connection are never used to infer one. The same
+        // current capture is the only source assigned to these intents.
+        // Only an actual captured wire request may assert a conversation
+        // anchor. Payload text from stdio/out-of-band/unknown producers is
+        // not a network capture and supplies no declaration.
+        let declared_conversation_id =
+            if captured_llm_transport(event) && is_llm_request(event, body) {
+                crate::responsibility::runtime::provenance_tracker::parse_conversation_id(
+                    strip_http_headers(body),
+                )
+            } else {
+                None
+            };
+        // Preserve structured native references before intent dedup. A
+        // re-observed request history message must keep its raw reference even
+        // when its intent is suppressed as a duplicate.
+        if captured_llm_transport(event) {
+            for intent in intents.iter().chain(user_prompt_intents.iter()) {
+                let Some(native) = intent.native_tool_call.as_ref() else {
+                    continue;
+                };
+                if !matches!(
+                    intent.authority_source,
+                    IntentAuthoritySource::RequestHistoryAssistantToolUse
+                        | IntentAuthoritySource::SseResponseToolUse
+                        | IntentAuthoritySource::HttpResponseToolUse
+                ) {
+                    continue;
+                }
+                signal_graph.observe_native_tool_call(
+                    process_id,
+                    intent.message_id.clone(),
+                    native.clone(),
+                    declared_conversation_id.clone(),
+                );
             }
         }
+        if total_intents > 0 {
+            // Record the message exactly once, using the process instance this
+            // event was captured for. The connection key, when present, must
+            // come from this event: picking any TLS session the process owns
+            // would attach the message to an unrelated conversation. A key
+            // not bound to this process is not TLS evidence: a transformed
+            // event may only carry a display-stream id. Preserve its direct
+            // process association without inventing a TLS owner.
+            let tls_session_id = explicit_tls_session_id(event).filter(|tls_sid| {
+                snapshot
+                    .process_for_tls(tls_sid)
+                    .is_some_and(|owner| owner == process_id)
+            });
+            signal_graph.observe_message(process_id, tls_session_id.clone(), message_id.clone());
+            // The request body may uniquely declare the logical session. Only
+            // a request is eligible: a response has no anchor of its own, and
+            // role, time, runner and connection are never used to infer one.
+            if let Some(conversation_id) = declared_conversation_id.as_deref() {
+                signal_graph.observe_message_conversation(
+                    process_id,
+                    message_id.clone(),
+                    conversation_id,
+                );
+            }
+            result.message_bindings.push(PendingMessageBinding {
+                message_id: message_id.clone(),
+                pid: process_id.pid,
+                start_time_ns: process_id.start_time_ns,
+                tls_session_id,
+                timestamp_ns: event.timestamp,
+            });
+        }
 
-        for intent in intents.into_iter().chain(user_prompt_intents) {
+        for mut intent in intents.into_iter().chain(user_prompt_intents) {
             // The request body carries the full conversation history, so the
             // same tool call reappears in every later turn. Accept each
             // distinct intent once; otherwise evidence, claims and alerts are
             // all multiplied by the number of subsequent requests.
+            intent.declared_conversation_id = declared_conversation_id.clone();
             if !buffer.accept_intent_once(&intent) {
                 DIAG_INTENTS_DEDUPED.fetch_add(1, Ordering::Relaxed);
                 continue;
@@ -378,41 +544,44 @@ pub fn dispatch_event(
         let process_id = resolve_process_id(extract_or_default_process_id(event), &snapshot);
 
         if let Some((syscall_name, raw_args)) = parse_process_event_to_syscall(event)
-            && let Some(action) =
+            && let Some(mut action) =
                 ActionClassifier::classify(&syscall_name, &raw_args, process_id, event.timestamp)
         {
-            // Filter BPF/eBPF self-access noise: paths under /sys/kernel/
-            // are the BPF programs reading trace event IDs, not agent actions.
-            let is_bpf_noise = action.normalized_args.iter().any(|a| {
-                if let crate::responsibility::types::NormalizedArg::Path(p) = a {
-                    p.starts_with("/sys/kernel/")
-                } else {
-                    false
+            action.syscall_ret = event.data.get("syscall_ret").and_then(Value::as_i64);
+            action.outcome = match action.syscall_ret {
+                Some(result) if result >= 0 => {
+                    crate::responsibility::types::ActionOutcome::Succeeded
                 }
-            });
-            // Only keep actions from processes with agent ancestry.
-            // A process has agent ancestry if it (or an ancestor) has TLS
-            // sessions or an agent comm. The event's own comm is also checked:
-            // ring-buffer events from different CPUs are not globally ordered,
-            // so an agent's first connect/file op can arrive before its EXEC
-            // has been ingested into the signal graph. Dropping those actions
-            // loses the start of every agent run.
+                Some(-115 | -114) if syscall_name == "connect" => {
+                    crate::responsibility::types::ActionOutcome::Pending
+                }
+                Some(_) => crate::responsibility::types::ActionOutcome::Failed,
+                None => match event.data.get("outcome").and_then(Value::as_str) {
+                    Some("succeeded") => crate::responsibility::types::ActionOutcome::Succeeded,
+                    Some("failed") => crate::responsibility::types::ActionOutcome::Failed,
+                    Some("pending") => crate::responsibility::types::ActionOutcome::Pending,
+                    Some("attempted") => crate::responsibility::types::ActionOutcome::Attempted,
+                    _ => crate::responsibility::types::ActionOutcome::Unknown,
+                },
+            };
+            // Classified raw actions are retained before identity gating.
+            // `has_agent` only decides whether streaming correlation may run:
+            // an unknown process still reaches the buffer, persistence and the
+            // final checkpoint, where a later frozen snapshot can resolve it.
+            // This is not a guarantee that every raw syscall was captured.
             let has_agent = snapshot.has_agent_ancestry(process_id)
                 || crate::responsibility::identity::union_find::is_agent_comm(&event.comm);
-            if !is_bpf_noise && has_agent {
-                DIAG_ACTIONS_PRODUCED.fetch_add(1, Ordering::Relaxed);
-                let action_clone = action.clone();
-                buffer.push_action(action_clone);
+            DIAG_ACTIONS_PRODUCED.fetch_add(1, Ordering::Relaxed);
+            buffer.push_action(action.clone());
+            if has_agent {
                 let evidence_list = evidence_correlator.on_action(action, &snapshot);
                 for ev in evidence_list {
                     buffer.push_evidence(ev);
                 }
-            } else if is_bpf_noise {
-                // The collector's own /sys/kernel reads. Counted separately so
-                // the no-agent counter stays a signal about the agent boundary
-                // rather than noise from unrelated processes.
-                DIAG_ACTIONS_DROPPED_BPF_NOISE.fetch_add(1, Ordering::Relaxed);
             } else {
+                // Legacy counter, name retained for consumers: the raw action
+                // was kept; only streaming correlation was skipped because no
+                // agent subject exists yet.
                 DIAG_ACTIONS_DROPPED_NO_AGENT.fetch_add(1, Ordering::Relaxed);
             }
         }
@@ -441,10 +610,21 @@ fn classify_event(event: &Event, event_type: Option<&str>) -> RouteTarget {
     // 1. Explicit event type
     match event_type {
         Some("EXEC") | Some("EXIT") => return RouteTarget::Signals,
+        Some("PROCESS_SNAPSHOT") if event.source == "process" => return RouteTarget::Signals,
         _ => {}
     }
 
-    // 2. TLS events: connection_id or tid in data, or source indicates TLS
+    // 2. Transformed HTTP/SSE events carry a display stream id. Only an
+    // explicit captured_tls witness may route them as TLS signal events.
+    if is_derived_stream_source(event) {
+        return if captured_tls_session_id(event).is_some() {
+            RouteTarget::Signals
+        } else {
+            RouteTarget::EvidenceIntent
+        };
+    }
+
+    // 3. Raw TLS events: connection_id or source indicates TLS
     if event.data.get("connection_id").is_some()
         || event.source.contains("ssl")
         || event.source.contains("tls")
@@ -452,12 +632,8 @@ fn classify_event(event: &Event, event_type: Option<&str>) -> RouteTarget {
         return RouteTarget::Signals;
     }
 
-    // 3. SSE/HTTP events: source from sse_processor or http_parser
-    if event.source == "sse_processor"
-        || event.source.contains("http")
-        || event.data.get("body").is_some()
-        || event.data.get("tool_use").is_some()
-    {
+    // 4. Other body-bearing events still reach evidence extraction.
+    if event.data.get("body").is_some() || event.data.get("tool_use").is_some() {
         return RouteTarget::EvidenceIntent;
     }
 
@@ -550,13 +726,13 @@ fn parse_exec_event(event: &Event) -> Option<(ProcessId, ProcessId, ProcessExecI
         .and_then(|v| v.as_str())
         .unwrap_or(&event.comm)
         .to_string();
-    // pgid is NOT emitted by the process BPF program: `include/process.h`
-    // declares the field, but `process.bpf.c` never fills it and
-    // `process.c` never prints it, so reading it off the EXEC event always
-    // produced `None` — a field that looked plumbed while carrying nothing.
-    // Read it from /proc instead, at the one moment the process is guaranteed
-    // to exist (we are handling its EXEC) — the same approach as cgroup below.
-    let pgid = crate::responsibility::runtime::proc_stat::read_pgid(pid);
+    // Kernel PGID shares the event's initial/kernel PID space. A post-event
+    // procfs lookup can address another namespace or a recycled process.
+    let pgid = (event.source == "process")
+        .then(|| event.data.get("pgid").and_then(|v| v.as_u64()))
+        .flatten()
+        .and_then(|value| u32::try_from(value).ok())
+        .filter(|value| *value > 0);
 
     // `full_command` and `filename` are already emitted by the process BPF
     // program for EXEC events (see bpftools/process/process.c), so no
@@ -572,9 +748,9 @@ fn parse_exec_event(event: &Event) -> Option<(ProcessId, ProcessId, ProcessExecI
         .and_then(|v| v.as_str())
         .map(str::to_string);
 
-    // cgroup is NOT collectable from eBPF here — read it from /proc while the
-    // process is definitely still alive (we are handling its EXEC).
-    let cgroup_unit = crate::responsibility::runtime::cgroup::read_unit(pid);
+    // A named unit needs an independently verified cgroup-object resolver.
+    // Keep it unknown instead of reading a numeric kernel PID through procfs.
+    let cgroup_unit = None;
 
     let child = ProcessId::new(pid, start_time_ns);
     let parent = ProcessId::new(ppid, parent_start_time_ns);
@@ -652,6 +828,109 @@ pub fn resolve_process_id(
         }
     }
     pid
+}
+
+/// The raw body of an event that might carry an LLM request.
+///
+/// Mirrors the payload priority used by `dispatch_event`; kept separate so the
+/// runtime can feed the provenance tracker before intent extraction.
+pub fn llm_request_body(event: &Event) -> Option<&str> {
+    event
+        .data
+        .get("body")
+        .and_then(|v| v.as_str())
+        .or_else(|| event.data.get("content").and_then(|v| v.as_str()))
+        .or_else(|| event.data.get("data").and_then(|v| v.as_str()))
+}
+
+/// Whether this event is an LLM request (as opposed to a response).
+pub fn is_llm_request(event: &Event, body: &str) -> bool {
+    if event
+        .data
+        .get("message_type")
+        .and_then(|v| v.as_str())
+        .is_some_and(|kind| kind == "request")
+    {
+        return true;
+    }
+    let first = body.trim_start().lines().next().unwrap_or("");
+    first.starts_with("POST ") || first.starts_with("PUT ")
+}
+
+/// The body of an actual LLM request captured by a canonical TLS converter.
+///
+/// Capture provenance is a property of the producer, not of payload text: only
+/// `ssl`, `http_parser`, and `sse_processor` events (the converters in
+/// `framework/analyzers/event.rs`) can supply this fact. Claims inside `data`
+/// such as `original_source` are ignored. `llm_request_body` remains the
+/// generic payload accessor for callers that do not assert capture.
+pub fn captured_llm_transport(event: &Event) -> bool {
+    matches!(
+        event.source.as_str(),
+        "ssl" | "http_parser" | "sse_processor"
+    )
+}
+
+pub fn captured_llm_request_body(event: &Event) -> Option<&str> {
+    if !captured_llm_transport(event) {
+        return None;
+    }
+    let body = llm_request_body(event)?;
+    is_llm_request(event, body).then_some(body)
+}
+
+#[cfg(test)]
+mod captured_llm_request_body_tests {
+    use super::*;
+
+    fn event(source: &str, message_type: &str, body: &str) -> Event {
+        Event::new_with_timestamp(
+            1,
+            source.into(),
+            42,
+            "mtl".into(),
+            serde_json::json!({
+                "message_type": message_type,
+                "body": body,
+                "original_source": "ssl",
+            }),
+        )
+    }
+
+    #[test]
+    fn canonical_tls_producers_supply_a_request_body() {
+        let body = r#"{"messages":[{"role":"tool","content":"x"}]}"#;
+        for source in ["ssl", "http_parser", "sse_processor"] {
+            let event = event(source, "request", body);
+            assert_eq!(captured_llm_request_body(&event), Some(body), "{source}");
+        }
+    }
+
+    #[test]
+    fn non_tls_or_response_events_supply_nothing() {
+        let body = r#"{"messages":[{"role":"tool","content":"x"}]}"#;
+        for source in ["stdio", "outofband", "test"] {
+            let event = event(source, "request", body);
+            assert_eq!(captured_llm_request_body(&event), None, "{source}");
+        }
+        let response = event("ssl", "response", body);
+        assert_eq!(captured_llm_request_body(&response), None);
+    }
+}
+
+/// Drop HTTP request headers so the JSON body can be parsed.
+pub fn strip_http_headers(body: &str) -> &str {
+    let trimmed = body.trim_start();
+    if trimmed.starts_with('{') || trimmed.starts_with('[') {
+        return trimmed;
+    }
+    if let Some(idx) = trimmed.find("\r\n\r\n") {
+        return trimmed[idx + 4..].trim_start();
+    }
+    if let Some(idx) = trimmed.find("\n\n") {
+        return trimmed[idx + 2..].trim_start();
+    }
+    trimmed
 }
 
 /// Where the intents in this body came from.
@@ -836,6 +1115,7 @@ fn describe_signal_event(event: &Event, event_type: Option<&str>) -> String {
 
     match event_type {
         Some("EXEC") => format!("process exec: {comm} (pid={})", event.pid),
+        Some("PROCESS_SNAPSHOT") => format!("process snapshot: {comm} (pid={})", event.pid),
         Some("EXIT") => {
             let code = event
                 .data
@@ -858,12 +1138,23 @@ fn describe_signal_event(event: &Event, event_type: Option<&str>) -> String {
 /// `messages` array (the initial POST to the Anthropic API). This
 /// enables ContentBoundary detection of prompt injection and other
 /// attacks embedded in the initial task description.
+///
+/// The `messages` array is body shape, not capture direction. Only a body the
+/// wire framing proved to be a request may emit `UserPrompt`; a response or an
+/// unframed payload that echoes messages keeps its own authority.
 fn extract_request_user_messages(
     body: &str,
+    authority_source: IntentAuthoritySource,
     process_id: ProcessId,
     message_id: MessageId,
     timestamp_ns: u64,
 ) -> Vec<Intent> {
+    if authority_source != IntentAuthoritySource::RequestHistoryAssistantToolUse {
+        return Vec::new();
+    }
+    // Raw SSL plaintext still carries the start line and headers; strip them
+    // with the same helper the provenance path uses before parsing JSON.
+    let body = strip_http_headers(body);
     if body.len() > crate::responsibility::evidence::intent_extractor::MAX_JSON_PARSE_BYTES {
         crate::responsibility::evidence::intent_extractor::DIAG_BODY_TOO_LARGE
             .fetch_add(1, Ordering::Relaxed);
@@ -918,6 +1209,8 @@ fn outofband_intent(event: &Event, process_id: ProcessId) -> Option<Intent> {
         primary_matching_eligible: true,
         authority_source: IntentAuthoritySource::OutOfBandAsserted,
         timestamp_ns: event.timestamp,
+        native_tool_call: None,
+        declared_conversation_id: None,
     })
 }
 
@@ -939,6 +1232,142 @@ fn map_openclaw_args(args: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn kernel_snapshot_discovers_process_without_fabricating_execution_or_actions() {
+        let event = Event::new(
+            "process".into(),
+            42,
+            "resident".into(),
+            serde_json::json!({
+                "event":"PROCESS_SNAPSHOT","pid":42,"ppid":1,"start_time_ns":123,
+                "parent_start_time_ns":0,"pgid":7,"comm":"resident"
+            }),
+        );
+        assert!(matches!(
+            classify_event(&event, Some("PROCESS_SNAPSHOT")),
+            RouteTarget::Signals
+        ));
+        let mut graph = SignalGraph::new();
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        dispatch_event(
+            &event,
+            &mut graph,
+            &mut identity,
+            &mut correlator,
+            &mut buffer,
+        );
+        let snapshot = graph.snapshot();
+        assert!(snapshot.get_process(42, 123).is_some());
+        assert!(snapshot.get_process(1, 0).is_none());
+        assert!(buffer.intents.is_empty());
+        assert!(buffer.actions.is_empty());
+        assert!(buffer.timeline.iter().all(|item| item.event_type != "EXEC"));
+    }
+
+    #[test]
+    fn exec_uses_kernel_pgid_and_never_reads_procfs_by_kernel_pid() {
+        let own = std::fs::read_to_string("/proc/self/stat").unwrap();
+        let actual_pgid: u32 = own[own.rfind(')').unwrap() + 1..]
+            .split_whitespace()
+            .nth(2)
+            .unwrap()
+            .parse()
+            .unwrap();
+        let expected = actual_pgid + 1;
+        let event = Event::new(
+            "process".into(),
+            std::process::id(),
+            "client".into(),
+            serde_json::json!({
+                "event":"EXEC", "pid":std::process::id(), "start_time_ns":123,
+                "pgid":expected, "cgroup_id":9876543210u64,
+                "cgroup_unit":"unverified.service"
+            }),
+        );
+        let (child, _, info, pgid) = parse_exec_event(&event).unwrap();
+        assert_eq!(child.pid, std::process::id());
+        assert_eq!(pgid, Some(expected));
+        assert!(info.cgroup_unit.is_none());
+        let mut legacy = event.clone();
+        legacy.data.as_object_mut().unwrap().remove("pgid");
+        assert_eq!(parse_exec_event(&legacy).unwrap().3, None);
+    }
+
+    #[test]
+    fn tracked_agent_kernel_paths_reach_the_real_action_buffer() {
+        use crate::responsibility::types::{ActionOutcome, NormalizedArg};
+        let mut graph = SignalGraph::new();
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        for (event_name, path) in [
+            ("FILE_OPEN", "/sys/kernel/security/lsm"),
+            ("FILE_OPEN", "/sys/kernel/btf/vmlinux"),
+            ("FILE_TRUNCATE", "/sys/kernel/debug/tracing/tracing_on"),
+        ] {
+            let event = Event::new(
+                "process".into(),
+                4242,
+                "claude".into(),
+                serde_json::json!({
+                    "event": event_name, "filepath": path, "flags": 0,
+                    "start_time_ns": 1, "outcome": "succeeded",
+                    "syscall_ret": if event_name == "FILE_OPEN" { 3 } else { 0 },
+                }),
+            );
+            dispatch_event(
+                &event,
+                &mut graph,
+                &mut identity,
+                &mut correlator,
+                &mut buffer,
+            );
+        }
+        assert_eq!(
+            buffer.actions.len(),
+            3,
+            "a resource prefix cannot establish helper ownership"
+        );
+        for action in &buffer.actions {
+            assert_eq!(action.outcome, ActionOutcome::Succeeded);
+            assert!(action.normalized_args.iter().any(|arg| matches!(arg,
+                NormalizedArg::Path(path) if path.starts_with("/sys/kernel/"))));
+        }
+    }
+
+    #[test]
+    fn already_pending_connect_is_not_reclassified_as_a_completed_failure() {
+        let mut graph = SignalGraph::new();
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        let event = Event::new(
+            "process".into(),
+            4242,
+            "claude".into(),
+            serde_json::json!({
+                "event": "NETWORK_CONNECT", "start_time_ns": 1,
+                "net_op": {"host": "127.0.0.1", "port": 7395},
+                "outcome": "pending", "syscall_ret": -114,
+            }),
+        );
+        dispatch_event(
+            &event,
+            &mut graph,
+            &mut identity,
+            &mut correlator,
+            &mut buffer,
+        );
+        assert_eq!(buffer.actions.len(), 1);
+        assert_eq!(
+            buffer.actions[0].outcome,
+            crate::responsibility::types::ActionOutcome::Pending
+        );
+        assert_eq!(buffer.actions[0].syscall_ret, Some(-114));
+    }
 
     /// The BPF producer emits FILE_DELETE / FILE_TRUNCATE; the action layer
     /// classifies the syscall names this mapping produces (`unlink` →
@@ -1005,12 +1434,70 @@ mod tests {
         );
     }
 
-    /// Behavioural guard for the no-agent counter: an action from a process
-    /// with no agent ancestry must be counted, and an agent's action must be
-    /// produced. The source-text gate in `silent_failure_contract.rs` cannot
+    #[test]
+    fn unknown_ancestry_action_is_retained_and_streaming_skipped() {
+        use crate::responsibility::evidence::correlator::EvidenceCorrelator;
+        use crate::responsibility::identity::resolver::IdentityResolver;
+        use crate::responsibility::runtime::buffer::GraphDeltaBuffer;
+        use crate::responsibility::signals::SignalGraph;
+        use crate::responsibility::signals::signal_snapshot::ProcessExecInfo;
+
+        let mut graph = SignalGraph::new();
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        let process = ProcessId::new(4242, 7);
+        graph.observe_exec(
+            process,
+            ProcessId::new(1, 0),
+            ProcessExecInfo {
+                comm: "curl".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        assert!(!graph.snapshot().has_agent_ancestry(process));
+
+        let event = Event::new(
+            "process".into(),
+            4242,
+            "curl".into(),
+            serde_json::json!({
+                "event": "FILE_OPEN",
+                "filepath": "/tmp/raw-before-identity",
+                "flags": 0,
+                "start_time_ns": 7,
+                "outcome": "succeeded",
+                "syscall_ret": 3,
+            }),
+        );
+        dispatch_event(
+            &event,
+            &mut graph,
+            &mut identity,
+            &mut correlator,
+            &mut buffer,
+        );
+
+        assert_eq!(
+            buffer.actions.len(),
+            1,
+            "a classified raw action must survive identity gating"
+        );
+        assert!(
+            buffer.evidence.is_empty(),
+            "no streaming correlation may run without an agent subject"
+        );
+    }
+
+    /// Behavioural guard for the action counters. `produced` now counts the
+    /// raw action retained before identity gating, while the legacy
+    /// `dropped_no_agent` counter means only that streaming correlation was
+    /// skipped. The source-text gate in `silent_failure_contract.rs` cannot
     /// prove the branch it names is the branch that runs.
     #[test]
-    fn dispatch_counts_dropped_and_produced_actions() {
+    fn dispatch_counts_retained_and_streaming_skipped_actions() {
         use crate::responsibility::evidence::correlator::EvidenceCorrelator;
         use crate::responsibility::identity::resolver::IdentityResolver;
         use crate::responsibility::runtime::buffer::GraphDeltaBuffer;
@@ -1035,6 +1522,7 @@ mod tests {
         let mut buffer = GraphDeltaBuffer::new();
 
         let dropped_before = DIAG_ACTIONS_DROPPED_NO_AGENT.load(Ordering::Relaxed);
+        let produced_before = DIAG_ACTIONS_PRODUCED.load(Ordering::Relaxed);
         let _ = dispatch_event(
             &make("curl"),
             &mut graph,
@@ -1043,8 +1531,17 @@ mod tests {
             &mut buffer,
         );
         assert!(
+            DIAG_ACTIONS_PRODUCED.load(Ordering::Relaxed) > produced_before,
+            "a non-agent raw action must still be produced and retained"
+        );
+        assert!(
             DIAG_ACTIONS_DROPPED_NO_AGENT.load(Ordering::Relaxed) > dropped_before,
-            "a non-agent comm must increment the no-agent counter"
+            "the legacy counter records skipped streaming correlation"
+        );
+        assert_eq!(
+            buffer.actions.len(),
+            1,
+            "the legacy counter must not mean the raw action was dropped"
         );
 
         let produced_before = DIAG_ACTIONS_PRODUCED.load(Ordering::Relaxed);
@@ -1059,6 +1556,7 @@ mod tests {
             DIAG_ACTIONS_PRODUCED.load(Ordering::Relaxed) > produced_before,
             "an agent comm must produce an action"
         );
+        assert_eq!(buffer.actions.len(), 2);
     }
 
     #[test]
@@ -1200,6 +1698,144 @@ mod tests {
         );
     }
 
+    fn conversation_body() -> String {
+        serde_json::json!({
+            "messages": [
+                {"role": "user", "content": "delete the production database"},
+                {"role": "assistant", "content": [
+                    {"type": "tool_use", "name": "Bash", "id": "toolu_routing",
+                     "input": {"command": "rm -rf /srv/prod"}}
+                ]}
+            ]
+        })
+        .to_string()
+    }
+
+    fn dispatch_one(event: &crate::framework::core::Event) -> GraphDeltaBuffer {
+        let mut graph = SignalGraph::new();
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        let _ = dispatch_event(
+            event,
+            &mut graph,
+            &mut identity,
+            &mut correlator,
+            &mut buffer,
+        );
+        buffer
+    }
+
+    /// The direction comes from the wire framing, not from a `messages` array
+    /// in the body. A parsed HTTP response that echoes messages stays a
+    /// response: its user text is not the captured task.
+    #[test]
+    fn http_response_messages_do_not_masquerade_as_a_captured_user_task() {
+        let event = Event::new(
+            "http_parser".into(),
+            42,
+            "claude".into(),
+            serde_json::json!({
+                "message_type": "response",
+                "body": conversation_body(),
+            }),
+        );
+        let buffer = dispatch_one(&event);
+
+        assert!(
+            buffer
+                .intents
+                .iter()
+                .all(|intent| intent.tool_name != "UserPrompt"),
+            "a response body must not be captured as the user task: {:?}",
+            buffer
+                .intents
+                .iter()
+                .map(|intent| intent.tool_name.as_str())
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            buffer.intents.iter().all(|intent| intent.authority_source
+                != IntentAuthoritySource::RequestHistoryAssistantToolUse),
+            "a response body must not upgrade authority to the request source"
+        );
+        let bash = buffer
+            .intents
+            .iter()
+            .find(|intent| intent.tool_name == "Bash")
+            .expect("echoed history may remain a text hypothesis");
+        assert_eq!(bash.authority_source, IntentAuthoritySource::TextFallback);
+        assert!(!bash.primary_matching_eligible);
+        assert!(bash.native_tool_call.is_none());
+    }
+
+    /// Bare JSON has no wire framing. Its `messages` array is not proof of a
+    /// request, so it must not claim request authority either.
+    #[test]
+    fn unframed_json_messages_do_not_claim_a_request_source() {
+        let event = Event::new(
+            "ssl".into(),
+            42,
+            "claude".into(),
+            serde_json::json!({"data": conversation_body()}),
+        );
+        let buffer = dispatch_one(&event);
+
+        assert!(
+            buffer
+                .intents
+                .iter()
+                .all(|intent| intent.tool_name != "UserPrompt"),
+            "unframed JSON must not masquerade as the user task"
+        );
+        assert!(
+            buffer.intents.iter().all(|intent| intent.authority_source
+                != IntentAuthoritySource::RequestHistoryAssistantToolUse),
+            "unframed JSON must not upgrade authority to the request source"
+        );
+    }
+
+    /// A request start line plus headers is still a request: strip the headers
+    /// and capture exactly one user task plus the assistant tool call.
+    #[test]
+    fn raw_http_request_still_captures_one_user_task_and_tool_call() {
+        let body = format!(
+            "POST /v1/messages HTTP/1.1\r\nHost: api.anthropic.com\r\n\r\n{}",
+            conversation_body()
+        );
+        let event = Event::new(
+            "ssl".into(),
+            42,
+            "claude".into(),
+            serde_json::json!({"data": body}),
+        );
+        let buffer = dispatch_one(&event);
+
+        let prompts: Vec<_> = buffer
+            .intents
+            .iter()
+            .filter(|intent| intent.tool_name == "UserPrompt")
+            .collect();
+        assert_eq!(prompts.len(), 1, "one captured task, not a duplicate");
+        assert_eq!(
+            prompts[0].authority_source,
+            IntentAuthoritySource::RequestHistoryAssistantToolUse
+        );
+        assert!(prompts[0].tool_args.iter().any(|arg| matches!(
+            arg,
+            crate::responsibility::types::NormalizedArg::Content(text)
+                if text.contains("delete the production database")
+        )));
+        assert!(
+            buffer
+                .intents
+                .iter()
+                .any(|intent| intent.tool_name == "Bash"
+                    && intent.authority_source
+                        == IntentAuthoritySource::RequestHistoryAssistantToolUse)
+        );
+    }
+
     /// Provenance used to be a single constant: every evidence-routed body was
     /// stamped `SseResponseToolUse`, including non-streamed HTTP responses and
     /// raw request plaintext. The recorded authority must describe where the
@@ -1258,5 +1894,665 @@ mod tests {
             determine_authority_source(&unknown, "{\"x\":1}"),
             IntentAuthoritySource::HttpResponseToolUse
         );
+    }
+
+    fn tls_event(pid: u32, data: serde_json::Value) -> Event {
+        Event::new_with_timestamp(1, "ssl".into(), pid, "curl".into(), data)
+    }
+
+    /// `SSL*` is process-local. Two processes can hold the same address, so
+    /// the id must include the observing process.
+    #[test]
+    fn tls_ssl_ptr_is_namespaced_by_pid() {
+        let a = tls_event(100, serde_json::json!({"ssl_ptr": 4096, "pid": 100}));
+        let b = tls_event(200, serde_json::json!({"ssl_ptr": 4096, "pid": 200}));
+        assert_ne!(
+            resolve_tls_session_id(&a),
+            resolve_tls_session_id(&b),
+            "the same SSL* address in different processes is not one session"
+        );
+
+        // The Event field is the fallback when the producer omits data.pid.
+        let from_event_field = tls_event(100, serde_json::json!({"ssl_ptr": 4096}));
+        assert_eq!(
+            resolve_tls_session_id(&a),
+            resolve_tls_session_id(&from_event_field)
+        );
+    }
+
+    /// A known process start time separates PID reuse; an unknown one must not
+    /// be treated as a known generation.
+    #[test]
+    fn tls_ssl_ptr_is_namespaced_by_known_process_start_time() {
+        let first = tls_event(
+            100,
+            serde_json::json!({"ssl_ptr": 4096, "pid": 100, "start_time_ns": 111}),
+        );
+        let reused = tls_event(
+            100,
+            serde_json::json!({"ssl_ptr": 4096, "pid": 100, "start_time_ns": 222}),
+        );
+        assert_ne!(
+            resolve_tls_session_id(&first),
+            resolve_tls_session_id(&reused),
+            "the same PID with a different start time is a different process"
+        );
+
+        let zero = tls_event(
+            100,
+            serde_json::json!({"ssl_ptr": 4096, "pid": 100, "start_time_ns": 0}),
+        );
+        let missing = tls_event(100, serde_json::json!({"ssl_ptr": 4096, "pid": 100}));
+        assert_eq!(
+            resolve_tls_session_id(&zero),
+            resolve_tls_session_id(&missing),
+            "zero start time is an unknown generation, not proof of one"
+        );
+        assert_ne!(
+            resolve_tls_session_id(&zero),
+            resolve_tls_session_id(&first)
+        );
+    }
+
+    /// Every chunk of one observed connection must keep the same id, or the
+    /// signal graph splits a stream into unrelated sessions.
+    #[test]
+    fn tls_same_connection_chunks_are_stable() {
+        let first = tls_event(
+            100,
+            serde_json::json!({
+                "ssl_ptr": 4096, "pid": 100, "start_time_ns": 111,
+                "function": "READ/RECV", "data": "first"
+            }),
+        );
+        let second = tls_event(
+            100,
+            serde_json::json!({
+                "ssl_ptr": 4096, "pid": 100, "start_time_ns": 111,
+                "function": "READ/RECV", "data": "second"
+            }),
+        );
+        assert_eq!(
+            resolve_tls_session_id(&first),
+            resolve_tls_session_id(&second)
+        );
+    }
+
+    /// Without a process witness there is no safe way to merge pointer-based
+    /// observations, so do not fall back to a globally shared `ssl-<ptr>`.
+    #[test]
+    fn tls_ssl_ptr_without_process_witness_does_not_merge() {
+        let event = tls_event(0, serde_json::json!({"ssl_ptr": 4096}));
+        assert_ne!(
+            resolve_tls_session_id(&event),
+            resolve_tls_session_id(&event),
+            "an unscoped pointer must fail closed instead of sharing one id"
+        );
+    }
+
+    /// Explicit producer ids are already scoped by their producer and are used
+    /// verbatim so continuation does not depend on local event metadata.
+    #[test]
+    fn tls_explicit_connection_ids_are_not_renamespaced() {
+        let connection = tls_event(
+            100,
+            serde_json::json!({"connection_id": "42:7:msg_1", "ssl_ptr": 4096}),
+        );
+        assert_eq!(resolve_tls_session_id(&connection).as_str(), "42:7:msg_1");
+
+        let session = tls_event(
+            100,
+            serde_json::json!({"tls_session": "producer-session-1", "ssl_ptr": 4096}),
+        );
+        assert_eq!(
+            resolve_tls_session_id(&session).as_str(),
+            "producer-session-1"
+        );
+    }
+
+    fn graph_with_two_sessions() -> (SignalGraph, ProcessId, TlsSessionId, TlsSessionId) {
+        let process = ProcessId::new(42, 1000);
+        let other = TlsSessionId::from("tls-other");
+        let source = TlsSessionId::from("tls-source");
+        let mut graph = SignalGraph::new();
+        graph.observe_exec(
+            process,
+            ProcessId::new(1, 1),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            10,
+        );
+        graph.observe_tls(process, other.clone(), 11);
+        graph.observe_tls(process, source.clone(), 12);
+        (graph, process, other, source)
+    }
+
+    #[test]
+    fn message_binds_to_the_explicit_source_connection_not_a_process_session() {
+        let (mut graph, process, other, source) = graph_with_two_sessions();
+        let event = Event::new_with_timestamp(
+            20,
+            "sse_processor".into(),
+            42,
+            "claude".into(),
+            serde_json::json!({
+                "connection_id": source.as_str(),
+                "message_id": "msg-source",
+                "body": conversation_body(),
+            }),
+        );
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        let dispatch = dispatch_event(
+            &event,
+            &mut graph,
+            &mut identity,
+            &mut correlator,
+            &mut buffer,
+        );
+
+        assert_eq!(dispatch.message_bindings.len(), 1);
+        assert_eq!(
+            dispatch.message_bindings[0].tls_session_id.as_ref(),
+            Some(&source),
+            "the captured source connection must be used verbatim"
+        );
+        let snapshot = graph.snapshot();
+        let message = MessageId::from("msg-source");
+        assert!(
+            snapshot
+                .tls_to_messages
+                .get(&source)
+                .is_some_and(|messages| messages.contains(&message)),
+            "the message must enter the frozen graph under its source connection"
+        );
+        assert!(
+            !snapshot.tls_to_messages.contains_key(&other),
+            "a different TLS session of the same process must stay unassigned"
+        );
+        assert!(
+            snapshot.messages_for_process(process).contains(&message),
+            "the authoritative resolver reads messages through the process map"
+        );
+    }
+
+    fn conversation_body_with_id(conversation_id: &str) -> String {
+        serde_json::json!({
+            "conversation_id": conversation_id,
+            "messages": [
+                {"role": "user", "content": "delete the production database"},
+                {"role": "assistant", "content": [
+                    {"type": "tool_use", "name": "Bash", "id": "toolu_anchor",
+                     "input": {"command": "rm -rf /srv/prod"}}
+                ]}
+            ]
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn request_conversation_declaration_anchors_the_observed_message() {
+        let (mut graph, process, _other, _source) = graph_with_two_sessions();
+        let event = Event::new_with_timestamp(
+            20,
+            "http_parser".into(),
+            42,
+            "claude".into(),
+            serde_json::json!({
+                "message_type": "request",
+                "message_id": "msg-request",
+                "body": conversation_body_with_id("conv-request"),
+            }),
+        );
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        let dispatch = dispatch_event(
+            &event,
+            &mut graph,
+            &mut identity,
+            &mut correlator,
+            &mut buffer,
+        );
+        assert_eq!(dispatch.message_bindings.len(), 1);
+
+        let snapshot = graph.snapshot();
+        let rows = snapshot.message_conversations();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].process_id, process);
+        assert_eq!(rows[0].message_id, MessageId::from("msg-request"));
+        assert_eq!(rows[0].conversation_id, "conv-request");
+    }
+
+    #[test]
+    fn response_conversation_declaration_is_not_an_anchor() {
+        let (mut graph, _process, _other, _source) = graph_with_two_sessions();
+        let event = Event::new_with_timestamp(
+            20,
+            "http_parser".into(),
+            42,
+            "claude".into(),
+            serde_json::json!({
+                "message_type": "response",
+                "message_id": "msg-response",
+                "body": conversation_body_with_id("conv-response"),
+            }),
+        );
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        let dispatch = dispatch_event(
+            &event,
+            &mut graph,
+            &mut identity,
+            &mut correlator,
+            &mut buffer,
+        );
+        assert_eq!(
+            dispatch.message_bindings.len(),
+            1,
+            "the response message is still observed; only its anchor is unknown"
+        );
+        assert!(
+            graph.snapshot().message_conversations().is_empty(),
+            "a response body never supplies the request's conversation anchor"
+        );
+    }
+
+    #[test]
+    fn message_without_a_connection_binds_directly_to_the_process() {
+        let (mut graph, process, _other, _source) = graph_with_two_sessions();
+        let event = Event::new_with_timestamp(
+            20,
+            "http_parser".into(),
+            42,
+            "claude".into(),
+            serde_json::json!({
+                "message_id": "msg-direct",
+                "body": conversation_body(),
+            }),
+        );
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        let dispatch = dispatch_event(
+            &event,
+            &mut graph,
+            &mut identity,
+            &mut correlator,
+            &mut buffer,
+        );
+
+        assert_eq!(dispatch.message_bindings.len(), 1);
+        assert!(
+            dispatch.message_bindings[0].tls_session_id.is_none(),
+            "an event with no connection field must not borrow a process TLS session"
+        );
+        let snapshot = graph.snapshot();
+        assert!(
+            snapshot
+                .direct_process_messages
+                .get(&process)
+                .is_some_and(|messages| messages.contains(&MessageId::from("msg-direct")))
+        );
+        assert!(
+            snapshot.tls_to_messages.is_empty(),
+            "a connection-less message must not be attached to any TLS session"
+        );
+    }
+
+    /// SSEProcessor's `connection_id` is not the raw TLS producer's `ssl_ptr`
+    /// key (the flattened event drops `ssl_ptr`). A stream key without an
+    /// observed TLS binding must remain a direct process association.
+    #[test]
+    fn explicit_sse_connection_keeps_the_message_without_borrowing_a_tls_session() {
+        let (mut graph, process, other, source) = graph_with_two_sessions();
+        let connection = TlsSessionId::from("42:7:msg-sse");
+        let event = Event::new_with_timestamp(
+            20,
+            "sse_processor".into(),
+            42,
+            "claude".into(),
+            serde_json::json!({
+                "connection_id": connection.as_str(),
+                "message_id": "msg-sse",
+                "body": conversation_body(),
+            }),
+        );
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        let dispatch = dispatch_event(
+            &event,
+            &mut graph,
+            &mut identity,
+            &mut correlator,
+            &mut buffer,
+        );
+
+        assert_eq!(dispatch.message_bindings[0].tls_session_id, None);
+        let snapshot = graph.snapshot();
+        let message = MessageId::from("msg-sse");
+        assert!(
+            snapshot
+                .direct_process_messages
+                .get(&process)
+                .is_some_and(|messages| messages.contains(&message)),
+            "the captured process must keep the message even when its connection is unbound"
+        );
+        assert!(!snapshot.tls_to_messages.contains_key(&connection));
+        assert!(
+            !snapshot.tls_to_messages.contains_key(&source)
+                && !snapshot.tls_to_messages.contains_key(&other),
+            "an unbound explicit key must not be rerouted to a process TLS session"
+        );
+    }
+
+    fn http_projection(raw: &Event) -> Event {
+        crate::framework::analyzers::event::HTTPEvent::new(
+            7,
+            "request".into(),
+            "POST /v1/messages HTTP/1.1".into(),
+            Some("POST".into()),
+            Some("/v1/messages".into()),
+            Some("HTTP/1.1".into()),
+            None,
+            None,
+            std::collections::HashMap::new(),
+            Some(conversation_body()),
+            conversation_body().len(),
+            true,
+            false,
+            None,
+            "ssl".into(),
+        )
+        .to_event(raw)
+    }
+
+    fn sse_projection(raw: &Event, stream_id: &str, message_id: &str) -> Event {
+        crate::framework::analyzers::event::SSEProcessorEvent::new(
+            stream_id.into(),
+            Some(message_id.into()),
+            20,
+            21,
+            "ssl".into(),
+            "READ/RECV".into(),
+            7,
+            conversation_body(),
+            conversation_body(),
+            conversation_body().len(),
+            1,
+            true,
+            vec![],
+        )
+        .to_event(raw)
+    }
+
+    #[test]
+    fn projected_http_keeps_the_raw_tls_key_and_message() {
+        let (mut graph, process, other, source) = graph_with_two_sessions();
+        let raw = tls_event(
+            42,
+            serde_json::json!({
+                "connection_id": source.as_str(),
+                "ssl_ptr": 4096,
+                "pid": 42,
+                "start_time_ns": 1000,
+                "data": "POST /v1/messages HTTP/1.1",
+            }),
+        );
+        let event = http_projection(&raw);
+        assert!(event.data.get("captured_tls").is_some());
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        let dispatch = dispatch_event(
+            &event,
+            &mut graph,
+            &mut identity,
+            &mut correlator,
+            &mut buffer,
+        );
+
+        assert_eq!(
+            dispatch.message_bindings[0].tls_session_id.as_ref(),
+            Some(&source)
+        );
+        let message = dispatch.message_bindings[0].message_id.clone();
+        let snapshot = graph.snapshot();
+        assert!(
+            snapshot
+                .tls_to_messages
+                .get(&source)
+                .is_some_and(|messages| messages.contains(&message))
+        );
+        assert_eq!(snapshot.process_for_tls(&source), Some(process));
+        assert!(!snapshot.tls_to_messages.contains_key(&other));
+    }
+
+    #[test]
+    fn projected_sse_display_stream_does_not_seed_a_phantom_tls_session() {
+        let (mut graph, _process, _other, source) = graph_with_two_sessions();
+        let raw = tls_event(
+            42,
+            serde_json::json!({
+                "connection_id": source.as_str(),
+                "ssl_ptr": 4096,
+                "pid": 42,
+                "start_time_ns": 1000,
+            }),
+        );
+        let stream = TlsSessionId::from("42:7:display-stream");
+        let event = sse_projection(&raw, stream.as_str(), "msg-projected");
+        assert_eq!(event.data["connection_id"].as_str(), Some(stream.as_str()));
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        let dispatch = dispatch_event(
+            &event,
+            &mut graph,
+            &mut identity,
+            &mut correlator,
+            &mut buffer,
+        );
+
+        assert_eq!(
+            dispatch.message_bindings[0].tls_session_id.as_ref(),
+            Some(&source),
+            "the captured producer key must win over the display stream id"
+        );
+        let snapshot = graph.snapshot();
+        assert!(!snapshot.tls_to_messages.contains_key(&stream));
+        assert_eq!(snapshot.process_for_tls(&stream), None);
+        assert!(
+            snapshot
+                .tls_to_messages
+                .get(&source)
+                .is_some_and(|messages| messages.contains(&MessageId::from("msg-projected")))
+        );
+    }
+
+    #[test]
+    fn projected_sse_without_capture_context_stays_direct() {
+        let (mut graph, process, _other, _source) = graph_with_two_sessions();
+        let raw = tls_event(42, serde_json::json!({"data": "POST /v1/messages"}));
+        let stream = TlsSessionId::from("42:7:missing-context");
+        let event = sse_projection(&raw, stream.as_str(), "msg-missing");
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        let dispatch = dispatch_event(
+            &event,
+            &mut graph,
+            &mut identity,
+            &mut correlator,
+            &mut buffer,
+        );
+
+        assert_eq!(dispatch.message_bindings[0].tls_session_id, None);
+        let snapshot = graph.snapshot();
+        assert!(
+            snapshot
+                .direct_process_messages
+                .get(&process)
+                .is_some_and(|messages| messages.contains(&MessageId::from("msg-missing")))
+        );
+        assert!(!snapshot.tls_to_messages.contains_key(&stream));
+        assert_eq!(snapshot.process_for_tls(&stream), None);
+    }
+
+    fn llm_request_event(conversation_id: &str, body_id: &str) -> Event {
+        let body = format!(
+            "POST /v1/messages HTTP/1.1\r\nContent-Type: application/json\r\n\r\n\
+             {{\"conversation_id\":\"{conversation_id}\",\"messages\":[\
+             {{\"role\":\"user\",\"content\":\"identical task\"}}]}}"
+        );
+        Event::new_with_timestamp(
+            1,
+            "ssl".into(),
+            42,
+            "claude".into(),
+            serde_json::json!({"data": body, "message_id": body_id, "message_type": "request"}),
+        )
+    }
+
+    #[test]
+    fn same_pid_declared_conversations_survive_routing_with_identical_content() {
+        let mut graph = SignalGraph::new();
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        for (conversation, message) in [("conv-a", "msg-a"), ("conv-b", "msg-b")] {
+            dispatch_event(
+                &llm_request_event(conversation, message),
+                &mut graph,
+                &mut identity,
+                &mut correlator,
+                &mut buffer,
+            );
+        }
+        assert_eq!(buffer.intents.len(), 2);
+        let conversations: Vec<_> = buffer
+            .intents
+            .iter()
+            .map(|intent| intent.declared_conversation_id.as_deref())
+            .collect();
+        assert_eq!(conversations, vec![Some("conv-a"), Some("conv-b")]);
+    }
+
+    #[test]
+    fn response_declaration_is_not_assigned_to_extracted_intents() {
+        let body = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n\
+                    {\"conversation_id\":\"conv-a\",\"content\":[\
+                    {\"type\":\"tool_use\",\"id\":\"toolu_resp\",\"name\":\"Bash\",\
+                    \"input\":{\"command\":\"ls\"}}]}";
+        let event = Event::new_with_timestamp(
+            1,
+            "ssl".into(),
+            42,
+            "claude".into(),
+            serde_json::json!({"data": body, "message_type": "response"}),
+        );
+        let mut graph = SignalGraph::new();
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        dispatch_event(
+            &event,
+            &mut graph,
+            &mut identity,
+            &mut correlator,
+            &mut buffer,
+        );
+        assert_eq!(buffer.intents.len(), 1);
+        assert_eq!(
+            buffer.intents[0]
+                .native_tool_call
+                .as_ref()
+                .map(|r| r.id.as_str()),
+            Some("toolu_resp")
+        );
+        assert_eq!(buffer.intents[0].declared_conversation_id, None);
+    }
+
+    fn request_history_native_event(message_id: &str, source: &str) -> Event {
+        let body = "POST /v1/messages HTTP/1.1\r\nContent-Type: application/json\r\n\r\n\
+                    {\"conversation_id\":\"conv-a\",\"messages\":[{\"role\":\"assistant\",\
+                    \"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_hist\",\
+                    \"name\":\"Bash\",\"input\":{\"command\":\"ls\"}}]}]}";
+        Event::new_with_timestamp(
+            1,
+            source.into(),
+            42,
+            "claude".into(),
+            serde_json::json!({
+                "data": body,
+                "message_id": message_id,
+                "message_type": "request",
+            }),
+        )
+    }
+
+    #[test]
+    fn native_reference_is_kept_before_intent_dedup() {
+        let mut graph = SignalGraph::new();
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        for message in ["msg-1", "msg-2"] {
+            dispatch_event(
+                &request_history_native_event(message, "ssl"),
+                &mut graph,
+                &mut identity,
+                &mut correlator,
+                &mut buffer,
+            );
+        }
+        assert_eq!(
+            buffer.intents.len(),
+            1,
+            "the re-observed history intent is deduplicated"
+        );
+        let snapshot = graph.snapshot();
+        assert_eq!(
+            snapshot.native_tool_call_observations().len(),
+            2,
+            "the raw reference survives even when the intent is suppressed"
+        );
+        assert!(
+            snapshot
+                .native_tool_call_observations()
+                .iter()
+                .all(|row| row.declared_conversation_id.as_deref() == Some("conv-a"))
+        );
+        let messages: Vec<&str> = snapshot
+            .native_tool_call_observations()
+            .iter()
+            .map(|row| row.message_id.as_str())
+            .collect();
+        assert_eq!(messages, vec!["msg-1", "msg-2"]);
+    }
+
+    #[test]
+    fn non_tls_asserted_request_supplies_no_native_reference_or_anchor() {
+        let mut graph = SignalGraph::new();
+        let mut identity = IdentityResolver::new();
+        let mut correlator = EvidenceCorrelator::new();
+        let mut buffer = GraphDeltaBuffer::new();
+        dispatch_event(
+            &request_history_native_event("msg-test", "test"),
+            &mut graph,
+            &mut identity,
+            &mut correlator,
+            &mut buffer,
+        );
+        let snapshot = graph.snapshot();
+        assert!(snapshot.native_tool_call_observations().is_empty());
+        assert!(snapshot.message_conversations().is_empty());
+        assert_eq!(snapshot.conversation_ids().count(), 0);
     }
 }

@@ -13,8 +13,14 @@ vi.mock('@/lib/api', () => ({
   api: { getRuns: vi.fn().mockResolvedValue([]) },
 }));
 
+// The duration label is derived from the wall clock, so the test must own that
+// clock: a real `Date.now()` makes `1m23s` depend on render latency and flakes.
+const FIXED_NOW_MS = 1_760_000_000_000;
+
 describe('LiveStatusBar —— 实时连接状态常驻栏', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(FIXED_NOW_MS);
     vi.clearAllMocks();
     useAppStore.setState({
       appState: 'replay',
@@ -24,6 +30,7 @@ describe('LiveStatusBar —— 实时连接状态常驻栏', () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   it('idle：显示「实时未启用」', () => {
@@ -35,7 +42,7 @@ describe('LiveStatusBar —— 实时连接状态常驻栏', () => {
     useAppStore.getState().setLiveStatus('connected');
     useAppStore
       .getState()
-      .setLiveRun({ runId: 'run-abc-1234', startedAtNs: Date.now() * 1e6 - 83e9, endedAtNs: null, isActive: true });
+      .setLiveRun({ runId: 'run-abc-1234', startedAtNs: FIXED_NOW_MS * 1e6 - 83e9, endedAtNs: null, isActive: true });
     useAppStore.getState().setLiveStats({ eventRate: 12 });
     render(<LiveStatusBar />);
     expect(screen.getByText('实时')).toBeTruthy();

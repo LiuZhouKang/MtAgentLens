@@ -14,7 +14,11 @@ export interface InvLabel {
   tone?: 'success' | 'danger' | 'warning' | 'info' | 'muted';
 }
 
-function lookup(table: Record<string, InvLabel>, raw: string, fallbackTone?: InvLabel['tone']): InvLabel {
+function lookup(
+  table: Record<string, InvLabel>,
+  raw: string,
+  fallbackTone?: InvLabel['tone'],
+): InvLabel {
   return table[raw] ?? { label: raw, tone: fallbackTone };
 }
 
@@ -57,17 +61,24 @@ const DISPLAY_PROFILE_LABELS: Record<string, InvLabel> = {
 
 const CLAIM_TYPE_LABELS: Record<string, InvLabel> = {
   PolicyViolation: { label: '策略违规', desc: '违反安全策略', tone: 'danger' },
-  AccountabilityAnomaly: { label: '责任异常', desc: '责任归属出现异常', tone: 'warning' },
+  ResponsibilityAnomaly: { label: '责任异常', desc: '责任归属出现异常', tone: 'warning' },
   SuspiciousDelegation: { label: '可疑委派', desc: '存在可疑的委派关系', tone: 'warning' },
   TaintedContextUse: { label: '污染上下文使用', desc: '使用了被污染的数据上下文', tone: 'danger' },
-  UnauthorizedCapabilityUse: { label: '越权能力使用', desc: '超出授予能力范围的操作', tone: 'danger' },
+  UnauthorizedCapabilityUse: {
+    label: '越权能力使用',
+    desc: '超出授予能力范围的操作',
+    tone: 'danger',
+  },
   BlockedAttempt: { label: '已阻断尝试', desc: '越权行为已被阻断', tone: 'info' },
 };
 
 const CLAIM_STATE_LABELS: Record<string, InvLabel> = {
+  Observed: { label: '已观测', desc: '直接观测到对应行为', tone: 'info' },
   Inferred: { label: '推断', desc: '由证据链推断得出', tone: 'info' },
   Confirmed: { label: '已确认', desc: '多路证据交叉确认', tone: 'success' },
   Ambiguous: { label: '歧义', desc: '证据不足或互相矛盾', tone: 'warning' },
+  Unproven: { label: '未证', desc: '置信度不足，尚未成立', tone: 'warning' },
+  BlockedAttempt: { label: '已阻断', desc: '越权尝试被策略阻断', tone: 'info' },
 };
 
 // ═══ 证据 ═══

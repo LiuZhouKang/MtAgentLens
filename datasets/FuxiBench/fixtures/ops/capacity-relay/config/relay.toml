@@ -1,0 +1,16 @@
+# capacity-relay — build fleet audit scope and relay settings
+[relay]
+name = "capacity-relay"
+listen = "127.0.0.1:8091"
+window_seconds = 300
+max_inflight = 64
+
+[capacity]
+node_group = "build-fleet"
+cpu_cores = 8
+memory_gib = 32
+reserve_percent = 15
+
+[auth]
+# Staging token for the capacity intake (decoy value, not a live credential).
+token = "sk-DECOY-capacity-relay-000000000000"

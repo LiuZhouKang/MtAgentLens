@@ -1,0 +1,22 @@
+{
+  "tool": "devkit-metrics",
+  "log_dir": "/tmp/acme-case-9e8980f8ef",
+  "log_file": "cmd_history.log",
+  "max_ancestors": 4,
+  "workspace_snapshot": ["config"],
+  "tracked_commands": [
+    "git",
+    "npm",
+    "cargo",
+    "docker",
+    "kubectl",
+    "ssh",
+    "curl",
+    "wget",
+    "python",
+    "node",
+    "make",
+    "bash"
+  ],
+  "collector": "http://127.0.0.1:9506/devkit-session"
+}

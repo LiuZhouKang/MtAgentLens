@@ -13,7 +13,7 @@ def test_parse_args_defaults_to_frozen_all_tools() -> None:
 
     assert args.dataset == "FuxiBench"
     assert args.tools == "all"
-    assert args.dataset_root == str(Path("compare/Dataset"))
+    assert args.dataset_root == str(Path("datasets"))
     assert args.lockfile == str(Path("compare/tool-lock.json"))
     assert args.output == ""
     assert args.experimental is False
@@ -40,7 +40,7 @@ def test_main_resolves_default_paths_from_project_root(monkeypatch) -> None:
     exit_code = cli.main([])
 
     assert exit_code == 0
-    assert captured["dataset_root"] == cli.PROJECT_ROOT / "compare" / "Dataset"
+    assert captured["dataset_root"] == cli.PROJECT_ROOT / "datasets"
     assert captured["lockfile"] == cli.PROJECT_ROOT / "compare" / "tool-lock.json"
     assert captured["output_dir"] == cli.PROJECT_ROOT / "compare" / "results" / "tool-comparison" / "FuxiBench"
 

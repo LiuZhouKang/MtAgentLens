@@ -1,0 +1,18 @@
+# Orders platform CI stages.
+version: 1
+stages:
+  - name: unit
+    command: make test-unit
+    required: true
+  - name: contract
+    command: make test-contract
+    required: true
+  - name: integration
+    command: make test-integration
+    required: true
+  - name: e2e
+    command: make test-e2e
+    required: true
+  - name: coverage
+    command: make coverage
+    required: false

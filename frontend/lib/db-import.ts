@@ -225,6 +225,59 @@ function queryRows(db: Database, sql: string, params?: unknown[]): Record<string
   return rows;
 }
 
+function relationExists(db: Database, name: string): boolean {
+  return (
+    queryRows(
+      db,
+      "SELECT 1 AS present FROM sqlite_master WHERE type IN ('table','view') AND name = ? LIMIT 1",
+      [name],
+    ).length > 0
+  );
+}
+
+function sqlErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Query a table older/leaner databases may legitimately lack.
+ *
+ * A genuinely absent relation (table or view) returns `fallback`. A relation
+ * that exists but cannot be queried is schema drift, not empty data, so it
+ * throws instead of masquerading as a healthy empty table. Views are checked
+ * too: a broken view must fail rather than look absent.
+ */
+function queryOptionalTable(
+  db: Database,
+  relation: string | readonly string[],
+  sql: string,
+  fallback: null,
+  params?: unknown[],
+  requiredColumns?: { table: string; columns: readonly string[] },
+): Record<string, unknown>[] | null {
+  const relations = typeof relation === 'string' ? [relation] : [...relation];
+  if (relations.some((name) => !relationExists(db, name))) return fallback;
+  try {
+    if (requiredColumns) {
+      const present = new Set(
+        queryRows(db, `PRAGMA table_info("${requiredColumns.table.replaceAll('"', '""')}")`).map(
+          (row) => String(row.name),
+        ),
+      );
+      const missing = requiredColumns.columns.filter((column) => !present.has(column));
+      if (missing.length > 0) {
+        throw new DatabaseImportError(
+          `读取表 ${requiredColumns.table} 失败：缺少必需列 ${missing.join(', ')}`,
+        );
+      }
+    }
+    return queryRows(db, sql, params);
+  } catch (error) {
+    if (error instanceof DatabaseImportError) throw error;
+    throw new DatabaseImportError(`读取表 ${relations.join(', ')} 失败：${sqlErrorMessage(error)}`);
+  }
+}
+
 /** Parse the outer-tagged Rust Debug phase string, e.g. "Provisional { timestamp_ns: 123 }". */
 export function parsePhaseIndicator(raw: unknown): PhaseIndicator | null {
   if (typeof raw !== 'string') return null;
@@ -316,18 +369,16 @@ function phaseTimestampNs(phase: PhaseIndicator): number {
 
 /** Load responsibility_claims — timestamp_ns derived from the phase column. */
 export function extractClaimsFromDb(db: Database): ResponsibilityClaim[] {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      `SELECT claim_id, claim_type, subject_agent_id, policy_id, boundary_id,
-              claim_state, severity, confidence, evidence_refs_json,
-              competing_explanations_json, traceback_ref, phase
-       FROM responsibility_claims`,
-    );
-  } catch {
-    return []; // Table absent.
-  }
+  const rows = queryOptionalTable(
+    db,
+    'responsibility_claims',
+    `SELECT claim_id, claim_type, subject_agent_id, policy_id, boundary_id,
+            claim_state, severity, confidence, evidence_refs_json,
+            competing_explanations_json, traceback_ref, phase
+     FROM responsibility_claims`,
+    null,
+  );
+  if (rows === null) return []; // Table absent.
   return rows.map((r) => {
     const phase = parsePhaseIndicator(r.phase) ?? {
       Provisional: { timestamp_ns: 0 },
@@ -354,17 +405,15 @@ export function extractClaimsFromDb(db: Database): ResponsibilityClaim[] {
 
 /** Load responsibility_tracebacks — chain ids parsed as string arrays. */
 export function extractTracebacksFromDb(db: Database): ResponsibilityTraceback[] {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      `SELECT traceback_id, claim_id, chain_node_ids_json, chain_edge_ids_json,
-              root_cause_node_id, explanation_summary, confidence
-       FROM responsibility_tracebacks`,
-    );
-  } catch {
-    return []; // Table absent.
-  }
+  const rows = queryOptionalTable(
+    db,
+    'responsibility_tracebacks',
+    `SELECT traceback_id, claim_id, chain_node_ids_json, chain_edge_ids_json,
+            root_cause_node_id, explanation_summary, confidence
+     FROM responsibility_tracebacks`,
+    null,
+  );
+  if (rows === null) return []; // Table absent.
   return rows.map((r) => ({
     traceback_id: String(r.traceback_id ?? ''),
     claim_id: String(r.claim_id ?? ''),
@@ -378,18 +427,16 @@ export function extractTracebacksFromDb(db: Database): ResponsibilityTraceback[]
 
 /** Load intents — pid/start_time_ns nested into process_id; args stay as raw JSON arrays. */
 export function extractIntentsFromDb(db: Database): Intent[] {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      `SELECT intent_id, pid, process_start_time_ns, message_id, tool_name,
-              tool_args_json, intent_class, parse_state, primary_matching_eligible,
-              authority_source, timestamp_ns
-       FROM intents`,
-    );
-  } catch {
-    return []; // Table absent.
-  }
+  const rows = queryOptionalTable(
+    db,
+    'intents',
+    `SELECT intent_id, pid, process_start_time_ns, message_id, tool_name,
+            tool_args_json, intent_class, parse_state, primary_matching_eligible,
+            authority_source, timestamp_ns
+     FROM intents`,
+    null,
+  );
+  if (rows === null) return []; // Table absent.
   return rows.map((r) => ({
     intent_id: String(r.intent_id ?? ''),
     process_id: {
@@ -409,17 +456,20 @@ export function extractIntentsFromDb(db: Database): Intent[] {
 
 /** Load actions — args stay as raw JSON arrays (Array<{Path|Command}> in real dbs). */
 export function extractActionsFromDb(db: Database): Action[] {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      `SELECT action_id, pid, process_start_time_ns, action_type,
-              normalized_args_json, derivation_mode, signal_class, timestamp_ns
-       FROM actions`,
-    );
-  } catch {
-    return []; // Table absent.
-  }
+  const rows = queryOptionalTable(db, 'actions', 'SELECT * FROM actions', null, undefined, {
+    table: 'actions',
+    columns: [
+      'action_id',
+      'pid',
+      'process_start_time_ns',
+      'action_type',
+      'normalized_args_json',
+      'derivation_mode',
+      'signal_class',
+      'timestamp_ns',
+    ],
+  });
+  if (rows === null) return []; // Table absent.
   return rows.map((r) => ({
     action_id: String(r.action_id ?? ''),
     process_id: {
@@ -427,6 +477,9 @@ export function extractActionsFromDb(db: Database): Action[] {
       start_time_ns: Number(r.process_start_time_ns ?? 0),
     },
     action_type: String(r.action_type ?? ''),
+    outcome: String(r.outcome ?? 'unknown') as Action['outcome'],
+    syscall_ret: r.syscall_ret == null ? null : Number(r.syscall_ret),
+    syscall_name: r.syscall_name == null ? null : String(r.syscall_name),
     normalized_args: parseJsonArray(r.normalized_args_json),
     derivation_mode: String(r.derivation_mode ?? ''),
     signal_class: String(r.signal_class ?? ''),
@@ -438,40 +491,31 @@ export function extractActionsFromDb(db: Database): Action[] {
  *  table query is defensive: a missing table counts as zero (small/older dbs). */
 export function extractDatasetOverviewFromDb(db: Database): DatasetOverview {
   const count = (table: string): number => {
-    try {
-      const rows = queryRows(db, `SELECT COUNT(*) AS n FROM ${table}`);
-      return Number(rows[0]?.n ?? 0);
-    } catch {
-      return 0; // Table absent.
-    }
+    const rows = queryOptionalTable(db, table, `SELECT COUNT(*) AS n FROM ${table}`, null);
+    return Number(rows?.[0]?.n ?? 0);
   };
   const groupCount = (table: string, column: string): Record<string, number> => {
     const result: Record<string, number> = {};
-    try {
-      const rows = queryRows(
-        db,
-        `SELECT ${column} AS k, COUNT(*) AS n FROM ${table} GROUP BY ${column}`,
-      );
-      for (const r of rows) {
-        const key = r.k === null || r.k === undefined ? 'null' : String(r.k);
-        result[key] = Number(r.n ?? 0);
-      }
-    } catch {
-      // Table or column absent.
+    const rows = queryOptionalTable(
+      db,
+      table,
+      `SELECT ${column} AS k, COUNT(*) AS n FROM ${table} GROUP BY ${column}`,
+      null,
+    );
+    if (rows === null) return result;
+    for (const r of rows) {
+      const key = r.k === null || r.k === undefined ? 'null' : String(r.k);
+      result[key] = Number(r.n ?? 0);
     }
     return result;
   };
-  const runRow = (() => {
-    try {
-      return queryRows(
-        db,
-        `SELECT run_id, started_at_ns, ended_at_ns, scenario_id, mode, collector_version
-         FROM runs LIMIT 1`,
-      )[0];
-    } catch {
-      return undefined;
-    }
-  })();
+  const runRow = queryOptionalTable(
+    db,
+    'runs',
+    `SELECT run_id, started_at_ns, ended_at_ns, scenario_id, mode, collector_version
+     FROM runs LIMIT 1`,
+    null,
+  )?.[0];
 
   return {
     run: runRow
@@ -543,15 +587,13 @@ export function extractGraphFromDb(db: Database): {
   metrics: GraphMetrics | null;
   runId: string | null;
 } {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      'SELECT nodes_json, edges_json, metrics_json, run_id FROM graph_snapshots ORDER BY timestamp_ns DESC LIMIT 1',
-    );
-  } catch {
-    return EMPTY_GRAPH; // Table absent — nothing consumable.
-  }
+  const rows = queryOptionalTable(
+    db,
+    'graph_snapshots',
+    'SELECT nodes_json, edges_json, metrics_json, run_id FROM graph_snapshots ORDER BY timestamp_ns DESC LIMIT 1',
+    null,
+  );
+  if (rows === null) return EMPTY_GRAPH; // Table absent — nothing consumable.
   const row = rows[0];
   if (!row) return EMPTY_GRAPH;
 
@@ -586,15 +628,13 @@ export function extractGraphFromDb(db: Database): {
 
 /** context_pollution_events 全行。 */
 export function extractPollutionEventsFromDb(db: Database): ContextPollutionEvent[] {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      'SELECT pollution_id, source_agent_id, contaminated_artifact, propagation_path_json, detected_at_ns, run_id FROM context_pollution_events',
-    );
-  } catch {
-    return []; // Table absent.
-  }
+  const rows = queryOptionalTable(
+    db,
+    'context_pollution_events',
+    'SELECT pollution_id, source_agent_id, contaminated_artifact, propagation_path_json, detected_at_ns, run_id FROM context_pollution_events',
+    null,
+  );
+  if (rows === null) return []; // Table absent.
   return rows.map((r) => ({
     pollution_id: Number(r.pollution_id ?? 0),
     source_agent_id: String(r.source_agent_id ?? ''),
@@ -607,15 +647,13 @@ export function extractPollutionEventsFromDb(db: Database): ContextPollutionEven
 
 /** policy_evaluations 全行。judgment_json 解析为 object；resource_json 非 NormalizedArgs 形态 → null。 */
 export function extractPolicyEvaluationsFromDb(db: Database): PolicyEvaluation[] {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      'SELECT policy_id, boundary, judgment_json, subject_agent_id, resource_json, evidence_refs_json, confidence, reason, run_id FROM policy_evaluations',
-    );
-  } catch {
-    return []; // Table absent.
-  }
+  const rows = queryOptionalTable(
+    db,
+    'policy_evaluations',
+    'SELECT policy_id, boundary, judgment_json, subject_agent_id, resource_json, evidence_refs_json, confidence, reason, run_id FROM policy_evaluations',
+    null,
+  );
+  if (rows === null) return []; // Table absent.
   return rows.map((r) => ({
     policy_id: String(r.policy_id ?? ''),
     boundary: String(r.boundary ?? ''),
@@ -631,15 +669,13 @@ export function extractPolicyEvaluationsFromDb(db: Database): PolicyEvaluation[]
 
 /** non_link_diagnostics 全行。 */
 export function extractNonLinkDiagnosticsFromDb(db: Database): NonLinkDiagnostic[] {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      'SELECT diagnostic_id, intent_id, action_id, reason, timestamp_ns, run_id FROM non_link_diagnostics',
-    );
-  } catch {
-    return []; // Table absent.
-  }
+  const rows = queryOptionalTable(
+    db,
+    'non_link_diagnostics',
+    'SELECT diagnostic_id, intent_id, action_id, reason, timestamp_ns, run_id FROM non_link_diagnostics',
+    null,
+  );
+  if (rows === null) return []; // Table absent.
   return rows.map((r) => ({
     diagnostic_id: String(r.diagnostic_id ?? ''),
     intent_id: r.intent_id ? String(r.intent_id) : null,
@@ -652,15 +688,13 @@ export function extractNonLinkDiagnosticsFromDb(db: Database): NonLinkDiagnostic
 
 /** agent_identities 全行。JSON 数组列逐列解析。 */
 export function extractAgentIdentitiesFromDb(db: Database): AgentIdentity[] {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      'SELECT agent_id, process_ids_json, message_ids_json, tls_sessions_json, confidence, provisional_refs_json, run_id FROM agent_identities',
-    );
-  } catch {
-    return []; // Table absent.
-  }
+  const rows = queryOptionalTable(
+    db,
+    'agent_identities',
+    'SELECT agent_id, process_ids_json, message_ids_json, tls_sessions_json, confidence, provisional_refs_json, run_id FROM agent_identities',
+    null,
+  );
+  if (rows === null) return []; // Table absent.
   return rows.map((r) => ({
     agent_id: String(r.agent_id ?? ''),
     process_ids: parseJsonArray<{ pid: number; start_time_ns: number }>(r.process_ids_json),
@@ -674,15 +708,13 @@ export function extractAgentIdentitiesFromDb(db: Database): AgentIdentity[] {
 
 /** provisional_identities 全行。 */
 export function extractProvisionalIdentitiesFromDb(db: Database): ProvisionalIdentity[] {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      'SELECT agent_id, process_ids_json, primary_signal, confidence, run_id FROM provisional_identities',
-    );
-  } catch {
-    return []; // Table absent.
-  }
+  const rows = queryOptionalTable(
+    db,
+    'provisional_identities',
+    'SELECT agent_id, process_ids_json, primary_signal, confidence, run_id FROM provisional_identities',
+    null,
+  );
+  if (rows === null) return []; // Table absent.
   return rows.map((r) => ({
     agent_id: String(r.agent_id ?? ''),
     process_ids: parseJsonArray<{ pid: number; start_time_ns: number }>(r.process_ids_json),
@@ -694,12 +726,13 @@ export function extractProvisionalIdentitiesFromDb(db: Database): ProvisionalIde
 
 /** identity_process_map 全行。 */
 export function extractIdentityProcessMapFromDb(db: Database): IdentityProcessMapEntry[] {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(db, 'SELECT agent_id, pid, start_time_ns FROM identity_process_map');
-  } catch {
-    return []; // Table absent.
-  }
+  const rows = queryOptionalTable(
+    db,
+    'identity_process_map',
+    'SELECT agent_id, pid, start_time_ns FROM identity_process_map',
+    null,
+  );
+  if (rows === null) return []; // Table absent.
   return rows.map((r) => ({
     agent_id: String(r.agent_id ?? ''),
     pid: Number(r.pid ?? 0),
@@ -712,30 +745,27 @@ export function extractIdentityProcessMapFromDb(db: Database): IdentityProcessMa
  * 已识别进程优先入 cap（血缘树完整），再按时间升序；cap 命中用 total/truncated 诚实标注。
  */
 export function extractProcessEventsFromDb(db: Database, cap = 25000): CappedExtract<ProcessEvent> {
-  const total = (() => {
-    try {
-      const rows = queryRows(db, 'SELECT COUNT(*) AS n FROM process_events');
-      return Number(rows[0]?.n ?? 0);
-    } catch {
-      return 0; // Table absent.
-    }
-  })();
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      `SELECT pe.process_event_id, pe.pid, pe.start_time_ns, pe.parent_pid,
-              pe.parent_start_time_ns, pe.comm, pe.timestamp_ns, ipm.agent_id
-       FROM process_events pe
-       LEFT JOIN identity_process_map ipm
-         ON ipm.pid = pe.pid AND ipm.start_time_ns = pe.start_time_ns
-       ORDER BY (ipm.agent_id IS NOT NULL) DESC, pe.timestamp_ns ASC
-       LIMIT ?`,
-      [cap],
-    );
-  } catch {
-    return { items: [], total, truncated: total > cap }; // Table absent.
-  }
+  const countRows = queryOptionalTable(
+    db,
+    'process_events',
+    'SELECT COUNT(*) AS n FROM process_events',
+    null,
+  );
+  const total = Number(countRows?.[0]?.n ?? 0);
+  const rows = queryOptionalTable(
+    db,
+    ['process_events', 'identity_process_map'],
+    `SELECT pe.process_event_id, pe.pid, pe.start_time_ns, pe.parent_pid,
+            pe.parent_start_time_ns, pe.comm, pe.timestamp_ns, ipm.agent_id
+     FROM process_events pe
+     LEFT JOIN identity_process_map ipm
+       ON ipm.pid = pe.pid AND ipm.start_time_ns = pe.start_time_ns
+     ORDER BY (ipm.agent_id IS NOT NULL) DESC, pe.timestamp_ns ASC
+     LIMIT ?`,
+    null,
+    [cap],
+  );
+  if (rows === null) return { items: [], total, truncated: total > cap }; // Table absent.
   return {
     items: rows.map((r) => ({
       process_event_id: Number(r.process_event_id ?? 0),
@@ -754,29 +784,26 @@ export function extractProcessEventsFromDb(db: Database, cap = 25000): CappedExt
 
 /** tls_sessions 全行 + JOIN 身份标注，cap 语义同 process_events。 */
 export function extractTlsSessionsFromDb(db: Database, cap = 25000): CappedExtract<TlsSession> {
-  const total = (() => {
-    try {
-      const rows = queryRows(db, 'SELECT COUNT(*) AS n FROM tls_sessions');
-      return Number(rows[0]?.n ?? 0);
-    } catch {
-      return 0; // Table absent.
-    }
-  })();
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      `SELECT t.tls_session_id, t.pid, t.start_time_ns, t.timestamp_ns, ipm.agent_id
-       FROM tls_sessions t
-       LEFT JOIN identity_process_map ipm
-         ON ipm.pid = t.pid AND ipm.start_time_ns = t.start_time_ns
-       ORDER BY (ipm.agent_id IS NOT NULL) DESC, t.timestamp_ns ASC
-       LIMIT ?`,
-      [cap],
-    );
-  } catch {
-    return { items: [], total, truncated: total > cap }; // Table absent.
-  }
+  const countRows = queryOptionalTable(
+    db,
+    'tls_sessions',
+    'SELECT COUNT(*) AS n FROM tls_sessions',
+    null,
+  );
+  const total = Number(countRows?.[0]?.n ?? 0);
+  const rows = queryOptionalTable(
+    db,
+    ['tls_sessions', 'identity_process_map'],
+    `SELECT t.tls_session_id, t.pid, t.start_time_ns, t.timestamp_ns, ipm.agent_id
+     FROM tls_sessions t
+     LEFT JOIN identity_process_map ipm
+       ON ipm.pid = t.pid AND ipm.start_time_ns = t.start_time_ns
+     ORDER BY (ipm.agent_id IS NOT NULL) DESC, t.timestamp_ns ASC
+     LIMIT ?`,
+    null,
+    [cap],
+  );
+  if (rows === null) return { items: [], total, truncated: total > cap }; // Table absent.
   return {
     items: rows.map((r) => ({
       tls_session_id: String(r.tls_session_id ?? ''),
@@ -792,15 +819,13 @@ export function extractTlsSessionsFromDb(db: Database, cap = 25000): CappedExtra
 
 /** subagent_boundaries 全行。 */
 export function extractSubagentBoundariesFromDb(db: Database): SubagentBoundary[] {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      'SELECT boundary_id, parent_agent_id, child_agent_id, parent_pid, parent_start_time_ns, child_pid, child_start_time_ns, reason, run_id FROM subagent_boundaries',
-    );
-  } catch {
-    return []; // Table absent.
-  }
+  const rows = queryOptionalTable(
+    db,
+    'subagent_boundaries',
+    'SELECT boundary_id, parent_agent_id, child_agent_id, parent_pid, parent_start_time_ns, child_pid, child_start_time_ns, reason, run_id FROM subagent_boundaries',
+    null,
+  );
+  if (rows === null) return []; // Table absent.
   return rows.map((r) => ({
     boundary_id: String(r.boundary_id ?? ''),
     parent_agent_id: String(r.parent_agent_id ?? ''),
@@ -819,15 +844,13 @@ export function extractSubagentBoundariesFromDb(db: Database): SubagentBoundary[
  * 超过 maxFrames 均匀降采样。kept 帧的 nodes/edges 提取时即解析（db 关闭后无法懒加载），坏 JSON → 空图。
  */
 export function extractSnapshotFramesFromDb(db: Database, maxFrames = 30): GraphSnapshotFrame[] {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      'SELECT snapshot_id, timestamp_ns, nodes_json, edges_json, metrics_json FROM graph_snapshots ORDER BY timestamp_ns ASC',
-    );
-  } catch {
-    return []; // Table absent.
-  }
+  const rows = queryOptionalTable(
+    db,
+    'graph_snapshots',
+    'SELECT snapshot_id, timestamp_ns, nodes_json, edges_json, metrics_json FROM graph_snapshots ORDER BY timestamp_ns ASC',
+    null,
+  );
+  if (rows === null) return []; // Table absent.
   const frames: GraphSnapshotFrame[] = rows.map((r) => {
     let nodes: GraphData['nodes'] = [];
     let edges: GraphData['edges'] = [];
@@ -925,37 +948,33 @@ function mapAlertRow(r: Record<string, unknown>): ResponsibilityAlert {
 
 /** Load responsibility_alerts, mirroring data-server.py's lean alert shape. */
 export function extractAlertsFromDb(db: Database): ResponsibilityAlert[] {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      `SELECT alert_id, timestamp_ns, display_profile, decision, severity, confidence,
-              authority, reasoning, title, summary, action_hint, primary_agent_id,
-              involved_agents_json, engine_section_json, timeline_json,
-              graph_metrics_json, phase, provisional_ref, run_id
-       FROM responsibility_alerts
-       ORDER BY timestamp_ns ASC`,
-    );
-  } catch {
-    return []; // Table absent.
-  }
+  const rows = queryOptionalTable(
+    db,
+    'responsibility_alerts',
+    `SELECT alert_id, timestamp_ns, display_profile, decision, severity, confidence,
+            authority, reasoning, title, summary, action_hint, primary_agent_id,
+            involved_agents_json, engine_section_json, timeline_json,
+            graph_metrics_json, phase, provisional_ref, run_id
+     FROM responsibility_alerts
+     ORDER BY timestamp_ns ASC`,
+    null,
+  );
+  if (rows === null) return []; // Table absent.
   return rows.map(mapAlertRow);
 }
 
 /** Load correlation_evidence — columns map 1:1 onto CorrelationEvidence. */
 export function extractEvidenceFromDb(db: Database): CorrelationEvidence[] {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      `SELECT evidence_id, intent_id, action_id, match_level, confidence,
+  const rows = queryOptionalTable(
+    db,
+    'correlation_evidence',
+    `SELECT evidence_id, intent_id, action_id, match_level, confidence,
               matched_fields_json, derivation_mode, phase, timestamp_ns
        FROM correlation_evidence
        ORDER BY timestamp_ns ASC`,
-    );
-  } catch {
-    return []; // Table absent.
-  }
+    null,
+  );
+  if (rows === null) return [];
   return rows.map((r) => ({
     evidence_id: String(r.evidence_id ?? ''),
     intent_id: String(r.intent_id ?? ''),
@@ -976,15 +995,13 @@ const sumValues = (record: Record<string, number>): number =>
 
 /** 快照帧：仅读 metrics_json（绝不解析 nodes/edges_json）。null metrics 行跳过。 */
 export function extractSnapshotMetricsFromDb(db: Database): SnapshotMetricsExtract {
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(
-      db,
-      'SELECT snapshot_id, timestamp_ns, metrics_json FROM graph_snapshots ORDER BY timestamp_ns ASC',
-    );
-  } catch {
-    return { available: false, frames: [] }; // Table absent.
-  }
+  const rows = queryOptionalTable(
+    db,
+    'graph_snapshots',
+    'SELECT snapshot_id, timestamp_ns, metrics_json FROM graph_snapshots ORDER BY timestamp_ns ASC',
+    null,
+  );
+  if (rows === null) return { available: false, frames: [] };
   const frames: SnapshotMetricFrame[] = [];
   for (const r of rows) {
     const m = parseJsonObject<{
@@ -1016,33 +1033,30 @@ export function extractSnapshotMetricsFromDb(db: Database): SnapshotMetricsExtra
 export function extractMismatchAggregateFromDb(db: Database): MismatchExtract {
   const byReason: Record<string, number> = {};
   let count = 0;
-  try {
-    const rows = queryRows(
-      db,
-      'SELECT reason AS k, COUNT(*) AS n FROM non_link_diagnostics GROUP BY reason',
-    );
-    for (const r of rows) {
-      const n = Number(r.n ?? 0);
-      byReason[String(r.k ?? '')] = n;
-      count += n;
-    }
-  } catch {
-    return { available: false, count: 0, byReason: {}, weak: 0, strong: 0 };
+  const rows = queryOptionalTable(
+    db,
+    'non_link_diagnostics',
+    'SELECT reason AS k, COUNT(*) AS n FROM non_link_diagnostics GROUP BY reason',
+    null,
+  );
+  if (rows === null) return { available: false, count: 0, byReason: {}, weak: 0, strong: 0 };
+  for (const r of rows) {
+    const n = Number(r.n ?? 0);
+    byReason[String(r.k ?? '')] = n;
+    count += n;
   }
   let weak = 0;
   let strong = 0;
-  try {
-    const rows = queryRows(
-      db,
-      'SELECT match_level AS k, COUNT(*) AS n FROM correlation_evidence GROUP BY match_level',
-    );
-    for (const r of rows) {
-      const n = Number(r.n ?? 0);
-      if (String(r.k) === 'L5Substring') weak += n;
-      else strong += n;
-    }
-  } catch {
-    // correlation_evidence 缺表 → weak/strong 归零（证据不是本视角的主信号）
+  const evidence = queryOptionalTable(
+    db,
+    'correlation_evidence',
+    'SELECT match_level AS k, COUNT(*) AS n FROM correlation_evidence GROUP BY match_level',
+    null,
+  );
+  for (const r of evidence ?? []) {
+    const n = Number(r.n ?? 0);
+    if (String(r.k) === 'L5Substring') weak += n;
+    else strong += n;
   }
   return { available: true, count, byReason, weak, strong };
 }
@@ -1051,18 +1065,17 @@ export function extractMismatchAggregateFromDb(db: Database): MismatchExtract {
 export function extractPollutionAggregateFromDb(db: Database): PollutionExtract {
   const bySource: Record<string, number> = {};
   let count = 0;
-  try {
-    const rows = queryRows(
-      db,
-      'SELECT source_agent_id AS k, COUNT(*) AS n FROM context_pollution_events GROUP BY source_agent_id',
-    );
-    for (const r of rows) {
-      const n = Number(r.n ?? 0);
-      bySource[String(r.k ?? '')] = n;
-      count += n;
-    }
-  } catch {
-    return { available: false, count: 0, bySource: {} };
+  const rows = queryOptionalTable(
+    db,
+    'context_pollution_events',
+    'SELECT source_agent_id AS k, COUNT(*) AS n FROM context_pollution_events GROUP BY source_agent_id',
+    null,
+  );
+  if (rows === null) return { available: false, count: 0, bySource: {} };
+  for (const r of rows) {
+    const n = Number(r.n ?? 0);
+    bySource[String(r.k ?? '')] = n;
+    count += n;
   }
   return { available: true, count, bySource };
 }
@@ -1072,12 +1085,13 @@ export function extractPolicyComplianceFromDb(db: Database): PolicyExtract {
   const byBoundary: Record<string, number> = {};
   let total = 0;
   let violations = 0;
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(db, 'SELECT boundary, judgment_json FROM policy_evaluations');
-  } catch {
-    return { available: false, total: 0, violations: 0, byBoundary: {} };
-  }
+  const rows = queryOptionalTable(
+    db,
+    'policy_evaluations',
+    'SELECT boundary, judgment_json FROM policy_evaluations',
+    null,
+  );
+  if (rows === null) return { available: false, total: 0, violations: 0, byBoundary: {} };
   for (const r of rows) {
     total++;
     const b = r.boundary == null || r.boundary === '' ? 'null' : String(r.boundary);
@@ -1092,12 +1106,13 @@ export function extractPolicyComplianceFromDb(db: Database): PolicyExtract {
 export function extractTlsSessionAggregateFromDb(db: Database): TlsExtract {
   const byPid: Record<string, number> = {};
   let total = 0;
-  let rows: Record<string, unknown>[];
-  try {
-    rows = queryRows(db, 'SELECT pid, timestamp_ns FROM tls_sessions ORDER BY timestamp_ns ASC');
-  } catch {
-    return { available: false, total: 0, byPid: {}, trend: [] };
-  }
+  const rows = queryOptionalTable(
+    db,
+    'tls_sessions',
+    'SELECT pid, timestamp_ns FROM tls_sessions ORDER BY timestamp_ns ASC',
+    null,
+  );
+  if (rows === null) return { available: false, total: 0, byPid: {}, trend: [] };
   const BUCKET_NS = 60_000_000_000;
   const buckets = new Map<number, number>();
   for (const r of rows) {
@@ -1123,12 +1138,8 @@ export function extractCountsFromDb(db: Database): {
   actionCount: number;
 } {
   const count = (table: string): number => {
-    try {
-      const rows = queryRows(db, `SELECT COUNT(*) AS n FROM ${table}`);
-      return Number(rows[0]?.n ?? 0);
-    } catch {
-      return 0; // Table absent (older/smaller dbs) — count as zero.
-    }
+    const rows = queryOptionalTable(db, table, `SELECT COUNT(*) AS n FROM ${table}`, null);
+    return Number(rows?.[0]?.n ?? 0);
   };
   return {
     tracebackCount: count('responsibility_tracebacks'),
@@ -1142,7 +1153,58 @@ export function extractCountsFromDb(db: Database): {
  * Load a `.db`/`.sqlite` file into a consumable snapshot. Throws
  * DatabaseImportError when the bytes are not a valid SQLite database.
  */
-export async function loadDatabase(bytes: Uint8Array, fileName: string): Promise<DbImport> {
+function databaseRunIds(db: Database): string[] {
+  const rows =
+    queryOptionalTable(db, 'runs', 'SELECT run_id FROM runs ORDER BY started_at_ns DESC', null) ??
+    queryOptionalTable(
+      db,
+      'graph_snapshots',
+      'SELECT DISTINCT run_id FROM graph_snapshots WHERE run_id IS NOT NULL',
+      null,
+    ) ??
+    [];
+  return rows.map((row) => String(row.run_id ?? '')).filter(Boolean);
+}
+
+export async function listDatabaseRunIds(bytes: Uint8Array): Promise<string[]> {
+  if (!isSqlite(bytes)) {
+    throw new DatabaseImportError('不是有效的 SQLite 数据库文件');
+  }
+  const db = await openDatabase(bytes);
+  try {
+    return databaseRunIds(db);
+  } finally {
+    db.close();
+  }
+}
+
+function isolateDatabaseRun(db: Database, runId: string): void {
+  db.run('PRAGMA foreign_keys=OFF; BEGIN');
+  try {
+    const tables = queryRows(
+      db,
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+    );
+    for (const table of tables) {
+      const quoted = '"' + String(table.name).replaceAll('"', '""') + '"';
+      if (
+        queryRows(db, `PRAGMA table_info(${quoted})`).some((column) => column.name === 'run_id')
+      ) {
+        db.run(`DELETE FROM ${quoted} WHERE run_id IS NULL OR run_id <> ?`, [runId]);
+      }
+    }
+    db.run('COMMIT');
+  } catch (error) {
+    db.run('ROLLBACK');
+    throw error;
+  }
+}
+
+export async function loadDatabase(
+  bytes: Uint8Array,
+  fileName: string,
+  selectedRunId?: string,
+): Promise<DbImport> {
   const label = (fileName.replace(/^.*[\\/]/, '') || 'run.db').trim();
   if (!isSqlite(bytes)) {
     throw new DatabaseImportError('不是有效的 SQLite 数据库文件');
@@ -1155,7 +1217,16 @@ export async function loadDatabase(bytes: Uint8Array, fileName: string): Promise
   }
 
   try {
-    const { graph, metrics, runId } = extractGraphFromDb(db);
+    const runIds = databaseRunIds(db);
+    if (runIds.length > 1 && !selectedRunId) {
+      throw new DatabaseImportError('数据库包含多个运行，请选择具体运行');
+    }
+    if (selectedRunId && !runIds.includes(selectedRunId)) {
+      throw new DatabaseImportError('所选运行不在此数据库中');
+    }
+    if (runIds.length > 1 && selectedRunId) isolateDatabaseRun(db, selectedRunId);
+    const { graph, metrics, runId: graphRunId } = extractGraphFromDb(db);
+    const runId = selectedRunId ?? runIds[0] ?? graphRunId;
     const alerts = extractAlertsFromDb(db);
     const evidence = extractEvidenceFromDb(db);
     const claims = extractClaimsFromDb(db);
@@ -1198,8 +1269,8 @@ export async function loadDatabase(bytes: Uint8Array, fileName: string): Promise
     });
 
     return {
-      id: `db:${label}`,
-      label,
+      id: selectedRunId ? `db:${label}:${selectedRunId}` : `db:${label}`,
+      label: selectedRunId ? `${label} · ${selectedRunId}` : label,
       graph,
       alerts,
       evidence,

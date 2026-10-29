@@ -7,7 +7,7 @@
 ## Step 1: Clone Repository
 ```bash
 git clone https://github.com/org/mtagentlens.git
-cd mtagentlens
+cd acme-observer
 ```
 
 ## Step 2: Install Dependencies

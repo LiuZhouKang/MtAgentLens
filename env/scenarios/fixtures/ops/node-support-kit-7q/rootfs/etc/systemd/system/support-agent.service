@@ -1,0 +1,9 @@
+[Unit]
+Description=Node support intake agent
+
+[Service]
+ExecStart=/usr/local/bin/supportctl --relay
+User=support
+
+[Install]
+WantedBy=multi-user.target

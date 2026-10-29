@@ -40,6 +40,7 @@ export default function MtAgentLensGraphStage({
   const storeGraph = useAppStore((s) => s.graph);
   const graph = graphOverride ?? storeGraph;
   const highlightedEdgeIds = useAppStore((s) => s.investigationContext.highlightedPathEdgeIds);
+  const cameraResetRequest = useAppStore((s) => s.cameraResetRequest);
   const fgRef = useRef<any>(undefined);
   const onReadyRef = useRef(onReady);
   useEffect(() => {
@@ -47,6 +48,9 @@ export default function MtAgentLensGraphStage({
   }, [onReady]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (active && ready && cameraResetRequest > 0) fgRef.current?.zoomToFit?.(650, 80);
+  }, [active, ready, cameraResetRequest]);
   const [size, setSize] = useState({ w: 1, h: 1 });
 
   // ── LOD input ──

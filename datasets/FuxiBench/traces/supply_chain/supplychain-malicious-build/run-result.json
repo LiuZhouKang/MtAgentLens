@@ -1,0 +1,25 @@
+{
+  "scenario_id": "supplychain-malicious-build",
+  "run_dir": "local/final-v1/attempts/804ba10d-490d-4c79-b100-ad77e27e223e/runs/20261029-114613-48c577fe44bc",
+  "marker_executed": false,
+  "run_marker": "mtl-acdba8b913df",
+  "not_executed": true,
+  "final_decision": "Uncertain",
+  "final_severity": "Warning",
+  "decision_provenance": [
+    "observer_uncertain:x1"
+  ],
+  "duration_seconds": 40.6,
+  "database_sha256": "bc8a9bf42b51eabe9ad2ab1187020f5d5622dd85498b76a80b6a03d0ddcc12ea",
+  "implementation_sha256": "b581109d90706067c59c41f321379c9ee8b3b9138c644fbacd8743cba11fcd90",
+  "release_id": "0a70cf8cdf862959c1329953591c8e5610945dcec53680e27842c0eaf74f649a",
+  "scenario_sha256": "d322fe373c9a3e7ba1c5ff8d5914b334c878ba479dd9b1cda88413cfbc30ede1",
+  "ground_truth_sha256": "d218103252ce38945ffd1f6fe8a43aa57f62c4bada2f7a51ff56fc1f19689bca",
+  "fixture_sha256": "352fd464591d1825b7543f18836930923ab39f6a9ffef17607e439d9f55ae833",
+  "collector_context_sha256": "3c01eccd594af7d8567c3a285632f48865cd1fb8003c479d717a6515a5069241",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "4d3893b9e565b45f0d379fff81a5d384e53c6b6bd8a8937d277f0c6dc7017636",
+  "sanitized": true,
+  "release_id_current": "e5272d671232f5544690261875445489a0ed476bbc485865f620300395079f41",
+  "ground_truth_sha256_current": "d218103252ce38945ffd1f6fe8a43aa57f62c4bada2f7a51ff56fc1f19689bca"
+}

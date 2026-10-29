@@ -1,36 +1,52 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 // Copyright (c) 2026 MtAgentLens Project
 
+use async_trait::async_trait;
+
+use crate::responsibility::observer::provider::{ObserverProvider, ObserverProviderError};
 use crate::responsibility::observer::types::{
-    CacheKey, CachePrior, CacheTTL, ObserverDecision, ObserverOutput,
+    CacheKey, CachePrior, CacheTTL, ObserverInput, ObserverOutput,
 };
 use std::collections::HashMap;
 
-// ── L2 Record ───────────────────────────────────────────────────────
-
-#[derive(Debug, Clone)]
-pub struct L2Record {
-    pub output: ObserverOutput,
-    pub count: u32,
+/// A provider that replays an exact-signature cache hit.
+///
+/// The runtime used to pass `None` on a cache hit, so the engine re-derived a
+/// heuristic verdict from the static score and silently discarded the cached
+/// Observer decision. That made the cache change the decision it was supposed
+/// to avoid recomputing. Replaying the stored verdict keeps the decision
+/// identical to the call that populated the cache.
+pub struct CachedObserver {
+    output: ObserverOutput,
 }
 
-// ── ObserverCache (L1 + L2, in-memory only) ─────────────────────────
+impl CachedObserver {
+    pub fn new(output: ObserverOutput) -> Self {
+        Self { output }
+    }
+}
 
-/// Two-level cache for observer decisions.
+#[async_trait]
+impl ObserverProvider for CachedObserver {
+    async fn evaluate(
+        &self,
+        _input: &ObserverInput,
+    ) -> Result<ObserverOutput, ObserverProviderError> {
+        Ok(self.output.clone())
+    }
+}
+
+// ── ObserverCache (L1 exact-signature dedup only) ───────────────────
+
+/// Exact-signature cache for Observer decisions.
 ///
-/// **L1** — Exact hash dedup (`HashMap<u32, ObserverOutput>`).
-/// A hit means we have already evaluated an identical signature and can
-/// return the cached result immediately.
-///
-/// **L2** — Resource-pattern anomaly rate (`HashMap<u32, Vec<L2Record>>`).
-/// Tracks aggregate safe/unsafe ratios per resource pattern. Survives
-/// `clear_task_bound()` so fleet-level anomaly rates persist across tasks
-/// within a single run.
+/// Only L1 remains: an identical signature returns the previous verdict.
+/// The old L2 "anomaly prior" fed earlier Observer verdicts back into later
+/// prompts; with a non-deterministic Observer that is a self-confirmation
+/// loop, not evidence weighting. It was removed rather than left as a
+/// knob that silently biases the arbiter.
 pub struct ObserverCache {
-    /// L1: exact signature → output (cleared per task boundary).
-    l1: HashMap<u32, ObserverOutput>,
-    /// L2: signature key → list of observed outcomes with counts.
-    l2: HashMap<u32, Vec<L2Record>>,
+    l1: HashMap<u64, ObserverOutput>,
 }
 
 impl Default for ObserverCache {
@@ -41,97 +57,75 @@ impl Default for ObserverCache {
 
 impl ObserverCache {
     pub fn new() -> Self {
-        Self {
-            l1: HashMap::new(),
-            l2: HashMap::new(),
-        }
+        Self { l1: HashMap::new() }
     }
 
-    // ── L1 operations ───────────────────────────────────────────────
-
-    /// Look up an exact signature in L1.
-    /// Returns `None` on miss (caller should proceed to evaluate, then store).
     pub fn lookup(&self, key: CacheKey) -> Option<ObserverOutput> {
         self.l1.get(&key.0).cloned()
     }
 
-    // ── Store ───────────────────────────────────────────────────────
-
-    /// Store an observer result.
+    /// Store an Observer result under the TTL the model asked for.
     ///
-    /// Always writes to L1. Writes to L2 when `ttl` is `Task` or `All`
-    /// (i.e. the result is useful for fleet-level pattern tracking).
+    /// `Once` means "do not reuse this verdict": storing it made the model's
+    /// explicit request unobservable and turned a one-off judgment into a
+    /// session-wide prior. `Task` and `All` share the session store because a
+    /// task boundary is also the session boundary here.
     pub fn store(&mut self, key: CacheKey, output: ObserverOutput, ttl: CacheTTL) {
-        self.l1.insert(key.0, output.clone());
-
-        if ttl != CacheTTL::Once {
-            let records = self.l2.entry(key.0).or_default();
-            if let Some(existing) = records
-                .iter_mut()
-                .find(|r| r.output.decision == output.decision)
-            {
-                existing.count += 1;
-            } else {
-                records.push(L2Record { output, count: 1 });
-            }
-            // Keep at most 5 distinct outcomes per key.
-            if records.len() > 5 {
-                records.sort_by_key(|r| -(r.count as i32));
-                records.truncate(5);
-            }
+        if matches!(ttl, CacheTTL::Once) {
+            return;
         }
+        self.l1.insert(key.0, output);
     }
 
-    // ── L2 anomaly rate ─────────────────────────────────────────────
-
-    /// Fraction of L2 records for `key` that were not `Safe`.
-    pub fn l2_anomaly_rate(&self, key: CacheKey) -> f32 {
-        match self.l2.get(&key.0) {
-            Some(records) if !records.is_empty() => {
-                let total: u32 = records.iter().map(|r| r.count).sum();
-                let anomalous: u32 = records
-                    .iter()
-                    .filter(|r| r.output.decision != ObserverDecision::Safe)
-                    .map(|r| r.count)
-                    .sum();
-                anomalous as f32 / total.max(1) as f32
-            }
-            _ => 0.0,
-        }
+    /// Prior is intentionally empty: no verdict feedback.
+    pub fn build_prior(&self, _key: CacheKey) -> CachePrior {
+        CachePrior::default()
     }
 
-    /// Fleet-level anomaly rate for a resource pattern (L2-based, in-memory).
-    /// In the current in-memory-only design this delegates to [`l2_anomaly_rate`].
-    pub fn fleet_anomaly_rate(&self, key: CacheKey) -> f32 {
-        self.l2_anomaly_rate(key)
-    }
-
-    // ── Prior ───────────────────────────────────────────────────────
-
-    /// Build a [`CachePrior`] for the given key from L2 state.
-    /// This is attached to [`ObserverInput`] before calling the LLM so the
-    /// provider can weight the decision against historical anomaly rates.
-    pub fn build_prior(&self, key: CacheKey) -> CachePrior {
-        let records = self.l2.get(&key.0);
-        let l2_hit = records.is_some_and(|r| !r.is_empty());
-        let l2_anomaly_rate = if l2_hit {
-            self.l2_anomaly_rate(key)
-        } else {
-            0.0
-        };
-        CachePrior {
-            l2_hit,
-            l2_prior_anomaly_rate: Some(l2_anomaly_rate),
-            l3_hit: false,
-            l3_fleet_anomaly_rate: None,
-        }
-    }
-
-    // ── Task boundary ───────────────────────────────────────────────
-
-    /// Clear L1 (exact dedup). L2 persists so fleet anomaly rates carry
-    /// across tasks within the same run.
+    /// Clear the exact-signature cache at a session/task boundary.
     pub fn clear_task_bound(&mut self) {
         self.l1.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::responsibility::observer::types::{CacheKey, ObserverDecision};
+    use crate::responsibility::types::AlertAuthority;
+
+    fn output() -> ObserverOutput {
+        ObserverOutput {
+            decision: ObserverDecision::Safe,
+            severity: crate::responsibility::claims::ClaimSeverity::Info,
+            confidence: 0.9,
+            cache_ttl: CacheTTL::Task,
+            authority: AlertAuthority::Supporting,
+            reasoning: "r".into(),
+            attacked_flag: false,
+            evidence_cited: vec![],
+            rule_verdicts: vec![],
+            pattern_verdicts: vec![],
+            candidate_verdicts: vec![],
+            review_provenance: vec![],
+        }
+    }
+
+    #[test]
+    fn once_is_not_stored() {
+        let mut cache = ObserverCache::new();
+        let key = CacheKey(7);
+        cache.store(key, output(), CacheTTL::Once);
+        assert!(cache.lookup(key).is_none());
+    }
+
+    #[test]
+    fn task_scoped_verdict_is_replayed() {
+        let mut cache = ObserverCache::new();
+        let key = CacheKey(7);
+        cache.store(key, output(), CacheTTL::Task);
+        assert!(cache.lookup(key).is_some());
+        cache.clear_task_bound();
+        assert!(cache.lookup(key).is_none());
     }
 }

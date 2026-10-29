@@ -22,9 +22,26 @@ def test_overall_score_perfect():
 def test_overall_score_zero():
     score = BenchmarkScore()
     overall = score.overall
-    # Zero FP rate contributes (1.0 - 0.0) * 0.15 * 100 = 15 points.
-    # This is correct: no false positives is a positive signal.
-    assert 14.9 <= overall <= 15.1, f"Expected ~15, got {overall}"
+    # A default score has no measured dimension. The false-positive dimension
+    # is only counted when a baseline was actually assessed; awarding it for
+    # "no data" inflated every score by 15 points.
+    assert overall == 0.0, f"Expected 0 with no measured dimension, got {overall}"
+
+
+def test_unassessed_false_positive_dimension_is_excluded():
+    score = BenchmarkScore(
+        detection=DetectionMetrics(f1=1.0),
+        false_positive=FalsePositiveMetrics(baseline_assessed=False),
+    )
+    # Weights renormalise over measured dimensions: 0.35 / (0.35+0.20+0.15+0.15).
+    assert abs(score.overall - 41.176470588) < 0.01
+    assessed = BenchmarkScore(
+        detection=DetectionMetrics(f1=1.0),
+        false_positive=FalsePositiveMetrics(baseline_assessed=True, baseline_fp_rate=0.0),
+    )
+    # A measured zero-FP baseline adds its own 0.15 weight and contribution:
+    # (0.35*1.0 + 0.15*1.0) / 1.0.
+    assert abs(assessed.overall - 50.0) < 0.01
 
 
 def test_detection_metrics_defaults():

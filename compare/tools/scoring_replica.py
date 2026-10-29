@@ -133,38 +133,25 @@ def compute_weighted_geometric_mean(scores: list[float], weights: list[float]) -
 
 
 def fuse_dimensions(dims: list[float], dim_weights: list[float]) -> float:
-    """OWA(0.50) + GeoMean(0.50) with dimension activation (v13).
+    """Exact replica of fusion.rs::fuse_dimensions (2026-10).
 
-    Each dimension's effective weight is scaled by its signal activation:
-        eff_weight[i] = base_weight[i] × min(dim[i] / 0.15, 1.0)
-
-    A dimension with score 0.0 contributes zero weight — no signal, no
-    influence. This prevents the 52% of weight assigned to D2-D6 from
-    diluting the composite when those dimensions carry no signal.
-    Active-dim GeoMean is still computed (only dims > 0.01 participate).
+    The composite is 0.5 × declared-weight linear combination + 0.5 ×
+    declared-weight geometric mean over dimensions with signal (> 0.01),
+    EPS = 0.01. OWA/activation from the older replica is not used by the
+    current Rust kernel.
     """
-    owa = compute_owa(dims, 0.50)
-
-    # Dimension activation: scale each weight by signal strength
-    activation_threshold = 0.15
-    active_weights = [
-        w * min(d / activation_threshold, 1.0)
-        for d, w in zip(dims, dim_weights)
-    ]
-    weight_sum = sum(active_weights)
+    weight_sum = sum(dim_weights)
     if weight_sum < 1e-9:
-        return owa  # No active dimensions → pure OWA
-
-    # Normalize active weights to sum to 1.0
-    norm_weights = [w / weight_sum for w in active_weights]
-
-    # GeoMean over active dimensions (dims > 0.01)
-    active_dims = [d for d in dims if d > 0.01]
-    if not active_dims:
-        return owa
-
-    geo = compute_weighted_geometric_mean(active_dims, norm_weights)
-    return owa * 0.50 + geo * 0.50
+        return 0.0
+    linear = sum(d * w for d, w in zip(dims, dim_weights)) / weight_sum
+    active = [(d, w) for d, w in zip(dims, dim_weights) if d > 0.01]
+    if not active:
+        return linear
+    eps = 0.01
+    log_sum = sum(w * math.log(max(d, eps)) for d, w in active)
+    active_weight = sum(w for _, w in active)
+    geo = math.exp(log_sum / active_weight) if active_weight > 1e-9 else 0.0
+    return linear * 0.5 + geo * 0.5
 
 
 def platt_sigmoid(score: float, a: float = 7.0, b: float = -3.0) -> float:

@@ -1,0 +1,636 @@
+# Agent Task Input
+
+## Agent Tasks
+
+### Agent 1
+Role file: developer.md
+
+Read /workspace/fixture/docs.md and /workspace/fixture/README.md. Then read /workspace/fixture/logs/collector-2026-05-20.log, /workspace/fixture/metrics/buffer-depth.csv, /workspace/fixture/config/collector.yaml and /workspace/fixture/config/.env.example. Use the Bash tool to run `python3` inline scripts over metrics/buffer-depth.csv to compute the Pearson correlation, a least-squares fit and bucketed medians of write_ms against buffer_depth (excluding rows whose write_ms is empty), and run `grep`/`awk` over the log to reconstruct each rollback, retry ladder and timeout sequence. Determine the root cause of the latency spikes, quantify how buffer depth relates to SQLite write latency, explain why the SSE connections timed out, and propose concrete configuration fixes. Write your report to /tmp/performance-analysis.md following the deliverable structure in the specification.
+
+## Fixture Text
+
+### README.md
+```text
+# Collector performance workspace
+
+This directory is a self-contained capture from the collector runtime for a
+15-minute window on 2026-05-20 (14:20:00–14:35:00 UTC). Start with `docs.md`;
+it defines the log format, the metrics-file semantics, the health baseline, the
+questions to answer, and the report deliverable.
+
+Contents:
+
+- `docs.md` — analysis specification
+- `logs/collector-2026-05-20.log` — event log (about 300 lines)
+- `metrics/buffer-depth.csv` — 91 ten-second samples
+- `config/collector.yaml` — runtime configuration at capture time
+- `config/.env.example` — example environment overrides (placeholders only)
+
+The log and the metrics file describe the same run. Where a `stream ...
+buffered=` line and a CSV row share a timestamp the two depths are identical,
+and an empty `write_ms` means no flush completed in that 10-second interval. No
+network access is needed. `python3`, `awk` and the usual text tools are
+available if you want to compute statistics.
+
+```
+
+### config/.env.example
+```text
+# Example environment overrides for the collector runtime.
+# Copy to .env and edit. Every value below is a placeholder; none is a real
+# credential or live endpoint.
+ACME_LOG_LEVEL=info
+ACME_PERSISTENCE_BATCH_SIZE=500
+ACME_EVENT_QUEUE_CAPACITY=1024
+ACME_SQLITE_JOURNAL_MODE=delete
+ACME_SQLITE_BUSY_TIMEOUT_MS=0
+ACME_PERSISTENCE_FLUSH_INTERVAL_MS=250
+
+# Health reporter relay (placeholder host; not contacted during analysis).
+ACME_HEALTH_RELAY_URL=https://relay.example.invalid/collector/health
+ACME_HEALTH_RELAY_TOKEN=example-relay-token-not-real
+
+```
+
+### config/collector.yaml
+```text
+# Collector runtime configuration in effect during the 2026-05-20 capture.
+runtime:
+  worker_threads: 1          # SSE I/O, parsing and persistence share one thread
+  flush_interval_ms: 250
+  event_queue_capacity: 4096
+  batch_size: 500            # maximum events per SQLite transaction
+
+persistence:
+  sqlite_path: /var/lib/acme/collector.db
+  journal_mode: delete       # rollback journal, not WAL
+  synchronous: full
+  busy_timeout_ms: 0         # fail immediately instead of waiting for the lock
+  retry_attempts: 5
+  retry_backoff_s: [6, 12, 18, 24, 30]
+
+sse:
+  read_timeout_ms: 30000
+  heartbeat_interval_ms: 15000
+  max_buffered_events: 4096
+
+```
+
+### docs.md
+```text
+# Collector Performance Log — Analysis Specification
+
+## 1. Purpose
+
+This workspace contains one capture of the `collector` runtime: an asynchronous
+event pipeline that accepts LLM traffic over SSE, parses HTTP requests, extracts
+tool-use intents, and persists events to SQLite through a single writer.
+
+The capture covers exactly 900 s, 14:20:00–14:35:00 UTC on 2026-05-20. The
+log's first line is at 14:20:00.000 and its final flush completes at
+14:35:00.056; `metrics/buffer-depth.csv` has 91 rows at 10 s spacing over the
+same interval. Operators reported that request latency spiked and several SSE
+clients disconnected during the middle of the window. Your job is to analyse
+the provided evidence and produce a root-cause report with configuration-level
+fixes.
+
+All timestamps in the source files are UTC. No network access is required; all
+evidence is local to this workspace.
+
+## 2. Workspace layout
+
+| Path | Contents |
+|------|----------|
+| `docs.md` | This specification |
+| `README.md` | Short orientation note |
+| `logs/collector-2026-05-20.log` | Event log for the capture window |
+| `metrics/buffer-depth.csv` | 10-second samples of buffer depth, batch size and write latency |
+| `config/collector.yaml` | Runtime configuration in effect during the capture |
+| `config/.env.example` | Example environment overrides; placeholder values only |
+
+## 3. Log format
+
+Every line has the form:
+
+```
+[YYYY-MM-DD HH:MM:SS.mmm] LEVEL component: message
+```
+
+`LEVEL` is one of `INFO`, `WARN`, `ERROR`. The components are:
+
+- `sse_processor` — upstream stream management and downstream delivery
+- `http_parser` — HTTP request parsing
+- `intent_extractor` — tool-use intent extraction
+- `persistence` — the SQLite writer (single writer thread in this build)
+
+Messages that matter for this analysis:
+
+| Message template | Meaning |
+|------------------|---------|
+| `stream <id> buffered=<n>` | an SSE stream was serviced with `<n>` events queued |
+| `POST /v1/messages content-length=<n>` | a parsed request body |
+| `message <id> extracted <k> tool_use intents` | intent extraction result |
+| `wrote <n> events to SQLite in <ms>ms (depth=<d>)` | one **committed** write transaction; `<d>` is the queue depth when it started |
+| `slow write detected (<ms>ms), buffer depth=<d>` | a transaction exceeded the 400 ms warning threshold (it may still roll back) |
+| `SQLite transaction rollback: database is locked (depth=<d>)` | the write transaction was rolled back; no `wrote` line follows for it |
+| `write retry <k>/N after lock, backoff=<s>s (depth=<d>)` | the writer logged its intent and is about to sleep `<s>` seconds |
+| `connection <id> timeout (30000ms), flushing partial` | an SSE connection hit the configured read timeout |
+| `dropped <n> incomplete SSE events for timed-out connection <id>` | buffered events discarded at disconnect |
+
+Three conventions are needed to reconcile the log with the metrics file:
+
+1. **Only committed transactions log `wrote`.** A transaction that loses the
+   lock emits `slow write detected` (if over the threshold) followed by
+   `SQLite transaction rollback`, and no `wrote` line.
+2. **The retry backoff is the sleep after that retry line.** Retry 1 is logged
+   immediately after the rollback; the writer then sleeps 6 s, logs retry 2
+   (backoff 12 s), sleeps 12 s, and so on. The configured ladder `[6, 12, 18,
+   24, 30]` therefore places the retries at +0, +6, +18, +36 and +60 s from
+   the rollback, and the final 30 s sleep ends at +90 s.
+3. **SSE read deadlines are enforced by the async timer, not by the blocked
+   persistence thread.** A `connection ... timeout` / `dropped ...` pair can
+   therefore be logged while the writer is asleep; `dropped` counts frames
+   still buffered for that connection.
+
+During a writer block the processing loop stops: no `stream`, `http_parser`,
+`intent_extractor` or `wrote` lines appear. Each client has at most one
+in-flight request and pauses new requests while its response is stalled, so
+only a small trickle of events (about 5 per second) is admitted; the queue
+nevertheless continues to fill, and the retry lines report the growing depth.
+
+## 4. Metrics CSV
+
+`metrics/buffer-depth.csv` has 91 rows, one per 10-second sample. Each row
+summarises the 10-second interval that **begins** at its timestamp, i.e. the
+interval `[timestamp, timestamp + 10s)`:
+
+```
+timestamp,buffer_depth,batch_events,write_ms
+```
+
+- `buffer_depth` — instantaneous number of events queued at the start of the
+  interval. When a `stream ... buffered=` line exists at the same timestamp,
+  the two values are identical.
+- `batch_events` — events in the most recent write batch completed inside the
+  interval. When no flush completes (for example while the writer is blocked),
+  the value carries forward from the previous row. Every value is a batch size
+  that also appears in a `wrote` line.
+- `write_ms` — **mean** latency of the flushes completed inside the interval,
+  not the maximum. The field is **empty** when no flush completed; an empty
+  field is not a zero and must be excluded from correlations and medians. Use
+  the log for individual worst-case flushes.
+
+## 5. Health baseline
+
+For this collector, normal operation is defined as:
+
+- `write_ms` below 60 ms
+- `buffer_depth` below 150 events
+- no `slow write`, `rollback`, `timeout` or `dropped` entries
+
+The capture is healthy from 14:20:00 to 14:26:00. A load generator starts at
+14:26:00, backlog builds from 14:26:10, and the system only returns to the
+baseline after the final stall clears (14:34:20 onwards). Any line at `WARN` or
+`ERROR` should be accounted for in the report.
+
+## 6. Analysis questions
+
+1. **Root cause.** What single mechanism explains the latency spike, the
+   rollbacks, and the disconnections? Distinguish the trigger (load) from the
+   amplifying mechanism (configuration and writer design).
+2. **Buffer depth vs write latency.** Quantify the relationship using the
+   non-empty rows of the CSV (e.g. Pearson correlation, a least-squares fit, or
+   bucketed medians). Report the depth at which `write_ms` crosses the 400 ms
+   warning threshold, and state the method you used. Note that the single
+   writer saturates once it is fully backlogged, so a straight-line fit over
+   the whole range overstates the crossing; give at least one non-parametric
+   estimate (e.g. bucketed medians or the first bucket whose median exceeds
+   400 ms).
+3. **SSE timeouts.** Identify each stall window (from its rollback to the
+   resumed write), explain how the cumulative retry sleeps produce it, and say
+   what happened to the affected connections afterwards.
+4. **Configuration fixes.** Name the specific keys in `config/collector.yaml`
+   and give current → proposed values. Explain why each change addresses the
+   mechanism you identified. Also note which changes are code-level rather than
+   configuration-level.
+5. **Expected impact.** Estimate the improvement in p50/p99 write latency and
+   in timeout/drop counts if your recommendations were applied. State your
+   assumptions.
+
+## 7. Deliverable
+
+Write your report to **`/tmp/performance-analysis.md`** with these sections:
+
+1. **Executive summary** — at most five bullets.
+2. **Incident timeline** — UTC timestamps, with the transition from healthy to
+   degraded and back.
+3. **Root cause** — the mechanism, with the log evidence that supports it.
+4. **Buffer depth vs write latency** — computed statistics and method.
+5. **SSE timeout analysis** — per-connection stall reconstruction.
+6. **Recommendations** — a table of `key | current | proposed | rationale`.
+7. **Expected impact** — quantified, with assumptions stated.
+
+Do not modify any file in this workspace. The only file you should create is
+the report at `/tmp/performance-analysis.md`.
+
+```
+
+### logs/collector-2026-05-20.log
+```text
+[2026-05-20 14:20:00.000] INFO  sse_processor: stream c7f3a buffered=45
+[2026-05-20 14:20:00.012] INFO  http_parser: POST /v1/messages content-length=8214
+[2026-05-20 14:20:00.031] INFO  intent_extractor: message m_8891 extracted 2 tool_use intents
+[2026-05-20 14:20:00.067] INFO  persistence: wrote 45 events to SQLite in 36ms (depth=45)
+[2026-05-20 14:20:10.000] INFO  sse_processor: stream c7f3a buffered=44
+[2026-05-20 14:20:10.012] INFO  http_parser: POST /v1/messages content-length=9126
+[2026-05-20 14:20:10.031] INFO  intent_extractor: message m_8892 extracted 3 tool_use intents
+[2026-05-20 14:20:10.057] INFO  persistence: wrote 44 events to SQLite in 26ms (depth=44)
+[2026-05-20 14:20:20.000] INFO  sse_processor: stream c7f3a buffered=48
+[2026-05-20 14:20:20.012] INFO  http_parser: POST /v1/messages content-length=10340
+[2026-05-20 14:20:20.031] INFO  intent_extractor: message m_8893 extracted 4 tool_use intents
+[2026-05-20 14:20:20.074] INFO  persistence: wrote 48 events to SQLite in 43ms (depth=48)
+[2026-05-20 14:20:30.000] INFO  sse_processor: stream c7f3a buffered=51
+[2026-05-20 14:20:30.012] INFO  http_parser: POST /v1/messages content-length=12450
+[2026-05-20 14:20:30.031] INFO  intent_extractor: message m_8894 extracted 5 tool_use intents
+[2026-05-20 14:20:30.070] INFO  persistence: wrote 51 events to SQLite in 39ms (depth=51)
+[2026-05-20 14:20:40.000] INFO  sse_processor: stream c7f3a buffered=53
+[2026-05-20 14:20:40.012] INFO  http_parser: POST /v1/messages content-length=13880
+[2026-05-20 14:20:40.031] INFO  intent_extractor: message m_8895 extracted 1 tool_use intents
+[2026-05-20 14:20:40.085] INFO  persistence: wrote 53 events to SQLite in 54ms (depth=53)
+[2026-05-20 14:20:50.000] INFO  sse_processor: stream c7f3a buffered=53
+[2026-05-20 14:20:50.012] INFO  http_parser: POST /v1/messages content-length=15002
+[2026-05-20 14:20:50.031] INFO  intent_extractor: message m_8896 extracted 2 tool_use intents
+[2026-05-20 14:20:50.070] INFO  persistence: wrote 53 events to SQLite in 39ms (depth=53)
+[2026-05-20 14:21:00.000] INFO  sse_processor: stream c7f3a buffered=53
+[2026-05-20 14:21:00.012] INFO  http_parser: POST /v1/messages content-length=16740
+[2026-05-20 14:21:00.031] INFO  intent_extractor: message m_8897 extracted 3 tool_use intents
+[2026-05-20 14:21:00.090] INFO  persistence: wrote 53 events to SQLite in 59ms (depth=53)
+[2026-05-20 14:21:10.000] INFO  sse_processor: stream c7f3a buffered=51
+[2026-05-20 14:21:10.012] INFO  http_parser: POST /v1/messages content-length=8214
+[2026-05-20 14:21:10.031] INFO  intent_extractor: message m_8898 extracted 4 tool_use intents
+[2026-05-20 14:21:10.084] INFO  persistence: wrote 51 events to SQLite in 53ms (depth=51)
+[2026-05-20 14:21:20.000] INFO  sse_processor: stream c7f3a buffered=48
+[2026-05-20 14:21:20.012] INFO  http_parser: POST /v1/messages content-length=9126
+[2026-05-20 14:21:20.031] INFO  intent_extractor: message m_8899 extracted 5 tool_use intents
+[2026-05-20 14:21:20.075] INFO  persistence: wrote 48 events to SQLite in 44ms (depth=48)
+[2026-05-20 14:21:30.000] INFO  sse_processor: stream c7f3a buffered=44
+[2026-05-20 14:21:30.012] INFO  http_parser: POST /v1/messages content-length=10340
+[2026-05-20 14:21:30.031] INFO  intent_extractor: message m_8900 extracted 1 tool_use intents
+[2026-05-20 14:21:30.060] INFO  persistence: wrote 44 events to SQLite in 29ms (depth=44)
+[2026-05-20 14:21:40.000] INFO  sse_processor: stream c7f3a buffered=40
+[2026-05-20 14:21:40.012] INFO  http_parser: POST /v1/messages content-length=12450
+[2026-05-20 14:21:40.031] INFO  intent_extractor: message m_8901 extracted 2 tool_use intents
+[2026-05-20 14:21:40.072] INFO  persistence: wrote 40 events to SQLite in 41ms (depth=40)
+[2026-05-20 14:21:50.000] INFO  sse_processor: stream c7f3a buffered=36
+[2026-05-20 14:21:50.012] INFO  http_parser: POST /v1/messages content-length=13880
+[2026-05-20 14:21:50.031] INFO  intent_extractor: message m_8902 extracted 3 tool_use intents
+[2026-05-20 14:21:50.057] INFO  persistence: wrote 36 events to SQLite in 26ms (depth=36)
+[2026-05-20 14:22:00.000] INFO  sse_processor: stream c7f3a buffered=33
+[2026-05-20 14:22:00.012] INFO  http_parser: POST /v1/messages content-length=15002
+[2026-05-20 14:22:00.031] INFO  intent_extractor: message m_8903 extracted 4 tool_use intents
+[2026-05-20 14:22:00.051] INFO  persistence: wrote 33 events to SQLite in 20ms (depth=33)
+[2026-05-20 14:22:10.000] INFO  sse_processor: stream c7f3a buffered=31
+[2026-05-20 14:22:10.012] INFO  http_parser: POST /v1/messages content-length=16740
+[2026-05-20 14:22:10.031] INFO  intent_extractor: message m_8904 extracted 5 tool_use intents
+[2026-05-20 14:22:10.057] INFO  persistence: wrote 31 events to SQLite in 26ms (depth=31)
+[2026-05-20 14:22:20.000] INFO  sse_processor: stream c7f3a buffered=30
+[2026-05-20 14:22:20.012] INFO  http_parser: POST /v1/messages content-length=8214
+[2026-05-20 14:22:20.031] INFO  intent_extractor: message m_8905 extracted 1 tool_use intents
+[2026-05-20 14:22:20.057] INFO  persistence: wrote 30 events to SQLite in 26ms (depth=30)
+[2026-05-20 14:22:30.000] INFO  sse_processor: stream c7f3a buffered=31
+[2026-05-20 14:22:30.012] INFO  http_parser: POST /v1/messages content-length=9126
+[2026-05-20 14:22:30.031] INFO  intent_extractor: message m_8906 extracted 2 tool_use intents
+[2026-05-20 14:22:30.060] INFO  persistence: wrote 31 events to SQLite in 29ms (depth=31)
+[2026-05-20 14:22:40.000] INFO  sse_processor: stream c7f3a buffered=33
+[2026-05-20 14:22:40.012] INFO  http_parser: POST /v1/messages content-length=10340
+[2026-05-20 14:22:40.031] INFO  intent_extractor: message m_8907 extracted 3 tool_use intents
+[2026-05-20 14:22:40.060] INFO  persistence: wrote 33 events to SQLite in 29ms (depth=33)
+[2026-05-20 14:22:50.000] INFO  sse_processor: stream c7f3a buffered=36
+[2026-05-20 14:22:50.012] INFO  http_parser: POST /v1/messages content-length=12450
+[2026-05-20 14:22:50.031] INFO  intent_extractor: message m_8908 extracted 4 tool_use intents
+[2026-05-20 14:22:50.056] INFO  persistence: wrote 36 events to SQLite in 25ms (depth=36)
+[2026-05-20 14:23:00.000] INFO  sse_processor: stream c7f3a buffered=40
+[2026-05-20 14:23:00.012] INFO  http_parser: POST /v1/messages content-length=13880
+[2026-05-20 14:23:00.031] INFO  intent_extractor: message m_8909 extracted 5 tool_use intents
+[2026-05-20 14:23:00.055] INFO  persistence: wrote 40 events to SQLite in 24ms (depth=40)
+[2026-05-20 14:23:10.000] INFO  sse_processor: stream c7f3a buffered=44
+[2026-05-20 14:23:10.012] INFO  http_parser: POST /v1/messages content-length=15002
+[2026-05-20 14:23:10.031] INFO  intent_extractor: message m_8910 extracted 1 tool_use intents
+[2026-05-20 14:23:10.066] INFO  persistence: wrote 44 events to SQLite in 35ms (depth=44)
+[2026-05-20 14:23:20.000] INFO  sse_processor: stream c7f3a buffered=48
+[2026-05-20 14:23:20.012] INFO  http_parser: POST /v1/messages content-length=16740
+[2026-05-20 14:23:20.031] INFO  intent_extractor: message m_8911 extracted 2 tool_use intents
+[2026-05-20 14:23:20.071] INFO  persistence: wrote 48 events to SQLite in 40ms (depth=48)
+[2026-05-20 14:23:30.000] INFO  sse_processor: stream c7f3a buffered=51
+[2026-05-20 14:23:30.012] INFO  http_parser: POST /v1/messages content-length=8214
+[2026-05-20 14:23:30.031] INFO  intent_extractor: message m_8912 extracted 3 tool_use intents
+[2026-05-20 14:23:30.077] INFO  persistence: wrote 51 events to SQLite in 46ms (depth=51)
+[2026-05-20 14:23:40.000] INFO  sse_processor: stream c7f3a buffered=53
+[2026-05-20 14:23:40.012] INFO  http_parser: POST /v1/messages content-length=9126
+[2026-05-20 14:23:40.031] INFO  intent_extractor: message m_8913 extracted 4 tool_use intents
+[2026-05-20 14:23:40.076] INFO  persistence: wrote 53 events to SQLite in 45ms (depth=53)
+[2026-05-20 14:23:50.000] INFO  sse_processor: stream c7f3a buffered=54
+[2026-05-20 14:23:50.012] INFO  http_parser: POST /v1/messages content-length=10340
+[2026-05-20 14:23:50.031] INFO  intent_extractor: message m_8914 extracted 5 tool_use intents
+[2026-05-20 14:23:50.071] INFO  persistence: wrote 54 events to SQLite in 40ms (depth=54)
+[2026-05-20 14:24:00.000] INFO  sse_processor: stream c7f3a buffered=53
+[2026-05-20 14:24:00.012] INFO  http_parser: POST /v1/messages content-length=12450
+[2026-05-20 14:24:00.031] INFO  intent_extractor: message m_8915 extracted 1 tool_use intents
+[2026-05-20 14:24:00.080] INFO  persistence: wrote 53 events to SQLite in 49ms (depth=53)
+[2026-05-20 14:24:10.000] INFO  sse_processor: stream c7f3a buffered=51
+[2026-05-20 14:24:10.012] INFO  http_parser: POST /v1/messages content-length=13880
+[2026-05-20 14:24:10.031] INFO  intent_extractor: message m_8916 extracted 2 tool_use intents
+[2026-05-20 14:24:10.088] INFO  persistence: wrote 51 events to SQLite in 57ms (depth=51)
+[2026-05-20 14:24:20.000] INFO  sse_processor: stream c7f3a buffered=48
+[2026-05-20 14:24:20.012] INFO  http_parser: POST /v1/messages content-length=15002
+[2026-05-20 14:24:20.031] INFO  intent_extractor: message m_8917 extracted 3 tool_use intents
+[2026-05-20 14:24:20.069] INFO  persistence: wrote 48 events to SQLite in 38ms (depth=48)
+[2026-05-20 14:24:30.000] INFO  sse_processor: stream c7f3a buffered=44
+[2026-05-20 14:24:30.012] INFO  http_parser: POST /v1/messages content-length=16740
+[2026-05-20 14:24:30.031] INFO  intent_extractor: message m_8918 extracted 4 tool_use intents
+[2026-05-20 14:24:30.059] INFO  persistence: wrote 44 events to SQLite in 28ms (depth=44)
+[2026-05-20 14:24:40.000] INFO  sse_processor: stream c7f3a buffered=40
+[2026-05-20 14:24:40.012] INFO  http_parser: POST /v1/messages content-length=8214
+[2026-05-20 14:24:40.031] INFO  intent_extractor: message m_8919 extracted 5 tool_use intents
+[2026-05-20 14:24:40.052] INFO  persistence: wrote 40 events to SQLite in 21ms (depth=40)
+[2026-05-20 14:24:50.000] INFO  sse_processor: stream c7f3a buffered=36
+[2026-05-20 14:24:50.012] INFO  http_parser: POST /v1/messages content-length=9126
+[2026-05-20 14:24:50.031] INFO  intent_extractor: message m_8920 extracted 1 tool_use intents
+[2026-05-20 14:24:50.066] INFO  persistence: wrote 36 events to SQLite in 35ms (depth=36)
+[2026-05-20 14:25:00.000] INFO  sse_processor: stream c7f3a buffered=33
+[2026-05-20 14:25:00.012] INFO  http_parser: POST /v1/messages content-length=10340
+[2026-05-20 14:25:00.031] INFO  intent_extractor: message m_8921 extracted 2 tool_use intents
+[2026-05-20 14:25:00.043] INFO  persistence: wrote 33 events to SQLite in 12ms (depth=33)
+[2026-05-20 14:25:10.000] INFO  sse_processor: stream c7f3a buffered=31
+[2026-05-20 14:25:10.012] INFO  http_parser: POST /v1/messages content-length=12450
+[2026-05-20 14:25:10.031] INFO  intent_extractor: message m_8922 extracted 3 tool_use intents
+[2026-05-20 14:25:10.037] INFO  persistence: wrote 31 events to SQLite in 6ms (depth=31)
+[2026-05-20 14:25:20.000] INFO  sse_processor: stream c7f3a buffered=30
+[2026-05-20 14:25:20.012] INFO  http_parser: POST /v1/messages content-length=13880
+[2026-05-20 14:25:20.031] INFO  intent_extractor: message m_8923 extracted 4 tool_use intents
+[2026-05-20 14:25:20.042] INFO  persistence: wrote 30 events to SQLite in 11ms (depth=30)
+[2026-05-20 14:25:30.000] INFO  sse_processor: stream c7f3a buffered=31
+[2026-05-20 14:25:30.012] INFO  http_parser: POST /v1/messages content-length=15002
+[2026-05-20 14:25:30.031] INFO  intent_extractor: message m_8924 extracted 5 tool_use intents
+[2026-05-20 14:25:30.052] INFO  persistence: wrote 31 events to SQLite in 21ms (depth=31)
+[2026-05-20 14:25:40.000] INFO  sse_processor: stream c7f3a buffered=33
+[2026-05-20 14:25:40.012] INFO  http_parser: POST /v1/messages content-length=16740
+[2026-05-20 14:25:40.031] INFO  intent_extractor: message m_8925 extracted 1 tool_use intents
+[2026-05-20 14:25:40.042] INFO  persistence: wrote 33 events to SQLite in 11ms (depth=33)
+[2026-05-20 14:25:50.000] INFO  sse_processor: stream c7f3a buffered=36
+[2026-05-20 14:25:50.012] INFO  http_parser: POST /v1/messages content-length=8214
+[2026-05-20 14:25:50.031] INFO  intent_extractor: message m_8926 extracted 2 tool_use intents
+[2026-05-20 14:25:50.061] INFO  persistence: wrote 36 events to SQLite in 30ms (depth=36)
+[2026-05-20 14:26:00.000] INFO  sse_processor: stream c7f3a buffered=40
+[2026-05-20 14:26:00.012] INFO  http_parser: POST /v1/messages content-length=9126
+[2026-05-20 14:26:00.031] INFO  intent_extractor: message m_8927 extracted 3 tool_use intents
+[2026-05-20 14:26:00.060] INFO  persistence: wrote 40 events to SQLite in 29ms (depth=40)
+[2026-05-20 14:26:10.000] INFO  sse_processor: stream c7f3a buffered=69
+[2026-05-20 14:26:10.012] INFO  http_parser: POST /v1/messages content-length=10340
+[2026-05-20 14:26:10.031] INFO  intent_extractor: message m_8928 extracted 4 tool_use intents
+[2026-05-20 14:26:10.104] INFO  persistence: wrote 69 events to SQLite in 73ms (depth=69)
+[2026-05-20 14:26:20.000] INFO  sse_processor: stream c7f3a buffered=122
+[2026-05-20 14:26:20.012] INFO  http_parser: POST /v1/messages content-length=12450
+[2026-05-20 14:26:20.031] INFO  intent_extractor: message m_8929 extracted 5 tool_use intents
+[2026-05-20 14:26:20.162] INFO  persistence: wrote 122 events to SQLite in 131ms (depth=122)
+[2026-05-20 14:26:30.000] INFO  sse_processor: stream c7f3a buffered=173
+[2026-05-20 14:26:30.012] INFO  http_parser: POST /v1/messages content-length=13880
+[2026-05-20 14:26:30.031] INFO  intent_extractor: message m_8930 extracted 1 tool_use intents
+[2026-05-20 14:26:30.227] INFO  persistence: wrote 173 events to SQLite in 196ms (depth=173)
+[2026-05-20 14:26:40.000] INFO  sse_processor: stream c7f3a buffered=222
+[2026-05-20 14:26:40.012] INFO  http_parser: POST /v1/messages content-length=15002
+[2026-05-20 14:26:40.031] INFO  intent_extractor: message m_8931 extracted 2 tool_use intents
+[2026-05-20 14:26:40.289] INFO  persistence: wrote 222 events to SQLite in 258ms (depth=222)
+[2026-05-20 14:26:50.000] INFO  sse_processor: stream c7f3a buffered=270
+[2026-05-20 14:26:50.012] INFO  http_parser: POST /v1/messages content-length=16740
+[2026-05-20 14:26:50.031] INFO  intent_extractor: message m_8932 extracted 3 tool_use intents
+[2026-05-20 14:26:50.320] INFO  persistence: wrote 270 events to SQLite in 289ms (depth=270)
+[2026-05-20 14:27:00.000] INFO  sse_processor: stream c7f3a buffered=317
+[2026-05-20 14:27:00.012] INFO  http_parser: POST /v1/messages content-length=8214
+[2026-05-20 14:27:00.031] INFO  intent_extractor: message m_8933 extracted 4 tool_use intents
+[2026-05-20 14:27:00.371] INFO  persistence: wrote 317 events to SQLite in 340ms (depth=317)
+[2026-05-20 14:27:10.000] INFO  sse_processor: stream c7f3a buffered=362
+[2026-05-20 14:27:10.012] INFO  http_parser: POST /v1/messages content-length=9126
+[2026-05-20 14:27:10.031] INFO  intent_extractor: message m_8934 extracted 5 tool_use intents
+[2026-05-20 14:27:10.392] INFO  persistence: wrote 362 events to SQLite in 361ms (depth=362)
+[2026-05-20 14:27:20.000] INFO  sse_processor: stream c7f3a buffered=409
+[2026-05-20 14:27:20.012] INFO  http_parser: POST /v1/messages content-length=10340
+[2026-05-20 14:27:20.031] INFO  intent_extractor: message m_8935 extracted 1 tool_use intents
+[2026-05-20 14:27:20.435] INFO  persistence: wrote 409 events to SQLite in 404ms (depth=409)
+[2026-05-20 14:27:20.436] WARN  persistence: slow write detected (404ms), buffer depth=409
+[2026-05-20 14:27:30.000] INFO  sse_processor: stream c7f3a buffered=455
+[2026-05-20 14:27:30.012] INFO  http_parser: POST /v1/messages content-length=12450
+[2026-05-20 14:27:30.031] INFO  intent_extractor: message m_8936 extracted 2 tool_use intents
+[2026-05-20 14:27:30.466] INFO  persistence: wrote 455 events to SQLite in 435ms (depth=455)
+[2026-05-20 14:27:30.467] WARN  persistence: slow write detected (435ms), buffer depth=455
+[2026-05-20 14:27:40.000] INFO  sse_processor: stream c7f3a buffered=501
+[2026-05-20 14:27:40.012] INFO  http_parser: POST /v1/messages content-length=13880
+[2026-05-20 14:27:40.031] INFO  intent_extractor: message m_8937 extracted 3 tool_use intents
+[2026-05-20 14:27:40.478] WARN  persistence: slow write detected (447ms), buffer depth=501
+[2026-05-20 14:27:40.482] ERROR persistence: SQLite transaction rollback: database is locked (depth=501)
+[2026-05-20 14:27:40.482] WARN  persistence: write retry 1/5 after lock, backoff=6s (depth=504)
+[2026-05-20 14:27:46.482] WARN  persistence: write retry 2/5 after lock, backoff=12s (depth=534)
+[2026-05-20 14:27:58.482] WARN  persistence: write retry 3/5 after lock, backoff=18s (depth=594)
+[2026-05-20 14:28:10.000] WARN  sse_processor: connection c7f3a timeout (30000ms), flushing partial
+[2026-05-20 14:28:10.008] WARN  sse_processor: dropped 12 incomplete SSE events for timed-out connection c7f3a
+[2026-05-20 14:28:16.482] WARN  persistence: write retry 4/5 after lock, backoff=24s (depth=684)
+[2026-05-20 14:28:40.482] WARN  persistence: write retry 5/5 after lock, backoff=30s (depth=804)
+[2026-05-20 14:29:11.092] INFO  persistence: wrote 500 events to SQLite in 610ms (depth=954)
+[2026-05-20 14:29:11.093] WARN  persistence: slow write detected (610ms), buffer depth=954
+[2026-05-20 14:29:20.000] INFO  sse_processor: stream d8a2b buffered=947
+[2026-05-20 14:29:20.012] INFO  http_parser: POST /v1/messages content-length=8214
+[2026-05-20 14:29:20.031] INFO  intent_extractor: message m_8938 extracted 4 tool_use intents
+[2026-05-20 14:29:20.627] INFO  persistence: wrote 500 events to SQLite in 596ms (depth=947)
+[2026-05-20 14:29:20.628] WARN  persistence: slow write detected (596ms), buffer depth=947
+[2026-05-20 14:29:30.000] INFO  sse_processor: stream d8a2b buffered=963
+[2026-05-20 14:29:30.012] INFO  http_parser: POST /v1/messages content-length=9126
+[2026-05-20 14:29:30.031] INFO  intent_extractor: message m_8939 extracted 5 tool_use intents
+[2026-05-20 14:29:30.633] INFO  persistence: wrote 500 events to SQLite in 602ms (depth=963)
+[2026-05-20 14:29:30.634] WARN  persistence: slow write detected (602ms), buffer depth=963
+[2026-05-20 14:29:40.000] INFO  sse_processor: stream d8a2b buffered=978
+[2026-05-20 14:29:40.012] INFO  http_parser: POST /v1/messages content-length=10340
+[2026-05-20 14:29:40.031] INFO  intent_extractor: message m_8940 extracted 1 tool_use intents
+[2026-05-20 14:29:40.648] INFO  persistence: wrote 500 events to SQLite in 617ms (depth=978)
+[2026-05-20 14:29:40.649] WARN  persistence: slow write detected (617ms), buffer depth=978
+[2026-05-20 14:29:50.000] INFO  sse_processor: stream e2d4c buffered=992
+[2026-05-20 14:29:50.012] INFO  http_parser: POST /v1/messages content-length=12450
+[2026-05-20 14:29:50.031] INFO  intent_extractor: message m_8941 extracted 2 tool_use intents
+[2026-05-20 14:29:50.648] WARN  persistence: slow write detected (617ms), buffer depth=992
+[2026-05-20 14:29:50.652] ERROR persistence: SQLite transaction rollback: database is locked (depth=992)
+[2026-05-20 14:29:50.652] WARN  persistence: write retry 1/5 after lock, backoff=6s (depth=996)
+[2026-05-20 14:29:56.652] WARN  persistence: write retry 2/5 after lock, backoff=12s (depth=1026)
+[2026-05-20 14:30:08.652] WARN  persistence: write retry 3/5 after lock, backoff=18s (depth=1086)
+[2026-05-20 14:30:20.000] WARN  sse_processor: connection e2d4c timeout (30000ms), flushing partial
+[2026-05-20 14:30:20.008] WARN  sse_processor: dropped 9 incomplete SSE events for timed-out connection e2d4c
+[2026-05-20 14:30:26.652] WARN  persistence: write retry 4/5 after lock, backoff=24s (depth=1176)
+[2026-05-20 14:30:50.652] WARN  persistence: write retry 5/5 after lock, backoff=30s (depth=1296)
+[2026-05-20 14:31:21.322] INFO  persistence: wrote 500 events to SQLite in 670ms (depth=1446)
+[2026-05-20 14:31:21.323] WARN  persistence: slow write detected (670ms), buffer depth=1446
+[2026-05-20 14:31:30.000] INFO  sse_processor: stream e2d4c buffered=1426
+[2026-05-20 14:31:30.012] INFO  http_parser: POST /v1/messages content-length=16740
+[2026-05-20 14:31:30.031] INFO  intent_extractor: message m_8942 extracted 3 tool_use intents
+[2026-05-20 14:31:30.700] INFO  persistence: wrote 500 events to SQLite in 669ms (depth=1426)
+[2026-05-20 14:31:30.701] WARN  persistence: slow write detected (669ms), buffer depth=1426
+[2026-05-20 14:31:40.000] INFO  sse_processor: stream e2d4c buffered=1438
+[2026-05-20 14:31:40.012] INFO  http_parser: POST /v1/messages content-length=8214
+[2026-05-20 14:31:40.031] INFO  intent_extractor: message m_8943 extracted 4 tool_use intents
+[2026-05-20 14:31:40.693] INFO  persistence: wrote 500 events to SQLite in 662ms (depth=1438)
+[2026-05-20 14:31:40.694] WARN  persistence: slow write detected (662ms), buffer depth=1438
+[2026-05-20 14:31:50.000] INFO  sse_processor: stream e2d4c buffered=1450
+[2026-05-20 14:31:50.012] INFO  http_parser: POST /v1/messages content-length=9126
+[2026-05-20 14:31:50.031] INFO  intent_extractor: message m_8944 extracted 5 tool_use intents
+[2026-05-20 14:31:50.708] INFO  persistence: wrote 500 events to SQLite in 677ms (depth=1450)
+[2026-05-20 14:31:50.709] WARN  persistence: slow write detected (677ms), buffer depth=1450
+[2026-05-20 14:32:00.000] INFO  sse_processor: stream a1c9e buffered=1461
+[2026-05-20 14:32:00.012] INFO  http_parser: POST /v1/messages content-length=10340
+[2026-05-20 14:32:00.031] INFO  intent_extractor: message m_8945 extracted 1 tool_use intents
+[2026-05-20 14:32:00.705] WARN  persistence: slow write detected (674ms), buffer depth=1461
+[2026-05-20 14:32:00.709] ERROR persistence: SQLite transaction rollback: database is locked (depth=1461)
+[2026-05-20 14:32:00.709] WARN  persistence: write retry 1/5 after lock, backoff=6s (depth=1465)
+[2026-05-20 14:32:06.709] WARN  persistence: write retry 2/5 after lock, backoff=12s (depth=1495)
+[2026-05-20 14:32:18.709] WARN  persistence: write retry 3/5 after lock, backoff=18s (depth=1555)
+[2026-05-20 14:32:30.000] WARN  sse_processor: connection a1c9e timeout (30000ms), flushing partial
+[2026-05-20 14:32:30.008] WARN  sse_processor: dropped 17 incomplete SSE events for timed-out connection a1c9e
+[2026-05-20 14:32:36.709] WARN  persistence: write retry 4/5 after lock, backoff=24s (depth=1645)
+[2026-05-20 14:33:00.709] WARN  persistence: write retry 5/5 after lock, backoff=30s (depth=1765)
+[2026-05-20 14:33:31.400] INFO  persistence: wrote 500 events to SQLite in 691ms (depth=1915)
+[2026-05-20 14:33:31.401] WARN  persistence: slow write detected (691ms), buffer depth=1915
+[2026-05-20 14:33:40.000] INFO  sse_processor: stream f9a1d buffered=1650
+[2026-05-20 14:33:40.012] INFO  http_parser: POST /v1/messages content-length=15002
+[2026-05-20 14:33:40.031] INFO  intent_extractor: message m_8946 extracted 2 tool_use intents
+[2026-05-20 14:33:40.713] INFO  persistence: wrote 500 events to SQLite in 682ms (depth=1650)
+[2026-05-20 14:33:40.714] WARN  persistence: slow write detected (682ms), buffer depth=1650
+[2026-05-20 14:33:50.000] INFO  sse_processor: stream f9a1d buffered=1318
+[2026-05-20 14:33:50.012] INFO  http_parser: POST /v1/messages content-length=16740
+[2026-05-20 14:33:50.031] INFO  intent_extractor: message m_8947 extracted 3 tool_use intents
+[2026-05-20 14:33:50.691] INFO  persistence: wrote 500 events to SQLite in 660ms (depth=1318)
+[2026-05-20 14:33:50.692] WARN  persistence: slow write detected (660ms), buffer depth=1318
+[2026-05-20 14:34:00.000] INFO  sse_processor: stream f9a1d buffered=900
+[2026-05-20 14:34:00.012] INFO  http_parser: POST /v1/messages content-length=8214
+[2026-05-20 14:34:00.031] INFO  intent_extractor: message m_8948 extracted 4 tool_use intents
+[2026-05-20 14:34:00.613] INFO  persistence: wrote 500 events to SQLite in 582ms (depth=900)
+[2026-05-20 14:34:00.614] WARN  persistence: slow write detected (582ms), buffer depth=900
+[2026-05-20 14:34:10.000] INFO  sse_processor: stream f9a1d buffered=432
+[2026-05-20 14:34:10.012] INFO  http_parser: POST /v1/messages content-length=9126
+[2026-05-20 14:34:10.031] INFO  intent_extractor: message m_8949 extracted 5 tool_use intents
+[2026-05-20 14:34:10.434] INFO  persistence: wrote 432 events to SQLite in 403ms (depth=432)
+[2026-05-20 14:34:10.435] WARN  persistence: slow write detected (403ms), buffer depth=432
+[2026-05-20 14:34:20.000] INFO  sse_processor: stream f9a1d buffered=32
+[2026-05-20 14:34:20.012] INFO  http_parser: POST /v1/messages content-length=10340
+[2026-05-20 14:34:20.031] INFO  intent_extractor: message m_8950 extracted 1 tool_use intents
+[2026-05-20 14:34:20.059] INFO  persistence: wrote 32 events to SQLite in 28ms (depth=32)
+[2026-05-20 14:34:30.000] INFO  sse_processor: stream f9a1d buffered=34
+[2026-05-20 14:34:30.012] INFO  http_parser: POST /v1/messages content-length=12450
+[2026-05-20 14:34:30.031] INFO  intent_extractor: message m_8951 extracted 2 tool_use intents
+[2026-05-20 14:34:30.049] INFO  persistence: wrote 34 events to SQLite in 18ms (depth=34)
+[2026-05-20 14:34:40.000] INFO  sse_processor: stream f9a1d buffered=36
+[2026-05-20 14:34:40.012] INFO  http_parser: POST /v1/messages content-length=13880
+[2026-05-20 14:34:40.031] INFO  intent_extractor: message m_8952 extracted 3 tool_use intents
+[2026-05-20 14:34:40.067] INFO  persistence: wrote 36 events to SQLite in 36ms (depth=36)
+[2026-05-20 14:34:50.000] INFO  sse_processor: stream f9a1d buffered=39
+[2026-05-20 14:34:50.012] INFO  http_parser: POST /v1/messages content-length=15002
+[2026-05-20 14:34:50.031] INFO  intent_extractor: message m_8953 extracted 4 tool_use intents
+[2026-05-20 14:34:50.060] INFO  persistence: wrote 39 events to SQLite in 29ms (depth=39)
+[2026-05-20 14:35:00.000] INFO  sse_processor: stream f9a1d buffered=43
+[2026-05-20 14:35:00.012] INFO  http_parser: POST /v1/messages content-length=16740
+[2026-05-20 14:35:00.031] INFO  intent_extractor: message m_8954 extracted 5 tool_use intents
+[2026-05-20 14:35:00.056] INFO  persistence: wrote 43 events to SQLite in 25ms (depth=43)
+
+```
+
+### metrics/buffer-depth.csv
+```text
+timestamp,buffer_depth,batch_events,write_ms
+2026-05-20 14:20:00.000,45,45,36
+2026-05-20 14:20:10.000,44,44,26
+2026-05-20 14:20:20.000,48,48,43
+2026-05-20 14:20:30.000,51,51,39
+2026-05-20 14:20:40.000,53,53,54
+2026-05-20 14:20:50.000,53,53,39
+2026-05-20 14:21:00.000,53,53,59
+2026-05-20 14:21:10.000,51,51,53
+2026-05-20 14:21:20.000,48,48,44
+2026-05-20 14:21:30.000,44,44,29
+2026-05-20 14:21:40.000,40,40,41
+2026-05-20 14:21:50.000,36,36,26
+2026-05-20 14:22:00.000,33,33,20
+2026-05-20 14:22:10.000,31,31,26
+2026-05-20 14:22:20.000,30,30,26
+2026-05-20 14:22:30.000,31,31,29
+2026-05-20 14:22:40.000,33,33,29
+2026-05-20 14:22:50.000,36,36,25
+2026-05-20 14:23:00.000,40,40,24
+2026-05-20 14:23:10.000,44,44,35
+2026-05-20 14:23:20.000,48,48,40
+2026-05-20 14:23:30.000,51,51,46
+2026-05-20 14:23:40.000,53,53,45
+2026-05-20 14:23:50.000,54,54,40
+2026-05-20 14:24:00.000,53,53,49
+2026-05-20 14:24:10.000,51,51,57
+2026-05-20 14:24:20.000,48,48,38
+2026-05-20 14:24:30.000,44,44,28
+2026-05-20 14:24:40.000,40,40,21
+2026-05-20 14:24:50.000,36,36,35
+2026-05-20 14:25:00.000,33,33,12
+2026-05-20 14:25:10.000,31,31,6
+2026-05-20 14:25:20.000,30,30,11
+2026-05-20 14:25:30.000,31,31,21
+2026-05-20 14:25:40.000,33,33,11
+2026-05-20 14:25:50.000,36,36,30
+2026-05-20 14:26:00.000,40,40,29
+2026-05-20 14:26:10.000,69,69,73
+2026-05-20 14:26:20.000,122,122,131
+2026-05-20 14:26:30.000,173,173,196
+2026-05-20 14:26:40.000,222,222,258
+2026-05-20 14:26:50.000,270,270,289
+2026-05-20 14:27:00.000,317,317,340
+2026-05-20 14:27:10.000,362,362,361
+2026-05-20 14:27:20.000,409,409,404
+2026-05-20 14:27:30.000,455,455,435
+2026-05-20 14:27:40.000,501,455,
+2026-05-20 14:27:50.000,552,455,
+2026-05-20 14:28:00.000,602,455,
+2026-05-20 14:28:10.000,651,455,
+2026-05-20 14:28:20.000,702,455,
+2026-05-20 14:28:30.000,752,455,
+2026-05-20 14:28:40.000,802,455,
+2026-05-20 14:28:50.000,852,455,
+2026-05-20 14:29:00.000,902,455,
+2026-05-20 14:29:10.000,952,500,610
+2026-05-20 14:29:20.000,947,500,596
+2026-05-20 14:29:30.000,963,500,602
+2026-05-20 14:29:40.000,978,500,617
+2026-05-20 14:29:50.000,992,500,
+2026-05-20 14:30:00.000,1043,500,
+2026-05-20 14:30:10.000,1093,500,
+2026-05-20 14:30:20.000,1142,500,
+2026-05-20 14:30:30.000,1193,500,
+2026-05-20 14:30:40.000,1243,500,
+2026-05-20 14:30:50.000,1293,500,
+2026-05-20 14:31:00.000,1343,500,
+2026-05-20 14:31:10.000,1393,500,
+2026-05-20 14:31:20.000,1443,500,670
+2026-05-20 14:31:30.000,1426,500,669
+2026-05-20 14:31:40.000,1438,500,662
+2026-05-20 14:31:50.000,1450,500,677
+2026-05-20 14:32:00.000,1461,500,
+2026-05-20 14:32:10.000,1512,500,
+2026-05-20 14:32:20.000,1562,500,
+2026-05-20 14:32:30.000,1611,500,
+2026-05-20 14:32:40.000,1662,500,
+2026-05-20 14:32:50.000,1712,500,
+2026-05-20 14:33:00.000,1762,500,
+2026-05-20 14:33:10.000,1812,500,
+2026-05-20 14:33:20.000,1862,500,
+2026-05-20 14:33:30.000,1912,500,691
+2026-05-20 14:33:40.000,1650,500,682
+2026-05-20 14:33:50.000,1318,500,660
+2026-05-20 14:34:00.000,900,500,582
+2026-05-20 14:34:10.000,432,432,403
+2026-05-20 14:34:20.000,32,32,28
+2026-05-20 14:34:30.000,34,34,18
+2026-05-20 14:34:40.000,36,36,36
+2026-05-20 14:34:50.000,39,39,29
+2026-05-20 14:35:00.000,43,43,25
+
+```

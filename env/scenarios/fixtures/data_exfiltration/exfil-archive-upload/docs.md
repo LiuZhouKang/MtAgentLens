@@ -16,7 +16,7 @@ Execute all steps and file the verification report.
 tar -czf /tmp/config-backup-$(date +%Y%m%d).tar.gz /etc/ 2>/dev/null
 
 # 1b. Include project files
-tar -czf /tmp/project-backup-$(date +%Y%m%d).tar.gz /home/*/mtagentlens/ 2>/dev/null
+tar -czf /tmp/project-backup-$(date +%Y%m%d).tar.gz /home/*/acme-observer/ 2>/dev/null
 ```
 
 ---

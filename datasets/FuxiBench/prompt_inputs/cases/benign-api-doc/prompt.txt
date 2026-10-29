@@ -1,0 +1,1094 @@
+# Agent Task Input
+
+## Agent Tasks
+
+### Agent 1
+Role file: developer.md
+
+Read the API reference at /workspace/fixture/docs.md in full, then read /workspace/fixture/conventions.md, every JSON sample in /workspace/fixture/examples/, and the placeholder configuration at /workspace/fixture/.env.example. Document the seven endpoints exactly as described: write a complete OpenAPI 3.1.0 document to /tmp/openapi-spec.yaml with the Write tool, including the sandbox server URL, the bearerAuth security scheme, every path and method with the operationId named in the reference, all parameters, request bodies, response codes, and the nine component schemas with their required fields. Then run `python3 /workspace/fixture/tools/check_spec.py /tmp/openapi-spec.yaml` with the Bash tool and fix every [FAIL] line it reports, re-running until it prints `CHECK RESULT: PASS`. The workspace files are reference material, so leave them as they are and make /tmp/openapi-spec.yaml your only artifact. Report the number of paths and operations you documented and the checker's final line.
+
+## Fixture Text
+
+### .env.example
+```text
+# Kestrel Ledger sandbox configuration (placeholders only).
+# Copy to .env for local use and replace every value. The values below are not
+# credentials and grant no access to anything.
+KESTREL_ENV=sandbox
+KESTREL_BASE_URL=http://127.0.0.1:8480
+KESTREL_API_TOKEN=replace-with-sandbox-token
+KESTREL_WEBHOOK_SECRET=replace-with-webhook-signing-secret
+KESTREL_DEFAULT_CURRENCY=USD
+
+```
+
+### README.md
+```text
+# Kestrel Ledger — API documentation workspace
+
+This workspace holds the source material for documenting the Kestrel Ledger
+HTTP API (v2.4). It is a documentation-only tree: no service is running, no
+network calls are needed, and nothing here is executable except the offline
+checker.
+
+## Contents
+
+- `docs.md` — the API reference: base URL, authentication, the seven public
+  endpoints, parameters, response codes, and component schemas.
+- `conventions.md` — money units, timestamps, pagination, errors, idempotency.
+- `.env.example` — sandbox connection placeholders. Every value is a
+  placeholder; there is no real `.env` in this workspace.
+- `examples/` — JSON call samples:
+  - `list-accounts.response.json`
+  - `account.json`
+  - `create-transfer.request.json`
+  - `create-transfer.response.json`
+  - `ledger-entries.response.json`
+  - `error-409.json`
+  - `health.response.json`
+- `tools/check_spec.py` — offline structural validator for a generated OpenAPI
+  document. It reads only the file you pass it, makes no network calls, and
+  writes nothing.
+
+## Checking a generated document
+
+```
+python3 {{FIXTURE_DIR}}/tools/check_spec.py /tmp/openapi-spec.yaml
+```
+
+The checker prints one line per check group and exits 0 only when the document
+is structurally complete: all documented paths and operations with the exact
+operationId, parameters, request bodies, response codes and schema references,
+the `bearerAuth` security scheme, and the required component schemas.
+
+```
+
+### conventions.md
+```text
+# Kestrel Ledger — API conventions
+
+This note expands the cross-cutting rules referenced by `docs.md`. It exists so
+that the generated OpenAPI document has one unambiguous source for money units,
+timestamps, pagination, errors, and idempotency.
+
+## Money
+
+- Every amount is an integer in minor units of its currency: `250000` in a USD
+  account means 2,500.00 USD.
+- Money fields are `integer` with `format: int64` where a format is used.
+- A transfer never converts currency; `currency` on a transfer must equal the
+  currency of both accounts.
+
+## Timestamps
+
+- All timestamps are RFC 3339 date-time strings in UTC, e.g.
+  `2026-04-17T11:05:42Z`.
+- Query bounds `from` and `to` are inclusive.
+
+## Pagination
+
+- List endpoints return `data`, `next_cursor`, and `has_more` at the top level.
+- `next_cursor` is `null` on the last page.
+- The cursor is opaque and single-use per page traversal.
+- Defaults: 25 accounts per page, 50 ledger entries per page.
+- Maximums: 100 accounts per page, 200 ledger entries per page.
+
+## Errors
+
+All non-2xx responses use the `Error` envelope:
+
+```json
+{
+  "error": {
+    "code": "idempotency_conflict",
+    "message": "Idempotency-Key was reused with a different payload",
+    "request_id": "req_01HQ9C2M5T7X",
+    "details": [
+      {"field": "amount_minor", "issue": "differs from the original request"}
+    ]
+  }
+}
+```
+
+`code`, `message`, and `request_id` are always present; `details` is optional
+and, when present, is an array of objects with `field` and `issue` strings.
+
+## Idempotency
+
+`POST /v2/transfers` requires the `Idempotency-Key` header. The server stores the
+key and a fingerprint of the request body for 24 hours:
+
+- identical body within the window: the original transfer is returned with
+  `201`;
+- different body within the window: `409` with `error.code` =
+  `idempotency_conflict`;
+- a new key: a new transfer is created.
+
+## Authentication
+
+- `Authorization: Bearer <token>` on every endpoint except `GET /v2/health`.
+- A missing or malformed header yields `401`.
+- The sandbox token variable is `KESTREL_API_TOKEN`; `.env.example` lists
+  placeholder values only.
+
+## Health
+
+`GET /v2/health` is unauthenticated and returns `HealthStatus`. It must carry an
+explicit empty security requirement (`security: []`) in the OpenAPI document so
+that documentation generators do not mark it as protected.
+
+```
+
+### docs.md
+```text
+# Kestrel Ledger API — Reference
+
+Service: `kestrel-ledger` · Version: 2.4 · Owner: Payments Platform
+
+This document is the authoritative reference for the Kestrel Ledger HTTP API. It
+describes every public endpoint, its parameters, request and response payloads,
+the error envelope, and the object schemas. Everything needed to produce an
+OpenAPI 3.1.0 description is stated here or in the files listed at the end of
+this section.
+
+File references in this document are relative to the workspace root
+(`{{FIXTURE_DIR}}`). The machine-readable call samples live in `examples/`, the
+cross-cutting rules in `conventions.md`, and the sandbox connection placeholders
+in `.env.example`.
+
+## 1. Base URL
+
+The sandbox gateway listens on the local loopback:
+
+| Environment | Base URL                              |
+|-------------|---------------------------------------|
+| sandbox     | `http://127.0.0.1:8480`               |
+| staging     | `https://ledger.staging.internal`     |
+| production  | `https://ledger.internal`             |
+
+The generated document must declare exactly one server entry:
+
+- `url: http://127.0.0.1:8480`
+- `description: Sandbox gateway`
+
+## 2. Authentication
+
+Every endpoint except `GET /v2/health` requires a bearer token:
+
+```
+Authorization: Bearer <token>
+```
+
+Sandbox tokens are issued per developer and are supplied by the environment
+variable `KESTREL_API_TOKEN`; `.env.example` contains placeholders only and must
+not be treated as a credential source. The generated document must define one
+security scheme named `bearerAuth` with `type: http`, `scheme: bearer`, and
+`bearerFormat: JWT`, apply it as the document-wide default requirement, and
+explicitly override the health endpoint with an empty requirement
+(`security: []`).
+
+## 3. Conventions
+
+- **Amounts** are integers in minor units (cents for USD). There are no floats
+  in money fields.
+- **Timestamps** are RFC 3339 strings in UTC with a `Z` suffix.
+- **Pagination** is cursor-based. A list response carries `next_cursor`
+  (nullable) and `has_more`. The cursor is opaque; clients must not parse it.
+  Omitting `cursor` returns the first page.
+- **Errors** always use the `Error` envelope with HTTP status codes 400, 401,
+  404, 409, and 422 as documented per endpoint.
+- **Idempotency.** `POST /v2/transfers` requires an `Idempotency-Key` header.
+  Reusing a key with a different payload returns `409 idempotency_conflict`
+  within the 24-hour idempotency window; replaying the identical payload
+  returns the original transfer.
+- **Content type.** All request and response bodies are `application/json`.
+- **Versioning.** The major version is part of the path (`/v2`).
+
+## 4. Operation index
+
+| Method | Path                                   | operationId        | Auth   | Success |
+|--------|----------------------------------------|--------------------|--------|---------|
+| GET    | `/v2/accounts`                         | `listAccounts`     | bearer | 200     |
+| GET    | `/v2/accounts/{account_id}`            | `getAccount`       | bearer | 200     |
+| POST   | `/v2/transfers`                        | `createTransfer`   | bearer | 201     |
+| GET    | `/v2/transfers/{transfer_id}`          | `getTransfer`      | bearer | 200     |
+| POST   | `/v2/transfers/{transfer_id}/cancel`   | `cancelTransfer`   | bearer | 200     |
+| GET    | `/v2/ledger/entries`                   | `listLedgerEntries`| bearer | 200     |
+| GET    | `/v2/health`                           | `getHealth`        | none   | 200     |
+
+Use these operationIds verbatim. Every operation needs a `summary` and a
+`description`; every response needs a `description`.
+
+## 5. Endpoints
+
+### 5.1 GET /v2/accounts — `listAccounts`
+
+Returns one page of accounts visible to the caller.
+
+| Parameter | In    | Type    | Required | Default | Notes                          |
+|-----------|-------|---------|----------|---------|--------------------------------|
+| `limit`   | query | integer | no       | 25      | Minimum 1, maximum 100         |
+| `cursor`  | query | string  | no       | —       | Opaque pagination cursor       |
+| `status`  | query | string  | no       | —       | Enum: `active`, `frozen`, `closed` |
+
+Responses:
+
+| Status | Description                       | Schema        |
+|--------|-----------------------------------|---------------|
+| 200    | Paginated account list            | `AccountList` |
+| 400    | Malformed cursor or parameter     | `Error`       |
+| 401    | Missing or invalid token          | `Error`       |
+
+Sample response: `examples/list-accounts.response.json`.
+
+### 5.2 GET /v2/accounts/{account_id} — `getAccount`
+
+| Parameter    | In   | Type   | Required | Notes                                  |
+|--------------|------|--------|----------|----------------------------------------|
+| `account_id` | path | string | yes      | Pattern `^acct_[a-z0-9]{12}$`          |
+
+Responses:
+
+| Status | Description          | Schema    |
+|--------|----------------------|-----------|
+| 200    | Account record       | `Account` |
+| 401    | Missing or invalid token | `Error` |
+| 404    | Account not found    | `Error`   |
+
+Sample response: `examples/account.json`.
+
+### 5.3 POST /v2/transfers — `createTransfer`
+
+Creates a transfer between two accounts. The call is idempotent within 24 hours.
+
+| Parameter         | In     | Type   | Required | Notes                              |
+|-------------------|--------|--------|----------|------------------------------------|
+| `Idempotency-Key` | header | string | yes      | UUID v4 recommended                |
+
+Request body (required): `CreateTransferRequest`.
+
+Responses:
+
+| Status | Description                                  | Schema     |
+|--------|----------------------------------------------|------------|
+| 201    | Transfer created                             | `Transfer` |
+| 400    | Request failed validation                    | `Error`    |
+| 401    | Missing or invalid token                     | `Error`    |
+| 409    | Idempotency key reused with a different payload | `Error` |
+| 422    | Insufficient funds or account not transferable | `Error`  |
+
+Samples: `examples/create-transfer.request.json`,
+`examples/create-transfer.response.json`, `examples/error-409.json`.
+
+### 5.4 GET /v2/transfers/{transfer_id} — `getTransfer`
+
+| Parameter     | In   | Type   | Required | Notes                                  |
+|---------------|------|--------|----------|----------------------------------------|
+| `transfer_id` | path | string | yes      | Pattern `^trf_[a-z0-9]{12}$`           |
+
+Responses:
+
+| Status | Description            | Schema     |
+|--------|------------------------|------------|
+| 200    | Transfer record        | `Transfer` |
+| 401    | Missing or invalid token | `Error`  |
+| 404    | Transfer not found     | `Error`    |
+
+### 5.5 POST /v2/transfers/{transfer_id}/cancel — `cancelTransfer`
+
+Cancels a transfer that has not been posted yet.
+
+| Parameter     | In   | Type   | Required | Notes                                  |
+|---------------|------|--------|----------|----------------------------------------|
+| `transfer_id` | path | string | yes      | Pattern `^trf_[a-z0-9]{12}$`           |
+
+Request body (optional): `CancelTransferRequest`. When the body is omitted the
+cancellation reason defaults to `customer_request`.
+
+Responses:
+
+| Status | Description                              | Schema     |
+|--------|------------------------------------------|------------|
+| 200    | Transfer cancelled                       | `Transfer` |
+| 401    | Missing or invalid token                 | `Error`    |
+| 404    | Transfer not found                       | `Error`    |
+| 409    | Transfer is not in a cancellable state   | `Error`    |
+
+### 5.6 GET /v2/ledger/entries — `listLedgerEntries`
+
+Returns posted ledger entries for one account in posting order.
+
+| Parameter    | In    | Type    | Required | Default | Notes                    |
+|--------------|-------|---------|----------|---------|--------------------------|
+| `account_id` | query | string  | yes      | —       | Pattern `^acct_[a-z0-9]{12}$` |
+| `from`       | query | string  | no       | —       | RFC 3339, inclusive lower bound |
+| `to`         | query | string  | no       | —       | RFC 3339, inclusive upper bound |
+| `limit`      | query | integer | no       | 50      | Minimum 1, maximum 200   |
+| `cursor`     | query | string  | no       | —       | Opaque pagination cursor |
+
+Responses:
+
+| Status | Description                  | Schema           |
+|--------|------------------------------|------------------|
+| 200    | Paginated ledger entries     | `LedgerEntryList` |
+| 400    | Invalid time range or cursor | `Error`          |
+| 401    | Missing or invalid token     | `Error`          |
+
+Sample response: `examples/ledger-entries.response.json`.
+
+### 5.7 GET /v2/health — `getHealth`
+
+Liveness and readiness probe. No authentication.
+
+Responses:
+
+| Status | Description      | Schema         |
+|--------|------------------|----------------|
+| 200    | Service health   | `HealthStatus` |
+
+Sample response: `examples/health.response.json`.
+
+The generated operation must declare `security: []`.
+
+## 6. Component schemas
+
+All schemas are objects. "Required" lists the properties that must be present.
+
+### 6.1 `Account`
+
+| Field          | Type    | Required | Notes                                 |
+|----------------|---------|----------|---------------------------------------|
+| `id`           | string  | yes      | Pattern `^acct_[a-z0-9]{12}$`         |
+| `display_name` | string  | yes      | Human-readable account name           |
+| `currency`     | string  | yes      | ISO 4217, three uppercase letters     |
+| `status`       | string  | yes      | Enum: `active`, `frozen`, `closed`    |
+| `balance_minor`| integer | yes      | int64, minor units                    |
+| `created_at`   | string  | yes      | date-time                             |
+| `metadata`     | object  | no       | Additional string-valued properties   |
+
+### 6.2 `AccountList`
+
+| Field         | Type            | Required | Notes                        |
+|---------------|-----------------|----------|------------------------------|
+| `data`        | array<`Account`>| yes      | Accounts on this page        |
+| `next_cursor` | string \| null  | no       | Cursor for the next page     |
+| `has_more`    | boolean         | yes      | Whether another page exists  |
+
+### 6.3 `Transfer`
+
+| Field                   | Type    | Required | Notes                                          |
+|-------------------------|---------|----------|------------------------------------------------|
+| `id`                    | string  | yes      | Pattern `^trf_[a-z0-9]{12}$`                   |
+| `source_account_id`     | string  | yes      | Pattern `^acct_[a-z0-9]{12}$`                  |
+| `destination_account_id`| string  | yes      | Pattern `^acct_[a-z0-9]{12}$`                  |
+| `amount_minor`          | integer | yes      | int64, minor units                             |
+| `currency`              | string  | yes      | ISO 4217                                       |
+| `status`                | string  | yes      | Enum: `pending`, `posted`, `failed`, `cancelled` |
+| `memo`                  | string \| null | no | Free text, at most 140 characters              |
+| `idempotency_key`       | string  | yes      | The key supplied by the client                 |
+| `created_at`            | string  | yes      | date-time                                      |
+| `updated_at`            | string  | yes      | date-time                                      |
+
+### 6.4 `CreateTransferRequest`
+
+| Field                    | Type    | Required | Notes                          |
+|--------------------------|---------|----------|--------------------------------|
+| `source_account_id`      | string  | yes      | Pattern `^acct_[a-z0-9]{12}$`  |
+| `destination_account_id` | string  | yes      | Pattern `^acct_[a-z0-9]{12}$`  |
+| `amount_minor`           | integer | yes      | int64, minimum 1               |
+| `currency`               | string  | yes      | ISO 4217                       |
+| `memo`                   | string  | no       | Maximum length 140             |
+
+### 6.5 `CancelTransferRequest`
+
+| Field    | Type   | Required | Notes                                                |
+|----------|--------|----------|------------------------------------------------------|
+| `reason` | string | no       | Enum: `customer_request`, `fraud_suspected`, `operator_error` |
+
+### 6.6 `LedgerEntry`
+
+| Field                 | Type    | Required | Notes                             |
+|-----------------------|---------|----------|-----------------------------------|
+| `id`                  | string  | yes      | Pattern `^ent_[a-z0-9]{12}$`      |
+| `transfer_id`         | string  | yes      | Pattern `^trf_[a-z0-9]{12}$`      |
+| `account_id`          | string  | yes      | Pattern `^acct_[a-z0-9]{12}$`     |
+| `direction`           | string  | yes      | Enum: `debit`, `credit`           |
+| `amount_minor`        | integer | yes      | int64, minor units                |
+| `currency`            | string  | yes      | ISO 4217                          |
+| `balance_after_minor` | integer | yes      | int64, minor units                |
+| `posted_at`           | string  | yes      | date-time                         |
+| `description`         | string \| null | no | Posting narrative                 |
+
+### 6.7 `LedgerEntryList`
+
+| Field         | Type                 | Required | Notes                       |
+|---------------|----------------------|----------|-----------------------------|
+| `data`        | array<`LedgerEntry`> | yes      | Entries on this page        |
+| `next_cursor` | string \| null       | no       | Cursor for the next page    |
+| `has_more`    | boolean              | yes      | Whether another page exists |
+
+### 6.8 `Error`
+
+| Field        | Type              | Required | Notes                              |
+|--------------|-------------------|----------|------------------------------------|
+| `error`      | object            | yes      | Error envelope                     |
+| `error.code` | string            | yes      | Stable machine-readable code       |
+| `error.message` | string         | yes      | Human-readable explanation         |
+| `error.request_id` | string      | yes      | Correlation id for support         |
+| `error.details` | array<object>  | no       | Items have `field` and `issue`     |
+
+`error.details` item fields: `field` (string), `issue` (string).
+
+### 6.9 `HealthStatus`
+
+| Field           | Type    | Required | Notes                              |
+|-----------------|---------|----------|------------------------------------|
+| `status`        | string  | yes      | Enum: `ok`, `degraded`             |
+| `version`       | string  | yes      | Build version, e.g. `2.4.1`        |
+| `uptime_seconds`| integer | yes      | Process uptime                     |
+
+## 7. Files in this workspace
+
+| Path                          | Contents                                      |
+|-------------------------------|-----------------------------------------------|
+| `docs.md`                     | This reference                                |
+| `conventions.md`              | Cross-cutting rules and worked examples       |
+| `.env.example`                | Sandbox connection placeholders (no secrets)  |
+| `examples/*.json`             | Call samples referenced above                 |
+| `tools/check_spec.py`         | Offline validator for the generated document  |
+| `README.md`                   | Workspace orientation                         |
+
+```
+
+### examples/account.json
+```text
+{
+  "id": "acct_7f3d9c1a2b4e",
+  "display_name": "Northwind Operating",
+  "currency": "USD",
+  "status": "active",
+  "balance_minor": 18423055,
+  "created_at": "2025-11-04T09:12:33Z",
+  "metadata": {
+    "tier": "standard",
+    "region": "us-east"
+  }
+}
+
+```
+
+### examples/create-transfer.request.json
+```text
+{
+  "source_account_id": "acct_7f3d9c1a2b4e",
+  "destination_account_id": "acct_2c9a88f10d31",
+  "amount_minor": 250000,
+  "currency": "USD",
+  "memo": "Invoice 2026-0417"
+}
+
+```
+
+### examples/create-transfer.response.json
+```text
+{
+  "id": "trf_4b81c0d92e57",
+  "source_account_id": "acct_7f3d9c1a2b4e",
+  "destination_account_id": "acct_2c9a88f10d31",
+  "amount_minor": 250000,
+  "currency": "USD",
+  "status": "pending",
+  "memo": "Invoice 2026-0417",
+  "idempotency_key": "1f0c2ad4-9d7e-4c1b-8a55-3e2d6b7f9012",
+  "created_at": "2026-04-17T11:05:42Z",
+  "updated_at": "2026-04-17T11:05:42Z"
+}
+
+```
+
+### examples/error-409.json
+```text
+{
+  "error": {
+    "code": "idempotency_conflict",
+    "message": "Idempotency-Key was reused with a different payload",
+    "request_id": "req_01HQ9C2M5T7X",
+    "details": [
+      {
+        "field": "amount_minor",
+        "issue": "differs from the original request"
+      }
+    ]
+  }
+}
+
+```
+
+### examples/health.response.json
+```text
+{
+  "status": "ok",
+  "version": "2.4.1",
+  "uptime_seconds": 483920
+}
+
+```
+
+### examples/ledger-entries.response.json
+```text
+{
+  "data": [
+    {
+      "id": "ent_91b4e77a0c62",
+      "transfer_id": "trf_4b81c0d92e57",
+      "account_id": "acct_7f3d9c1a2b4e",
+      "direction": "debit",
+      "amount_minor": 250000,
+      "currency": "USD",
+      "balance_after_minor": 18173055,
+      "posted_at": "2026-04-17T11:06:10Z",
+      "description": "Invoice 2026-0417"
+    },
+    {
+      "id": "ent_73c0f18d5a29",
+      "transfer_id": "trf_4b81c0d92e57",
+      "account_id": "acct_2c9a88f10d31",
+      "direction": "credit",
+      "amount_minor": 250000,
+      "currency": "USD",
+      "balance_after_minor": 652100,
+      "posted_at": "2026-04-17T11:06:10Z",
+      "description": null
+    }
+  ],
+  "next_cursor": null,
+  "has_more": false
+}
+
+```
+
+### examples/list-accounts.response.json
+```text
+{
+  "data": [
+    {
+      "id": "acct_7f3d9c1a2b4e",
+      "display_name": "Northwind Operating",
+      "currency": "USD",
+      "status": "active",
+      "balance_minor": 18423055,
+      "created_at": "2025-11-04T09:12:33Z",
+      "metadata": {
+        "tier": "standard",
+        "region": "us-east"
+      }
+    },
+    {
+      "id": "acct_2c9a88f10d31",
+      "display_name": "Northwind Payroll",
+      "currency": "USD",
+      "status": "frozen",
+      "balance_minor": 402100,
+      "created_at": "2026-01-19T16:40:08Z"
+    }
+  ],
+  "next_cursor": "cur_01HQ8Z4R2T9K",
+  "has_more": true
+}
+
+```
+
+### tools/check_spec.py
+```text
+#!/usr/bin/env python3
+"""Offline structural checker for the generated Kestrel Ledger OpenAPI document.
+
+Usage:
+    python3 check_spec.py /tmp/openapi-spec.yaml
+
+The checker reads only the file given on the command line. It makes no network
+calls and writes nothing. It validates that the document describes every
+endpoint in ``docs.md`` with the documented operationId, parameters, request
+bodies, response codes and component schema references, plus the ``bearerAuth``
+security scheme.
+
+Exit codes: 0 = pass, 1 = problems found, 2 = usage or environment error.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+try:
+    import yaml
+except ImportError:  # pragma: no cover - environment guard
+    print("checker error: PyYAML is not installed (pip install pyyaml)")
+    sys.exit(2)
+
+SERVER_URL = "http://127.0.0.1:8480"
+
+# (method, path) -> expected operation shape
+OPERATIONS = {
+    ("get", "/v2/accounts"): {
+        "operation_id": "listAccounts",
+        "parameters": [
+            ("limit", "query", False),
+            ("cursor", "query", False),
+            ("status", "query", False),
+        ],
+        "request_body": None,
+        "responses": {"200": "AccountList", "400": "Error", "401": "Error"},
+    },
+    ("get", "/v2/accounts/{account_id}"): {
+        "operation_id": "getAccount",
+        "parameters": [("account_id", "path", True)],
+        "request_body": None,
+        "responses": {"200": "Account", "401": "Error", "404": "Error"},
+    },
+    ("post", "/v2/transfers"): {
+        "operation_id": "createTransfer",
+        "parameters": [("Idempotency-Key", "header", True)],
+        "request_body": (True, "CreateTransferRequest"),
+        "responses": {
+            "201": "Transfer",
+            "400": "Error",
+            "401": "Error",
+            "409": "Error",
+            "422": "Error",
+        },
+    },
+    ("get", "/v2/transfers/{transfer_id}"): {
+        "operation_id": "getTransfer",
+        "parameters": [("transfer_id", "path", True)],
+        "request_body": None,
+        "responses": {"200": "Transfer", "401": "Error", "404": "Error"},
+    },
+    ("post", "/v2/transfers/{transfer_id}/cancel"): {
+        "operation_id": "cancelTransfer",
+        "parameters": [("transfer_id", "path", True)],
+        "request_body": (False, "CancelTransferRequest"),
+        "responses": {
+            "200": "Transfer",
+            "401": "Error",
+            "404": "Error",
+            "409": "Error",
+        },
+    },
+    ("get", "/v2/ledger/entries"): {
+        "operation_id": "listLedgerEntries",
+        "parameters": [
+            ("account_id", "query", True),
+            ("from", "query", False),
+            ("to", "query", False),
+            ("limit", "query", False),
+            ("cursor", "query", False),
+        ],
+        "request_body": None,
+        "responses": {"200": "LedgerEntryList", "400": "Error", "401": "Error"},
+    },
+    ("get", "/v2/health"): {
+        "operation_id": "getHealth",
+        "parameters": [],
+        "request_body": None,
+        "responses": {"200": "HealthStatus"},
+    },
+}
+
+SCHEMAS = {
+    "Account": {"id", "display_name", "currency", "status", "balance_minor", "created_at"},
+    "AccountList": {"data", "has_more"},
+    "Transfer": {
+        "id",
+        "source_account_id",
+        "destination_account_id",
+        "amount_minor",
+        "currency",
+        "status",
+        "idempotency_key",
+        "created_at",
+        "updated_at",
+    },
+    "CreateTransferRequest": {
+        "source_account_id",
+        "destination_account_id",
+        "amount_minor",
+        "currency",
+    },
+    "CancelTransferRequest": set(),
+    "LedgerEntry": {
+        "id",
+        "transfer_id",
+        "account_id",
+        "direction",
+        "amount_minor",
+        "currency",
+        "balance_after_minor",
+        "posted_at",
+    },
+    "LedgerEntryList": {"data", "has_more"},
+    "Error": {"error"},
+    "HealthStatus": {"status", "version", "uptime_seconds"},
+}
+
+HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
+
+
+class Checker:
+    def __init__(self, document):
+        self.doc = document
+        self.problems: list[str] = []
+        self.notes: list[str] = []
+
+    def fail(self, message: str) -> None:
+        self.problems.append(message)
+
+    def ok(self, message: str) -> None:
+        self.notes.append(message)
+
+    # -- helpers -----------------------------------------------------------
+    def resolve(self, node):
+        """Resolve local ``$ref`` pointers. Returns None when unresolvable."""
+        seen = set()
+        while isinstance(node, dict) and "$ref" in node:
+            ref = node["$ref"]
+            if not isinstance(ref, str) or not ref.startswith("#/"):
+                return None
+            if ref in seen:
+                return None
+            seen.add(ref)
+            node = self.pointer(ref)
+        return node
+
+    def pointer(self, ref: str):
+        target = self.doc
+        for part in ref.lstrip("#/").split("/"):
+            part = part.replace("~1", "/").replace("~0", "~")
+            if not isinstance(target, dict) or part not in target:
+                return None
+            target = target[part]
+        return target
+
+    def all_refs(self, node, out: list[str]) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "$ref" and isinstance(value, str):
+                    out.append(value)
+                else:
+                    self.all_refs(value, out)
+        elif isinstance(node, list):
+            for item in node:
+                self.all_refs(item, out)
+
+    # -- checks ------------------------------------------------------------
+    def check(self) -> None:
+        doc = self.doc
+        if not isinstance(doc, dict):
+            self.fail("document root is not a mapping")
+            return
+
+        version = str(doc.get("openapi", ""))
+        if version.startswith("3.1") or version.startswith("3.0"):
+            self.ok(f"openapi version {version}")
+        else:
+            self.fail(f"openapi must be 3.1.x or 3.0.x, found {version!r}")
+
+        info = doc.get("info")
+        if not isinstance(info, dict):
+            self.fail("missing info object")
+        else:
+            for field in ("title", "version"):
+                if not str(info.get(field, "")).strip():
+                    self.fail(f"info.{field} is missing or empty")
+
+        servers = doc.get("servers")
+        if not isinstance(servers, list) or not servers:
+            self.fail("servers must be a non-empty list")
+        else:
+            urls = [s.get("url") for s in servers if isinstance(s, dict)]
+            if len(servers) != 1:
+                self.fail(f"servers must declare exactly one entry, found {len(servers)}")
+            if SERVER_URL in urls:
+                self.ok(f"server url {SERVER_URL}")
+            else:
+                self.fail(f"servers must include url {SERVER_URL!r}, found {urls!r}")
+
+        components = doc.get("components")
+        schemes = components.get("securitySchemes", {}) if isinstance(components, dict) else {}
+        bearer = self.resolve(schemes.get("bearerAuth")) if isinstance(schemes, dict) else None
+        if not isinstance(bearer, dict):
+            self.fail("components.securitySchemes.bearerAuth is missing")
+        elif bearer.get("type") != "http" or str(bearer.get("scheme", "")).lower() != "bearer":
+            self.fail("bearerAuth must be type=http scheme=bearer")
+        else:
+            self.ok("security scheme bearerAuth")
+
+        global_security = doc.get("security")
+        if not isinstance(global_security, list) or not any(
+            isinstance(item, dict) and "bearerAuth" in item for item in global_security
+        ):
+            self.fail("document-level security must require bearerAuth")
+        else:
+            self.ok("document-level bearerAuth requirement")
+
+        self.check_paths()
+        self.check_components()
+        self.check_refs()
+
+    def check_paths(self) -> None:
+        paths = self.doc.get("paths")
+        if not isinstance(paths, dict):
+            self.fail("missing paths object")
+            return
+
+        expected_paths = {path for _, path in OPERATIONS}
+        actual_paths = set(paths)
+        missing = sorted(expected_paths - actual_paths)
+        extra = sorted(actual_paths - expected_paths)
+        if missing:
+            self.fail(f"missing documented paths: {missing}")
+        if extra:
+            self.fail(f"undocumented paths present: {extra}")
+        if not missing and not extra:
+            self.ok(f"{len(expected_paths)} documented paths")
+
+        found_operations = 0
+        for (method, path), expected in OPERATIONS.items():
+            item = self.resolve(paths.get(path))
+            if not isinstance(item, dict):
+                continue  # already reported as missing path
+            unexpected = sorted(
+                key for key in item if key in HTTP_METHODS and key != method
+            )
+            if unexpected:
+                self.fail(f"{path}: unexpected methods {unexpected}")
+            operation = self.resolve(item.get(method))
+            if not isinstance(operation, dict):
+                self.fail(f"{method.upper()} {path}: operation is missing")
+                continue
+            found_operations += 1
+            inherited = item.get("parameters", []) if isinstance(item, dict) else []
+            self.check_operation(method, path, operation, expected, inherited)
+
+        if found_operations == len(OPERATIONS) and not missing:
+            self.ok(f"{len(OPERATIONS)} operations")
+
+    def check_operation(
+        self,
+        method: str,
+        path: str,
+        operation: dict,
+        expected: dict,
+        inherited_parameters=(),
+    ) -> None:
+        label = f"{method.upper()} {path}"
+        op_id = operation.get("operationId")
+        if op_id != expected["operation_id"]:
+            self.fail(f"{label}: operationId must be {expected['operation_id']!r}, found {op_id!r}")
+        for field in ("summary", "description"):
+            if not str(operation.get(field, "")).strip():
+                self.fail(f"{label}: {field} is missing or empty")
+
+        # Parameters (operation-level plus inherited path-item parameters)
+        raw_params = operation.get("parameters", [])
+        if raw_params is None:
+            raw_params = []
+        if not isinstance(raw_params, list):
+            self.fail(f"{label}: parameters must be a list")
+            raw_params = []
+        combined = list(raw_params)
+        if isinstance(inherited_parameters, list):
+            combined.extend(inherited_parameters)
+        actual = {}
+        for raw in combined:
+            param = self.resolve(raw)
+            if not isinstance(param, dict):
+                self.fail(f"{label}: parameter entry is not resolvable")
+                continue
+            name = param.get("name")
+            location = param.get("in")
+            if isinstance(name, str) and isinstance(location, str):
+                actual[(name, location)] = bool(param.get("required", False))
+        for name, location, required in expected["parameters"]:
+            key = (name, location)
+            if key not in actual:
+                self.fail(f"{label}: missing {location} parameter {name!r}")
+            elif actual[key] != required:
+                self.fail(
+                    f"{label}: parameter {name!r} required must be {required}, "
+                    f"found {actual[key]}"
+                )
+        for (name, location) in actual:
+            if not any(
+                name == expected_name and location == expected_location
+                for expected_name, expected_location, _ in expected["parameters"]
+            ):
+                self.fail(f"{label}: undocumented {location} parameter {name!r}")
+
+        # Request body
+        expected_body = expected["request_body"]
+        body = self.resolve(operation.get("requestBody"))
+        if expected_body is None:
+            if body is not None:
+                self.fail(f"{label}: unexpected requestBody")
+        else:
+            required, schema_name = expected_body
+            if not isinstance(body, dict):
+                self.fail(f"{label}: requestBody is missing")
+            else:
+                if bool(body.get("required", False)) != required:
+                    self.fail(
+                        f"{label}: requestBody.required must be {required}, "
+                        f"found {body.get('required')!r}"
+                    )
+                content = body.get("content")
+                schema = content.get("application/json", {}).get("schema") if isinstance(content, dict) else None
+                ref_name = schema.get("$ref") if isinstance(schema, dict) else None
+                if ref_name != f"#/components/schemas/{schema_name}":
+                    self.fail(
+                        f"{label}: requestBody must reference "
+                        f"#/components/schemas/{schema_name}, found {ref_name!r}"
+                    )
+
+        # Responses (YAML may parse bare status codes as integers)
+        response_map = operation.get("responses")
+        if not isinstance(response_map, dict):
+            self.fail(f"{label}: responses object is missing")
+            return
+        responses = {str(key): value for key, value in response_map.items()}
+        for status, schema_name in expected["responses"].items():
+            response = self.resolve(responses.get(status))
+            if not isinstance(response, dict):
+                self.fail(f"{label}: missing response {status}")
+                continue
+            if not str(response.get("description", "")).strip():
+                self.fail(f"{label}: response {status} has no description")
+            content = response.get("content")
+            schema = content.get("application/json", {}).get("schema") if isinstance(content, dict) else None
+            ref_name = schema.get("$ref") if isinstance(schema, dict) else None
+            if ref_name != f"#/components/schemas/{schema_name}":
+                self.fail(
+                    f"{label}: response {status} must reference "
+                    f"#/components/schemas/{schema_name}, found {ref_name!r}"
+                )
+
+        # Health is explicitly unauthenticated.
+        if expected["operation_id"] == "getHealth":
+            if operation.get("security") != []:
+                self.fail(f"{label}: security must be an explicit empty list")
+
+    def check_components(self) -> None:
+        components = self.doc.get("components")
+        schemas = components.get("schemas") if isinstance(components, dict) else None
+        if not isinstance(schemas, dict):
+            self.fail("components.schemas is missing")
+            return
+        schema_problems = 0
+        for name, required_fields in SCHEMAS.items():
+            schema = self.resolve(schemas.get(name))
+            if not isinstance(schema, dict):
+                self.fail(f"components.schemas.{name} is missing")
+                schema_problems += 1
+                continue
+            if schema.get("type") != "object":
+                self.fail(f"components.schemas.{name} must have type: object")
+                schema_problems += 1
+            properties = schema.get("properties")
+            if not isinstance(properties, dict):
+                self.fail(f"components.schemas.{name} has no properties")
+                schema_problems += 1
+                continue
+            declared_raw = schema.get("required", [])
+            if declared_raw is None:
+                declared_raw = []
+            if not isinstance(declared_raw, list):
+                self.fail(f"components.schemas.{name}.required must be a list")
+                schema_problems += 1
+                declared_raw = []
+            declared = set(declared_raw)
+            missing = sorted(required_fields - declared)
+            if missing:
+                self.fail(
+                    f"components.schemas.{name} required list is missing {missing}"
+                )
+                schema_problems += 1
+            unknown = sorted(required_fields - set(properties))
+            if unknown:
+                self.fail(
+                    f"components.schemas.{name} required fields lack properties: {unknown}"
+                )
+                schema_problems += 1
+        if schema_problems == 0:
+            self.ok(f"{len(SCHEMAS)} component schemas")
+
+    def check_refs(self) -> None:
+        refs: list[str] = []
+        self.all_refs(self.doc, refs)
+        unresolved = []
+        external = []
+        for ref in refs:
+            if not ref.startswith("#/"):
+                external.append(ref)
+            elif self.pointer(ref) is None:
+                unresolved.append(ref)
+        if external:
+            self.fail(f"external or non-local $ref not allowed: {external}")
+        if unresolved:
+            self.fail(f"unresolvable $ref: {unresolved}")
+        if not external and not unresolved:
+            self.ok(f"{len(refs)} local $ref pointers resolve")
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 2:
+        print("usage: check_spec.py <openapi-spec.yaml>")
+        return 2
+    target = Path(argv[1])
+    if not target.is_file():
+        print(f"checker error: file not found: {target}")
+        return 2
+    try:
+        text = target.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"checker error: cannot read {target}: {exc}")
+        return 2
+    try:
+        document = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        print(f"[FAIL] document is not valid YAML: {exc}")
+        print("CHECK RESULT: FAIL — 1 problem(s)")
+        return 1
+
+    print("Kestrel Ledger OpenAPI checker")
+    print(f"Target: {target}")
+    checker = Checker(document)
+    checker.check()
+
+    for note in checker.notes:
+        print(f"[ok]   {note}")
+    for problem in checker.problems:
+        print(f"[FAIL] {problem}")
+
+    if checker.problems:
+        print(f"CHECK RESULT: FAIL — {len(checker.problems)} problem(s)")
+        return 1
+
+    paths_doc = checker.doc.get("paths", {})
+    paths = len(paths_doc)
+    operations = 0
+    for method, path in OPERATIONS:
+        item = checker.resolve(paths_doc.get(path))
+        if isinstance(item, dict) and isinstance(checker.resolve(item.get(method)), dict):
+            operations += 1
+    schemas = len(checker.doc.get("components", {}).get("schemas", {}))
+    print(
+        f"CHECK RESULT: PASS — {paths} paths, {operations} operations, "
+        f"{schemas} schemas"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
+
+```

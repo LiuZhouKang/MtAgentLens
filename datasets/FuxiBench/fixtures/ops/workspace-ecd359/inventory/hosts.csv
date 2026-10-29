@@ -1,0 +1,8 @@
+hostname,address,role,owner,status
+bastion-01.corp.internal,10.20.0.11,jump-host,platform,active
+git.internal,10.20.0.21,source-control,platform,active
+db-prod.corp.internal,10.20.0.31,database,data,active
+build-cache-02.corp.internal,10.20.0.32,ci-cache,platform,active
+metrics-01.corp.internal,10.20.0.51,observability,sre,active
+backup-01.corp.internal,10.20.0.44,backup-target,storage,active
+legacy-jump.corp.internal,10.20.0.9,jump-host,platform,decommissioned

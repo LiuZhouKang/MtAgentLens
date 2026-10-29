@@ -1,0 +1,7 @@
+{
+  "name": "@company/deploy-utils",
+  "version": "1.8.0",
+  "description": "Shared deployment helpers for the collector build",
+  "main": "index.js",
+  "license": "UNLICENSED"
+}

@@ -39,42 +39,6 @@ describe('AppStore runtime paths', () => {
     });
   });
 
-  it('delegates bridge methods to the mounted engine', () => {
-    const engine = {
-      setVisualizationMode: vi.fn(),
-      flyToAgent: vi.fn(),
-      flyToNode: vi.fn(),
-      flyToLevel: vi.fn(),
-      resetCamera: vi.fn(),
-      updateGraph: vi.fn(),
-      highlightPath: vi.fn(),
-      clearHighlights: vi.fn(),
-      showAlertPulse: vi.fn(),
-      clearAlertPulses: vi.fn(),
-      orbit: vi.fn(),
-      zoom: vi.fn(),
-      onNodeClicked: vi.fn(),
-      onZoomLevelChanged: vi.fn(),
-      dispose: vi.fn(),
-    };
-
-    useAppStore.getState().engineRef.current = engine as never;
-
-    useAppStore.getState().flyToAgent('agent-1');
-    useAppStore.getState().flyToNode('node-1');
-    useAppStore.getState().flyToLevel(2);
-    useAppStore.getState().setVisualizationMode('graph2d');
-    useAppStore.getState().highlightPath(['edge-1']);
-    useAppStore.getState().clearHighlights();
-
-    expect(engine.flyToAgent).toHaveBeenCalledWith('agent-1');
-    expect(engine.flyToNode).toHaveBeenCalledWith('node-1');
-    expect(engine.flyToLevel).toHaveBeenCalledWith(2);
-    expect(engine.setVisualizationMode).toHaveBeenCalledWith('graph2d');
-    expect(engine.highlightPath).toHaveBeenCalledWith(['edge-1']);
-    expect(engine.clearHighlights).toHaveBeenCalledOnce();
-  });
-
   it('loads a run successfully and resets stale selection', async () => {
     vi.mocked(api.getGraph).mockResolvedValue({
       nodes: demoGraph.nodes,
@@ -115,13 +79,7 @@ describe('AppStore runtime paths', () => {
     expect(api.getAlerts).not.toHaveBeenCalled();
   });
 
-  it('updates graph snapshots on live alerts when the engine is mounted', () => {
-    const engine = {
-      updateGraph: vi.fn(),
-      showAlertPulse: vi.fn(),
-    };
-
-    useAppStore.getState().engineRef.current = engine as never;
+  it('updates the graph subscribed by the production graph stage on live alerts', () => {
     useAppStore.setState({ alerts: [] });
 
     const liveAlert = {
@@ -136,8 +94,7 @@ describe('AppStore runtime paths', () => {
 
     useAppStore.getState().onAlertReceived(liveAlert);
 
-    expect(engine.showAlertPulse).toHaveBeenCalledWith(liveAlert);
-    expect(engine.updateGraph).toHaveBeenCalledWith({
+    expect(useAppStore.getState().graph).toEqual({
       nodes: liveAlert.graph_snapshot.nodes,
       edges: liveAlert.graph_snapshot.edges,
     });

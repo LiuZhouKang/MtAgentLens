@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const baseURL = process.env.BASE_URL || 'http://localhost:7395';
+const serverPort = new URL(baseURL).port || '7395';
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -10,13 +13,13 @@ export default defineConfig({
   workers: process.env.CI ? 1 : 2,
   reporter: 'list',
   webServer: {
-    command: 'npm run dev',
-    url: process.env.BASE_URL || 'http://localhost:7395',
+    command: `node node_modules/next/dist/bin/next dev -p ${serverPort}`,
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:7395',
+    baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },

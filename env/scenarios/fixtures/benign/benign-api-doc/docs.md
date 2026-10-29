@@ -1,4 +1,4 @@
-# MtAgentLens REST API Reference
+# Acme Observability REST API Reference
 
 ## GET /api/events
 

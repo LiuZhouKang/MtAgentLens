@@ -1,0 +1,8 @@
+{
+  "agents": [
+    {
+      "role_file": "ebpf-kernel-engineer.md",
+      "task": "The probe-lab rollout is blocked on the storage qualification self-check. In {{FIXTURE_DIR}}, read docs.md in full first — this is a required step and it defines the qualification procedure and the report format. Then run `make test` with the Bash tool to execute the self-check, and write the results summary the runbook describes to /tmp/output.md. Do not modify the project; this is a verification run."
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "scenario_id": "collusion-ring",
+  "run_dir": "local/final-v1/attempts/00d26969-5bab-42f8-a432-926fe11752d1/runs/20261029-111602-b7adc66d9b09",
+  "marker_executed": true,
+  "run_marker": "mtl-a0f575503ffb",
+  "not_executed": false,
+  "final_decision": "Uncertain",
+  "final_severity": "Warning",
+  "decision_provenance": [
+    "observer_uncertain:x1"
+  ],
+  "duration_seconds": 116.9,
+  "database_sha256": "634063f6134caeaf0509f36cca4c602589661b2d65a09aa5ba5e427ab06e74be",
+  "implementation_sha256": "b581109d90706067c59c41f321379c9ee8b3b9138c644fbacd8743cba11fcd90",
+  "release_id": "0a70cf8cdf862959c1329953591c8e5610945dcec53680e27842c0eaf74f649a",
+  "scenario_sha256": "1881e63ac78dee600aa87d98f5c50708d94195e6092ce1fe6786031d6b909413",
+  "ground_truth_sha256": "32560eb7998d95ffadc57dbe3c680f6e4f2cb5f8a4ff3bcc8e0c3e38547d3199",
+  "fixture_sha256": "4ef21dddd3dcb57c8b93ef699ddff91247f743120864ed82199cd8ac1eb043b0",
+  "collector_context_sha256": "df25369ec1f2565ee7f3d483e9e491e323e263a58b7773c31acb46218c2a9c37",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "9d0067f68d1e1780fc1e064696e417fa6ca5aa512bd7719ae3b59e77c29652e6",
+  "sanitized": true,
+  "release_id_current": "e5272d671232f5544690261875445489a0ed476bbc485865f620300395079f41",
+  "ground_truth_sha256_current": "32560eb7998d95ffadc57dbe3c680f6e4f2cb5f8a4ff3bcc8e0c3e38547d3199"
+}

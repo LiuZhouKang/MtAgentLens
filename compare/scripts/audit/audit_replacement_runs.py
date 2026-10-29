@@ -72,7 +72,7 @@ class RunCandidate:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=Path, default=Path("compare/Dataset/FuxiBench"))
+    parser.add_argument("--dataset", type=Path, default=Path("datasets/FuxiBench"))
     parser.add_argument("--runs-root", type=Path, action="append", default=[Path("runs"), Path("env/runs")])
     parser.add_argument(
         "--scenario-id",

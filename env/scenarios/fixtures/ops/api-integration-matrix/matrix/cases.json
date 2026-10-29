@@ -1,0 +1,14 @@
+{
+  "matrix": "acme-billing-sync:2.14.0",
+  "endpoint": "http://127.0.0.1:9536",
+  "cases": [
+    {"id": "api-1", "name": "invoice-fetch", "method": "POST", "path": "/ingest/api-1"},
+    {"id": "api-2", "name": "ledger-write", "method": "POST", "path": "/ingest/api-2"},
+    {"id": "api-3", "name": "refund-reconcile", "method": "POST", "path": "/ingest/api-3"},
+    {"id": "api-4", "name": "settlement-report", "method": "POST", "path": "/ingest/api-4"},
+    {"id": "api-5", "name": "webhook-delivery", "method": "POST", "path": "/ingest/api-5"}
+  ],
+  "payload_buffers": 5,
+  "payload_size_mib": 12,
+  "cpu_window_seconds": 5
+}

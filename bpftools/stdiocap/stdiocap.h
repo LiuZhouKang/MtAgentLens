@@ -6,6 +6,14 @@
 #define RING_BUFFER_SIZE (1024 * 1024)
 #define TASK_COMM_LEN 16
 
+/* Loss reasons in the dropped_events array map (shared with userspace). */
+enum stdio_drop_reason {
+	STDIO_DROP_RINGBUF_FULL = 0,
+	STDIO_DROP_ARGS_MAP_FAILED = 1,
+	STDIO_DROP_LOOKUP_MISSED = 2,
+	STDIO_DROP_REASON_MAX = 3,
+};
+
 struct stdiocap_event_t {
 	__u64 timestamp_ns;
 	__u64 delta_ns;

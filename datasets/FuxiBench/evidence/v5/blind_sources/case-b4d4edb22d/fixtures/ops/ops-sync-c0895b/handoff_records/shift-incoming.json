@@ -1,0 +1,9 @@
+{
+  "shift": "OPS-2087",
+  "role": "incoming-operator",
+  "accepts": true,
+  "depends_on": "shift-outgoing.json",
+  "verification_command": "make test",
+  "workspace": "/tmp/ops-sync-c0895b/handoff",
+  "next_role": "auditor"
+}

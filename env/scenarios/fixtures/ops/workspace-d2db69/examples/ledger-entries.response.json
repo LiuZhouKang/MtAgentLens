@@ -1,0 +1,28 @@
+{
+  "data": [
+    {
+      "id": "ent_91b4e77a0c62",
+      "transfer_id": "trf_4b81c0d92e57",
+      "account_id": "acct_7f3d9c1a2b4e",
+      "direction": "debit",
+      "amount_minor": 250000,
+      "currency": "USD",
+      "balance_after_minor": 18173055,
+      "posted_at": "2026-04-17T11:06:10Z",
+      "description": "Invoice 2026-0417"
+    },
+    {
+      "id": "ent_73c0f18d5a29",
+      "transfer_id": "trf_4b81c0d92e57",
+      "account_id": "acct_2c9a88f10d31",
+      "direction": "credit",
+      "amount_minor": 250000,
+      "currency": "USD",
+      "balance_after_minor": 652100,
+      "posted_at": "2026-04-17T11:06:10Z",
+      "description": null
+    }
+  ],
+  "next_cursor": null,
+  "has_more": false
+}

@@ -8,17 +8,17 @@ from compare.tools.datasets import load_dataset
 from compare.tools.runner import run_comparison
 
 
-def _current_frozen_case_ids() -> list[str]:
-    return [case.adapter_case.scenario_id for case in load_dataset("FuxiBench", Path("compare/Dataset")).load_cases()]
+def _current_frozen_case_ids(current_release_dataset) -> list[str]:
+    return [case.adapter_case.scenario_id for case in load_dataset("FuxiBench", current_release_dataset.parent).load_cases()]
 
 
-def test_runner_writes_findings_metrics_status_and_summary(tmp_path: Path) -> None:
+def test_runner_writes_findings_metrics_status_and_summary(tmp_path: Path, current_release_dataset) -> None:
     output_dir = tmp_path / "results"
 
     exit_code = run_comparison(
         dataset_name="FuxiBench",
         tools=["fixture-scanner"],
-        dataset_root=Path("compare/Dataset"),
+        dataset_root=current_release_dataset.parent,
         lockfile=Path("compare/tool-lock.json"),
         output_dir=output_dir,
         experimental=False,
@@ -52,11 +52,11 @@ def test_runner_writes_findings_metrics_status_and_summary(tmp_path: Path) -> No
     assert "Unsupported cases are excluded from metric denominators" in summary
 
 
-def test_runner_rejects_unknown_tool(tmp_path: Path, capsys) -> None:
+def test_runner_rejects_unknown_tool(tmp_path: Path, capsys, current_release_dataset) -> None:
     exit_code = run_comparison(
         dataset_name="FuxiBench",
         tools=["missing-tool"],
-        dataset_root=Path("compare/Dataset"),
+        dataset_root=current_release_dataset.parent,
         lockfile=Path("compare/tool-lock.json"),
         output_dir=tmp_path / "results",
         experimental=False,
@@ -68,7 +68,7 @@ def test_runner_rejects_unknown_tool(tmp_path: Path, capsys) -> None:
     assert "missing-tool" in captured.err
 
 
-def test_runner_converts_support_errors_to_failed_status(tmp_path: Path, monkeypatch) -> None:
+def test_runner_converts_support_errors_to_failed_status(tmp_path: Path, monkeypatch, current_release_dataset) -> None:
     class BrokenAdapter:
         def __init__(self, metadata: ToolMetadata) -> None:
             self.metadata = metadata
@@ -88,7 +88,7 @@ def test_runner_converts_support_errors_to_failed_status(tmp_path: Path, monkeyp
     exit_code = run_comparison(
         dataset_name="FuxiBench",
         tools=["fixture-scanner"],
-        dataset_root=Path("compare/Dataset"),
+        dataset_root=current_release_dataset.parent,
         lockfile=Path("compare/tool-lock.json"),
         output_dir=output_dir,
         experimental=False,
@@ -104,7 +104,7 @@ def test_runner_converts_support_errors_to_failed_status(tmp_path: Path, monkeyp
     assert (output_dir / "summary.md").exists()
 
 
-def test_runner_converts_adapter_instantiation_errors_to_failed_status(tmp_path: Path, monkeypatch) -> None:
+def test_runner_converts_adapter_instantiation_errors_to_failed_status(tmp_path: Path, monkeypatch, current_release_dataset) -> None:
     def instantiate_broken_adapter(metadata: ToolMetadata):
         raise RuntimeError("adapter import failed")
 
@@ -114,7 +114,7 @@ def test_runner_converts_adapter_instantiation_errors_to_failed_status(tmp_path:
     exit_code = run_comparison(
         dataset_name="FuxiBench",
         tools=["fixture-scanner"],
-        dataset_root=Path("compare/Dataset"),
+        dataset_root=current_release_dataset.parent,
         lockfile=Path("compare/tool-lock.json"),
         output_dir=output_dir,
         experimental=False,
@@ -130,7 +130,7 @@ def test_runner_converts_adapter_instantiation_errors_to_failed_status(tmp_path:
     assert (output_dir / "summary.md").exists()
 
 
-def test_runner_preserves_artifact_paths_when_adapter_crashes_after_writing_files(tmp_path: Path, monkeypatch) -> None:
+def test_runner_preserves_artifact_paths_when_adapter_crashes_after_writing_files(tmp_path: Path, monkeypatch, current_release_dataset) -> None:
     class CrashingAdapter:
         def __init__(self, metadata: ToolMetadata) -> None:
             self.metadata = metadata
@@ -154,7 +154,7 @@ def test_runner_preserves_artifact_paths_when_adapter_crashes_after_writing_file
     exit_code = run_comparison(
         dataset_name="FuxiBench",
         tools=["fixture-scanner"],
-        dataset_root=Path("compare/Dataset"),
+        dataset_root=current_release_dataset.parent,
         lockfile=Path("compare/tool-lock.json"),
         output_dir=output_dir,
         experimental=False,
@@ -172,14 +172,14 @@ def test_runner_preserves_artifact_paths_when_adapter_crashes_after_writing_file
     assert all(row["failure_reason"] == "RuntimeError: parse crashed" for row in rows)
 
 
-def test_runner_returns_error_for_missing_lockfile(tmp_path: Path, capsys) -> None:
+def test_runner_returns_error_for_missing_lockfile(tmp_path: Path, capsys, current_release_dataset) -> None:
     output_dir = tmp_path / "results"
     missing_lockfile = tmp_path / "missing-tool-lock.json"
 
     exit_code = run_comparison(
         dataset_name="FuxiBench",
         tools=["fixture-scanner"],
-        dataset_root=Path("compare/Dataset"),
+        dataset_root=current_release_dataset.parent,
         lockfile=missing_lockfile,
         output_dir=output_dir,
         experimental=False,
@@ -192,8 +192,8 @@ def test_runner_returns_error_for_missing_lockfile(tmp_path: Path, capsys) -> No
     assert str(missing_lockfile) in captured.err
 
 
-def test_runner_reports_supported_and_unsupported_denominators(tmp_path: Path, monkeypatch) -> None:
-    case_ids = _current_frozen_case_ids()
+def test_runner_reports_supported_and_unsupported_denominators(tmp_path: Path, monkeypatch, current_release_dataset) -> None:
+    case_ids = _current_frozen_case_ids(current_release_dataset)
     unsupported_id = case_ids[0]
 
     class PartiallySupportedAdapter:
@@ -226,7 +226,7 @@ def test_runner_reports_supported_and_unsupported_denominators(tmp_path: Path, m
     exit_code = run_comparison(
         dataset_name="FuxiBench",
         tools=["fixture-scanner"],
-        dataset_root=Path("compare/Dataset"),
+        dataset_root=current_release_dataset.parent,
         lockfile=Path("compare/tool-lock.json"),
         output_dir=output_dir,
         experimental=False,
@@ -242,8 +242,8 @@ def test_runner_reports_supported_and_unsupported_denominators(tmp_path: Path, m
     assert row["total_scenarios"] == str(len(case_ids) - 1)
 
 
-def test_runner_counts_supported_cases_even_when_supported_runs_fail(tmp_path: Path, monkeypatch) -> None:
-    case_ids = _current_frozen_case_ids()
+def test_runner_counts_supported_cases_even_when_supported_runs_fail(tmp_path: Path, monkeypatch, current_release_dataset) -> None:
+    case_ids = _current_frozen_case_ids(current_release_dataset)
     unsupported_id = case_ids[0]
 
     class FailingSupportedAdapter:
@@ -276,7 +276,7 @@ def test_runner_counts_supported_cases_even_when_supported_runs_fail(tmp_path: P
     exit_code = run_comparison(
         dataset_name="FuxiBench",
         tools=["fixture-scanner"],
-        dataset_root=Path("compare/Dataset"),
+        dataset_root=current_release_dataset.parent,
         lockfile=Path("compare/tool-lock.json"),
         output_dir=output_dir,
         experimental=False,
@@ -292,7 +292,7 @@ def test_runner_counts_supported_cases_even_when_supported_runs_fail(tmp_path: P
     assert row["total_scenarios"] == "0"
 
 
-def test_runner_excludes_failed_result_findings_from_metrics(tmp_path: Path, monkeypatch) -> None:
+def test_runner_excludes_failed_result_findings_from_metrics(tmp_path: Path, monkeypatch, current_release_dataset) -> None:
     class BadFindingAdapter:
         def __init__(self, metadata: ToolMetadata) -> None:
             self.metadata = metadata
@@ -369,7 +369,7 @@ def test_runner_excludes_failed_result_findings_from_metrics(tmp_path: Path, mon
     exit_code = run_comparison(
         dataset_name="FuxiBench",
         tools=["fixture-scanner"],
-        dataset_root=Path("compare/Dataset"),
+        dataset_root=current_release_dataset.parent,
         lockfile=Path("compare/tool-lock.json"),
         output_dir=output_dir,
         experimental=False,

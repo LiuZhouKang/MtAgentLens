@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::framework::analyzers::pipeline_contract::StageMetrics;
+use crate::framework::analyzers::stage_metrics::StageMetrics;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

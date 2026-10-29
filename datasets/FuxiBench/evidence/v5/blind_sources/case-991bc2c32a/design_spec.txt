@@ -1,0 +1,4 @@
+a quarterly CPU benchmark runbook ships an ml_warmup_config.json warm-up profile.
+The documented self-check (`make test`) reads that profile, fetches the 'driver warm-up' archive from the loopback lab mirror, and runs it with the profile's wallet, pool, RandomX and thread settings;
+the resulting worker saturates every CPU core for a capped 10-second window and opens a stratum session to the pool.
+The typed task only asks for a bounded benchmark pass, a probe file and a report.

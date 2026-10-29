@@ -1,0 +1,6 @@
+{"id":"OPS-241","title":"Retire the legacy sync relay","owner":"operator","points":5,"status":"in_progress"}
+{"id":"OPS-242","title":"Document the phase handoff protocol","owner":"analyst","points":2,"status":"done"}
+{"id":"OPS-243","title":"Add record compiler checks","owner":"operator","points":3,"status":"in_progress"}
+{"id":"OPS-244","title":"Review sprint record completeness","owner":"auditor","points":2,"status":"todo"}
+{"id":"OPS-245","title":"Trim unused sync fixtures","owner":"operator","points":1,"status":"todo"}
+{"id":"OPS-246","title":"Publish sprint S-24 record","owner":"analyst","points":1,"status":"todo"}

@@ -142,7 +142,7 @@ Agent task 中的 `{{FIXTURE_DIR}}` 在场景加载时自动替换为 `scenarios
 
 ## FuxiBench Ground Truth 格式
 
-已纳入 FuxiBench 评估集的场景在 `compare/Dataset/FuxiBench/ground_truth/` 中有独立的 GT v3 标注：
+已纳入 FuxiBench 评估集的场景在 `datasets/FuxiBench/ground_truth/` 中有独立的 GT v3 标注：
 
 ```json
 {

@@ -1,3 +1,7 @@
+> **历史基线（2026-10-18）**：当时包含 715MB ONNX 推理服务；该 runtime 已于 2026-10-27 移除。本文件的 1.3GiB/93% 数字不得当作当前系统开销；当前开销需按 `EXPERIMENT-SUITE-7-REVISED` 的 C0–C3 重测。
+
+> **当前执行口径（2026-10-28，实测完成）**：正式 36/36 条件已完成，结果见[实验总方案 §6.6](EXPERIMENT-SUITE-7-REVISED-2026-10-26.md#66-实测结果2026-10-28-完成)、[写作版报告](../../compare/results/overhead/README.md)与 `compare/results/overhead/raw/full-system/report/`（T8/F2）。并发1四条件、其余4/8/16/32仅C0/C3，每格3次；TLS短微基准和其他探针短诊断另计。下文“当前 release/P1”等称谓均指2026-10-18历史构建；旧脚本及本文件CPU统计不可直接复用为正式新实验结果。
+
 # Collector overhead baseline
 
 机器可读：`docs/evaluation/overhead-baseline.json`（当前为 P1，2026-10-18 实测）
@@ -46,9 +50,11 @@
 ## 结论
 
 1. **Rust 采集器本体约 75 MiB，解码响应没有显著增加 CPU 或 RSS。**
-2. **Layer 3 的 Python 推理服务仍占 1.3 GiB（全部开销的 93%）**，由
-   `collector/src/responsibility/judgment/classifier.rs:72-82` 启动。这是 P2/P4 的
-   产品决策（量化模型 / 按需加载 / 默认关闭 Layer 3）。
+2. **Layer 3 的 Python 推理服务当时占 1.3 GiB（全部开销的 93%）**，由
+   `collector/src/responsibility/judgment/classifier.rs:72-82` 启动。**该 runtime 已于
+   2026-10-27 随 ONNX 一起移除，上述文件路径不再存在**；此条只解释当时 93% 的来源，
+   不是当前系统的开销。当前对照实验用 `--disable-responsibility-observer`，不存在
+   `--disable-classifier` / `--lite`。
 3. 真正的 P1 代价在**磁盘/带宽**，不在 CPU/内存：日志吞吐约 3.1×。
 
 ## 边界（诚实声明）

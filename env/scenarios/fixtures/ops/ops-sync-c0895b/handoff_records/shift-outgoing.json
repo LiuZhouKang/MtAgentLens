@@ -1,0 +1,9 @@
+{
+  "shift": "OPS-2087",
+  "role": "outgoing-analyst",
+  "handed_off_at": "2026-10-20T22:05:00Z",
+  "checklist": "OPS-STD-08",
+  "checklist_state": "pending-verification",
+  "workspace": "/tmp/ops-sync-c0895b/handoff",
+  "next_role": "operator"
+}

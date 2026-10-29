@@ -11,22 +11,6 @@ use crate::responsibility::types::{
     Action, ActionCandidateType, ActionId, CandidateDerivationMode, ProcessId, SignalClass,
 };
 
-// ─── Linux O_* flag constants ─────────────────────────────────────────
-
-/// O_WRONLY — write only.
-const O_WRONLY: i32 = 0o1;
-/// O_RDWR — read/write.
-const O_RDWR: i32 = 0o2;
-/// O_CREAT — create file if it does not exist.
-const O_CREAT: i32 = 0o100;
-/// O_TRUNC — truncate file to zero length.
-const O_TRUNC: i32 = 0o1000;
-/// O_APPEND — append (writes always at end).
-const O_APPEND: i32 = 0o2000;
-
-/// Bits that matter for write-vs-overwrite classification.
-const WRITE_FLAGS_MASK: i32 = O_WRONLY | O_RDWR | O_CREAT | O_TRUNC;
-
 // ─── ActionClassifier ─────────────────────────────────────────────────
 
 pub struct ActionClassifier;
@@ -49,6 +33,9 @@ impl ActionClassifier {
         let normalized_args = extract_action_args(&action_type, raw_args);
 
         Some(Action {
+            outcome: crate::responsibility::types::ActionOutcome::Unknown,
+            syscall_ret: None,
+            syscall_name: Some(syscall.to_string()),
             action_id: ActionId::new(),
             process_id,
             action_type,
@@ -63,16 +50,10 @@ impl ActionClassifier {
     ///
     /// Returns `None` for syscalls that are not relevant to the evidence
     /// pipeline (e.g., getpid, mmap, etc.).
-    fn syscall_to_type(syscall: &str, raw_args: &[String]) -> Option<ActionCandidateType> {
+    fn syscall_to_type(syscall: &str, _raw_args: &[String]) -> Option<ActionCandidateType> {
         match syscall {
             // ── File open variants — distinguish read/write/overwrite by flags ──
-            "openat" | "open" | "openat2" => {
-                let flags = raw_args
-                    .get(1)
-                    .and_then(|f| f.parse::<i32>().ok())
-                    .unwrap_or(0);
-                Self::classify_open_flags(flags)
-            }
+            "openat" | "open" | "openat2" => Some(ActionCandidateType::FileOpen),
 
             // ── Read syscalls ──
             "read" | "pread64" | "preadv" | "readv" => Some(ActionCandidateType::FileRead),
@@ -105,45 +86,11 @@ impl ActionClassifier {
         }
     }
 
-    /// Classify the open(2) flags into a file action type.
-    fn classify_open_flags(flags: i32) -> Option<ActionCandidateType> {
-        let masked = flags & WRITE_FLAGS_MASK;
-
-        // O_RDWR | O_CREAT | O_TRUNC → overwrite
-        if (masked & (O_CREAT | O_TRUNC)) == (O_CREAT | O_TRUNC) && (masked & O_RDWR) != 0 {
-            return Some(ActionCandidateType::FileOverwrite);
-        }
-        // O_WRONLY | O_CREAT | O_TRUNC → overwrite
-        if (masked & (O_CREAT | O_TRUNC)) == (O_CREAT | O_TRUNC) && (masked & O_WRONLY) != 0 {
-            return Some(ActionCandidateType::FileOverwrite);
-        }
-
-        // O_WRONLY | O_CREAT → write (create)
-        if (masked & O_CREAT) != 0 && (masked & (O_WRONLY | O_RDWR)) != 0 {
-            return Some(ActionCandidateType::FileWrite);
-        }
-        // O_WRONLY → write
-        if (masked & O_WRONLY) != 0 {
-            return Some(ActionCandidateType::FileWrite);
-        }
-        // O_RDWR → write (could also be read, but write is more impactful
-        // for security monitoring)
-        if (masked & O_RDWR) != 0 {
-            return Some(ActionCandidateType::FileWrite);
-        }
-        // O_APPEND → write
-        if (masked & O_APPEND) != 0 {
-            return Some(ActionCandidateType::FileWrite);
-        }
-
-        // Default: read-only open
-        Some(ActionCandidateType::FileRead)
-    }
-
     /// Assign a signal class to each action type.
     fn signal_class_for(action_type: &ActionCandidateType) -> SignalClass {
         match action_type {
-            ActionCandidateType::FileRead
+            ActionCandidateType::FileOpen
+            | ActionCandidateType::FileRead
             | ActionCandidateType::FileWrite
             | ActionCandidateType::FileOverwrite
             | ActionCandidateType::FileDelete
@@ -176,7 +123,7 @@ mod tests {
             1000,
         );
         assert!(action.is_some());
-        assert_eq!(action.unwrap().action_type, ActionCandidateType::FileRead);
+        assert_eq!(action.unwrap().action_type, ActionCandidateType::FileOpen);
     }
 
     #[test]
@@ -189,7 +136,7 @@ mod tests {
             1000,
         );
         assert!(action.is_some());
-        assert_eq!(action.unwrap().action_type, ActionCandidateType::FileWrite);
+        assert_eq!(action.unwrap().action_type, ActionCandidateType::FileOpen);
     }
 
     #[test]
@@ -202,10 +149,7 @@ mod tests {
             1000,
         );
         assert!(action.is_some());
-        assert_eq!(
-            action.unwrap().action_type,
-            ActionCandidateType::FileOverwrite
-        );
+        assert_eq!(action.unwrap().action_type, ActionCandidateType::FileOpen);
     }
 
     #[test]
@@ -319,7 +263,7 @@ mod tests {
             1000,
         );
         assert!(action.is_some());
-        assert_eq!(action.unwrap().action_type, ActionCandidateType::FileWrite);
+        assert_eq!(action.unwrap().action_type, ActionCandidateType::FileOpen);
     }
 
     #[test]

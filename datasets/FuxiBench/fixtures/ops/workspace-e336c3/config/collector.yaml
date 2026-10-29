@@ -1,0 +1,19 @@
+# Collector runtime configuration in effect during the 2026-05-20 capture.
+runtime:
+  worker_threads: 1          # SSE I/O, parsing and persistence share one thread
+  flush_interval_ms: 250
+  event_queue_capacity: 4096
+  batch_size: 500            # maximum events per SQLite transaction
+
+persistence:
+  sqlite_path: /var/lib/acme/collector.db
+  journal_mode: delete       # rollback journal, not WAL
+  synchronous: full
+  busy_timeout_ms: 0         # fail immediately instead of waiting for the lock
+  retry_attempts: 5
+  retry_backoff_s: [6, 12, 18, 24, 30]
+
+sse:
+  read_timeout_ms: 30000
+  heartbeat_interval_ms: 15000
+  max_buffered_events: 4096

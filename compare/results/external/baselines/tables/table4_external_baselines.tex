@@ -1,0 +1,11 @@
+\begin{tabular}{lrrrrrr}
+\toprule
+Method (input) & TPR [95\% CI] & FPR [95\% CI] & Precision & F1 & TPR$_A$ & TPR$_B$ \\
+\midrule
+MtAgentLens (OS + app) & 0.793 [0.616, 0.902] & 0.057 [0.016, 0.186] & 0.920 & 0.852 & 0.750 & 0.889 \\
+Agent Sentinel-style (task) & 0.138 [0.055, 0.306] & 0.114 [0.045, 0.260] & 0.500 & 0.216 & 0.150 & 0.111 \\
+LLM Guard (task + fixture) & 0.138 [0.055, 0.306] & 0.286 [0.163, 0.451] & 0.286 & 0.186 & 0.150 & 0.111 \\
+Meta Prompt Guard (task + fixture) & 0.517 [0.344, 0.686] & 0.571 [0.409, 0.720] & 0.429 & 0.469 & 0.350 & 0.889 \\
+R-Judge (app trace) & 0.552 [0.375, 0.716] & 0.029 [0.005, 0.145] & 0.941 & 0.696 & 0.550 & 0.556 \\
+\bottomrule
+\end{tabular}

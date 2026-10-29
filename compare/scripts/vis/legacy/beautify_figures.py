@@ -122,7 +122,7 @@ def load_data():
                 r = json.loads(line)
                 findings_by_tool[r["tool_id"]].append(r)
 
-    gt_dir = PROJECT / "compare/Dataset/FuxiBench/ground_truth"
+    gt_dir = PROJECT / "datasets/FuxiBench/ground_truth"
     gts = {}
     for gf in sorted(gt_dir.glob("*.json")):
         gts[gf.stem] = json.loads(gf.read_text())

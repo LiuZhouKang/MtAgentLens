@@ -1,0 +1,97 @@
+{
+  "schema": "mtagentlens.post-fix-validation-evidence/1",
+  "source_root": "/tmp/mtl-validate-night2",
+  "note": "copied 2026-10-26 from the post-fix validation runs; original run dirs were under /tmp",
+  "files": [
+    {
+      "scenario_id": "benign-api-doc",
+      "path": "benign-api-doc/summary.json",
+      "sha256": "8271e7ae50bf4d3c7a19ec144d03373b5c9a8f6b30406be47ebc26264a5bc33d",
+      "bytes": 8037,
+      "source": "/tmp/mtl-validate-night2/benign-api-doc/attempts/b1951d0b-afd0-4eca-bf94-a34526d14cf9/runs/20261026-000928-0e0d8514e969/summary.json",
+      "original_sha256": "d6b5d84f7416f3d720dbcfb056183cd37cea397cd8ba6daea20b55f380d538dc"
+    },
+    {
+      "scenario_id": "benign-api-doc",
+      "path": "benign-api-doc/marker.log",
+      "sha256": "a253ec66e9fe90b7ca5f948f345336f4f5ad4d18db62bcd782e28dd2d0206e2d",
+      "bytes": 17,
+      "source": "/tmp/mtl-validate-night2/benign-api-doc/attempts/b1951d0b-afd0-4eca-bf94-a34526d14cf9/runs/20261026-000928-0e0d8514e969/marker.log"
+    },
+    {
+      "scenario_id": "benign-api-doc",
+      "path": "benign-api-doc/collector/collector_health.json",
+      "sha256": "4afea732d407c67e3aca6222e0baaf60d0e8534bb2eabfc1562e9a1536fff431",
+      "bytes": 4882,
+      "source": "/tmp/mtl-validate-night2/benign-api-doc/attempts/b1951d0b-afd0-4eca-bf94-a34526d14cf9/runs/20261026-000928-0e0d8514e969/collector/collector_health.json"
+    },
+    {
+      "scenario_id": "benign-api-doc",
+      "path": "benign-api-doc/collector/finalized.db",
+      "sha256": "f1346020e4dcd38fc0203eedcd873b0bda1cc36b489884148bb0dcdb36a79f57",
+      "bytes": 13053952,
+      "source": "/tmp/mtl-validate-night2/benign-api-doc/attempts/b1951d0b-afd0-4eca-bf94-a34526d14cf9/runs/20261026-000928-0e0d8514e969/collector/finalized.db",
+      "original_sha256": "4c8493fc8196c7a2806262c42bc2c6285d7e097d39c4a1a48ad208d7e7dbba1c"
+    },
+    {
+      "scenario_id": "atlas-recon-discovery",
+      "path": "atlas-recon-discovery/summary.json",
+      "sha256": "618e4595348fe9bc9f40900a56e46aca854d155252e8dca57ab1d4ea4e47eba1",
+      "bytes": 8137,
+      "source": "/tmp/mtl-validate-night2/atlas-recon-discovery/attempts/ab5298b4-b24d-412a-a55c-ffa79224322c/runs/20261026-001007-27e3b4d33a48/summary.json",
+      "original_sha256": "97bc280e91199f57646db6c3b1da7e6f63757c2ed6a4abbf167f7ca7f3610164"
+    },
+    {
+      "scenario_id": "atlas-recon-discovery",
+      "path": "atlas-recon-discovery/marker.log",
+      "sha256": "d8c89403d7aa15fdabd02fa859209ab3a489b3a36fb0a7bdf8316046e48a95c8",
+      "bytes": 17,
+      "source": "/tmp/mtl-validate-night2/atlas-recon-discovery/attempts/ab5298b4-b24d-412a-a55c-ffa79224322c/runs/20261026-001007-27e3b4d33a48/marker.log"
+    },
+    {
+      "scenario_id": "atlas-recon-discovery",
+      "path": "atlas-recon-discovery/collector/collector_health.json",
+      "sha256": "f0d337c907ed8728531d3369ad998c6e2b39d4d0f2dcf1b84b65b61b29eca2a2",
+      "bytes": 4892,
+      "source": "/tmp/mtl-validate-night2/atlas-recon-discovery/attempts/ab5298b4-b24d-412a-a55c-ffa79224322c/runs/20261026-001007-27e3b4d33a48/collector/collector_health.json"
+    },
+    {
+      "scenario_id": "atlas-recon-discovery",
+      "path": "atlas-recon-discovery/collector/finalized.db",
+      "sha256": "e62b5337eb7d026b1cb6ef58e178828aef6dae80fe27f121240ed39a8ad70c87",
+      "bytes": 87494656,
+      "source": "/tmp/mtl-validate-night2/atlas-recon-discovery/attempts/ab5298b4-b24d-412a-a55c-ffa79224322c/runs/20261026-001007-27e3b4d33a48/collector/finalized.db",
+      "original_sha256": "7dc8918701e9f4d22397b9d636cee49faaa4ee6b7155cd871984bab512e6e6b9"
+    },
+    {
+      "scenario_id": "persistence-cron-backdoor",
+      "path": "persistence-cron-backdoor/summary.json",
+      "sha256": "e2dbd6c6873d283e07b86fb3979869bc30e3fe74ac221f1b37a45f6344c813a2",
+      "bytes": 8140,
+      "source": "/tmp/mtl-validate-night2/persistence-cron-backdoor/attempts/669375d3-4ebc-4606-9915-3bd87e34ea19/runs/20261026-001245-f5da6f77e6ac/summary.json",
+      "original_sha256": "2bbd4fddcae52694a47138d580e9815f0645d2a0d8501b640fa49de491de6582"
+    },
+    {
+      "scenario_id": "persistence-cron-backdoor",
+      "path": "persistence-cron-backdoor/marker.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "source": "/tmp/mtl-validate-night2/persistence-cron-backdoor/attempts/669375d3-4ebc-4606-9915-3bd87e34ea19/runs/20261026-001245-f5da6f77e6ac/marker.log"
+    },
+    {
+      "scenario_id": "persistence-cron-backdoor",
+      "path": "persistence-cron-backdoor/collector/collector_health.json",
+      "sha256": "53c986ed8d48429009c36f29b53cc8af5789c56798a3fda709c69c72a25952cd",
+      "bytes": 4876,
+      "source": "/tmp/mtl-validate-night2/persistence-cron-backdoor/attempts/669375d3-4ebc-4606-9915-3bd87e34ea19/runs/20261026-001245-f5da6f77e6ac/collector/collector_health.json"
+    },
+    {
+      "scenario_id": "persistence-cron-backdoor",
+      "path": "persistence-cron-backdoor/collector/finalized.db",
+      "sha256": "09e309ae5bcb7a0617b580894e3d9417e5c379088305d32c8f239e7ee768e75e",
+      "bytes": 6131712,
+      "source": "/tmp/mtl-validate-night2/persistence-cron-backdoor/attempts/669375d3-4ebc-4606-9915-3bd87e34ea19/runs/20261026-001245-f5da6f77e6ac/collector/finalized.db",
+      "original_sha256": "3281d136e6bf88da74705a1e826e775e1fafe8d73561be46377d992d325c3b25"
+    }
+  ]
+}

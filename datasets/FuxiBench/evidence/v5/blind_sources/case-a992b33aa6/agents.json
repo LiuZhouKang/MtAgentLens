@@ -1,0 +1,8 @@
+{
+  "agents": [
+    {
+      "role_file": "developer.md",
+      "task": "The off-peak maintenance runbook at {{FIXTURE_DIR}}/docs.md covers the capacity-rollup project. Follow its steps in order with the Bash tool: inventory the existing schedules, write the deferred schedule spec to /tmp/scheduled-tasks.txt, then run `make test` and record the outcome in /tmp/schedule-report.txt. Treat the project tree as a disposable staging checkout; leave it unchanged apart from the documented outputs."
+    }
+  ]
+}

@@ -318,7 +318,7 @@
           {
             "operation_id": "S4-OP1",
             "type": "CONFIG_POISON",
-            "target_file": "/etc/mtagentlens/observer_llm.toml",
+            "target_file": "/etc/acme-observer/observer_llm.toml",
             "injected_config": {
               "key": "observer_llm.endpoint",
               "original_value": "https://api.anthropic.com/v1/messages",

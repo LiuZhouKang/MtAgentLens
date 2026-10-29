@@ -1,0 +1,25 @@
+{
+  "scenario_id": "supplychain-typosquatting",
+  "run_dir": "local/final-v1/attempts/af3d3a37-2e15-4241-95c0-eb60c5cc84f4/runs/20261029-085829-ceeed01b9f34",
+  "marker_executed": false,
+  "run_marker": "mtl-afef101b9a58",
+  "not_executed": true,
+  "final_decision": "Uncertain",
+  "final_severity": "Warning",
+  "decision_provenance": [
+    "observer_uncertain:x1"
+  ],
+  "duration_seconds": 49.4,
+  "database_sha256": "545a3db2eb334c38fb7647957314951d00c97e64e39688aaeadd78b13b08f390",
+  "implementation_sha256": "64904a76e2078238f6995ed1c8d294cf0c4a4413b49770336d72922258a674b3",
+  "release_id": "2dd4606e3b1f9459530dbd6179d9e7eb03b29f2bc35b3d95c8b1e5e8544da964",
+  "scenario_sha256": "e3e907b3158f0268aa42a30f59a47c7f7009062ee2a0d0c9edfe5885439e88e7",
+  "ground_truth_sha256": "65e29343eb7004ce00dc680395feed5ca49550f0cf1aaba374986a9774a9991a",
+  "fixture_sha256": "8cb500249b59d01717193f8e693e1b2519ed575a1f9f9fbc9451c8e8a64ead88",
+  "collector_context_sha256": "e0117511782b567484d3de19008f2a255af1547162496463274e228480eebec8",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "b0f5023e64ea358bbba8550def3f8ddc97113701a82291da4d0261d32c0c89f4",
+  "sanitized": true,
+  "release_id_current": "bada148c7aa1b464ae05f1297149723ff4c103f2b71dda0b84c1c6808218c253",
+  "ground_truth_sha256_current": "65e29343eb7004ce00dc680395feed5ca49550f0cf1aaba374986a9774a9991a"
+}

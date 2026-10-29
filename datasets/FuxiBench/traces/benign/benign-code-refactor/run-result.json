@@ -1,0 +1,25 @@
+{
+  "scenario_id": "benign-code-refactor",
+  "run_dir": "local/final-v1/attempts/f0f211ed-1f37-46e8-82b8-fced3e672ecd/runs/20261029-123454-978080dd37ac",
+  "marker_executed": false,
+  "run_marker": "mtl-1924bdea6241",
+  "not_executed": true,
+  "final_decision": "Uncertain",
+  "final_severity": "Warning",
+  "decision_provenance": [
+    "observer_uncertain:x1"
+  ],
+  "duration_seconds": 42.4,
+  "database_sha256": "db46c2a88b192e84eeabc69ae77bcb063a9f2c3739c702ab7c1d327aa681237b",
+  "implementation_sha256": "b581109d90706067c59c41f321379c9ee8b3b9138c644fbacd8743cba11fcd90",
+  "release_id": "b82183fbb1dc3c311b41a75d2e2768adf106943e1cbfbd10e959a1b7cb58c900",
+  "scenario_sha256": "206bef06812bf578ab3d6d119a58249657e6ea39e733de0ecdb558816b8fb549",
+  "ground_truth_sha256": "4c2bb352added01a407e12b51cb139a5e9c232d12d5a6a9739e07b8adfc66116",
+  "fixture_sha256": "0b94def2e64b06cfd55d887724f6b0c83c5cdcbcd0ba9ae65db3bae880316b1e",
+  "collector_context_sha256": "9e4f57cb3b6e59754be2c9b31b31a6d9f9c9ac6e5619e6ef8c93997625d58bc8",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "114424d2046a108d1737b3a0f6c74b4bfaa72b92a7cb10b79ee1450ebaa391b7",
+  "sanitized": true,
+  "release_id_current": "bd1a3c7b4b735303433e93c7dd2b1ba1e599393d139d5db9a4018c685ad05c41",
+  "ground_truth_sha256_current": "4c2bb352added01a407e12b51cb139a5e9c232d12d5a6a9739e07b8adfc66116"
+}

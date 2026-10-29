@@ -9,6 +9,7 @@ from typing import Mapping, Protocol
 
 class BoundaryType(str, Enum):
     RESOURCE = "ResourceBoundary"
+    NETWORK = "NetworkBoundary"
     CONTENT = "ContentBoundary"
     DELEGATION = "DelegationBoundary"
     EXEC_ARG = "ExecArgBoundary"
@@ -34,6 +35,10 @@ class ExpectedClaim:
     # Optional agent attribution (for identity ablation). When None,
     # agent matching is skipped (backward compatible).
     expected_agent_id: str | None = None
+    resource_patterns: tuple[str, ...] = ()
+    command_patterns: tuple[str, ...] = ()
+    content_patterns: tuple[str, ...] = ()
+    should_alert: bool = True
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "resource_substrings", tuple(self.resource_substrings))

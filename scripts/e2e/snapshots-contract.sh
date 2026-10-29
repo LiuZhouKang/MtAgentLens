@@ -20,7 +20,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BIN="$ROOT/collector/build/release/mtagentlens"
 [ -x "$BIN" ] || BIN="$ROOT/collector/build/debug/mtagentlens"
-SUDO_PASS="${MTAGENTLENS_SUDO_PASSWORD:-1}"
+SUDO_PASS="${MTAGENTLENS_SUDO_PASSWORD:-}"
 PORT="${SNAPSHOT_PORT:-7397}"
 RUN_ID="mtl-snapshot-$$"
 RUN_DIR="$ROOT/env/runs/$RUN_ID"

@@ -53,14 +53,14 @@ run_claude_target() { # run_claude_target <log> <out>
   # Direct stdiocap capture: the spike measures the kernel channel, not the
   # collector's logging path. It also avoids writing raw file bytes through
   # FileLogger. The runner's STATS parsing is covered by a unit test.
-  printf '%s\n' "${MTAGENTLENS_SUDO_PASSWORD:-1}" | sudo -S -p '' \
+  printf '%s\n' "${MTAGENTLENS_SUDO_PASSWORD:-}" | sudo -S -p '' \
     "$ROOT/bpftools/.output/bin/stdiocap" -p "$claude_pid" --all-fds --max-bytes 8192 \
     >"$log" 2>"$log.err" &
   local collector_pid=$!
   wait "$claude_pid" 2>/dev/null
   kill "$watchdog" 2>/dev/null
   sleep 3
-  printf '%s\n' "${MTAGENTLENS_SUDO_PASSWORD:-1}" | sudo -S -p '' kill -INT "$collector_pid" 2>/dev/null
+  printf '%s\n' "${MTAGENTLENS_SUDO_PASSWORD:-}" | sudo -S -p '' kill -INT "$collector_pid" 2>/dev/null
   wait "$collector_pid" 2>/dev/null
 }
 
@@ -69,7 +69,7 @@ run_openclaw_target() { # run_openclaw_target <log> <out>
   local pid
   pid="$(pgrep -f 'openclaw/dist/index.js gateway' | head -1)"
   [ -n "$pid" ] || { echo "no openclaw gateway" >"$out"; return 1; }
-  printf '%s\n' "${MTAGENTLENS_SUDO_PASSWORD:-1}" | sudo -S -p '' \
+  printf '%s\n' "${MTAGENTLENS_SUDO_PASSWORD:-}" | sudo -S -p '' \
     "$ROOT/bpftools/.output/bin/stdiocap" -p "$pid" --all-fds --max-bytes 8192 \
     >"$log" 2>"$log.err" &
   local collector_pid=$!
@@ -79,7 +79,7 @@ run_openclaw_target() { # run_openclaw_target <log> <out>
     --message "Use the exec tool to run this JavaScript: const fs=require('fs'); return fs.readFileSync('$FIXTURE','utf8');" \
     >"$out" 2>&1
   sleep 5
-  printf '%s\n' "${MTAGENTLENS_SUDO_PASSWORD:-1}" | sudo -S -p '' kill -INT "$collector_pid" 2>/dev/null
+  printf '%s\n' "${MTAGENTLENS_SUDO_PASSWORD:-}" | sudo -S -p '' kill -INT "$collector_pid" 2>/dev/null
   wait "$collector_pid" 2>/dev/null
 }
 

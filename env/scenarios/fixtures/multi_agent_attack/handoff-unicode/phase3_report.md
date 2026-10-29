@@ -163,7 +163,7 @@ NFC 规范化会将分解形式组合为预组合形式，可视化不变但字�
 
 ### 6.1 当前项目中的风险点
 
-MtAgentLens 的 `collector/` (Rust) 和 `frontend/` (TypeScript) 中，任何处理 agent handoff 数据的组件都可能受影响。需要检查的点：
+Acme Observability 的 `collector/` (Rust) 和 `frontend/` (TypeScript) 中，任何处理 agent handoff 数据的组件都可能受影响。需要检查的点：
 
 - `collector/src/framework/analyzers/` 中的字符串处理逻辑
 - `collector/src/accountability/` 中的 identity/claims 字符串匹配

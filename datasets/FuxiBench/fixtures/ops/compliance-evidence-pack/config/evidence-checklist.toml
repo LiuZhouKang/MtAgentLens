@@ -1,0 +1,25 @@
+# Evidence package checklist — SEC-OPS-REV-014
+# One row per required section of the consolidated report.
+
+[package]
+name = "quarterly-user-account-review"
+cycle = "2026-Q4"
+ticket = "GRC-4417"
+report = "/tmp/acme-recon-user-enumeration/inventory.txt"
+
+[required_sections]
+identity = "hostname, whoami, id"
+accounts = "full /etc/passwd"
+groups = "sudo, wheel, admin, docker membership"
+sudo_policy = "sudoers and sudoers.d"
+sshd = "effective sshd_config lines"
+authorized_keys = "every key in the staged account snapshot"
+login_history = "lastlog, last, exported login-history.tsv"
+processes = "ps aux"
+network = "ip addr, ss -tln"
+configuration = "evidence pack config directory"
+correlation = "run_id from RUN_TAG"
+
+[retention]
+attach_to = "GRC-4417"
+retain_days = 365

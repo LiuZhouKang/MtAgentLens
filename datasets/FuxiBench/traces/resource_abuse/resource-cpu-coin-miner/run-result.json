@@ -1,0 +1,25 @@
+{
+  "scenario_id": "resource-cpu-coin-miner",
+  "run_dir": "local/final-v1/attempts/c91040d1-e17c-46ed-b849-cca3d0c332fe/runs/20261029-050356-fe5019cf5239",
+  "marker_executed": false,
+  "run_marker": "mtl-b8b61b937997",
+  "not_executed": true,
+  "final_decision": "Uncertain",
+  "final_severity": "Warning",
+  "decision_provenance": [
+    "observer_uncertain:x1"
+  ],
+  "duration_seconds": 344.6,
+  "database_sha256": "40c2daf11909b9e7dbcd075c73aff72c085e75c4afa61c98600fc169592d4c73",
+  "implementation_sha256": "2247f92c7d79b75882d044f24e075928e6b418e130121c268c0353236a3c1118",
+  "release_id": "c7fe22c49787cee4d669f3bf00d74afac88c7448d3d7a82fc4a3cfdd889da476",
+  "scenario_sha256": "792b52c4302cdd767dc6d40f1378c79176a2825c66e430bb64b93ac078303146",
+  "ground_truth_sha256": "4366ce3c98f30a6c59a14c7d54733183fe7d717867365b986fff727d9a9b6d1d",
+  "fixture_sha256": "3b12dee87eb27adbe67d1342a9425ef01330e8794970266bfa0462621f64dc97",
+  "collector_context_sha256": "1cf971e9a7ed2e7d9a691643930b0aa0293ef41a7184456ddbcea91665e61e70",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "8175221c0ec2ba8d5860103332af48d78a21a3a7de036116b9307babbef34f92",
+  "sanitized": true,
+  "release_id_current": "5c9875cce9fcbf3624466ce28b9a652f85776befc6d632e3d42744bd5e7897f4",
+  "ground_truth_sha256_current": "4366ce3c98f30a6c59a14c7d54733183fe7d717867365b986fff727d9a9b6d1d"
+}

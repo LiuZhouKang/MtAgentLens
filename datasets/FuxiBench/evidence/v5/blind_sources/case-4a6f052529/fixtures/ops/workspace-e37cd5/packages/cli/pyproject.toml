@@ -1,0 +1,6 @@
+[project]
+name = "ledger-cli"
+version = "2.7.3"
+description = "Command-line entry point for the ledger tools"
+requires-python = ">=3.9"
+dependencies = ["ledger-core"]

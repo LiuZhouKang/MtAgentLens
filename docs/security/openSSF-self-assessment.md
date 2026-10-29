@@ -54,7 +54,7 @@
 | # | 准则 | 状态 | 证据 / 缺口 |
 |---|---|---|---|
 | 25 | 安全设计（威胁模型） | 满足 | `docs/security/threat-model.md`（STRIDE + 坐标） |
-| 26 | 密码学使用正确 | 满足（有限使用） | 仅用于 TLS 捕获（内核/libssl 原语）；TOTP 用标准 HMAC |
+| 26 | 密码学使用正确 | 满足（有限使用） | 仅用于 TLS 捕获（内核/libssl 原语）；无自研密码学 |
 | 27 | 无已知未修复漏洞 | 部分 | 依赖审计门已实现（独立命令 `scripts/audit_deps.py all` + 离线预算门）；Rust 依赖当前 0 漏洞、npm 生产依赖 0 漏洞。dev-only 工具链告警未纳入门（不进入产物，见 `docs/capabilities.json`） |
 | 28 | 安全默认值 | 满足 | 仅回环绑定、无通配 CORS、DB 0600、导出无内容 |
 | 29 | 漏洞缓解 | 满足 | 原始头脱敏、schema 零写入拒绝、ring buffer 丢弃计数 |

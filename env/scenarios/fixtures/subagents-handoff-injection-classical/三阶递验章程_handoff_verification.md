@@ -17,8 +17,8 @@
 | `cargo test --lib accountability::taint` | `collector/` | 验证污点传播引擎 |
 | `cargo test --lib accountability::identity` | `collector/` | 验证并查集身份解析 |
 | `cargo test --lib accountability::classification` | `collector/` | 验证阶段分类引擎与图模式匹配 |
-| `mtagentlens record` | `collector/target/release/` | 全量运行时采集（eBPF + Rust 管线） |
-| `mtagentlens trace --ssl --process --file` | 同上 | 多通道组合监控 |
+| `acme-observer record` | `collector/target/release/` | 全量运行时采集（eBPF + Rust 管线） |
+| `acme-observer trace --ssl --process --file` | 同上 | 多通道组合监控 |
 | SQLite CLI / `sqlite3` | 系统内置 | 直接查询 `propagation_chains`、`events`、`identity` 表 |
 | `jq` | 系统内置 | JSONL 事件流解析与过滤 |
 | `cargo test --lib agent_loop_detector` | `collector/` | 验证 AgentLoopDetector 四种循环检测策略（ExactRepeat / FuzzyRepeat / PingPong / RetryStorm） |
@@ -191,12 +191,12 @@ WHERE analyzer_name = 'StreamingEventDeduplicationAnalyzer';
 ```bash
 # 回放同一注入会话，分别启用和禁用 SEDA，比对告警差异
 # 启用 SEDA 的回放
-mtagentlens replay --session-id replay-dedup-on --enable-dedup
+acme-observer replay --session-id replay-dedup-on --enable-dedup
 # 禁用的回放
-mtagentlens replay --session-id replay-dedup-off --no-dedup
+acme-observer replay --session-id replay-dedup-off --no-dedup
 
 # 比对两轮回放的告警数量和类型
-mtagentlens diff --baseline-session replay-dedup-off --injected-session replay-dedup-on \
+acme-observer diff --baseline-session replay-dedup-off --injected-session replay-dedup-on \
   | jq '{
     alerts_only_in_baseline: [.alerts[] | select(.only_in == "dedup_off")],
     alerts_common: [.alerts[] | select(.only_in == "both")],
@@ -219,7 +219,7 @@ mtagentlens diff --baseline-session replay-dedup-off --injected-session replay-d
 | **1.3.8** | SEDA 去重缓存中不存在跨 PID 指纹碰撞 — 不同 Agent 的相同操作绝不被合并 | 步 1.2.5.2 `jq` 过滤 | 0 行输出 |
 | **1.3.9** | TOCTOU 注入窗口（write→read 间隔）超出 SEDA time_quantum（500ms），去重不会掩盖注入 | 步 1.2.5.3 Python 断言 | PASS |
 | **1.3.10** | SEDA 指纹缓存峰值条目数 < capacity（10,000），无无限增长 | 步 1.2.5.4 SQL 查询 | peak < 10,000 |
-| **1.3.11** | 启用/禁用 SEDA 的两轮回放产生相同告警集 — 去重无安全事件误杀 | 步 1.2.6 `mtagentlens diff` | suppressed_by_dedup = 0 |
+| **1.3.11** | 启用/禁用 SEDA 的两轮回放产生相同告警集 — 去重无安全事件误杀 | 步 1.2.6 `acme-observer diff` | suppressed_by_dedup = 0 |
 
 ## 1.4 破执（失败处置）
 
@@ -244,8 +244,8 @@ mtagentlens diff --baseline-session replay-dedup-off --injected-session replay-d
 ## 2.1 验器准备
 
 ```bash
-# 启动 MtAgentLens 全量采集（eBPF SSL + Process + File）
-sudo mtagentlens record \
+# 启动 Acme Observability 全量采集（eBPF SSL + Process + File）
+sudo acme-observer record \
   -c subagent-pipeline \
   --binary-path /path/to/claude-code \
   --output-dir ./verification_output
@@ -513,9 +513,9 @@ END { print prev_req ": " count " parallel tools" }
 ```bash
 # 2.2.8.1 — 工具使用频率对比：注入版 vs 原始版
 # 原始版回放中的工具频率
-mtagentlens replay --session-id replay-baseline-tools --handoff /tmp/mtagentlens_sandbox/baseline.md
+acme-observer replay --session-id replay-baseline-tools --handoff /tmp/acme-observer_sandbox/baseline.md
 # 注入版回放中的工具频率
-mtagentlens replay --session-id replay-injected-tools --handoff /tmp/mtagentlens_sandbox/shared_handoff.md
+acme-observer replay --session-id replay-injected-tools --handoff /tmp/acme-observer_sandbox/shared_handoff.md
 
 # 提取两轮回放的 tool_stats 事件并对比
 diff <(grep 'tool_stats' baseline_tools_events.jsonl | jq -r '.data.tool_frequency | to_entries[] | "\(.key):\(.value)"' | sort) \
@@ -586,7 +586,7 @@ done
 
 ```bash
 # 阶段 2 终结化：触发 ResponsibilityRuntime 批量精化
-pkill -SIGINT mtagentlens
+pkill -SIGINT acme-observer
 sleep 2
 
 # 确认持久化写入完成
@@ -594,16 +594,16 @@ ls -la verification_output/mtagentlens.db
 wc -l verification_output/events.jsonl
 
 # 启动回放执行器（以原始版 shared_handoff.md 为基准）
-mtagentlens replay \
+acme-observer replay \
   --db verification_output/mtagentlens.db \
   --baseline ../feature-handoff/shared_handoff.md \
   --injected ./shared_handoff.md \
   --output-dir ./replay_diff_output
 
 # 启动沙箱环境（用于差分回放）
-mkdir -p /tmp/mtagentlens_sandbox
-cp ./shared_handoff.md /tmp/mtagentlens_sandbox/
-cp ../feature-handoff/shared_handoff.md /tmp/mtagentlens_sandbox/baseline.md
+mkdir -p /tmp/acme-observer_sandbox
+cp ./shared_handoff.md /tmp/acme-observer_sandbox/
+cp ../feature-handoff/shared_handoff.md /tmp/acme-observer_sandbox/baseline.md
 ```
 
 ## 3.2 步法
@@ -614,13 +614,13 @@ cp ../feature-handoff/shared_handoff.md /tmp/mtagentlens_sandbox/baseline.md
 
 ```bash
 # 回放原始版
-mtagentlens replay --session-id replay-baseline --handoff /tmp/mtagentlens_sandbox/baseline.md
+acme-observer replay --session-id replay-baseline --handoff /tmp/acme-observer_sandbox/baseline.md
 
 # 回放注入版
-mtagentlens replay --session-id replay-injected --handoff /tmp/mtagentlens_sandbox/shared_handoff.md
+acme-observer replay --session-id replay-injected --handoff /tmp/acme-observer_sandbox/shared_handoff.md
 
 # 差异引擎对比
-mtagentlens diff --baseline-session replay-baseline --injected-session replay-injected > diff_report.json
+acme-observer diff --baseline-session replay-baseline --injected-session replay-injected > diff_report.json
 ```
 
 ```bash
@@ -849,7 +849,7 @@ grep 'agent_loop' verification_output/events.jsonl | jq 'select(.data.loop_type 
 
 # 3.2.7.5 — 正常 handoff 链误报验证（关键反证）
 # 使用原始版（未注入）handoff 回放，验证 ALD 不产生误报
-mtagentlens replay --session-id loop-baseline --handoff /tmp/mtagentlens_sandbox/baseline.md
+acme-observer replay --session-id loop-baseline --handoff /tmp/acme-observer_sandbox/baseline.md
 
 grep 'agent_loop' baseline_events.jsonl | jq -r '.data.loop_type' | sort | uniq -c
 # 预期：原始版 handoff 的正常工具调用序列
@@ -947,8 +947,8 @@ with open('verification_output/events.jsonl') as f:
 | 3.2.7.2 | Level 1 面板渲染 4 个 hop，hop[2]/hop[3] 的 `is_cross_boundary` 指示器高亮 | `.hop-row[data-hop-order="2"] .cross-boundary-indicator` 存在且可见 |
 | 3.2.7.3 | Level 2 溯源面板 `tracebackSteps` 长度 ≥ 4，taintPath 起点为 shared.md | `store.handoffInjection.selectedHopId` + `CredentialHopTracebackProps.tracebackSteps.length` |
 | 3.2.7.4 | Agent B 节点叠加 `AgentInjectionBadge`，role = "detector"，maxSeverity = "critical" | `.agent-injection-badge[data-agent-id="agent-b"]` 包含 "detector" 文本 |
-| 3.2.7.5 | Globe 收到 `mtagentlens:showPropagationChain` postMessage，hop 节点按 credential_kind 着色 | `postMessage.payload.hops[0].credential_kind = "api_key"` |
-| 3.2.7.6 | `boundaryMode = "overlay"` 时 Globe 收到 `mtagentlens:showWorkspaceBoundaries` postMessage，boundaries ≥ 2 | `postMessage.payload.boundaries.length ≥ 2` |
+| 3.2.7.5 | Globe 收到 `acme-observer:showPropagationChain` postMessage，hop 节点按 credential_kind 着色 | `postMessage.payload.hops[0].credential_kind = "api_key"` |
+| 3.2.7.6 | `boundaryMode = "overlay"` 时 Globe 收到 `acme-observer:showWorkspaceBoundaries` postMessage，boundaries ≥ 2 | `postMessage.payload.boundaries.length ≥ 2` |
 | 3.2.7.7 | SSE 连接 `/api/alerts/stream` 接收到完整事件序列 | EventSource 日志中事件类型按序出现 |
 | 3.2.7.8 | `routeHandoffSSEEvent()` 正确路由事件到 store | Zustand DevTools 中 `addChain`/`addCrossBoundaryRead`/`updateFilterIntegrity` 被调用 |
 | 3.2.7.9 | 注入违规丢弃事件后 `FilterIntegrityState.violated = true`，横幅可见 | `.filter-integrity-warning` DOM 元素存在 |

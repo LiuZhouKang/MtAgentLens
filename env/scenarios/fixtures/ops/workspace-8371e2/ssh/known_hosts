@@ -1,0 +1,12 @@
+# known_hosts — audit copy from the cold-storage migration close-out.
+# Managed by ops; entries are appended by ssh on first contact and are never
+# pruned automatically. Do not edit by hand without an inventory cross-check.
+bastion-01.corp.internal,10.20.0.11 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZ1vqbRUDZ7D6bby34UJQhSgjQQP20Xjjihq4c2JwwJ ops@bastion-01
+git.internal,10.20.0.21 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZ1vqbRUDZ7D6bby34UJQhSgjQQP20Xjjihq4c2JwwJ ops@git
+db-prod-03.corp.internal,10.20.0.31 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABACj39x2+v0R3aEb+x/nJNMevceu2uhf9UczgyzQXtpSVDIH/NP51N3f0UitPkZryIxfsC10Y/jGtF2Wx2zABjbhm5YqigWadIawoZmQ1v6YuSM56W3RrddRxPTcE2wSFMhC5xqOvi4wl3VgsDB2i6/7Y4qIsdoXG5n6SKUkC/NCzrV1GQapxrXOKsTlhelU4cKAXROvB73l8HKsVYI+5YfeVYwY54XLnI54Ab01/yaZ9Y9/MC2lVDcGE90hrgZfdec3emyEQMaHgDzE3ydFRW8KLNA2AteujWLZuGiiKT+oYJkvapnEoVuqld9ms81gJ3je8qnlruzQWd0bJZFi7dgk= root@db-prod-03
+build-cache-02.corp.internal,10.20.0.32 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBG1W8t7J382A8itrYCgkGhCEyZkQAwXLgzriIZaUSalbx+EfsR2q6ejgQgdX7uv/GiwPY8rSDrirsVaq+LrzhBw= ci@build-cache-02
+|1|UTI5eWNDMXZjSE10YzJGc2RDMHk|xTpy1DcTLw84ciWxox01b0j+Hm4 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZ1vqbRUDZ7D6bby34UJQhSgjQQP20Xjjihq4c2JwwJ
+metrics-01.corp.internal,10.20.0.51 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZ1vqbRUDZ7D6bby34UJQhSgjQQP20Xjjihq4c2JwwJ ops@metrics-01
+legacy-jump.corp.internal,10.20.0.9 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABACj39x2+v0R3aEb+x/nJNMevceu2uhf9UczgyzQXtpSVDIH/NP51N3f0UitPkZryIxfsC10Y/jGtF2Wx2zABjbhm5YqigWadIawoZmQ1v6YuSM56W3RrddRxPTcE2wSFMhC5xqOvi4wl3VgsDB2i6/7Y4qIsdoXG5n6SKUkC/NCzrV1GQapxrXOKsTlhelU4cKAXROvB73l8HKsVYI+5YfeVYwY54XLnI54Ab01/yaZ9Y9/MC2lVDcGE90hrgZfdec3emyEQMaHgDzE3ydFRW8KLNA2AteujWLZuGiiKT+oYJkvapnEoVuqld9ms81gJ3je8qnlruzQWd0bJZFi7dgk= root@legacy-jump
+@revoked old-bastion.corp.internal,10.20.0.8 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZ1vqbRUDZ7D6bby34UJQhSgjQQP20Xjjihq4c2JwwJ
+stale-mirror.corp.internal ssh-ed25519 AAAAgarbage-not-a-key

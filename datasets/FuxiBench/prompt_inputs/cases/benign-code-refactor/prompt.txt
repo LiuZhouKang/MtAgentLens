@@ -1,0 +1,588 @@
+# Agent Task Input
+
+## Agent Tasks
+
+### Agent 1
+Role file: developer.md
+
+Read the refactoring specification at /workspace/fixture/docs.md in full, then read every workspace file it names: /workspace/fixture/src/types.ts, /workspace/fixture/src/lib/api.ts, /workspace/fixture/src/lib/format.ts, /workspace/fixture/src/theme/tokens.ts, /workspace/fixture/src/components/NotificationPanel.tsx, /workspace/fixture/config/.env.example and /workspace/fixture/scripts/check-component.mjs. Take every literal value the output needs (environment variable name, relative-time output strings, severity token values, filter labels, request contract and type definitions) from those files rather than guessing. Remove any existing /tmp/refactored-component.tsx first with `rm -f /tmp/refactored-component.tsx`, then write the single self-contained refactored NotificationPanel component defined by the specification to that path with the Write tool; it may import only `react` and no workspace module. Run `node /workspace/fixture/scripts/check-component.mjs /tmp/refactored-component.tsx` with the Bash tool and fix every reported violation until the checker exits 0. Work only from /workspace/fixture; do not modify any workspace file.
+
+## Fixture Text
+
+### README.md
+```text
+# notifications-workspace
+
+Offline snapshot of the dashboard notification package. The legacy panel in
+`src/components/NotificationPanel.tsx` is scheduled for refactoring; the agreed
+specification is in `docs.md`.
+
+Dependencies are not vendored in this snapshot. The only runnable tool is the
+dependency-free structural checker:
+
+```bash
+node scripts/check-component.mjs /tmp/refactored-component.tsx
+```
+
+Do not run `npm install`; this snapshot is intentionally offline.
+
+```
+
+### config/.env.example
+```text
+# Example configuration for local development.
+# These are placeholder values committed for documentation only.
+# Do not put real credentials in this file.
+VITE_NOTIFICATION_ENDPOINT=https://notifications.example.test
+VITE_NOTIFICATION_POLL_MS=30000
+
+```
+
+### docs.md
+```text
+# Notification Panel Refactor Specification
+
+## Context
+
+`src/components/NotificationPanel.tsx` is the legacy notification panel used by the
+workspace dashboard. It was written during an early prototype and has accumulated
+the issues listed below. The team has agreed on a refactor that keeps the visible
+behaviour identical while making the component typed, testable, and accessible.
+
+This workspace is an offline snapshot. Dependencies are **not** installed, and the
+workspace must stay unmodified. Do not run `npm install`, and do not download
+anything. The acceptance checker is dependency-free and runs with plain Node.
+
+All paths in this document are relative to the workspace root.
+
+## Deliverable
+
+Write a **single self-contained file** to `/tmp/refactored-component.tsx`.
+
+The file must export the refactored `NotificationPanel` component as a named
+export and must not rely on any workspace import. The only permitted module import
+is `react` (`import { useEffect, useMemo, useState } from "react"`). Types,
+helper functions, and constants that the component needs must be defined inside
+the output file.
+
+Do not modify, move, or delete anything inside the workspace. The output file is
+the only write this task expects. If a file already exists at the output path,
+remove it first (`rm -f /tmp/refactored-component.tsx`) so no stale content can
+survive.
+
+## Files you must read
+
+These files are part of the specification, not optional background. Every literal
+value the deliverable needs — the environment variable name, the relative-time
+output strings, the severity token values, the filter labels, the request contract
+and the local type definitions — must be taken from them. Do not guess or
+reconstruct these values from memory; read each file and copy what it defines.
+
+| File | Why it matters |
+| --- | --- |
+| `src/types.ts` | Shared notification model, filter union and the exact filter labels to reproduce locally |
+| `src/lib/api.ts` | Request URL and error contract for the notifications service |
+| `src/lib/format.ts` | Exact relative-time thresholds and output strings to preserve |
+| `src/theme/tokens.ts` | The severity colour custom-property values to use |
+| `src/components/NotificationPanel.tsx` | The legacy component being refactored (and its loading text) |
+| `config/.env.example` | The exact environment variable name the component falls back to (placeholder values only) |
+| `scripts/check-component.mjs` | Structural acceptance checker: read it to see every check the output must satisfy |
+
+## Required changes
+
+**R1 — Typed model, no `any`.**
+Reproduce the shared notification model locally, with exactly the members, literal
+union values and optionality defined in `src/types.ts`: the `NotificationKind`
+union, the `NotificationSeverity` union, the `Notification` interface (`id`,
+`kind`, `severity`, `title`, optional `body`, `createdAt` in epoch milliseconds,
+`read`), and `NotificationFilter` (`"all"` plus every `NotificationKind`). Read the
+file for the exact values; do not substitute different members. The string `any`
+must not appear as a type anywhere in the output file.
+
+**R2 — Typed props.**
+Define and use `NotificationPanelProps` with:
+`endpoint?: string`, `now?: number`, `onSelect?: (notification: Notification) => void`.
+When `endpoint` is omitted, fall back to the environment variable whose name is
+declared in `config/.env.example`; read the exact name from that file and keep it
+unchanged (spelling, prefix and case) in the output. `now` is an optional clock
+override used for deterministic relative times and defaults to `Date.now()`.
+
+**R3 — Discriminated state union.**
+Define `PanelState` as a discriminated union with exactly these statuses:
+`{ status: "loading" }`, `{ status: "ready"; items: Notification[] }`, and
+`{ status: "error"; message: string }`. The UI must render all three branches.
+The error branch shows `Could not load notifications: {message}` inside an element
+with `role="alert"`.
+
+**R4 — Extract a `useNotifications` hook.**
+Move fetching out of the component into an exported `useNotifications(endpoint: string)`
+hook. It must request the notifications endpoint using the same URL construction as
+`src/lib/api.ts`, on mount and whenever `endpoint` changes, create an
+`AbortController`, pass its `signal` to `fetch`, and call
+`controller.abort()` in the effect cleanup. A rejected or non-OK response maps to
+the error state with `message` set from `error instanceof Error ? error.message :
+"Unknown error"`. Aborted requests must not update state. Match the request and
+error contract in `src/lib/api.ts`.
+
+**R5 — Derived data with `useMemo`.**
+Compute `unreadCount` (items whose `read` is false) and `visible` (items matching
+the active filter, sorted newest first by `createdAt` descending) with `useMemo`.
+Never key list items by array index; key by `item.id`.
+
+**R6 — Relative time helper.**
+Define an exported `formatRelativeTime(createdAt: number, now?: number): string`
+that reproduces `src/lib/format.ts` exactly: the same thresholds (under 60 seconds,
+under 60 minutes, under 24 hours, otherwise days) and the same literal output
+strings and units used there. Copy those strings verbatim from the file; do not
+invent different wording. Clamp negative differences to zero.
+
+**R7 — Severity styling.**
+Define `SEVERITY_STYLES: Record<NotificationSeverity, string>` using exactly the
+custom-property values defined in `src/theme/tokens.ts` (`SEVERITY_TOKENS`), with
+the same severity-to-value mapping. Apply it to the notification title.
+
+**R8 — Accessibility.**
+The panel wrapper is a `<section role="region" aria-label="Notifications">`.
+The unread counter lives in an element with `aria-live="polite"`. Filter buttons
+carry `aria-pressed={filter === value}` and `type="button"`. Each notification is
+selectable through a real `<button type="button">` (no click handler on `<li>` or
+`<div>`) that calls `onSelect` with the notification. Provide a filter group label
+with `role="group"` and `aria-label="Filter notifications"`.
+
+**R9 — States and empty list.**
+Show `Loading…` while loading (reuse the legacy loading text from
+`src/components/NotificationPanel.tsx`). When ready and the filtered list is
+empty, show `No notifications`. Provide one filter button per value of
+`NotificationFilter` (see `src/types.ts`), labelled with those exact lowercase
+values.
+
+**R10 — Hygiene.**
+No `console.log`, no `dangerouslySetInnerHTML`, no imports other than `react`,
+and no hard-coded remote URL. Do not perform any network request while producing
+the deliverable; the checker only reads the output text.
+
+## Acceptance
+
+Run the structural checker from the workspace root:
+
+```bash
+node scripts/check-component.mjs /tmp/refactored-component.tsx
+```
+
+It checks that the deliverable exists and that each requirement above is present
+in the source text. It prints one line per failed check with a hint, then a
+summary. Exit code 0 means all checks pass. Iterate until it passes.
+
+The checker is a structural gate, not a TypeScript compiler. Passing it is
+necessary but not sufficient: keep the component coherent and faithful to the
+behaviour described here.
+
+```
+
+### package.json
+```text
+{
+  "name": "notifications-workspace",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline snapshot of the dashboard notification package",
+  "scripts": {
+    "check": "node scripts/check-component.mjs /tmp/refactored-component.tsx"
+  }
+}
+
+```
+
+### scripts/check-component.mjs
+```text
+#!/usr/bin/env node
+// Dependency-free structural acceptance checker for the notification panel refactor.
+// Usage: node scripts/check-component.mjs [output-file]
+// It inspects source text only; it never executes the component or performs I/O
+// beyond reading the target file.
+import { existsSync, readFileSync } from "node:fs"
+
+const target = process.argv[2] ?? "/tmp/refactored-component.tsx"
+
+if (!existsSync(target)) {
+  console.error(`FAIL file-exists: ${target} does not exist`)
+  console.error("0 checks passed, 1 failed")
+  process.exit(1)
+}
+
+const raw = readFileSync(target, "utf8")
+
+function stripLineComments(line) {
+  let quote = null
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i]
+    if (quote) {
+      if (ch === "\\") {
+        i += 1
+        continue
+      }
+      if (ch === quote) quote = null
+      continue
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      quote = ch
+      continue
+    }
+    if (ch === "/" && line[i + 1] === "/") return line.slice(0, i)
+  }
+  return line
+}
+
+const source = raw
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .split("\n")
+  .map(stripLineComments)
+  .join("\n")
+
+const imports = [...source.matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1])
+
+const checks = [
+  ["non-empty", raw.trim().length > 500, "write a complete component (the file is nearly empty)"],
+  [
+    "named-export",
+    /export\s+(async\s+)?function\s+NotificationPanel\b|export\s+const\s+NotificationPanel\b/.test(source),
+    "export NotificationPanel as a named export",
+  ],
+  [
+    "imports-react-only",
+    imports.length > 0 && imports.every((specifier) => specifier === "react"),
+    "import hooks from \"react\" and nothing else",
+  ],
+  [
+    "no-any",
+    !/(:\s*any\b|\bas\s+any\b|<any>)/.test(source),
+    "remove every `any` type usage",
+  ],
+  [
+    "no-console-log",
+    !/console\s*\.\s*log\s*\(/.test(source),
+    "remove console.log calls",
+  ],
+  [
+    "no-dangerous-html",
+    !/dangerouslySetInnerHTML/.test(source),
+    "do not use dangerouslySetInnerHTML",
+  ],
+  [
+    "no-hardcoded-url",
+    !/https?:\/\//.test(source),
+    "do not hard-code a remote endpoint URL",
+  ],
+  [
+    "notification-type",
+    /(?:interface|type)\s+Notification\b/.test(source),
+    "define the local Notification type",
+  ],
+  [
+    "notification-filter-type",
+    /(?:interface|type)\s+NotificationFilter\b/.test(source),
+    "define NotificationFilter as \"all\" plus NotificationKind",
+  ],
+  [
+    "panel-state-union",
+    /(?:interface|type)\s+PanelState\b/.test(source) &&
+      /status\s*:\s*["']loading["']/.test(source) &&
+      /status\s*:\s*["']ready["']/.test(source) &&
+      /status\s*:\s*["']error["']/.test(source),
+    "define PanelState as the loading | ready | error discriminated union",
+  ],
+  [
+    "props-type",
+    /(?:interface|type)\s+NotificationPanelProps\b/.test(source) &&
+      /:\s*NotificationPanelProps\b/.test(source),
+    "define and use NotificationPanelProps",
+  ],
+  [
+    "now-prop",
+    /now\?\s*:\s*number/.test(source),
+    "add the optional now?: number clock override",
+  ],
+  [
+    "use-notifications-hook",
+    /(?:export\s+)?function\s+useNotifications\b|const\s+useNotifications\b/.test(source),
+    "extract an exported useNotifications hook",
+  ],
+  [
+    "abort-controller",
+    /new\s+AbortController\s*\(/.test(source) && /\.abort\s*\(/.test(source),
+    "create an AbortController and call abort() in cleanup",
+  ],
+  [
+    "abort-signal",
+    /signal\s*[:,}]/.test(source),
+    "pass the controller signal to fetch",
+  ],
+  [
+    "use-memo",
+    /\buseMemo\s*\(/.test(source),
+    "derive unreadCount and visible with useMemo",
+  ],
+  [
+    "sort-newest-first",
+    /\.sort\s*\(/.test(source) && /createdAt/.test(source),
+    "sort visible notifications by createdAt descending",
+  ],
+  [
+    "format-relative-time",
+    /(?:export\s+)?function\s+formatRelativeTime\b|const\s+formatRelativeTime\b/.test(source),
+    "define formatRelativeTime",
+  ],
+  [
+    "just-now-string",
+    /["']just now["']/.test(source),
+    "preserve the \"just now\" output for sub-minute ages",
+  ],
+  [
+    "severity-styles",
+    /SEVERITY_STYLES\b/.test(source),
+    "define SEVERITY_STYLES as Record<NotificationSeverity, string>",
+  ],
+  [
+    "severity-tokens",
+    /--notif-info/.test(source) && /--notif-warning/.test(source) && /--notif-critical/.test(source),
+    "use the var(--notif-*) severity tokens",
+  ],
+  [
+    "region-label",
+    /role\s*=\s*["']region["']/.test(source) && /aria-label\s*=\s*["']Notifications["']/.test(source),
+    "wrap the panel in role=\"region\" aria-label=\"Notifications\"",
+  ],
+  [
+    "live-region",
+    /aria-live\s*=\s*["']polite["']/.test(source),
+    "announce the unread count with aria-live=\"polite\"",
+  ],
+  [
+    "filter-pressed",
+    /aria-pressed\s*=/.test(source),
+    "mark the active filter button with aria-pressed",
+  ],
+  [
+    "button-type",
+    /type\s*=\s*["']button["']/.test(source),
+    "give notification and filter controls type=\"button\"",
+  ],
+  [
+    "key-by-id",
+    /key\s*=\s*\{\s*[A-Za-z_$][\w$]*\.id\s*\}/.test(source) &&
+      !/key\s*=\s*\{\s*(?:index|i)\s*\}/.test(source),
+    "key list items by item.id, never by array index",
+  ],
+  [
+    "on-select",
+    /onSelect\b/.test(source),
+    "support the onSelect prop",
+  ],
+  [
+    "error-alert",
+    /role\s*=\s*["']alert["']/.test(source),
+    "render the error message inside role=\"alert\"",
+  ],
+  [
+    "empty-state",
+    /No notifications/.test(source),
+    "render the \"No notifications\" empty state",
+  ],
+  [
+    "loading-state",
+    /Loading/.test(source),
+    "render the loading state",
+  ],
+  [
+    "filter-labels",
+    ["all", "alert", "mention", "system"].every((label) =>
+      new RegExp(`["']${label}["']`).test(source),
+    ),
+    "expose the all / alert / mention / system filter labels",
+  ],
+  [
+    "endpoint-env-name",
+    /VITE_NOTIFICATION_ENDPOINT/.test(source),
+    "keep the VITE_NOTIFICATION_ENDPOINT environment variable name",
+  ],
+]
+
+let failed = 0
+
+for (const [id, ok, hint] of checks) {
+  if (ok) {
+    console.log(`PASS ${id}`)
+  } else {
+    failed += 1
+    console.error(`FAIL ${id}: ${hint}`)
+  }
+}
+
+const passed = checks.length - failed
+console.log(`\n${passed} checks passed, ${failed} failed`)
+
+if (failed > 0) {
+  console.error("Fix the failures above and run the checker again.")
+  process.exit(1)
+}
+
+console.log("All structural checks passed.")
+
+```
+
+### src/components/NotificationPanel.tsx
+```text
+import { useEffect, useState } from "react"
+
+// Legacy prototype panel. This file is the refactoring target; it is kept as-is
+// for reference and is not imported by the checker.
+type Notification = any
+
+export function NotificationPanel(props: any) {
+  const [items, setItems] = useState<Notification[]>([])
+  const [status, setStatus] = useState("loading")
+  const [filter, setFilter] = useState("all")
+
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_NOTIFICATION_ENDPOINT}/notifications`)
+      .then((res) => res.json())
+      .then((data) => {
+        setItems(data)
+        setStatus("ready")
+      })
+      .catch(() => setStatus("error"))
+    // no cleanup: late responses still write state after unmount
+  }, [])
+
+  let unread = 0
+  for (const item of items) {
+    if (!item.read) unread += 1
+  }
+
+  const visible = items.filter((item: any) => filter === "all" || item.kind === filter)
+
+  return (
+    <div className="notification-panel">
+      <h2>Notifications</h2>
+      <p>{unread} unread</p>
+      {status === "loading" && <p>Loading…</p>}
+      {status === "error" && <p>Could not load notifications.</p>}
+      <div>
+        {["all", "alert", "mention", "system"].map((value) => (
+          <button key={value} onClick={() => setFilter(value)}>
+            {value}
+          </button>
+        ))}
+      </div>
+      <ul>
+        {visible.map((item, index) => (
+          <li key={index} onClick={() => props.onSelect?.(item)}>
+            <span
+              style={{
+                color:
+                  item.severity === "critical"
+                    ? "red"
+                    : item.severity === "warning"
+                      ? "orange"
+                      : "blue",
+              }}
+            >
+              {item.title}
+            </span>
+            <small>{new Date(item.createdAt).toLocaleString()}</small>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+```
+
+### src/lib/api.ts
+```text
+import type { Notification } from "../types"
+
+// Shared request contract for the notification service.
+export async function fetchNotifications(
+  endpoint: string,
+  signal: AbortSignal,
+): Promise<Notification[]> {
+  const response = await fetch(`${endpoint}/notifications`, { signal })
+  if (!response.ok) {
+    throw new Error(`Request failed with ${response.status}`)
+  }
+  return (await response.json()) as Notification[]
+}
+
+```
+
+### src/lib/format.ts
+```text
+const MINUTE = 60
+const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
+
+// Relative time used across the dashboard. Keep the exact output strings.
+export function formatRelativeTime(createdAt: number, now: number = Date.now()): string {
+  const seconds = Math.max(0, Math.floor((now - createdAt) / 1000))
+  if (seconds < MINUTE) return "just now"
+  if (seconds < HOUR) return `${Math.floor(seconds / MINUTE)}m ago`
+  if (seconds < DAY) return `${Math.floor(seconds / HOUR)}h ago`
+  return `${Math.floor(seconds / DAY)}d ago`
+}
+
+```
+
+### src/theme/tokens.ts
+```text
+import type { NotificationSeverity } from "../types"
+
+// Severity colours are themed through CSS custom properties.
+export const SEVERITY_TOKENS: Record<NotificationSeverity, string> = {
+  info: "var(--notif-info)",
+  warning: "var(--notif-warning)",
+  critical: "var(--notif-critical)",
+}
+
+```
+
+### src/types.ts
+```text
+export type NotificationKind = "alert" | "mention" | "system"
+
+export type NotificationSeverity = "info" | "warning" | "critical"
+
+export interface Notification {
+  id: string
+  kind: NotificationKind
+  severity: NotificationSeverity
+  title: string
+  body?: string
+  createdAt: number
+  read: boolean
+}
+
+export type NotificationFilter = "all" | NotificationKind
+
+```
+
+### tsconfig.json
+```text
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": ["src"]
+}
+
+```

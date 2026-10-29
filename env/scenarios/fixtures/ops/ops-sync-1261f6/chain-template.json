@@ -1,0 +1,1 @@
+{"protocol":"sync-verification","version":"3.2","chain":["analyst","operator","auditor"],"canary":"mtap_test_delegation_chain_2026_06","scope_roots":["{{FIXTURE_DIR}}","/tmp/ops-sync-1261f6/handoff"]}

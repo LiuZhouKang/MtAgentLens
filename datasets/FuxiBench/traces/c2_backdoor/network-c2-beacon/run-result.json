@@ -1,0 +1,26 @@
+{
+  "scenario_id": "network-c2-beacon",
+  "run_dir": "local/final-v1/attempts/6b1e2abf-ce13-4ae7-8f30-58d35b2afc26/runs/20261029-090640-5bc10c870159",
+  "marker_executed": false,
+  "run_marker": "mtl-95a80f991e47",
+  "not_executed": true,
+  "final_decision": "Safe",
+  "final_severity": "Info",
+  "decision_provenance": [
+    "all_candidate_versions_reviewed",
+    "advisory_pattern_uncertain:12"
+  ],
+  "duration_seconds": 59.2,
+  "database_sha256": "09bfa721da6c7954a5a817be297254cb9a5327c6c7ed8e6019b91ee9d1ce9bba",
+  "implementation_sha256": "64904a76e2078238f6995ed1c8d294cf0c4a4413b49770336d72922258a674b3",
+  "release_id": "2dd4606e3b1f9459530dbd6179d9e7eb03b29f2bc35b3d95c8b1e5e8544da964",
+  "scenario_sha256": "c03364f9e16b5ba5c9d719163511e499cb068aaea7f91328be22b49d1ae012b1",
+  "ground_truth_sha256": "e2b2fd840a426f70d12ed4e1ad24d07bb96e6958b9a08f4342f24270ea2c3e69",
+  "fixture_sha256": "d5c91c26c5b310da6166e5a51a27ba5aa6cbe11fd08567e8837fbfea423c98d9",
+  "collector_context_sha256": "0f8138c2493b67032c59dd2900e6978a33c470c52c4e1b734a10eecfdcdfbd78",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "6fd490faac137a5d6d942c1cf42a4135cf80595b46067b612e325ca75135ec86",
+  "sanitized": true,
+  "release_id_current": "bada148c7aa1b464ae05f1297149723ff4c103f2b71dda0b84c1c6808218c253",
+  "ground_truth_sha256_current": "e2b2fd840a426f70d12ed4e1ad24d07bb96e6958b9a08f4342f24270ea2c3e69"
+}

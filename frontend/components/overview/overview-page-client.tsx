@@ -103,6 +103,7 @@ export default function OverviewPageClient() {
   const dbAssets = useAppStore((state) => state.dbAssets);
   const actions = useAppStore((state) => state.actions);
   const liveSnapshotFrames = useAppStore((state) => state.liveSnapshotFrames);
+  const liveEventCount = useAppStore((state) => state.live.stats.eventCount);
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [selectedSigmaNodeId, setSelectedSigmaNodeId] = useState<string | null>(null);
 
@@ -304,11 +305,13 @@ export default function OverviewPageClient() {
   // network shows its skeleton (NetworkLoading) while Sigma builds. Heavy
   // responsibility-unit/investigation modeling never gates first paint.
   const hasData = graph.nodes.length > 0 || alerts.length > 0;
+  const dataLoading = useAppStore((state) => state.dataLoading);
 
-  // 页面内容就绪信号（供布局层协调加载层）：有数据即渲染仪表盘 → 置就绪。
+  // 页面内容就绪信号：加载结束即就绪。把“有没有数据”当成就绪条件会让
+  // 无数据的数据源（例如只有 system 的 live run）永久停在品牌加载层。
   useEffect(() => {
-    setPageReady(hasData);
-  }, [hasData, setPageReady]);
+    setPageReady(!dataLoading);
+  }, [dataLoading, setPageReady]);
 
   const pageRef = useRef<HTMLDivElement>(null);
 
@@ -402,9 +405,32 @@ export default function OverviewPageClient() {
   );
 
   if (!hasData) {
+    if (dataLoading) {
+      return (
+        <div ref={pageRef} style={{ height: '100%', position: 'relative' }}>
+          <LoadingScreen show />
+        </div>
+      );
+    }
     return (
-      <div ref={pageRef} style={{ height: '100%', position: 'relative' }}>
-        <LoadingScreen show />
+      <div ref={pageRef} className="ln-page__inner" style={{ maxWidth: 720, margin: '0 auto' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: 8,
+            minHeight: '60vh',
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ fontSize: 16, fontWeight: 600 }}>暂无责任数据</h2>
+          <p className="ln-panel__meta" style={{ maxWidth: 460 }}>
+            当前数据源没有图节点或告警。导入 responsibility.db，或连接一个实时 run 后，
+            责任网络与 KPI 会显示在这里。
+          </p>
+        </div>
       </div>
     );
   }
@@ -857,7 +883,7 @@ export default function OverviewPageClient() {
           <SectionPanel
             eyebrow="Live Event Stream"
             title="事件流"
-            meta={`${formatCompactNumber(graph.edges.length * 72)}/s`}
+            meta={liveEventCount > 0 ? `${formatCompactNumber(liveEventCount)} 事件` : '—'}
             bodyClassName="ln-panel-body"
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

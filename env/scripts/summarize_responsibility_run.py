@@ -139,7 +139,6 @@ def health_lines(run: Path) -> list[str]:
         "SSL monitoring enabled",
         "Process monitoring enabled",
         "Observer: LLM provider",
-        "DeBERTa classifier",
         "Responsibility runtime enabled",
         "Multi-agent anomaly detection enabled",
         "Handoff injection detection enabled",
@@ -169,7 +168,38 @@ def runtime_diagnostics(run: Path) -> dict:
     }
     if not path.exists():
         return diagnostics
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+    text = path.read_text(encoding="utf-8", errors="replace")
+    # Loss counters follow the benchmark's single parser (per-source final
+    # stats, cumulative, unknown when a source never reports). A local
+    # "last RINGBUF_STATS line wins" rule silently mixed TLS and process.
+    sys.path.insert(0, str(ROOT / "env" / "src"))
+    from mtagentlens_benchmark.engine.collector_manager import (
+        _parse_runtime_metrics_from_logs,
+        _recover_configured_capture_sources,
+    )
+
+    # The persisted run configuration is the only evidence that a configured
+    # source was supposed to report. Logs alone cannot prove completeness.
+    configured: set[str] | None = None
+    health_path = run / "collector" / "collector_health.json"
+    if health_path.exists():
+        try:
+            health = json.loads(health_path.read_text(encoding="utf-8"))
+            configured = _recover_configured_capture_sources(health)
+        except (OSError, ValueError) as exc:
+            diagnostics["capture_config_error"] = shorten(exc, 120)
+    metrics = _parse_runtime_metrics_from_logs(
+        text, run / "collector" / "collector", configured
+    )
+    diagnostics["ringbuf_drops"] = metrics.get("ring_buffer_drops")
+    diagnostics["capture_configured_sources"] = (
+        sorted(configured) if configured is not None else None
+    )
+    if configured is None:
+        metrics["capture_stats_complete"] = None
+        metrics["capture_loss_free"] = None
+    diagnostics["capture_stats_complete"] = metrics.get("capture_stats_complete")
+    for line in text.splitlines():
         if "[classify] Observer LLM:" in line:
             diagnostics["observer_classify_lines"] += 1
         if "[runtime:trigger] observer forced" in line:
@@ -181,10 +211,6 @@ def runtime_diagnostics(run: Path) -> dict:
                     diagnostics["observer_failure_reason"] = "HTTP 401 authentication failure"
                 else:
                     diagnostics["observer_failure_reason"] = shorten(line, 110)
-        if "RINGBUF_STATS" in line and "dropped_events" in line:
-            match = re.search(r'"dropped_events":(\d+)', line)
-            if match:
-                diagnostics["ringbuf_drops"] = int(match.group(1))
         match = re.search(
             r"Observer calls:\s*(\d+)\s*\|\s*Route:\s*([^\s|]+)\s*\|\s*Final score:\s*([0-9.]+)",
             line,
@@ -468,7 +494,6 @@ def main() -> int:
                     for key, value in breakdown.items()
                     if key in ("boundary_score", "evidence_score", "role_score", "repetition_score", "behavioral_score", "total")
                 ),
-                f"DeBERTa score: {format_score(engine.get('deberta_score') if isinstance(engine, dict) else None)}",
                 f"Observer trigger: {shorten(observer_text, 140)}",
             ])
             print()
@@ -494,8 +519,15 @@ def main() -> int:
             checks.append(
                 f"Observer Provider 调用失败 {diagnostics['observer_failures']} 次，原因: {diagnostics['observer_failure_reason'] or 'unknown'}"
             )
-        if args.show_drops and diagnostics["ringbuf_drops"]:
-            checks.append(f"采集端 dropped_events={diagnostics['ringbuf_drops']}")
+        if args.show_drops:
+            if diagnostics["ringbuf_drops"] is None:
+                checks.append("采集端丢包统计未知（缺少最终 STATS）")
+            else:
+                complete = diagnostics.get("capture_stats_complete")
+                completeness = "完整" if complete is True else "不完整" if complete is False else "未知"
+                checks.append(
+                    f"采集端 dropped_events={diagnostics['ringbuf_drops']}（统计{completeness}）"
+                )
         if not checks:
             checks.append("未发现影响演示解读的一致性问题。")
         print_bullets(checks)

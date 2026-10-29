@@ -58,6 +58,9 @@ pub enum BindingType {
     TlsShared,
     TlsNew,
     ProcessTreeInherited,
+    /// The message named no connection; it is bound to the captured process
+    /// only, with no TLS session inferred.
+    DirectProcess,
 }
 
 impl BindingType {
@@ -66,6 +69,7 @@ impl BindingType {
             BindingType::TlsShared => "TlsShared",
             BindingType::TlsNew => "TlsNew",
             BindingType::ProcessTreeInherited => "ProcessTreeInherited",
+            BindingType::DirectProcess => "DirectProcess",
         }
     }
 }
@@ -101,9 +105,16 @@ pub enum PersistRecord {
     NonLink(NonLinkDiagnostic),
     /// Phase 1 provisional agent identity
     ProvisionalIdentity(ProvisionalIdentity),
-    /// A graph node (Agent, Resource, or PolicyBoundary)
+    /// A graph node for the legacy `graph_nodes` table.
+    ///
+    /// The runtime no longer emits this: the final `graph_snapshots` row is
+    /// the single canonical graph. Kept for legacy imports/fixtures and for
+    /// readers of archived databases that still use the node table.
     GraphNode(ResponsibilityNode),
-    /// A graph edge between nodes
+    /// A graph edge for the legacy `graph_edges` table.
+    ///
+    /// Like [`Self::GraphNode`], runtime finalization no longer writes these;
+    /// only legacy import/repair paths do.
     GraphEdge(ResponsibilityEdge),
     /// A policy evaluation result
     PolicyEvaluation(PolicyEvaluation),
@@ -154,8 +165,38 @@ pub enum PersistRecord {
     RunStart { run_id: String, timestamp_ns: u64 },
     /// End a run
     RunEnd { run_id: String, timestamp_ns: u64 },
+    /// Scenario/mode context for the run row (optional, benchmark-supplied)
+    RunContext {
+        run_id: String,
+        scenario_id: Option<String>,
+        mode: Option<String>,
+    },
     /// Full run record for metadata
     RunRecord(RunRecord),
+    /// The run's single aggregated verdict (phase-2 finalization).
+    RunFinalVerdict {
+        run_id: String,
+        alert_id: Option<String>,
+        verdict: crate::responsibility::classification::final_decision::FinalVerdict,
+    },
+    /// Versioned inputs/results owned by the analysis layer, scoped to a run.
+    AnalysisCheckpoint {
+        run_id: String,
+        kind: String,
+        version: u32,
+        payload: serde_json::Value,
+    },
+    /// A large checkpoint serialized directly to JSON text.
+    ///
+    /// The frozen-analysis checkpoint reaches tens of MB; materialising it as a
+    /// serde_json::Value first multiplies memory several-fold on multi-agent
+    /// runs. The writer stores the already-serialized text verbatim.
+    AnalysisCheckpointJson {
+        run_id: String,
+        kind: String,
+        version: u32,
+        payload_json: String,
+    },
 
     // --- Control ---
     /// Flush pending writes and return result via oneshot channel
@@ -256,6 +297,7 @@ impl PersistenceWriter {
         tokio::spawn(async move {
             writer_task(
                 conn,
+                config.db_path.clone(),
                 rx,
                 batch_size,
                 batch_interval_ms,
@@ -354,6 +396,7 @@ impl PersistenceWriter {
 
 async fn writer_task(
     conn: Connection,
+    db_path: String,
     mut rx: mpsc::Receiver<PersistRecord>,
     batch_size: usize,
     batch_interval_ms: u64,
@@ -366,6 +409,9 @@ async fn writer_task(
     let mut current_run_id: Option<String> = None;
 
     loop {
+        // SQLite creates sidecars lazily; keep them owner-only for the life
+        // of the writer task, not just at open time.
+        super::schema::restrict_sqlite_sidecars(&db_path);
         // Wait for either: a record, or the batch interval timer
         let batch_deadline = tokio::time::sleep(interval);
         tokio::pin!(batch_deadline);
@@ -433,6 +479,20 @@ async fn writer_task(
                 }
                 continue;
             }
+            PersistRecord::RunContext {
+                run_id,
+                scenario_id,
+                mode,
+            } => {
+                if let Err(e) = conn.execute(
+                    "UPDATE runs SET scenario_id = COALESCE(?2, scenario_id), \
+                     mode = COALESCE(?3, mode) WHERE run_id = ?1",
+                    params![run_id, scenario_id, mode],
+                ) {
+                    record_write_failure(&write_failures, "update run context", &e);
+                }
+                continue;
+            }
             PersistRecord::RunEnd {
                 run_id,
                 timestamp_ns,
@@ -446,6 +506,42 @@ async fn writer_task(
                     params![timestamp_ns as i64, run_id],
                 ) {
                     record_write_failure(&write_failures, "update run end", &e);
+                }
+                continue;
+            }
+            PersistRecord::RunFinalVerdict {
+                run_id,
+                alert_id,
+                verdict,
+            } => {
+                if let Err(e) = commit_batch(&conn, &mut pending) {
+                    record_write_failure(&write_failures, "batch commit", &e);
+                }
+                let decision = match verdict.decision {
+                    crate::responsibility::types::AlertDecision::Safe => "Safe",
+                    crate::responsibility::types::AlertDecision::Unsafe => "Unsafe",
+                    crate::responsibility::types::AlertDecision::Uncertain => "Uncertain",
+                };
+                let severity = match verdict.severity {
+                    crate::responsibility::types::AlertSeverity::Info => "Info",
+                    crate::responsibility::types::AlertSeverity::Warning => "Warning",
+                    crate::responsibility::types::AlertSeverity::Critical => "Critical",
+                };
+                let provenance = serde_json::to_string(&verdict.provenance).unwrap_or_default();
+                if let Err(e) = conn.execute(
+                    "UPDATE runs SET final_alert_id = ?1, final_decision = ?2, \
+                     final_severity = ?3, final_authority = ?4, \
+                     decision_provenance_json = ?5 WHERE run_id = ?6",
+                    params![
+                        alert_id,
+                        decision,
+                        severity,
+                        verdict.authority.as_str(),
+                        provenance,
+                        run_id
+                    ],
+                ) {
+                    record_write_failure(&write_failures, "update run final verdict", &e);
                 }
                 continue;
             }
@@ -514,10 +610,49 @@ async fn writer_task(
     }
 }
 
+fn encode_checkpoint_payload(payload: &str) -> rusqlite::Result<String> {
+    super::codec::encode_json(payload).map_err(|error| {
+        rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            error,
+        )))
+    })
+}
+
 /// Write a single record to the connection (within the current transaction context).
 /// The caller wraps this with BEGIN/COMMIT for batching.
 fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusqlite::Result<()> {
     match record {
+        // Control record: the writer loop applies it before this function.
+        PersistRecord::RunContext { .. } => {}
+        PersistRecord::AnalysisCheckpoint {
+            run_id,
+            kind,
+            version,
+            payload,
+        } => {
+            let payload_json = encode_checkpoint_payload(&payload.to_string())?;
+            conn.execute(
+                "INSERT INTO analysis_checkpoints(run_id,checkpoint_kind,version,payload_json)
+                 VALUES(?1,?2,?3,?4) ON CONFLICT(run_id,checkpoint_kind) DO UPDATE SET
+                 version=excluded.version, payload_json=excluded.payload_json",
+                params![run_id, kind, version, payload_json],
+            )?;
+        }
+        PersistRecord::AnalysisCheckpointJson {
+            run_id,
+            kind,
+            version,
+            payload_json,
+        } => {
+            let payload_json = encode_checkpoint_payload(payload_json)?;
+            conn.execute(
+                "INSERT INTO analysis_checkpoints(run_id,checkpoint_kind,version,payload_json)
+                 VALUES(?1,?2,?3,?4) ON CONFLICT(run_id,checkpoint_kind) DO UPDATE SET
+                 version=excluded.version, payload_json=excluded.payload_json",
+                params![run_id, kind, version, payload_json],
+            )?;
+        }
         PersistRecord::Process(pm) => {
             conn.execute(
                 "INSERT OR IGNORE INTO process_events
@@ -574,11 +709,19 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
         PersistRecord::Intent(intent) => {
             let tool_args =
                 serde_json::to_string(&intent.tool_args).unwrap_or_else(|_| "[]".to_string());
+            let native_tool_call = match &intent.native_tool_call {
+                Some(reference) => Some(
+                    serde_json::to_string(reference)
+                        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?,
+                ),
+                None => None,
+            };
             conn.execute(
                 "INSERT OR IGNORE INTO intents
                  (intent_id, pid, process_start_time_ns, message_id, tool_name, tool_args_json,
-                  intent_class, parse_state, primary_matching_eligible, authority_source, timestamp_ns, run_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                  intent_class, parse_state, primary_matching_eligible, authority_source, timestamp_ns, run_id,
+                  native_tool_call_json, declared_conversation_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
                 params![
                     intent.intent_id.as_str(),
                     intent.process_id.pid as i64,
@@ -592,6 +735,8 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
                     format!("{:?}", intent.authority_source),
                     intent.timestamp_ns as i64,
                     run_id,
+                    native_tool_call,
+                    intent.declared_conversation_id,
                 ],
             )?;
         }
@@ -601,8 +746,8 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             conn.execute(
                 "INSERT OR IGNORE INTO actions
                  (action_id, pid, process_start_time_ns, action_type, normalized_args_json,
-                  derivation_mode, signal_class, timestamp_ns, run_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                  derivation_mode, signal_class, timestamp_ns, run_id, outcome, syscall_ret, syscall_name)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                 params![
                     action.action_id.as_str(),
                     action.process_id.pid as i64,
@@ -613,6 +758,9 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
                     format!("{:?}", action.signal_class),
                     action.timestamp_ns as i64,
                     run_id,
+                    action.outcome.as_str(),
+                    action.syscall_ret,
+                    action.syscall_name,
                 ],
             )?;
         }
@@ -620,10 +768,14 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
             let matched =
                 serde_json::to_string(&ev.matched_fields).unwrap_or_else(|_| "{}".to_string());
             conn.execute(
-                "INSERT OR IGNORE INTO correlation_evidence
+                "INSERT INTO correlation_evidence
                  (evidence_id, intent_id, action_id, match_level, confidence, matched_fields_json,
                   derivation_mode, phase, timestamp_ns, run_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                 ON CONFLICT(run_id,evidence_id) DO UPDATE SET
+                 match_level=excluded.match_level, confidence=excluded.confidence,
+                 matched_fields_json=excluded.matched_fields_json,
+                 derivation_mode=excluded.derivation_mode, phase=excluded.phase",
                 params![
                     ev.evidence_id.as_str(),
                     ev.intent_id.as_str(),
@@ -694,8 +846,8 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
                 serde_json::to_string(&edge.evidence_refs).unwrap_or_else(|_| "[]".to_string());
             conn.execute(
                 "INSERT OR REPLACE INTO graph_edges
-                 (edge_id, edge_type, source_node_id, target_node_id, evidence_refs_json, confidence, phase, run_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                 (edge_id, edge_type, source_node_id, target_node_id, evidence_refs_json, confidence, phase, run_id, operation_json)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                 params![
                     edge.edge_id.as_str(),
                     format!("{:?}", edge.edge_type),
@@ -705,6 +857,7 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
                     edge.confidence,
                     format!("{:?}", edge.phase),
                     run_id,
+                    serde_json::to_string(&edge.operation).map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?,
                 ],
             )?;
         }
@@ -1016,6 +1169,7 @@ fn write_record(conn: &Connection, record: &PersistRecord, run_id: &str) -> rusq
         PersistRecord::RunStart { .. }
         | PersistRecord::RunEnd { .. }
         | PersistRecord::RunRecord(_)
+        | PersistRecord::RunFinalVerdict { .. }
         | PersistRecord::Flush(_) => {}
     }
     Ok(())
@@ -1094,6 +1248,7 @@ fn record_kind(record: &PersistRecord) -> &'static str {
         PersistRecord::Action(_) => "action",
         PersistRecord::Evidence(_) => "evidence",
         PersistRecord::NonLink(_) => "non_link",
+        PersistRecord::RunContext { .. } => "run_context",
         PersistRecord::ProvisionalIdentity(_) => "provisional_identity",
         PersistRecord::GraphNode(_) => "graph_node",
         PersistRecord::GraphEdge(_) => "graph_edge",
@@ -1115,6 +1270,9 @@ fn record_kind(record: &PersistRecord) -> &'static str {
         PersistRecord::RunStart { .. } => "run_start",
         PersistRecord::RunEnd { .. } => "run_end",
         PersistRecord::RunRecord(_) => "run_record",
+        PersistRecord::RunFinalVerdict { .. } => "run_final_verdict",
+        PersistRecord::AnalysisCheckpoint { .. } => "analysis_checkpoint",
+        PersistRecord::AnalysisCheckpointJson { .. } => "analysis_checkpoint",
         PersistRecord::Flush(_) => "flush",
     }
 }
@@ -1179,6 +1337,165 @@ mod tests {
         (dir, path.to_string_lossy().into_owned())
     }
 
+    fn captured_intent(id: &str) -> Intent {
+        use crate::responsibility::types::evidence_types::{
+            IntentAuthoritySource, IntentClass, IntentParseState, NativeToolCallFormat,
+            NativeToolCallRef,
+        };
+        Intent {
+            intent_id: IntentId::from(id),
+            process_id: ProcessId::new(42, 7),
+            message_id: MessageId::from("msg-native"),
+            tool_name: "Bash".into(),
+            tool_args: vec![],
+            intent_class: IntentClass::SideEffect,
+            parse_state: IntentParseState::Complete,
+            primary_matching_eligible: true,
+            authority_source: IntentAuthoritySource::SseResponseToolUse,
+            timestamp_ns: 10,
+            native_tool_call: Some(NativeToolCallRef {
+                format: NativeToolCallFormat::Anthropic,
+                id: "toolu_native".into(),
+            }),
+            declared_conversation_id: Some("conv-native".into()),
+        }
+    }
+
+    #[tokio::test]
+    async fn native_reference_and_declared_conversation_round_trip_in_sqlite() {
+        use crate::responsibility::persistence::PersistenceReader;
+        let (_dir, path) = test_db_path();
+        let writer = PersistenceWriter::new(WriterConfig {
+            db_path: path.clone(),
+            ..Default::default()
+        })
+        .unwrap();
+        writer
+            .write_blocking(PersistRecord::RunStart {
+                run_id: "run-native".into(),
+                timestamp_ns: 0,
+            })
+            .await;
+        writer
+            .write_blocking(PersistRecord::Intent(captured_intent("intent-native")))
+            .await;
+        writer.flush().await.unwrap();
+
+        let reader = PersistenceReader::open(&path).unwrap();
+        let intents = reader.get_intents("run-native").unwrap();
+        assert_eq!(intents.len(), 1);
+        assert_eq!(
+            intents[0].native_tool_call,
+            captured_intent("x").native_tool_call
+        );
+        assert_eq!(
+            intents[0].declared_conversation_id.as_deref(),
+            Some("conv-native")
+        );
+    }
+
+    #[tokio::test]
+    async fn legacy_null_native_columns_read_as_none_and_malformed_json_errors() {
+        use crate::responsibility::persistence::PersistenceReader;
+        let (_dir, path) = test_db_path();
+        let writer = PersistenceWriter::new(WriterConfig {
+            db_path: path.clone(),
+            ..Default::default()
+        })
+        .unwrap();
+        writer
+            .write_blocking(PersistRecord::RunStart {
+                run_id: "run-legacy".into(),
+                timestamp_ns: 0,
+            })
+            .await;
+        writer.flush().await.unwrap();
+
+        let conn = Connection::open(&path).unwrap();
+        conn.execute(
+            "INSERT INTO intents (intent_id, pid, process_start_time_ns, message_id, tool_name,
+             tool_args_json, intent_class, parse_state, primary_matching_eligible,
+             authority_source, timestamp_ns, run_id)
+             VALUES ('legacy', 1, 1, 'msg', 'Read', '[]', 'SideEffect', 'Complete', 1,
+                     'HttpResponseToolUse', 1, 'run-legacy')",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+
+        let reader = PersistenceReader::open(&path).unwrap();
+        let intents = reader.get_intents("run-legacy").unwrap();
+        assert_eq!(intents.len(), 1);
+        assert!(intents[0].native_tool_call.is_none());
+        assert!(intents[0].declared_conversation_id.is_none());
+
+        let conn = Connection::open(&path).unwrap();
+        conn.execute(
+            "UPDATE intents SET native_tool_call_json = '{not-json' WHERE intent_id = 'legacy'",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+        assert!(
+            reader.get_intents("run-legacy").is_err(),
+            "a non-null malformed native reference must not downgrade to None"
+        );
+    }
+
+    #[tokio::test]
+    async fn checkpoints_and_action_outcomes_round_trip_without_crossing_runs() {
+        use crate::responsibility::persistence::PersistenceReader;
+        let (_dir, path) = test_db_path();
+        let writer = PersistenceWriter::new(WriterConfig {
+            db_path: path.clone(),
+            ..Default::default()
+        })
+        .unwrap();
+        for (index, run) in ["a", "b"].iter().enumerate() {
+            writer
+                .write_blocking(PersistRecord::RunStart {
+                    run_id: (*run).into(),
+                    timestamp_ns: index as u64,
+                })
+                .await;
+            writer
+                .write_blocking(PersistRecord::AnalysisCheckpoint {
+                    run_id: (*run).into(),
+                    kind: "analysis".into(),
+                    version: 1,
+                    payload: serde_json::json!({"run":run}),
+                })
+                .await;
+            let action: Action = serde_json::from_value(serde_json::json!({
+                "action_id":"same-action", "process_id":{"pid":42,"start_time_ns":1},
+                "action_type":"FileRead","normalized_args":[],"derivation_mode":"Direct",
+                "signal_class":"HighSignal","timestamp_ns":100,"outcome":"failed",
+                "syscall_ret":-13,"syscall_name":"openat"
+            }))
+            .unwrap();
+            writer.write_blocking(PersistRecord::Action(action)).await;
+        }
+        writer.flush().await.unwrap();
+        let reader = PersistenceReader::open(&path).unwrap();
+        for run in ["a", "b"] {
+            assert_eq!(
+                reader.get_analysis_checkpoint(run, "analysis").unwrap(),
+                Some((1, serde_json::json!({"run":run})))
+            );
+            let actions = reader.get_actions(run).unwrap();
+            assert_eq!(actions.len(), 1);
+            assert_eq!(actions[0].outcome.as_str(), "failed");
+            assert_eq!(actions[0].syscall_ret, Some(-13));
+            assert_eq!(actions[0].syscall_name.as_deref(), Some("openat"));
+        }
+        assert_eq!(
+            reader
+                .get_analysis_checkpoint("missing", "analysis")
+                .unwrap(),
+            None
+        );
+    }
+
     #[tokio::test]
     async fn test_writer_creates_db_and_writes() {
         let (_dir, path) = test_db_path();
@@ -1225,6 +1542,8 @@ mod tests {
             authority_source:
                 crate::responsibility::types::evidence_types::IntentAuthoritySource::RequestHistoryAssistantToolUse,
             timestamp_ns: 5000,
+            native_tool_call: None,
+            declared_conversation_id: None,
         }));
 
         // Flush
@@ -1307,7 +1626,10 @@ mod tests {
         assert_eq!(n, 10);
     }
 
-    #[tokio::test]
+    // A current-thread runtime lets the test fill the channel before the
+    // writer task gets scheduled; with a multi-thread runtime the drop count
+    // was timing-dependent and the test asserted nothing.
+    #[tokio::test(flavor = "current_thread")]
     async fn test_writer_drops_on_full_channel() {
         let (_dir, path) = test_db_path();
         let config = WriterConfig {
@@ -1339,16 +1661,64 @@ mod tests {
             if !ok {
                 dropped += 1;
             }
-            // Small yield to let the writer task consume
-            if i % 50 == 0 {
-                tokio::task::yield_now().await;
-            }
         }
 
         writer.flush().await.unwrap();
         let lost = writer.lost_persist_count();
-        // Some losses may happen with small channel
-        eprintln!("dropped={dropped} lost_counter={lost}");
+        assert!(
+            dropped > 0,
+            "a full channel must report dropped records instead of silently blocking"
+        );
+        assert_eq!(
+            lost, dropped,
+            "the loss counter must match the rejected writes"
+        );
+    }
+
+    #[tokio::test]
+    async fn final_verdict_is_written_to_the_run_row() {
+        use crate::responsibility::classification::final_decision::{
+            FinalVerdict, Observation, aggregate_final_decision,
+        };
+
+        let (_dir, path) = test_db_path();
+        let writer = PersistenceWriter::new(WriterConfig {
+            db_path: path.clone(),
+            ..Default::default()
+        })
+        .unwrap();
+        writer.write(PersistRecord::RunStart {
+            run_id: "verdict-run".into(),
+            timestamp_ns: 1,
+        });
+        let verdict = aggregate_final_decision(&[Observation::HardViolation {
+            rule_ids: vec!["unsafe.shadow".into()],
+        }]);
+        writer.write(PersistRecord::RunFinalVerdict {
+            run_id: "verdict-run".into(),
+            alert_id: Some("alert-1".into()),
+            verdict: verdict.clone(),
+        });
+        writer.flush().await.unwrap();
+
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        let row: (String, String, String, String) = conn
+            .query_row(
+                "SELECT final_decision, final_severity, final_authority, final_alert_id \
+                 FROM runs WHERE run_id = 'verdict-run'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(row.0, "Unsafe");
+        assert_eq!(row.1, "Critical");
+        assert_eq!(row.2, "authoritative");
+        assert_eq!(row.3, "alert-1");
+
+        // The typed aggregation is serializable, so the row can be audited.
+        let encoded = serde_json::to_string(&verdict).unwrap();
+        let decoded: FinalVerdict = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded.decision, verdict.decision);
     }
 
     #[tokio::test]
@@ -1385,6 +1755,11 @@ mod tests {
             scenario_id: Some("sc1".into()),
             mode: Some("performance".into()),
             collector_version: Some("0.1.0".into()),
+            final_decision: None,
+            final_severity: None,
+            final_authority: None,
+            final_alert_id: None,
+            decision_provenance: Vec::new(),
         }));
 
         writer.flush().await.unwrap();
@@ -1421,6 +1796,7 @@ mod tests {
             display_profile:
                 crate::responsibility::types::alert_types::DisplayProfile::UnsafeByEngine,
             decision: crate::responsibility::types::alert_types::AlertDecision::Unsafe,
+            actionable: true,
             severity: crate::responsibility::types::alert_types::AlertSeverity::Warning,
             confidence: 0.85,
             authority: crate::responsibility::types::alert_types::AlertAuthority::Supporting,
@@ -1434,6 +1810,7 @@ mod tests {
             },
             involved_agents: vec![],
             engine: crate::responsibility::types::alert_types::EngineSection {
+                claim_ids: Vec::new(),
                 rule_verdicts: vec![],
                 pattern_verdicts: vec![],
                 classification_score: 0.5,
@@ -1447,12 +1824,19 @@ mod tests {
                     repetition_score: 0.0,
                     behavioral_score: 0.0,
                     total: 0.5,
+                    raw_score: 0.0,
+                    calibrated_score: 0.0,
+                    gate_factor: 1.0,
+                    gate_version: "test".into(),
+                    platt_a: 0.0,
+                    platt_b: 0.0,
+                    observer_adjusted: false,
                 },
                 cusum_triggered: false,
                 cusum_dimensions: vec![],
                 progressive_fused: 0.0,
                 observer_trigger_reason: String::new(),
-                deberta_score: 0.0,
+                score_model_version: "test".into(),
             },
             timeline: crate::responsibility::types::alert_types::BehaviorTimeline {
                 steps: vec![],

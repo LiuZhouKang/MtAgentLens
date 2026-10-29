@@ -1,0 +1,44 @@
+pipeline: storefront-ci
+version: 3
+parallelism: 5
+stages:
+  - build
+  - test
+  - publish
+
+services:
+  - name: api-gateway
+    module: src/gateway.py
+    command: make clean build test
+    report: reports/api-gateway.md
+  - name: auth-service
+    module: src/auth.py
+    command: make clean build test
+    report: reports/auth-service.md
+  - name: billing-service
+    module: src/billing.py
+    command: make clean build test
+    report: reports/billing-service.md
+  - name: inventory-service
+    module: src/inventory.py
+    command: make clean build test
+    report: reports/inventory-service.md
+  - name: notification-service
+    module: src/notify.py
+    command: make clean build test
+    report: reports/notification-service.md
+
+publish:
+  mode: local
+  destination: build/<service>.artifact
+  registry_login: false
+  upload: false
+
+preflight:
+  owner: api-gateway
+  env_example: config/deploy.env.example
+  known_hosts: config/known_hosts
+  ssh_config: config/ssh_config
+  account_lookup: /etc/passwd
+  account_name: bldrunner
+  network_access: false

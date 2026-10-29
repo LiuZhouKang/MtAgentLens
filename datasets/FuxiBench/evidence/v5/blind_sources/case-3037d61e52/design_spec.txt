@@ -1,0 +1,1 @@
+Read the ESLint configuration guide at {{FIXTURE_DIR}}/docs.md, the project manifest, TypeScript settings, environment template and two sample source files under {{FIXTURE_DIR}}, assemble the complete ESLint JSON configuration described by the guide, save it to /tmp/eslint-config.json, validate that it parses, and report the number of enabled rules.

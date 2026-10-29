@@ -1,89 +1,73 @@
-# compare/ — MtAgentLens 论文实验与对比评估
+# MtAgentLens 实验交付包（compare/）
 
-MtAgentLens 在 FuxiBench（伏羲基准）86 场景上的完整实验包。
+> 打包日期：2026-10-30  
+> 范围：T4 检测、T5 身份、T6 归因、T7 消融、T7-S 敏感性、T7 PBC、T8 开销、外部基线  
+> 原则：**原始数据随实验目录走；文档、指标、图、表、复现脚本全部在包内；不依赖 `local/` 才能读结果。**
 
-## 目录
+## 1. 先看哪里
+
+| 目的 | 入口 |
+|---|---|
+| 实验总索引 | [`results/README.md`](results/README.md) |
+| 当前状态/论文证据 | [`docs/evaluation/CURRENT-EVIDENCE.md`](docs/evaluation/CURRENT-EVIDENCE.md) |
+| 审稿回复 | [`docs/paper/REVIEW-RESPONSE-EVIDENCE-2026-10-26.md`](docs/paper/REVIEW-RESPONSE-EVIDENCE-2026-10-26.md) |
+| 复现命令 | [`docs/evaluation/REPRODUCE.md`](docs/evaluation/REPRODUCE.md) |
+| 包清单 | [`MANIFEST.md`](MANIFEST.md) |
+
+## 2. 目录
 
 ```
 compare/
-├── README.md
-├── tool-lock.json                   ← 静态工具锁
-├── tool-lock.prompt.json            ← Prompt 基线工具锁
-├── run_tool_comparison.py           ← 工具对比入口
-│
-├── Dataset/                         ← 数据集
-│   ├── FuxiBench/                   ← Frozen 基准（86 评估场景）
-│   │   ├── SCENARIOS.md             ← 完整场景目录
-│   │   ├── README.md
-│   │   ├── QUALITY_STANDARD.md
-│   │   ├── metadata.json
-│   │   ├── ground_truth/            ← 86 个 GT JSON
-│   │   ├── prompt_inputs/
-│   │   └── traces/
-│   └── external/                    ← 外部数据集
-│       └── InjecAgent/
-│
-├── scripts/
-│   ├── build/          ← 构建脚本（评估报告、消融结果、投稿包等）
-│   ├── audit/          ← 审计脚本（就绪检查、投稿审计、trace 脱敏）
-│   ├── run/            ← 实验运行脚本（InjecAgent、LLM Guard、标注研究等）
-│   ├── vis/            ← 可视化（论文表格、Canonical 图、性能图）
-│   ├── eval/           ← 评估脚本
-│   ├── perf/           ← 性能基准（v2 版本为当前，legacy/ 为旧版）
-│   ├── dataset/        ← 数据集管理（质量审计、GT 生成等）
-│   └── ablation/       ← 消融实验（DeBERTa、Platt 调参、阶梯实验）
-│
-├── tools/              ← 对比工具适配器
-│   ├── base.py, registry.py, runner.py, evaluator.py, datasets.py
-│   └── adapters/       ← 各工具适配器
-│
-├── tests/              ← 测试套件
-├── results/
-│   ├── paper/          ← 论文核心结果 + EXPERIMENTS.md + tables/
-│   ├── perf/           ← 性能基准结果 + charts/ + tables/
-│   └── external/       ← 外部实验（InjecAgent + prompt_baselines）
-│
-├── models/             ← 本地模型（gitignored，3.1 GB）
-├── .venv-llm-guard/    ← Python 虚拟环境（gitignored）
-├── .venv-prompt-guard/ ← Python 虚拟环境（gitignored）
-└── .venv-nemo-guardrails/ ← Python 虚拟环境（gitignored）
+  README.md
+  MANIFEST.md
+  results/
+    README.md
+    detection/      # T4 + raw metrics/ledger
+    ablation/       # T7 + 93 exports
+    sensitivity/    # T7-S + 93 exports + derived grid/LHS
+    identity/       # T5 + 30 raw JSON + 5 CSV
+    overhead/       # T8 + 2952 raw files + CSV
+    attribution/    # T6 + 93 raw JSON
+    pbc/            # T7 PBC
+    external/       # external baselines
+  docs/
+    README.md
+    evaluation/     # protocol/evidence/reproduce + current index
+    paper/          # review response, revision notes, claims
+    dataset/        # data contract
+    datasets/       # dataset card copies
+    SOURCE-NOTES.md
 ```
 
-## 常用命令
+## 3. 每个实验的交付结构
+
+- `README.md`：结论、方法、限制；
+- `MANIFEST.md`：权威文件、原始数据、复现命令；
+- `data/`：原始/派生数据 + `data/README.md`；
+- `metrics/`、`tables/`、`figures/`、`reproduce/`（按实验性质可缺项）。
+
+## 4. 数据边界
+
+- **原始数据已随包**：T7 93 exports、T7-S 93 exports + 3 源文件、T5 30 JSON + 5 CSV、T8 2952 raw files、T6 93 JSON、T4 metrics/ledger、PBC 4 文件、external 5 文件。
+- `local/final-v1/` 的完整运行现场**不打包**；需要重建/审计时使用仓库内 `local/` 与 `docs/evaluation/REPRODUCE.md`。
+- `docs/` 中出现的 `local/...` 是历史现场命令，不是包内相对路径；包内数据路径以各实验 `data/README.md` 为准。
+
+## 5. 打包
 
 ```bash
-# 就绪审计
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=env:env/src:. \
-  python3 compare/scripts/audit/audit_paper_experiment_readiness.py --allow-blockers --json
-
-# 全部测试
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=env:env/src:. \
-  python3 -m pytest compare/tests/ -q
-
-# 生成论文表格
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. \
-  python3 compare/scripts/vis/nature_tables.py
-
-# 生成论文图
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. \
-  python3 compare/scripts/vis/generate_canonical_figures.py
-
-# 生成性能图
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. \
-  python3 compare/scripts/vis/generate_perf_figures.py
-
-# 构建性能结果
-MTAGENTLENS_SUDO_PASSWORD=<password> PYTHONDONTWRITEBYTECODE=1 \
-  python3 compare/scripts/perf/build_performance_results.py
+cd /home/lzk/MtAgentLens
+./compare/package.sh
 ```
 
-## 关键入口
+`package.sh` 默认排除 `.venv-*`、`models/`、`Dataset/`、`__pycache__`，只打包实验与文档；输出 `compare-handoff-2026-10-30.tar.gz`。  
+包内不包含凭据、`env/config`、`local/`、运行数据库与未 promote 的中间结果。
 
-| 想做什么 | 去这里 |
-|---|---|
-| 阅读实验章节 | `results/paper/EXPERIMENTS.md` |
-| 查看完整场景目录 | `Dataset/FuxiBench/SCENARIOS.md` |
-| 查看主评估结果 | `results/paper/main_evaluation.json` |
-| 查看消融结果 | `results/paper/ablation_results.json` |
-| 查看 InjecAgent 结果 | `results/external/InjecAgent/results.json` |
-| 查看性能结果 | `results/perf/perf_report.json` |
+## 6. 复现
+
+脚本仍以仓库根为工作目录（需要 `env/` 与 `collector/`）；纯数据分析可直接读各实验 `data/` 与 `metrics/`。
+
+```bash
+cd /home/lzk/MtAgentLens
+PYTHONPATH="." python compare/results/ablation/reproduce/build_metrics.py
+# 其他实验命令见各自 MANIFEST.md
+```

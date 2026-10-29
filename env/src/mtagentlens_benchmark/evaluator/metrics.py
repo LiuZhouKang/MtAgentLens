@@ -15,13 +15,19 @@ from mtagentlens_benchmark.types import (
 )
 
 
+def _connect_readonly(db_path: Path) -> sqlite3.Connection:
+    if not db_path.is_file():
+        raise ValueError(f"result database is not an existing file: {db_path}")
+    return sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True)
+
+
 def compute_detection_metrics(
     db_path: Path,
     ground_truth: GroundTruth,
     time_window_tolerance_s: float = 5.0,
 ) -> DetectionMetrics:
     """Layer 1: Compute P/R/F1 for alert detection."""
-    conn = sqlite3.connect(str(db_path))
+    conn = _connect_readonly(db_path)
 
     expected_ids = {a.alert_id for a in ground_truth.alerts}
     actual_rows = conn.execute(
@@ -54,17 +60,12 @@ def compute_causal_chain_metrics(
     ground_truth: GroundTruth,
 ) -> CausalChainMetrics:
     """Layer 2: Compute causal chain completeness."""
-    conn = sqlite3.connect(str(db_path))
-
     if not ground_truth.alerts:
-        conn.close()
-        return CausalChainMetrics(
-            chain_completeness=1.0,
-            link_precision=1.0,
-            link_recall=1.0,
-            broken_chains=0,
-            avg_chain_length_match=1.0,
+        raise ValueError(
+            f"ground truth for {db_path} has no alerts; causal chain metrics are not evaluable"
         )
+
+    conn = _connect_readonly(db_path)
 
     traceback_count = conn.execute(
         "SELECT COUNT(*) FROM responsibility_tracebacks"
@@ -98,7 +99,7 @@ def compute_identity_metrics(
     db_path: Path,
 ) -> IdentityMetrics:
     """Layer 3: Compute identity resolution accuracy."""
-    conn = sqlite3.connect(str(db_path))
+    conn = _connect_readonly(db_path)
 
     ipm_agents = set(r[0] for r in conn.execute(
         "SELECT DISTINCT agent_id FROM identity_process_map"
@@ -127,9 +128,7 @@ def compute_false_positive_metrics(
     total_alerts = 0
 
     for db_path, scenario_id in baseline_results:
-        if not db_path.exists():
-            continue
-        conn = sqlite3.connect(str(db_path))
+        conn = _connect_readonly(db_path)
         non_info = conn.execute(
             "SELECT COUNT(*) FROM responsibility_alerts WHERE severity != 'Info'"
         ).fetchone()[0]
@@ -154,7 +153,7 @@ def compute_robustness_metrics(
     ground_truth: GroundTruth,
 ) -> RobustnessMetrics:
     """Layer 5: Compute robustness/signal contribution metrics."""
-    conn = sqlite3.connect(str(db_path))
+    conn = _connect_readonly(db_path)
 
     ev_breakdown = conn.execute(
         "SELECT match_level, COUNT(*) FROM correlation_evidence GROUP BY match_level"
@@ -188,20 +187,29 @@ def compute_benchmark_score(
     baseline_results: list[tuple[Path, str]],
 ) -> BenchmarkScore:
     """Compute the full 5-layer benchmark score from all result pairs."""
+    if not results:
+        raise ValueError("no evaluation results; ground truth cannot be scored")
+
+    for db_path, gt in results:
+        if not db_path.is_file():
+            raise ValueError(f"result database is not an existing file: {db_path}")
+        if not gt.alerts:
+            raise ValueError(
+                f"ground truth for {db_path} has no alerts; it is not evaluable"
+            )
+
     all_detection = []
     all_causal = []
     all_identity = []
     all_robustness = []
 
     for db_path, gt in results:
-        if not db_path.exists():
-            continue
         all_detection.append(compute_detection_metrics(db_path, gt))
         all_causal.append(compute_causal_chain_metrics(db_path, gt))
         all_identity.append(compute_identity_metrics(db_path))
         all_robustness.append(compute_robustness_metrics(db_path, gt))
 
-    n = len(all_detection) or 1
+    n = len(all_detection)
 
     avg_detection = DetectionMetrics(
         precision=round(sum(d.precision for d in all_detection) / n, 4),

@@ -1,0 +1,649 @@
+{
+  "summary": {
+    "alerts": 31,
+    "base_routes": {
+      "safe": 31,
+      "observer": 0,
+      "unsafe": 0
+    },
+    "route_changes_when_dimension_zeroed": {
+      "boundary": 0,
+      "pattern": 0,
+      "role": 0,
+      "repetition": 0,
+      "evidence": 0,
+      "behavioral": 0
+    },
+    "dimension_nonzero": {
+      "rule_score": 0,
+      "pattern_score": 9,
+      "boundary_score": 11,
+      "evidence_score": 5,
+      "role_score": 9,
+      "repetition_score": 31,
+      "behavioral_score": 0
+    }
+  },
+  "alerts": [
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.02
+      },
+      "base_route": "safe",
+      "stored_total": 0.00034685692,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.04
+      },
+      "base_route": "safe",
+      "stored_total": 0.00037886828,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.12
+      },
+      "base_route": "safe",
+      "stored_total": 0.00053658534,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.06
+      },
+      "base_route": "safe",
+      "stored_total": 0.0004136414,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.06
+      },
+      "base_route": "safe",
+      "stored_total": 0.0004136414,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.04
+      },
+      "base_route": "safe",
+      "stored_total": 0.00037886828,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 1.0,
+        "boundary_score": 0.033333335,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.1
+      },
+      "base_route": "safe",
+      "stored_total": 0.0027157376,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.06
+      },
+      "base_route": "safe",
+      "stored_total": 0.0004136414,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Uncertain",
+      "pbc": 2,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 1.0,
+        "boundary_score": 0.024390243,
+        "evidence_score": 0.92999995,
+        "role_score": 0.003992289,
+        "repetition_score": 0.14
+      },
+      "base_route": "safe",
+      "stored_total": 0.0073100887,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 2,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 1.0,
+        "boundary_score": 0.0754717,
+        "evidence_score": 0.8246132,
+        "role_score": 0.11920292,
+        "repetition_score": 0.32
+      },
+      "base_route": "safe",
+      "stored_total": 0.009761983,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 2,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 1.0,
+        "boundary_score": 0.0754717,
+        "evidence_score": 0.0,
+        "role_score": 0.00816257,
+        "repetition_score": 0.08
+      },
+      "base_route": "safe",
+      "stored_total": 0.016596438,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 1,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 1.0,
+        "boundary_score": 0.04761905,
+        "evidence_score": 0.85446805,
+        "role_score": 0.07984577,
+        "repetition_score": 0.26
+      },
+      "base_route": "safe",
+      "stored_total": 0.0025705483,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 1,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 1.0,
+        "boundary_score": 0.15,
+        "evidence_score": 0.0,
+        "role_score": 0.009013301,
+        "repetition_score": 0.1
+      },
+      "base_route": "safe",
+      "stored_total": 0.04368824,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.14
+      },
+      "base_route": "safe",
+      "stored_total": 0.000584494,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 1.0,
+        "boundary_score": 0.054054055,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.12
+      },
+      "base_route": "safe",
+      "stored_total": 0.002540692,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.04
+      },
+      "base_route": "safe",
+      "stored_total": 0.00037886828,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.02
+      },
+      "base_route": "safe",
+      "stored_total": 0.00034685692,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.04
+      },
+      "base_route": "safe",
+      "stored_total": 0.00037886828,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.04
+      },
+      "base_route": "safe",
+      "stored_total": 0.00037886828,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.02
+      },
+      "base_route": "safe",
+      "stored_total": 0.00034685692,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.04
+      },
+      "base_route": "safe",
+      "stored_total": 0.00037886828,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.04
+      },
+      "base_route": "safe",
+      "stored_total": 0.00037886828,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.04
+      },
+      "base_route": "safe",
+      "stored_total": 0.00037886828,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.04
+      },
+      "base_route": "safe",
+      "stored_total": 0.00037886828,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.04
+      },
+      "base_route": "safe",
+      "stored_total": 0.00037886828,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 1,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.16666667,
+        "evidence_score": 0.87,
+        "role_score": 0.088399686,
+        "repetition_score": 0.14
+      },
+      "base_route": "safe",
+      "stored_total": 0.0010268466,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 1,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.3846154,
+        "evidence_score": 0.0,
+        "role_score": 0.008577486,
+        "repetition_score": 0.04
+      },
+      "base_route": "safe",
+      "stored_total": 0.014978422,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.04
+      },
+      "base_route": "safe",
+      "stored_total": 0.00037886828,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 1,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 1.0,
+        "boundary_score": 0.16666667,
+        "evidence_score": 0.6182057,
+        "role_score": 0.075858176,
+        "repetition_score": 0.04
+      },
+      "base_route": "safe",
+      "stored_total": 0.002199663,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 1,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 1.0,
+        "boundary_score": 0.375,
+        "evidence_score": 0.0,
+        "role_score": 0.00776757,
+        "repetition_score": 0.08
+      },
+      "base_route": "safe",
+      "stored_total": 0.016919453,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    },
+    {
+      "decision": "Safe",
+      "pbc": 0,
+      "dims": {
+        "rule_score": 0.0,
+        "pattern_score": 0.0,
+        "boundary_score": 0.0,
+        "evidence_score": 0.0,
+        "role_score": 0.0,
+        "repetition_score": 0.02
+      },
+      "base_route": "safe",
+      "stored_total": 0.00034685692,
+      "route_without_boundary": "safe",
+      "route_without_pattern": "safe",
+      "route_without_role": "safe",
+      "route_without_repetition": "safe",
+      "route_without_evidence": "safe",
+      "route_without_behavioral": "safe"
+    }
+  ]
+}

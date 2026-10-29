@@ -299,27 +299,44 @@ int main(int argc, char **argv)
 		err = 0;
 	}
 
+	/* Stop production before draining and publishing the final counters. */
+	stdiocap_bpf__detach(obj);
+	ring_buffer__consume(rb);
+	fflush(stdout);
+
 	/* Emit a parseable STATS event so the Rust runner (and the spike) can see
 	 * ring-buffer drops. The runner requires timestamp_ns/pid/comm, so this is
 	 * a full event object, not a stderr line. */
 	{
-		__u32 key = 0;
+		__u64 reasons[STDIO_DROP_REASON_MAX] = {};
 		__u64 dropped = 0;
 		int map_fd = bpf_map__fd(obj->maps.dropped_events);
 		struct timespec now;
 		__u64 timestamp_ns = 0;
+		int ok = map_fd >= 0;
 
+		for (__u32 key = 0; ok && key < STDIO_DROP_REASON_MAX; key++) {
+			if (bpf_map_lookup_elem(map_fd, &key, &reasons[key]) != 0)
+				ok = 0;
+			else
+				dropped += reasons[key];
+		}
 		if (clock_gettime(CLOCK_MONOTONIC, &now) == 0)
 			timestamp_ns = (__u64)now.tv_sec * 1000000000ULL + (__u64)now.tv_nsec;
-		if (map_fd >= 0 && bpf_map_lookup_elem(map_fd, &key, &dropped) == 0) {
+		if (ok) {
 			printf("{\"direction\":\"STATS\",\"timestamp_ns\":%llu,"
 			       "\"comm\":\"stdiocap\",\"pid\":0,\"tid\":0,"
 			       "\"uid\":0,\"fd\":-1,\"fd_role\":\"stats\","
 			       "\"fd_target\":null,\"len\":0,\"buf_size\":0,"
 			       "\"latency_ms\":0,\"copy_failed\":false,\"data\":null,"
-			       "\"truncated\":false,\"dropped_events\":%llu}\n",
+			       "\"truncated\":false,\"dropped_events\":%llu,"
+			       "\"ringbuf_full_dropped\":%llu,\"args_map_dropped\":%llu,"
+			       "\"lookup_missed_dropped\":%llu}\n",
 			       (unsigned long long)timestamp_ns,
-			       (unsigned long long)dropped);
+			       (unsigned long long)dropped,
+			       (unsigned long long)reasons[STDIO_DROP_RINGBUF_FULL],
+			       (unsigned long long)reasons[STDIO_DROP_ARGS_MAP_FAILED],
+			       (unsigned long long)reasons[STDIO_DROP_LOOKUP_MISSED]);
 			fflush(stdout);
 		}
 	}

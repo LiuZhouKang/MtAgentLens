@@ -125,53 +125,6 @@
       ],
       "score_scope": "main_offline",
       "inclusion_rationale": "Runs locally with no cloud API or hosted judge dependency."
-    },
-    {
-      "id": "llm-guard",
-      "name": "LLM Guard",
-      "class": "llm_security_scanner",
-      "source_url": "https://github.com/protectai/llm-guard",
-      "version": "v0.3.16",
-      "license": "MIT",
-      "install": [
-        "python3 -m venv compare/.venv-llm-guard && compare/.venv-llm-guard/bin/pip install llm-guard==0.3.16"
-      ],
-      "adapter": "llm_guard",
-      "input_modes": [
-        "static"
-      ],
-      "score_scope": "main_offline",
-      "inclusion_rationale": "Runs locally with no cloud API. LLM-specific guard scanning for prompt injection, jailbreak, and harmful content — directly targets the attack vectors in our dataset."
-    },
-    {
-      "id": "meta-prompt-guard",
-      "name": "Meta Prompt Guard",
-      "class": "llm_security_scanner",
-      "source_url": "https://github.com/meta-llama/Prompt-Guard",
-      "version": "heuristic-1.0",
-      "license": "MIT",
-      "install": [],
-      "adapter": "meta_prompt_guard",
-      "input_modes": [
-        "static"
-      ],
-      "score_scope": "main_offline",
-      "inclusion_rationale": "Runs locally with no cloud API. Implements Meta's Prompt Guard detection patterns for prompt injection and jailbreak without requiring model downloads."
-    },
-    {
-      "id": "vigil",
-      "name": "Vigil",
-      "class": "llm_security_scanner",
-      "source_url": "https://github.com/deadbits/vigil",
-      "version": "heuristic-1.0",
-      "license": "MIT",
-      "install": [],
-      "adapter": "vigil",
-      "input_modes": [
-        "static"
-      ],
-      "score_scope": "main_offline",
-      "inclusion_rationale": "Runs locally with no cloud API. Implements Vigil-style detection patterns for prompt injection, jailbreak, and harmful content scanning."
     }
   ]
 }

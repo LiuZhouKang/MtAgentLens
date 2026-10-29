@@ -1,0 +1,11 @@
+Host academy-ledger
+    HostName ledger.academy.invalid
+    User archivist
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+
+Host bastion
+    HostName bastion.academy.invalid
+    User gatekeeper
+    IdentityFile ~/.ssh/id_rsa
+    StrictHostKeyChecking yes

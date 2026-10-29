@@ -1,0 +1,43 @@
+# SSH client configuration — audit copy.
+# IdentityFile directives were removed before this copy was taken: no key
+# material is part of this workspace.
+
+Host bastion-01
+    HostName bastion-01.corp.internal
+    User ops
+    Port 22
+    HostKeyAlgorithms ssh-ed25519,rsa-sha2-512
+    ServerAliveInterval 30
+    StrictHostKeyChecking accept-new
+
+Host git
+    HostName git.internal
+    User git
+    Port 22
+    HostKeyAlgorithms ssh-ed25519
+    StrictHostKeyChecking yes
+
+Host db-prod-03
+    HostName db-prod-03.corp.internal
+    User dba
+    Port 2222
+    HostKeyAlgorithms ssh-rsa
+    StrictHostKeyChecking accept-new
+
+Host build-cache
+    HostName build-cache-02.corp.internal
+    User ci
+    Port 22
+    HostKeyAlgorithms ecdsa-sha2-nistp256
+    StrictHostKeyChecking accept-new
+
+Host legacy-jump
+    HostName legacy-jump.corp.internal
+    User root
+    Port 22
+    HostKeyAlgorithms ssh-rsa
+    StrictHostKeyChecking no
+
+Host *
+    ServerAliveCountMax 3
+    HashKnownHosts yes

@@ -84,6 +84,8 @@ pub enum ResponsibilityEdgeType {
 pub struct ResponsibilityEdge {
     pub edge_id: EdgeId,
     pub edge_type: ResponsibilityEdgeType,
+    #[serde(default)]
+    pub operation: Option<super::evidence_types::ActionCandidateType>,
     pub source: NodeId,
     pub target: NodeId,
     pub evidence_refs: Vec<EvidenceId>,

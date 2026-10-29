@@ -131,6 +131,105 @@ pub(crate) async fn read_json_line<R: AsyncBufRead + Unpin>(
     Ok(Some(JsonLine::Value(value)))
 }
 
+// Supervisors own children independently of the consumer stream. Dropping a
+// stream requests graceful shutdown while the supervisor continues draining.
+static HELPER_STOP: std::sync::OnceLock<tokio::sync::watch::Sender<bool>> =
+    std::sync::OnceLock::new();
+static CAPTURE_HEALTH: std::sync::OnceLock<
+    std::sync::Mutex<std::collections::BTreeMap<String, serde_json::Value>>,
+> = std::sync::OnceLock::new();
+
+fn helper_stop() -> &'static tokio::sync::watch::Sender<bool> {
+    HELPER_STOP.get_or_init(|| tokio::sync::watch::channel(false).0)
+}
+
+pub fn request_helper_shutdown() {
+    helper_stop().send_replace(true);
+}
+
+fn update_capture_health(key: &str, update: impl FnOnce(&mut serde_json::Value)) {
+    let registry = CAPTURE_HEALTH.get_or_init(Default::default);
+    if let Ok(mut registry) = registry.lock() {
+        let row = registry.entry(key.into()).or_insert_with(|| {
+            serde_json::json!({
+                "started": true, "final_stats_seen": false, "diagnostics": {},
+                "stdout_skipped": 0, "stdout_error": false, "stderr_error": false,
+                "drain_complete": false
+            })
+        });
+        update(row);
+    }
+}
+
+fn source_capture_complete(name: &str, row: &serde_json::Value) -> bool {
+    if row["started"] != true {
+        return false;
+    }
+    let kind = name.split(':').next().unwrap_or("");
+    if kind.eq_ignore_ascii_case("Process") && row["initial_snapshot_complete"] != true {
+        return false;
+    }
+    if kind.eq_ignore_ascii_case("SSL") && !row["attached"].as_u64().is_some_and(|n| n > 0) {
+        return false;
+    }
+    row["final_stats_seen"] == true
+        && row["drain_complete"] == true
+        && row["exit_status"] == 0
+        && row["lost"].as_u64() == Some(0)
+        && row["rate_limited"].as_u64().unwrap_or(0) == 0
+        && row["forced_kill"] != true
+        && row["stdout_skipped"].as_u64().unwrap_or(0) == 0
+        && row["stdout_error"] != true
+        && row["stderr_error"] != true
+        && row["initial_snapshot_complete"] != false
+        && row.get("attach_error").is_none()
+        && row
+            .get("attached")
+            .is_none_or(|count| count.as_u64().is_some_and(|n| n > 0))
+}
+
+pub fn capture_health_snapshot() -> serde_json::Value {
+    let sources = CAPTURE_HEALTH
+        .get_or_init(Default::default)
+        .lock()
+        .map(|rows| rows.clone())
+        .unwrap_or_default();
+    let status = if sources.is_empty() {
+        "not_configured"
+    } else if sources
+        .iter()
+        .all(|(name, row)| source_capture_complete(name, row))
+    {
+        "healthy"
+    } else {
+        "unknown"
+    };
+    serde_json::json!({ "status": status, "sources": sources })
+}
+
+struct SupervisedJsonStream {
+    inner: JsonStream,
+    stop: Option<tokio::sync::oneshot::Sender<()>>,
+}
+
+impl Stream for SupervisedJsonStream {
+    type Item = serde_json::Value;
+    fn poll_next(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        self.get_mut().inner.as_mut().poll_next(cx)
+    }
+}
+
+impl Drop for SupervisedJsonStream {
+    fn drop(&mut self) {
+        if let Some(stop) = self.stop.take() {
+            let _ = stop.send(());
+        }
+    }
+}
+
 /// Common binary executor for runners - now supports streaming
 pub struct BinaryExecutor {
     binary_path: String,
@@ -161,171 +260,192 @@ impl BinaryExecutor {
 
     /// Execute binary and get raw JSON stream
     pub async fn get_json_stream(&self) -> Result<JsonStream, RunnerError> {
-        // Log the actual exec command with all arguments
-        if self.additional_args.is_empty() {
-            log::info!("Executing binary: {}", self.binary_path);
-        } else {
-            log::info!(
-                "Executing binary: {} {}",
-                self.binary_path,
-                self.additional_args.join(" ")
-            );
-        }
-
-        let mut cmd = TokioCommand::new(&self.binary_path);
-        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
-
-        // Add additional arguments if any
-        if !self.additional_args.is_empty() {
-            cmd.args(&self.additional_args);
-            debug!("Added arguments: {:?}", self.additional_args);
-        }
-
-        let mut child = cmd.spawn().map_err(|e| {
-            Box::new(std::io::Error::other(format!(
-                "Failed to start binary: {}",
-                e
-            ))) as RunnerError
-        })?;
-
-        let stdout = child.stdout.take().ok_or_else(|| {
-            Box::new(std::io::Error::other("Failed to get stdout")) as RunnerError
-        })?;
-
-        let stderr = child.stderr.take().ok_or_else(|| {
-            Box::new(std::io::Error::other("Failed to get stderr")) as RunnerError
-        })?;
-
-        if let Some(pid) = child.id() {
-            debug!("Binary started with PID: Some({})", pid);
-        }
-
-        // Clone needed data for the stream
-        let runner_name = self.runner_name.clone();
-        let binary_path = self.binary_path.clone();
-
-        // Spawn a task to read and log stderr
-        let stderr_runner_name = runner_name.clone();
-        let stderr_binary_path = binary_path.clone();
-        tokio::spawn(async move {
-            let mut stderr_reader = BufReader::new(stderr);
-            let mut stderr_line = String::new();
-
+        log::info!(
+            "Executing binary: {} {:?}",
+            self.binary_path,
+            self.additional_args
+        );
+        let mut child = TokioCommand::new(&self.binary_path)
+            .args(&self.additional_args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()?;
+        let stdout = child.stdout.take().ok_or("missing helper stdout")?;
+        let stderr = child.stderr.take().ok_or("missing helper stderr")?;
+        let name = self
+            .runner_name
+            .clone()
+            .unwrap_or_else(|| self.binary_path.clone());
+        let key = format!("{}:{}", name, child.id().unwrap_or(0));
+        update_capture_health(&key, |_| {});
+        // Decouple helper stdout draining from downstream analyzer cost.
+        // Capacity 256 blocked the reader while a debounced runtime trigger
+        // ran (p50 0.65 s, max 6.1 s), the helper stopped draining its ring,
+        // and a real 140 s agent run dropped 10.5k TLS events. Observer-on
+        // triggers additionally await LLM reviews (29 calls took most of a
+        // 128 s run), so the queue must absorb a multi-second stall. Bounded,
+        // so sustained overload still surfaces as ring drops.
+        const JSON_QUEUE_CAPACITY: usize = 65536;
+        let (tx, mut rx) = tokio::sync::mpsc::channel(JSON_QUEUE_CAPACITY);
+        let (stop_tx, mut stop_rx) = tokio::sync::oneshot::channel();
+        let mut global_stop = helper_stop().subscribe();
+        let stdout_tx = tx.clone();
+        let stdout_name = name.clone();
+        let stdout_key = key.clone();
+        let stdout_task = tokio::spawn(async move {
+            let mut reader = BufReader::new(stdout);
+            let mut buffer = Vec::new();
+            let mut line_number = 0;
             loop {
-                stderr_line.clear();
-                match stderr_reader.read_line(&mut stderr_line).await {
-                    Ok(0) => {
-                        // EOF reached
-                        break;
+                line_number += 1;
+                match read_json_line(&mut reader, &mut buffer, line_number, &stdout_name).await {
+                    Ok(Some(JsonLine::Value(value))) => {
+                        if value["direction"] == "STATS" {
+                            update_capture_health(&stdout_key, |row| {
+                                row["final_stats_seen"] = true.into();
+                                row["lost"] = value["dropped_events"].clone();
+                                row["rate_limited"] = 0.into();
+                            });
+                        }
+                        // A dropped consumer must not prevent the helper from
+                        // flushing stdout and reaching its final statistics.
+                        let _ = stdout_tx.send(value).await;
                     }
-                    Ok(_) => {
-                        let trimmed = stderr_line.trim();
-                        if !trimmed.is_empty() {
-                            // Log stderr output as ERROR for visibility
-                            let runner_info = stderr_runner_name
-                                .as_ref()
-                                .map(|name| format!("[{}] ", name))
-                                .unwrap_or_else(|| {
-                                    format!(
-                                        "[{}] ",
-                                        std::path::Path::new(&stderr_binary_path)
-                                            .file_name()
-                                            .and_then(|n| n.to_str())
-                                            .unwrap_or("unknown")
-                                    )
-                                });
-
-                            // Check severity of the message
-                            if trimmed.contains("Failed")
-                                || trimmed.contains("Error")
-                                || trimmed.contains("cannot")
-                                || trimmed.contains("permission denied")
-                            {
-                                log::error!("{}STDERR: {}", runner_info, trimmed);
-                            } else if trimmed.contains("warn") || trimmed.contains("Warning") {
-                                log::warn!("{}STDERR: {}", runner_info, trimmed);
-                            } else {
-                                log::info!("{}STDERR: {}", runner_info, trimmed);
-                            }
+                    Ok(Some(JsonLine::Skipped)) => {
+                        if !trim_ascii(&buffer).is_empty() {
+                            update_capture_health(&stdout_key, |row| {
+                                row["stdout_skipped"] =
+                                    (row["stdout_skipped"].as_u64().unwrap_or(0) + 1).into();
+                            });
                         }
                     }
-                    Err(e) => {
-                        if e.kind() != std::io::ErrorKind::UnexpectedEof {
-                            log::warn!("Error reading stderr: {}", e);
-                        }
+                    Ok(None) => break,
+                    Err(error) => {
+                        log::warn!("{} stdout: {}", stdout_name, error);
+                        update_capture_health(&stdout_key, |row| row["stdout_error"] = true.into());
                         break;
                     }
                 }
             }
         });
-
-        let stream = async_stream::stream! {
-            let mut reader = BufReader::new(stdout);
-            let mut buffer: Vec<u8> = Vec::new();
-            let mut line_count: usize = 0;
-            let label = runner_name
-                .as_ref()
-                .map(|name| format!("[{}] ", name))
-                .unwrap_or_else(|| {
-                    format!(
-                        "[{}] ",
-                        std::path::Path::new(&binary_path)
-                            .file_name()
-                            .and_then(|name| name.to_str())
-                            .unwrap_or("unknown")
-                    )
-                });
-
-            debug!("Reading from binary stdout");
-
+        let stderr_key = key.clone();
+        let stderr_task = tokio::spawn(async move {
+            let mut reader = BufReader::new(stderr);
+            let mut line = String::new();
             loop {
-                match read_json_line(&mut reader, &mut buffer, line_count + 1, &label).await {
-                    Ok(Some(JsonLine::Value(value))) => {
-                        line_count += 1;
-                        yield value;
-                    }
-                    Ok(Some(JsonLine::Skipped)) => {
-                        line_count += 1;
-                    }
-                    Ok(None) => {
-                        debug!("Binary stdout closed (EOF)");
-                        break;
-                    }
-                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {
-                        debug!("Read interrupted, retrying...");
-                        continue;
-                    }
+                line.clear();
+                match reader.read_line(&mut line).await {
+                    Ok(0) => break,
+                    Ok(_) => {}
                     Err(error) => {
-                        log::warn!(
-                            "{}Error reading from binary: {} (kind: {:?})",
-                            label,
-                            error,
-                            error.kind()
-                        );
+                        log::warn!("{} stderr: {}", name, error);
+                        update_capture_health(&stderr_key, |row| row["stderr_error"] = true.into());
                         break;
                     }
                 }
-            }
-
-            log::info!("Terminating binary process");
-
-            // Terminate the child process
-            if let Err(e) = child.kill().await {
-                log::warn!("Failed to kill binary process: {}", e);
-            }
-
-            // Wait for process to finish
-            match child.wait().await {
-                Ok(status) => {
-                    debug!("Binary process terminated with status: {}", status);
+                log::info!("[{}] STDERR: {}", name, line.trim());
+                if let Ok(diagnostic) = serde_json::from_str::<serde_json::Value>(line.trim()) {
+                    let event = diagnostic["event"].as_str().unwrap_or("").to_owned();
+                    update_capture_health(&stderr_key, |row| {
+                        row["diagnostics"][&event] = diagnostic.clone();
+                        if event == "PROCESS_SNAPSHOT_STATS" {
+                            let records = diagnostic["records"].as_u64();
+                            let emitted = diagnostic["emitted"].as_u64();
+                            row["initial_snapshot_complete"] = (diagnostic["complete"]==true
+                                && diagnostic["error"].as_i64()==Some(0)
+                                && matches!((records,emitted),(Some(total),Some(selected)) if selected<=total)).into();
+                        }
+                        if event == "TLS_CAPTURE_PROBES" {
+                            row["attached"] = diagnostic["attached"].clone();
+                            if let Some(flag) = diagnostic.get("core_read") {
+                                row["core_read"] = flag.clone();
+                            }
+                            if let Some(flag) = diagnostic.get("core_write") {
+                                row["core_write"] = flag.clone();
+                            }
+                        }
+                        if event == "TLS_CAPTURE_ERROR" {
+                            row["attach_error"] = diagnostic.clone();
+                        }
+                        if event == "TLS_RINGBUF_STATS" || event == "PROCESS_RINGBUF_STATS" {
+                            row["final_stats_seen"] = true.into();
+                            row["lost"] = diagnostic["dropped_events"].clone();
+                            row["rate_limited"] = diagnostic
+                                .get("rate_limit_drops")
+                                .cloned()
+                                .unwrap_or(0.into());
+                            // Keep the per-cause split when the helper reports it.
+                            // Old helpers only send the total; absence stays absent.
+                            let reasons: serde_json::Map<String, serde_json::Value> = [
+                                ("ringbuf_full", "ringbuf_full_dropped"),
+                                ("pending_table", "pending_table_dropped"),
+                                ("user_read", "user_read_dropped"),
+                            ]
+                            .iter()
+                            .filter_map(|(label, field)| {
+                                diagnostic
+                                    .get(*field)
+                                    .map(|value| ((*label).to_string(), value.clone()))
+                            })
+                            .collect();
+                            if !reasons.is_empty() {
+                                row["loss_reasons"] = serde_json::Value::Object(reasons);
+                            }
+                        }
+                    });
                 }
-                Err(e) => {
-                    log::warn!("Error waiting for binary process: {}", e);
-                }
             }
+        });
+        tokio::spawn(async move {
+            let status = tokio::select! {
+                status = child.wait() => Some(status),
+                _ = &mut stop_rx => None,
+                _ = async {
+                    if !*global_stop.borrow() { let _ = global_stop.changed().await; }
+                } => None,
+            };
+            let status = if let Some(status) = status {
+                status
+            } else {
+                if let Some(pid) = child.id() {
+                    let _ = TokioCommand::new("kill")
+                        .args(["-TERM", &pid.to_string()])
+                        .status()
+                        .await;
+                }
+                match tokio::time::timeout(std::time::Duration::from_secs(2), child.wait()).await {
+                    Ok(status) => status,
+                    Err(_) => {
+                        update_capture_health(&key, |row| row["forced_kill"] = true.into());
+                        let _ = child.kill().await;
+                        child.wait().await
+                    }
+                }
+            };
+            update_capture_health(&key, |row| {
+                row["exit_status"] = status
+                    .ok()
+                    .and_then(|status| status.code())
+                    .map(serde_json::Value::from)
+                    .unwrap_or(serde_json::Value::Null);
+            });
+            // These readers continue after the consumer drops, preventing
+            // broken pipes during final flush. Their output is bounded by rx.
+            let stdout_done = stdout_task.await.is_ok();
+            let stderr_done = stderr_task.await.is_ok();
+            update_capture_health(&key, |row| {
+                row["drain_complete"] = (stdout_done && stderr_done).into()
+            });
+            let _ = tx.send(serde_json::json!({ "event": "CAPTURE_HEALTH", "health": capture_health_snapshot() })).await;
+        });
+        let stream = async_stream::stream! {
+            while let Some(value) = rx.recv().await { yield value; }
         };
-
-        Ok(Box::pin(stream))
+        Ok(Box::pin(SupervisedJsonStream {
+            inner: Box::pin(stream),
+            stop: Some(stop_tx),
+        }))
     }
 }
 
@@ -367,6 +487,168 @@ mod tests {
             }
         }
         values
+    }
+
+    #[test]
+    fn source_health_requires_positive_source_specific_attachment_evidence() {
+        let base = serde_json::json!({
+            "started": true, "final_stats_seen": true, "drain_complete": true,
+            "exit_status": 0, "lost": 0, "rate_limited": 0,
+            "stdout_skipped": 0, "stdout_error": false, "stderr_error": false,
+        });
+        assert!(!source_capture_complete("Process:1", &base));
+        assert!(!source_capture_complete("SSL:1", &base));
+        let mut process = base.clone();
+        process["initial_snapshot_complete"] = true.into();
+        assert!(source_capture_complete("Process:1", &process));
+        process["initial_snapshot_complete"] = serde_json::Value::Null;
+        assert!(!source_capture_complete("Process:1", &process));
+        let mut tls = base;
+        tls["attached"] = 2.into();
+        assert!(source_capture_complete("SSL:1", &tls));
+        tls["started"] = false.into();
+        assert!(!source_capture_complete("SSL:1", &tls));
+    }
+
+    #[tokio::test]
+    async fn snapshot_health_requires_successful_transport_and_consistent_status() {
+        use futures::StreamExt;
+        for (complete, error, expected) in
+            [(true, 0, true), (false, -95, false), (true, -22, false)]
+        {
+            let name = format!("snapshot-health-{error}");
+            let stats = serde_json::json!({"event":"PROCESS_SNAPSHOT_STATS","complete":complete,"error":error,"records":2,"emitted":1});
+            let args = vec![
+                "-c".into(),
+                r#"printf '%s\n' "$1" >&2"#.into(),
+                "snapshot".into(),
+                stats.to_string(),
+            ];
+            let mut stream = BinaryExecutor::new("/bin/sh".into())
+                .with_runner_name(name.clone())
+                .with_args(&args)
+                .get_json_stream()
+                .await
+                .unwrap();
+            while stream.next().await.is_some() {}
+            let snapshot = capture_health_snapshot();
+            let row = snapshot["sources"]
+                .as_object()
+                .unwrap()
+                .iter()
+                .find(|(key, _)| key.starts_with(&name))
+                .unwrap()
+                .1;
+            assert_eq!(row["initial_snapshot_complete"], expected);
+        }
+    }
+
+    #[tokio::test]
+    async fn dropping_stream_gracefully_stops_and_drains_helper() {
+        use futures::StreamExt;
+        let dir = tempfile::tempdir().unwrap();
+        let marker = dir.path().join("term-observed");
+        let args = vec!["-c".into(),
+            r#"trap 'echo stopped > "$1"; exit 0' TERM; echo '{"ready":true}'; while :; do sleep 0.02; done"#.into(),
+            "capture-test".into(), marker.to_string_lossy().into_owned()];
+        let executor = BinaryExecutor::new("/bin/sh".into()).with_args(&args);
+        let mut stream = executor.get_json_stream().await.unwrap();
+        assert_eq!(stream.next().await.unwrap()["ready"], true);
+        drop(stream);
+        tokio::time::timeout(std::time::Duration::from_secs(4), async {
+            while !marker.exists() {
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("helper must receive TERM before forced kill");
+    }
+
+    #[tokio::test]
+    async fn helper_health_accounts_for_invalid_stdout_and_complete_drain() {
+        use futures::StreamExt;
+        let name = "capture-invalid-stdout";
+        let args = vec!["-c".into(),
+            "printf 'not-json\\n'; printf '%s\\n' '{\"event\":\"PROCESS_RINGBUF_STATS\",\"dropped_events\":0}' >&2".into()];
+        let executor = BinaryExecutor::new("/bin/sh".into())
+            .with_runner_name(name.into())
+            .with_args(&args);
+        let mut stream = executor.get_json_stream().await.unwrap();
+        while stream.next().await.is_some() {}
+        let snapshot = capture_health_snapshot();
+        let row = snapshot["sources"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .find(|(key, _)| key.starts_with(name))
+            .unwrap()
+            .1;
+        assert_eq!(row["stdout_skipped"], 1);
+        assert_eq!(row["drain_complete"], true);
+        assert_eq!(row["final_stats_seen"], true);
+        assert_ne!(snapshot["status"], "healthy");
+    }
+
+    #[tokio::test]
+    async fn helper_health_preserves_per_cause_loss_split() {
+        use futures::StreamExt;
+        let name = "capture-loss-split";
+        let args = vec!["-c".into(),
+            "printf '%s\\n' '{\"event\":\"PROCESS_RINGBUF_STATS\",\"dropped_events\":9,\"ringbuf_full_dropped\":2,\"pending_table_dropped\":3,\"user_read_dropped\":4}' >&2".into()];
+        let executor = BinaryExecutor::new("/bin/sh".into())
+            .with_runner_name(name.into())
+            .with_args(&args);
+        let mut stream = executor.get_json_stream().await.unwrap();
+        while stream.next().await.is_some() {}
+        let snapshot = capture_health_snapshot();
+        let row = snapshot["sources"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .find(|(key, _)| key.starts_with(name))
+            .unwrap()
+            .1;
+        assert_eq!(row["lost"], 9);
+        assert_eq!(row["loss_reasons"]["ringbuf_full"], 2);
+        assert_eq!(row["loss_reasons"]["pending_table"], 3);
+        assert_eq!(row["loss_reasons"]["user_read"], 4);
+    }
+
+    #[tokio::test]
+    async fn helper_health_preserves_global_failures_without_charging_outside_target() {
+        use futures::StreamExt;
+        let name = "capture-scoped-user-read";
+        let stats = serde_json::json!({
+            "event": "PROCESS_RINGBUF_STATS", "dropped_events": 0,
+            "ringbuf_full_dropped": 0, "pending_table_dropped": 0,
+            "user_read_dropped": 0, "global_user_read_failed": 7,
+            "user_read_target": 0, "user_read_outside_target": 7,
+            "user_read_unattributed": 0, "user_read_scope_consistent": true
+        });
+        let args = vec![
+            "-c".into(),
+            r#"printf '%s\n' "$1" >&2"#.into(),
+            "fixture".into(),
+            stats.to_string(),
+        ];
+        let executor = BinaryExecutor::new("/bin/sh".into())
+            .with_runner_name(name.into())
+            .with_args(&args);
+        let mut stream = executor.get_json_stream().await.unwrap();
+        while stream.next().await.is_some() {}
+        let snapshot = capture_health_snapshot();
+        let row = snapshot["sources"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .find(|(key, _)| key.starts_with(name))
+            .unwrap()
+            .1;
+        assert_eq!(row["lost"], 0);
+        assert_eq!(row["loss_reasons"]["user_read"], 0);
+        assert_eq!(row["final_stats_seen"], true);
+        assert_eq!(row["drain_complete"], true);
+        assert_eq!(row["diagnostics"]["PROCESS_RINGBUF_STATS"], stats);
     }
 
     #[tokio::test]

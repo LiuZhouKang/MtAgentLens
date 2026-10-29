@@ -8,7 +8,7 @@ from compare.scripts.run.run_submission_package_gate import (
 )
 
 
-def test_submission_gate_accepts_current_package_without_pytest(tmp_path: Path) -> None:
+def test_submission_gate_blocks_missing_evidence_without_pytest(tmp_path: Path) -> None:
     output = tmp_path / "SUBMISSION_GATE.json"
 
     artifact = run_submission_gate(
@@ -18,10 +18,10 @@ def test_submission_gate_accepts_current_package_without_pytest(tmp_path: Path) 
     )
 
     assert artifact["schema"] == "mtagentlens.submission_package_gate.v1"
-    assert artifact["status"] == "ready_without_pytest"
-    assert artifact["readiness"]["overall_status"] == "ready"
-    assert artifact["submission_audit"]["overall_status"] == "ready_with_external_author_actions"
-    assert artifact["stale_claim_scan"]["status"] == "pass"
+    assert artifact["status"] == "blocked"
+    assert artifact["readiness"]["overall_status"] == "blocked"
+    assert artifact["submission_audit"]["overall_status"] == "blocked"
+    assert artifact["stale_claim_scan"]["status"] == "blocker"
     assert artifact["stale_claim_scan"]["matches"] == []
     assert artifact["pytest"]["status"] == "skipped"
     assert output.exists()
@@ -30,7 +30,8 @@ def test_submission_gate_accepts_current_package_without_pytest(tmp_path: Path) 
 def test_stale_claim_scan_covers_manuscript_entrypoints() -> None:
     artifact = scan_stale_claims()
 
-    assert artifact["status"] == "pass"
+    assert artifact["status"] == "blocker"
+    assert artifact["missing_paths"]
     assert artifact["matches"] == []
     scanned = set(artifact["scanned_paths"])
     assert "compare/results/paper/README.md" in scanned

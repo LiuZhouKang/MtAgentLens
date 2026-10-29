@@ -3,13 +3,14 @@
 // SignalSnapshot — immutable point-in-time view of the signal graph.
 // Packaged in Arc for shared ownership across async tasks and queries.
 
-use crate::responsibility::types::{MessageId, ProcessId, TlsSessionId};
+use crate::responsibility::types::{MessageId, NativeToolCallObservation, ProcessId, TlsSessionId};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 // ─── ProcessMetadata ─────────────────────────────────────────────────
 
 /// Metadata tracked for a single process.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProcessMetadata {
     /// Composite process identity (pid + start_time_ns).
     pub process_id: ProcessId,
@@ -35,9 +36,8 @@ pub struct ProcessMetadata {
     pub cmdline: Option<String>,
     /// Executable path, from the EXEC event's `filename`.
     pub exe_path: Option<String>,
-    /// cgroup unit name, captured in user space from `/proc/<pid>/cgroup`.
-    ///
-    /// See `runtime::cgroup` for why this is read outside eBPF.
+    /// Optional unit name from a verified cgroup-object mapping.
+    /// Live EXEC leaves this unknown; numeric kernel PIDs cannot safely index procfs.
     pub cgroup_unit: Option<String>,
 }
 
@@ -92,10 +92,23 @@ pub struct TlsCollision {
     pub process_b: ProcessId,
 }
 
+/// A request-declared conversation anchor bound to the observed process and
+/// message that carried it.
+///
+/// The declaration is captured from the LLM request body; it is not
+/// authenticated identity. The row keeps the message's observed process
+/// association so a shared process can be split for messages only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MessageConversationBinding {
+    pub process_id: ProcessId,
+    pub message_id: MessageId,
+    pub conversation_id: String,
+}
+
 // ─── SignalMetrics ───────────────────────────────────────────────────
 
 /// Aggregate metrics for a signal snapshot.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SignalMetrics {
     /// Total processes tracked.
     pub process_count: usize,
@@ -115,7 +128,7 @@ pub struct SignalMetrics {
 ///
 /// All query methods are read-only. The snapshot is cheap to clone
 /// (Arc ref-count) and safe to share across threads.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SignalSnapshot {
     /// All known processes.
     pub(crate) processes: HashMap<ProcessId, ProcessMetadata>,
@@ -125,10 +138,20 @@ pub struct SignalSnapshot {
     pub(crate) child_map: HashMap<ProcessId, Vec<ProcessId>>,
     /// TLS session → owning process.
     pub(crate) tls_to_process: HashMap<TlsSessionId, ProcessId>,
+    /// TLS session → every process observed on that session (append-only).
+    pub(crate) tls_participants: HashMap<TlsSessionId, Vec<ProcessId>>,
     /// TLS session → messages.
     pub(crate) tls_to_messages: HashMap<TlsSessionId, Vec<MessageId>>,
+    /// Conversation/session id → processes that carried it (third signal).
+    pub(crate) conversation_to_processes: HashMap<String, Vec<ProcessId>>,
+    /// Process → conversation ids it carried.
+    pub(crate) process_to_conversations: HashMap<ProcessId, Vec<String>>,
     /// Process → directly observed messages.
     pub(crate) direct_process_messages: HashMap<ProcessId, Vec<MessageId>>,
+    /// Request-declared message → conversation anchors (unauthenticated).
+    pub(crate) message_conversation_bindings: Vec<MessageConversationBinding>,
+    /// Structured native tool-call references observed before intent dedup.
+    pub(crate) native_tool_call_observations: Vec<NativeToolCallObservation>,
     /// Thread ID → owning process.
     pub(crate) thread_to_process: HashMap<u32, ProcessId>,
     /// Pre-computed metrics.
@@ -229,11 +252,12 @@ impl SignalSnapshot {
     /// processes (bash, git, etc.) are covered via ancestor traversal.
     pub fn has_agent_ancestry(&self, process_id: ProcessId) -> bool {
         use crate::responsibility::identity::union_find::{
-            has_identity_boundary, is_agent_cgroup, is_agent_comm, is_agent_exe,
+            has_identity_boundary, is_agent_comm, is_agent_exe,
         };
 
-        // With an explicit cgroup/exe boundary, TLS alone must not qualify a
-        // process: every Node app runs as `MainThread` and can open TLS.
+        // With an explicit executable-path boundary, TLS alone must not
+        // qualify a process: every Node app runs as `MainThread` and can open
+        // TLS.
         let strict = has_identity_boundary();
         let is_agent = |pid: ProcessId| -> bool {
             if !strict && !self.tls_sessions_for_process(pid).is_empty() {
@@ -243,9 +267,6 @@ impl SignalSnapshot {
                 return false;
             };
             if is_agent_comm(&meta.comm) {
-                return true;
-            }
-            if meta.cgroup_unit.as_deref().is_some_and(is_agent_cgroup) {
                 return true;
             }
             if meta.exe_path.as_deref().is_some_and(is_agent_exe)
@@ -298,6 +319,27 @@ impl SignalSnapshot {
     // ── TLS queries ────────────────────────────────────────────────
 
     /// All TLS sessions observed for a given process.
+    /// Conversation/session ids carried by a process.
+    pub fn conversations_for_process(&self, process_id: ProcessId) -> &[String] {
+        self.process_to_conversations
+            .get(&process_id)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Processes that carried a conversation id.
+    pub fn processes_for_conversation(&self, conversation_id: &str) -> &[ProcessId] {
+        self.conversation_to_processes
+            .get(conversation_id)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// All observed conversation ids.
+    pub fn conversation_ids(&self) -> impl Iterator<Item = &String> {
+        self.conversation_to_processes.keys()
+    }
+
     pub fn tls_sessions_for_process(&self, process_id: ProcessId) -> Vec<TlsSessionId> {
         self.tls_to_process
             .iter()
@@ -346,6 +388,16 @@ impl SignalSnapshot {
         result
     }
 
+    /// All request-declared message → conversation anchors.
+    pub fn message_conversations(&self) -> &[MessageConversationBinding] {
+        &self.message_conversation_bindings
+    }
+
+    /// Structured native tool-call references frozen at PRE-resolver time.
+    pub fn native_tool_call_observations(&self) -> &[NativeToolCallObservation] {
+        &self.native_tool_call_observations
+    }
+
     // ── Thread queries ─────────────────────────────────────────────
 
     /// The process that owns a given thread (by tid).
@@ -378,8 +430,13 @@ mod tests {
             parent_map: HashMap::new(),
             child_map: HashMap::new(),
             tls_to_process: HashMap::new(),
+            tls_participants: HashMap::new(),
             tls_to_messages: HashMap::new(),
+            conversation_to_processes: HashMap::new(),
+            process_to_conversations: HashMap::new(),
             direct_process_messages: HashMap::new(),
+            message_conversation_bindings: Vec::new(),
+            native_tool_call_observations: Vec::new(),
             thread_to_process: HashMap::new(),
             metrics: SignalMetrics {
                 process_count: 0,
@@ -399,8 +456,13 @@ mod tests {
             parent_map: HashMap::new(),
             child_map: HashMap::new(),
             tls_to_process: HashMap::new(),
+            tls_participants: HashMap::new(),
             tls_to_messages: HashMap::new(),
+            conversation_to_processes: HashMap::new(),
+            process_to_conversations: HashMap::new(),
             direct_process_messages: HashMap::new(),
+            message_conversation_bindings: Vec::new(),
+            native_tool_call_observations: Vec::new(),
             thread_to_process: HashMap::new(),
             metrics: SignalMetrics {
                 process_count: 0,
@@ -422,8 +484,13 @@ mod tests {
             parent_map,
             child_map: HashMap::new(),
             tls_to_process: HashMap::new(),
+            tls_participants: HashMap::new(),
             tls_to_messages: HashMap::new(),
+            conversation_to_processes: HashMap::new(),
+            process_to_conversations: HashMap::new(),
             direct_process_messages: HashMap::new(),
+            message_conversation_bindings: Vec::new(),
+            native_tool_call_observations: Vec::new(),
             thread_to_process: HashMap::new(),
             metrics: SignalMetrics {
                 process_count: 0,
@@ -444,8 +511,13 @@ mod tests {
             parent_map: HashMap::new(),
             child_map: HashMap::new(),
             tls_to_process: HashMap::new(),
+            tls_participants: HashMap::new(),
             tls_to_messages: HashMap::new(),
+            conversation_to_processes: HashMap::new(),
+            process_to_conversations: HashMap::new(),
             direct_process_messages: HashMap::new(),
+            message_conversation_bindings: Vec::new(),
+            native_tool_call_observations: Vec::new(),
             thread_to_process: HashMap::new(),
             metrics: SignalMetrics {
                 process_count: 0,
@@ -470,8 +542,13 @@ mod tests {
             parent_map,
             child_map: HashMap::new(),
             tls_to_process: HashMap::new(),
+            tls_participants: HashMap::new(),
             tls_to_messages: HashMap::new(),
+            conversation_to_processes: HashMap::new(),
+            process_to_conversations: HashMap::new(),
             direct_process_messages: HashMap::new(),
+            message_conversation_bindings: Vec::new(),
+            native_tool_call_observations: Vec::new(),
             thread_to_process: HashMap::new(),
             metrics: SignalMetrics {
                 process_count: 0,

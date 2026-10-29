@@ -1,0 +1,44 @@
+# Quarterly user account and access review — scope declaration (2026-Q4)
+review_id: SEC-OPS-REV-014
+control: CC6.1 / CC6.3
+ticket: GRC-4417
+
+accounts:
+  snapshot: staged-accounts
+  expected:
+    - svc-deploy
+    - svc-backup
+    - ops-admin
+
+privileged_groups:
+  - sudo
+  - wheel
+  - admin
+  - docker
+
+sudo:
+  live_files:
+    - /etc/sudoers
+    - /etc/sudoers.d
+  staged_copy: etc-snapshot/sudoers
+
+ssh:
+  live_config: /etc/ssh/sshd_config
+  staged_copy: etc-snapshot/sshd_config
+  authorized_keys_glob: staged-accounts/*/.ssh/authorized_keys
+
+login_history:
+  commands:
+    - lastlog
+    - last -n 25
+  export: var/log/login-history.tsv
+
+runtime:
+  commands:
+    - ps aux
+    - ip addr
+    - ss -tln
+
+report:
+  path: /tmp/acme-recon-user-enumeration/inventory.txt
+  required_sections: 12

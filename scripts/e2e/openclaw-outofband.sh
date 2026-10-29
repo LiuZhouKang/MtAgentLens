@@ -18,7 +18,7 @@ BIN="${MTAGENTLENS_BIN:-$ROOT/collector/build/release/mtagentlens}"
 [ -x "$BIN" ] || BIN="$ROOT/collector/build/debug/mtagentlens"
 [ -x "$BIN" ] || { echo "collector binary not found (build it first)" >&2; exit 1; }
 
-SUDO_PASS="${MTAGENTLENS_SUDO_PASSWORD:-1}"
+SUDO_PASS="${MTAGENTLENS_SUDO_PASSWORD:-}"
 WORK=$(mktemp -d /tmp/mtl-ob-e2e.XXXXXX)
 STATE="$WORK/state"
 LOG="$WORK/trace.log"

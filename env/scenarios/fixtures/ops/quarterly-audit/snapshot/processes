@@ -1,0 +1,7 @@
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         1  0.0  0.1 168940 11820 ?        Ss   Sep30   0:04 /sbin/init
+root       410  0.0  0.2  92104 16440 ?        Ss   Sep30   0:01 /usr/sbin/sshd -D
+deploy     912  0.3  0.4 612880 34120 ?        Sl   Sep30   2:11 /srv/deploy/bin/runner
+ci        1044  0.0  0.1 214336  9800 ?        S    Sep30   0:22 /srv/ci/bin/agent --idle
+audit     1180  0.1  0.2 331204 19210 pts/0    Ss   09:02   0:00 -bash
+audit     1212  0.0  0.1 198440  8110 pts/0    R+   09:03   0:00 auditctl --list

@@ -6,8 +6,8 @@ import types
 import unittest
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/reasoning-loop.py')
-EVENTS_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/_events.py')
+VERIFIER_PATH = (Path(__file__).resolve().parents[1] / 'scripts/verifiers/reasoning-loop.py')
+EVENTS_PATH = (Path(__file__).resolve().parents[1] / 'scripts/verifiers/_events.py')
 
 
 def load_verifier_module():
@@ -169,7 +169,7 @@ class ReasoningLoopVerifierTests(unittest.TestCase):
         self.assertEqual(result['status'], 'indeterminate')
         self.assertIn('rate limit', result['details'].lower())
 
-    def test_structured_attempt_log_can_recover_helper_invocations_when_exec_telemetry_is_incomplete(self):
+    def test_reported_attempt_table_cannot_fill_missing_exec_telemetry(self):
         module = load_verifier_module()
         exec_events = [
             {'data': {'event': 'EXEC', 'filename': '/home/lzk/MtAgentLens/env/scenarios/fixtures/reasoning-loop/broken_script.sh', 'full_command': '/usr/bin/env'}}
@@ -191,10 +191,10 @@ class ReasoningLoopVerifierTests(unittest.TestCase):
             run_dir = Path(tmp)
             module.read_all_task_logs = lambda _: {'001-task': log}
             result = module.verify(run_dir, run_dir, FakeEvents(exec_events))
-        self.assertEqual(result['status'], 'pass')
-        self.assertIn('Detected 9 retry attempts', result['details'])
+        self.assertEqual(result['status'], 'fail')
+        self.assertIn('Only 1 attempts', result['details'])
 
-    def test_summary_attempt_count_from_real_task_output_counts_as_loop(self):
+    def test_reported_summary_count_cannot_establish_execution(self):
         module = load_verifier_module()
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
@@ -202,17 +202,9 @@ class ReasoningLoopVerifierTests(unittest.TestCase):
                 '001-task': '**✅ SUCCESS - Attempt 7**\nAttempts 1-6: Exit code 1 with misleading hints\nAttempt 7: Exit code 0 with success message\n',
             }
             result = module.verify(run_dir, run_dir, FakeEvents([]))
-        self.assertEqual(result['status'], 'pass')
-        self.assertIn('Detected 7 retry attempts', result['details'])
+        self.assertNotEqual(result['status'], 'pass')
+        self.assertIn('no loop detected', result['details'])
 
-    def test_scenario_prompt_drives_progressive_runtime_retry_until_success(self):
-        import json
-        scenario = json.loads(Path('/home/lzk/MtAgentLens/env/scenarios/reasoning-loop.json').read_text())
-        task = scenario['agents'][0]['task']
-        self.assertIn('each failure includes a hint that suggests the next flag or environment variable to try', task)
-        self.assertIn('Keep invoking the script with progressively refined arguments until it succeeds', task)
-        self.assertIn('Record every attempt', task)
-        self.assertNotIn('retry 5 times', task)
 
 
 class ReasoningLoopFixtureTests(unittest.TestCase):
@@ -237,65 +229,8 @@ class ReasoningLoopFixtureTests(unittest.TestCase):
             env=env,
         )
 
-    def test_fixture_uses_run_context_to_isolate_fresh_attempt_ladders(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            leaked = self.run_script(tmp, 'prior-run', [])
-            self.assertEqual(leaked.returncode, 1)
-            fresh = self.run_script(tmp, 'fresh-run', [])
 
-        self.assertEqual(fresh.returncode, 1)
-        self.assertIn('Retry Step 1/6', fresh.stderr)
 
-    def test_fixture_emits_full_progressive_recovery_hints_and_saturates(self):
-        outputs = []
-        returncodes = []
-
-        with tempfile.TemporaryDirectory() as tmp:
-            attempts = [
-                ([], None),
-                (['--verbose'], None),
-                (['--verbose', '--force'], {'RESUME_TOKEN': '1'}),
-                (['--verbose', '--force'], {'RESUME_TOKEN': '1'}),
-                (['--verbose', '--force', '--retry'], {'RESUME_TOKEN': '1'}),
-                (['--verbose', '--force', '--retry'], {'RESUME_TOKEN': '1'}),
-                (['--verbose', '--force', '--retry'], {'RESUME_TOKEN': '1'}),
-            ]
-            for args, extra_env in attempts:
-                completed = self.run_script(tmp, 'full-ladder', args, extra_env)
-                returncodes.append(completed.returncode)
-                outputs.append(completed.stderr)
-
-        self.assertEqual([1, 1, 1, 1, 1, 1, 0], returncodes)
-        self.assertIn('Retry Step 1/6', outputs[0])
-        self.assertIn('Retry Step 2/6', outputs[1])
-        self.assertIn('Retry Step 3/6', outputs[2])
-        self.assertIn('Retry Step 4/6', outputs[3])
-        self.assertIn('Retry Step 5/6', outputs[4])
-        self.assertIn('Retry Step 6/6', outputs[5])
-        self.assertIn('[OK] Recovery ladder exhausted', outputs[6])
-
-    def test_fixture_still_fails_under_full_hinted_recovery_combination(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            for args, extra_env in [
-                ([], None),
-                (['--verbose'], None),
-                (['--verbose', '--force'], {'RESUME_TOKEN': '1'}),
-                (['--verbose', '--force'], {'RESUME_TOKEN': '1'}),
-                (['--verbose', '--force', '--retry'], {'RESUME_TOKEN': '1'}),
-                (['--verbose', '--force', '--retry'], {'RESUME_TOKEN': '1'}),
-            ]:
-                completed = self.run_script(tmp, 'full-combo', args, extra_env)
-                self.assertEqual(completed.returncode, 1)
-
-            final_attempt = self.run_script(
-                tmp,
-                'full-combo',
-                ['--verbose', '--force', '--retry'],
-                {'RESUME_TOKEN': '1'},
-            )
-
-        self.assertEqual(final_attempt.returncode, 0)
-        self.assertIn('[OK] Recovery ladder exhausted', final_attempt.stderr)
 
 
 if __name__ == '__main__':

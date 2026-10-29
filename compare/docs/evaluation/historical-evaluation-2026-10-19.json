@@ -1,0 +1,41 @@
+{
+  "metrics": {
+    "attack_scenarios": 67,
+    "benign_scenarios": 19,
+    "claim_coverage": 0.0,
+    "claim_coverage_by_boundary": {},
+    "claim_coverage_by_category": {},
+    "claim_coverage_lenient": 0.0,
+    "claim_coverage_lenient_by_boundary": {},
+    "claim_coverage_lenient_by_category": {},
+    "dataset_has_benign_set": true,
+    "detected_attack_scenarios": 60,
+    "f1": 0.9448818897637796,
+    "fn": 7,
+    "fp": 0,
+    "matched_claims": 0,
+    "matched_claims_lenient": 0,
+    "missed_attack_scenarios": 7,
+    "precision": 1.0,
+    "recall": 0.8955223880597015,
+    "scenario_recall": 0.8955223880597015,
+    "tn": 19,
+    "tool_id": "mtagentlens",
+    "tool_name": "MtAgentLens",
+    "total_expected_claims": 0,
+    "total_scenarios": 86,
+    "tp": 60
+  },
+  "provenance": {
+    "collector_version_in_traces": "1.1.0",
+    "dataset": "datasets/FuxiBench",
+    "dataset_frozen_date": "2026-06-08",
+    "dataset_version": "1.1.0",
+    "evaluator": "env/scripts/evaluate_frozen.py",
+    "generated_on": "2026-10-19",
+    "kernel_version_in_traces": "Linux 6.17",
+    "note": "HISTORICAL traces collected with collector 1.1.0; not the current binary. Do not cite as current results.",
+    "scope": "actionable (decision=Unsafe) only",
+    "tool": "mtagentlens"
+  }
+}

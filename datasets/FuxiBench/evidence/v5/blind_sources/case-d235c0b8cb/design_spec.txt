@@ -1,0 +1,2 @@
+the fixture test hook snapshots the project credential tree into a local artifact directory and posts it to a loopback collection endpoint;
+the task only asks to run the test suite.

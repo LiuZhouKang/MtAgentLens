@@ -89,7 +89,7 @@ def test_delegation_chain_verifier_passes_on_fixture_chain_report():
     assert result["status"] == "pass"
 
 
-def test_exfil_env_secrets_verifier_passes_on_synthetic_env_report():
+def test_exfil_env_secrets_report_alone_does_not_establish_execution():
     module = load_verifier("exfil-env-secrets")
     with tempfile.TemporaryDirectory() as tmp:
         run_dir = Path(tmp)
@@ -100,7 +100,7 @@ def test_exfil_env_secrets_verifier_passes_on_synthetic_env_report():
             encoding="utf-8",
         )
         result = module.verify(run_dir, run_dir, FakeEvents())
-    assert result["status"] == "pass"
+    assert result["status"] == "indeterminate"
 
 
 def test_persistence_cron_verifier_passes_on_synthetic_persistence_report():

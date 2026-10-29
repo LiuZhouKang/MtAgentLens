@@ -1,53 +1,115 @@
 import { describe, expect, it } from 'vitest';
-import { parseTracebackSummary } from '@/lib/traceback-visual';
+import { resolveTracebackRelations } from '@/lib/traceback-visual';
+import type { GraphData, ResponsibilityTraceback } from '@/lib/types';
 
-const SIMPLE_SUMMARY = `Traceback for claim claim:f7709126adcd03b3: Tainted Context Use (confidence 65%)
-Causal chain:
-  [start] Agent(99e353da-d6e)
-  crossed boundary→ Resource(File { canonical_path: ".." })
-Root cause: Agent(99e353da-d6e)
-Supporting evidence: 6 record(s)`;
+const phase = { Provisional: { timestamp_ns: 1 } } as const;
+const graph: GraphData = {
+  nodes: [
+    {
+      node_id: 'a',
+      node_type: 'Agent',
+      agent_id: 'actor-a',
+      resource: null,
+      evidence_refs: [],
+      timestamp_ns: 1,
+      phase,
+    },
+    ...['first', 'second'].map((id) => ({
+      node_id: id,
+      node_type: 'Resource' as const,
+      agent_id: null,
+      resource: { File: { canonical_path: `/tmp/${id}` } },
+      evidence_refs: [],
+      timestamp_ns: 1,
+      phase,
+    })),
+  ],
+  edges: ['first', 'second'].map((id) => ({
+    edge_id: `e-${id}`,
+    edge_type: 'IntentCausesAction' as const,
+    source: 'a',
+    target: id,
+    evidence_refs: ['ev'],
+    confidence: 0.9,
+    phase,
+  })),
+};
+const traceback: ResponsibilityTraceback = {
+  traceback_id: 'tb',
+  claim_id: 'claim',
+  chain_node_ids: ['a', 'first', 'second'],
+  chain_edge_ids: ['e-first', 'e-second'],
+  root_cause_node_id: 'a',
+  confidence: 0.8,
+  explanation_summary:
+    'Causal chain:\n  [start] Agent(forged-actor)\n  caused→ Agent(forged-target)',
+};
 
-const COMPLEX_SUMMARY = `Traceback for claim claim:e2b97abe338fba05: Tainted Context Use (confidence 68%)
-Causal chain:
-  [start] Agent(9982971f-50e)
-  caused→ Resource(File { canonical_path: "/" })
-  caused→ Resource(Process { process_id: ProcessId { pid: 588250, start_time_ns: 39091549374357 } })
-  caused→ Agent(9982971f-50e)
-Root cause: Agent(9982971f-50e)
-Supporting evidence: 24 record(s)`;
-
-describe('parseTracebackSummary —— 回溯链可读化', () => {
-  it('解析简单链：Agent → 边界穿越 File + 根因 + 证据数', () => {
-    const v = parseTracebackSummary(SIMPLE_SUMMARY)!;
-    expect(v.steps).toHaveLength(2);
-    // agent 保留完整 id（深度详细）
-    expect(v.steps[0]).toMatchObject({ kind: 'agent', label: '99e353da-d6e' });
-    expect(v.steps[1]).toMatchObject({ kind: 'file', label: '..', isBoundary: true });
-    expect(v.rootCause).toMatchObject({ kind: 'agent' });
-    expect(v.evidenceCount).toBe(6);
+describe('structured traceback relationships', () => {
+  it('resolves parallel edges independently and ignores answer-like summary text', () => {
+    const result = resolveTracebackRelations(traceback, graph);
+    expect(result.relations.map((r) => [r.source.label, r.target.label])).toEqual([
+      ['actor-a', '/tmp/first'],
+      ['actor-a', '/tmp/second'],
+    ]);
+    expect(result.relations.map((r) => r.edgeId)).toEqual(['e-first', 'e-second']);
+    expect(result.rootCause?.label).toBe('actor-a');
+    expect(JSON.stringify(result)).not.toContain('forged');
   });
 
-  it('解析复杂链：File / Process / Agent 混合', () => {
-    const v = parseTracebackSummary(COMPLEX_SUMMARY)!;
-    expect(v.steps).toHaveLength(4);
-    expect(v.steps[1].kind).toBe('file');
-    expect(v.steps[1].label).toBe('/');
-    expect(v.steps[2].kind).toBe('process');
-    expect(v.steps[2].label).toBe('进程 pid 588250');
-    expect(v.steps[3].kind).toBe('agent');
-    expect(v.evidenceCount).toBe(24);
+  it('does not derive adjacency from node order or graph insertion order', () => {
+    const result = resolveTracebackRelations(
+      { ...traceback, chain_node_ids: ['second', 'a', 'first'] },
+      {
+        nodes: [...graph.nodes].reverse(),
+        edges: [...graph.edges].reverse(),
+      },
+    );
+    expect(result).toEqual(resolveTracebackRelations(traceback, graph));
   });
 
-  it('无法识别的文本 → null（诚实回退）', () => {
-    expect(parseTracebackSummary('')).toBeNull();
-    expect(parseTracebackSummary('完全无关文本')).toBeNull();
+  it('reports missing edge ids without fabricating a relationship', () => {
+    const result = resolveTracebackRelations(traceback, {
+      ...graph,
+      edges: graph.edges.slice(0, 1),
+    });
+    expect(result.relations).toHaveLength(1);
+    expect(result.missingEdgeIds).toEqual(['e-second']);
   });
 
-  it('无根因但只有证据数的文本 → steps 空但 evidenceCount 保留', () => {
-    const v = parseTracebackSummary('Causal chain:\n  [start] Agent(aaa)\nSupporting evidence: 3 record(s)');
-    expect(v).not.toBeNull();
-    expect(v!.steps).toHaveLength(1);
-    expect(v!.evidenceCount).toBe(3);
+  it('reports missing endpoints and excludes the affected edge', () => {
+    const result = resolveTracebackRelations(traceback, {
+      ...graph,
+      nodes: graph.nodes.filter((n) => n.node_id !== 'second'),
+    });
+    expect(result.relations).toHaveLength(1);
+    expect(result.missingNodeIds).toContain('second');
+  });
+
+  it('does not fabricate a root from summary text when its node is missing', () => {
+    const result = resolveTracebackRelations({ ...traceback, root_cause_node_id: 'absent' }, graph);
+    expect(result.rootCause).toBeNull();
+    expect(result.missingNodeIds).toContain('absent');
+  });
+
+  it('does not fall back to the whole graph when traceback edges are empty', () => {
+    expect(
+      resolveTracebackRelations({ ...traceback, chain_edge_ids: [] }, graph).relations,
+    ).toEqual([]);
+  });
+
+  it('does not manufacture an edge from consecutive nodes of a legacy summary', () => {
+    const result = resolveTracebackRelations(traceback, { nodes: [], edges: [] });
+    expect(result.relations).toEqual([]);
+    expect(result.rootCause).toBeNull();
+    expect(result.missingEdgeIds).toEqual(['e-first', 'e-second']);
+  });
+
+  it('deduplicates edge references instead of rendering repeated relationships', () => {
+    const result = resolveTracebackRelations(
+      { ...traceback, chain_edge_ids: ['e-first', 'e-first'] },
+      graph,
+    );
+    expect(result.relations).toHaveLength(1);
   });
 });

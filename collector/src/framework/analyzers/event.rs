@@ -6,6 +6,53 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
+/// Exact TLS-only fields observed on the original raw SSL/TLS event.
+///
+/// HTTP/SSE analyzers replace the wire `connection_id` with a display stream
+/// id and drop `ssl_ptr`. Keeping only these bounded source fields lets routing
+/// derive the same producer key without re-importing responsibility logic.
+fn captured_tls_metadata(original_event: &Event) -> Option<Value> {
+    if !(original_event.source.contains("ssl") || original_event.source.contains("tls")) {
+        return None;
+    }
+
+    let data = &original_event.data;
+    let mut captured = serde_json::Map::new();
+    for field in ["connection_id", "tls_session"] {
+        if let Some(value) = data.get(field).and_then(Value::as_str) {
+            captured.insert(field.to_string(), Value::String(value.to_string()));
+        }
+    }
+    if let Some(value) = data
+        .get("ssl_ptr")
+        .and_then(Value::as_u64)
+        .filter(|p| *p != 0)
+    {
+        captured.insert("ssl_ptr".to_string(), Value::from(value));
+    }
+    if let Some(value) = data.get("pid").and_then(Value::as_u64).filter(|p| *p != 0) {
+        captured.insert("pid".to_string(), Value::from(value));
+    }
+    if let Some(value) = data
+        .get("start_time_ns")
+        .and_then(Value::as_u64)
+        .filter(|start| *start != 0)
+    {
+        captured.insert("start_time_ns".to_string(), Value::from(value));
+    }
+
+    (!captured.is_empty()).then_some(Value::Object(captured))
+}
+
+fn with_captured_tls(mut data: Value, original_event: &Event) -> Value {
+    if let Some(captured) = captured_tls_metadata(original_event)
+        && let Some(object) = data.as_object_mut()
+    {
+        object.insert("captured_tls".to_string(), captured);
+    }
+    data
+}
+
 /// SSE Processor Event - represents a complete SSE interaction with timing information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SSEProcessorEvent {
@@ -63,7 +110,10 @@ impl SSEProcessorEvent {
 
     pub fn to_event(&self, original_event: &Event) -> Event {
         // Serialize struct to JSON Value to ensure exact match with struct fields
-        let data = serde_json::to_value(self).unwrap_or_else(|_| serde_json::json!({}));
+        let data = with_captured_tls(
+            serde_json::to_value(self).unwrap_or_else(|_| serde_json::json!({})),
+            original_event,
+        );
 
         // Use merged end_time if events were merged, otherwise use original timestamp
         let timestamp = if self.event_count > 1 {
@@ -148,7 +198,10 @@ impl HTTPEvent {
 
     pub fn to_event(&self, original_event: &Event) -> Event {
         // Serialize struct to JSON Value to ensure exact match with struct fields
-        let data = serde_json::to_value(self).unwrap_or_else(|_| serde_json::json!({}));
+        let data = with_captured_tls(
+            serde_json::to_value(self).unwrap_or_else(|_| serde_json::json!({})),
+            original_event,
+        );
 
         Event::new_with_timestamp(
             original_event.timestamp, // Use original event timestamp directly
@@ -157,5 +210,109 @@ impl HTTPEvent {
             original_event.comm.clone(),
             data,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn raw_ssl(data: Value) -> Event {
+        Event::new_with_timestamp(7, "ssl".into(), 42, "curl".into(), data)
+    }
+
+    fn http_event(body: &str) -> HTTPEvent {
+        HTTPEvent::new(
+            7,
+            "request".into(),
+            "POST /v1/messages HTTP/1.1".into(),
+            Some("POST".into()),
+            Some("/v1/messages".into()),
+            Some("HTTP/1.1".into()),
+            None,
+            None,
+            HashMap::new(),
+            Some(body.into()),
+            body.len(),
+            true,
+            false,
+            None,
+            "ssl".into(),
+        )
+    }
+
+    fn sse_event(stream_id: &str) -> SSEProcessorEvent {
+        SSEProcessorEvent::new(
+            stream_id.into(),
+            Some("msg-1".into()),
+            7,
+            8,
+            "ssl".into(),
+            "READ/RECV".into(),
+            7,
+            "{}".into(),
+            "{}".into(),
+            2,
+            1,
+            true,
+            vec![],
+        )
+    }
+
+    #[test]
+    fn projections_preserve_only_the_raw_tls_source_fields() {
+        let raw = raw_ssl(json!({
+            "connection_id": "raw-conn",
+            "tls_session": "raw-session",
+            "ssl_ptr": 4096,
+            "pid": 42,
+            "start_time_ns": 99,
+            "data": "GET /secret HTTP/1.1",
+        }));
+        let expected = json!({
+            "connection_id": "raw-conn",
+            "tls_session": "raw-session",
+            "ssl_ptr": 4096,
+            "pid": 42,
+            "start_time_ns": 99,
+        });
+
+        let http = http_event("{}").to_event(&raw);
+        assert_eq!(http.data["captured_tls"], expected);
+        assert!(http.data["captured_tls"].get("data").is_none());
+        assert_eq!(http.data["connection_id"], Value::Null);
+
+        let sse = sse_event("42:7:display-stream").to_event(&raw);
+        assert_eq!(sse.data["connection_id"], "42:7:display-stream");
+        assert_eq!(sse.data["captured_tls"], expected);
+        assert!(sse.data["captured_tls"].get("data").is_none());
+    }
+
+    #[test]
+    fn non_tls_or_context_free_source_does_not_invent_captured_tls() {
+        let process = Event::new_with_timestamp(
+            7,
+            "process".into(),
+            42,
+            "curl".into(),
+            json!({"ssl_ptr": 4096}),
+        );
+        assert!(
+            http_event("{}")
+                .to_event(&process)
+                .data
+                .get("captured_tls")
+                .is_none()
+        );
+
+        let bare_ssl = raw_ssl(json!({"data": "GET / HTTP/1.1"}));
+        assert!(
+            sse_event("42:7:stream")
+                .to_event(&bare_ssl)
+                .data
+                .get("captured_tls")
+                .is_none()
+        );
     }
 }

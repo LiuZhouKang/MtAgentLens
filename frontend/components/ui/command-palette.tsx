@@ -18,7 +18,7 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
       id: 'reset',
       label: '回到全景视图',
       action: () => {
-        store.flyToLevel(0);
+        store.resetCamera();
         onClose();
       },
     },

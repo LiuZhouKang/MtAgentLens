@@ -702,7 +702,9 @@ def verify_c4_chain_integrity(run_dir: Path) -> Dict[str, Any]:
 
     # Determine status
     core_links = link_count_ab + link_count_bc
-    if completed_agents >= 3 and core_links == 0:
+    if completed_agents < 2:
+        status = "indeterminate"
+    elif core_links == 0:
         status = "fail"
     elif completed_agents >= 2 and core_links == 0 and (link_count_cd > 0 or bridge_count >= 2):
         status = "degraded"
@@ -751,6 +753,8 @@ def verify_c5_artifact_completeness(run_dir: Path, events: EventSource) -> Dict[
         else:
             missing.append(artifact)
             evidence.append(f"C5: {artifact} MISSING — degrading")
+
+    failures.extend(f"C5: Missing required artifact: {artifact}" for artifact in missing)
 
     # ── Optional artifacts ──
     for artifact in OPTIONAL_RUN_ARTIFACTS:
@@ -874,7 +878,7 @@ def verify_c6_handoff_artifacts(run_dir: Path) -> Dict[str, Any]:
         return {
             "layer": "C6",
             "status": "pass",
-            "evidence": evidence,
+            "evidence": evidence + failures,
             "details": "No handoff YAML artifacts to validate — .kiro/handoffs/ not present in run directory",
         }
 
@@ -904,6 +908,11 @@ def verify_c6_handoff_artifacts(run_dir: Path) -> Dict[str, Any]:
                 m = re.search(rf"{field}\s*:\s*[\"']?([^\"'\n#]+)", text)
                 if m:
                     handoff_data[f"_{field}_value"] = m.group(1).strip()
+
+            from_phase = handoff_data.get("_from_phase_value")
+            to_phase = handoff_data.get("_to_phase_value")
+            if from_phase and to_phase and to_phase not in VALID_TO_PHASES.get(from_phase, set()):
+                failures.append(f"C6: {hf.name}: Invalid phase transition {from_phase}→{to_phase}")
 
             # Check quality gates section
             if re.search(r"quality_gates\s*:", text):
@@ -949,28 +958,6 @@ def verify_c6_handoff_artifacts(run_dir: Path) -> Dict[str, Any]:
             else:
                 failures.append(f"C6: feature_name mismatch across handoffs: {unique_names}")
 
-        # Check phase transition validity
-        phase_pairs: List[Tuple[str, str]] = []
-        for ph in parsed_handoffs:
-            from_v = ph.get("_from_phase_value")
-            to_v = ph.get("_to_phase_value")
-            if from_v and to_v:
-                phase_pairs.append((from_v.strip('"').strip("'"), to_v.strip('"').strip("'")))
-
-        if phase_pairs:
-            valid_chain = all(
-                to_p in VALID_TO_PHASES.get(from_p, set())
-                for from_p, to_p in phase_pairs
-            )
-            if valid_chain:
-                evidence.append(f"C6: All phase transitions valid: {phase_pairs}")
-            else:
-                invalid = [
-                    f"{f}→{t}" for f, t in phase_pairs
-                    if t not in VALID_TO_PHASES.get(f, set())
-                ]
-                failures.append(f"C6: Invalid phase transitions: {invalid}")
-
         # Check temporal ordering (timestamps should be non-decreasing)
         timestamps = []
         for ph in parsed_handoffs:
@@ -1004,7 +991,7 @@ def verify_c6_handoff_artifacts(run_dir: Path) -> Dict[str, Any]:
     return {
         "layer": "C6",
         "status": status,
-        "evidence": evidence,
+        "evidence": evidence + failures,
         "details": (
             f"Handoff artifact format: {len(parsed_handoffs)} files checked, "
             f"{len(failures)} format issues"

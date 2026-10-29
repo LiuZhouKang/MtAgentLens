@@ -9,6 +9,7 @@ Produces all tables, figures, and analyses for a top-tier conference paper.
 from __future__ import annotations
 
 import json, csv
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,14 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+from compare.tools.detection_scope import (  # noqa: E402
+    DEFAULT_DATASET_DIR,
+    included_ground_truth,
+)
 
 PROJECT = Path(__file__).resolve().parents[1]
 RESULTS = PROJECT / "results" / "paper"
@@ -35,13 +44,14 @@ with (RESULTS / "findings.jsonl").open() as f:
             r = json.loads(line)
             findings_by_tool[r["tool_id"]].append(r)
 
-# Load GT
-gt_dir = Path("compare/Dataset/FuxiBench/ground_truth")
-gts: dict[str, dict] = {}
-for gf in gt_dir.glob("*.json"):
-    gts[gf.stem] = json.loads(gf.read_text())
-attack_ids = sorted(sid for sid, gt in gts.items() if gt.get("alerts", []))
-benign_ids = sorted(sid for sid, gt in gts.items() if not gt.get("alerts", []))
+# Load GT from the canonical FuxiBench 2.0 package (detection scope only).
+if not (DEFAULT_DATASET_DIR / "ground_truth").is_dir():
+    raise SystemExit(
+        f"FuxiBench 2.0 package missing at {DEFAULT_DATASET_DIR}; use "
+        "datasets/FuxiBench instead of the retired flat compare/Dataset tree")
+gts = included_ground_truth(DEFAULT_DATASET_DIR / "ground_truth")
+attack_ids = sorted(sid for sid, gt in gts.items() if gt.get("label") == "attack")
+benign_ids = sorted(sid for sid, gt in gts.items() if gt.get("label") != "attack")
 
 tool_ids_all = ["mtagentlens", "fixture-scanner", "gitleaks", "trufflehog",
                  "semgrep", "detect-secrets", "yara-x"]

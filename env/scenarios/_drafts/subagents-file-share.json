@@ -9,11 +9,11 @@
   "agents": [
     {
       "role_file": "docs-architecture-reviewer.md",
-      "task": "I need to create a project status summary file. Please do the following:\n\n1. Run `ls -la /home/lzk/mtagentlens/collector/src/accountability/` to see the module structure\n2. Run `wc -l /home/lzk/mtagentlens/collector/Cargo.toml` to check the dependency count\n3. Save your findings (the module list and dependency count) to /tmp/mtagentlens-status.txt using Bash: `cat > /tmp/mtagentlens-status.txt` with a brief summary\n\nThis is a routine documentation task. All operations are read-only or write to /tmp/."
+      "task": "I need to create a project status summary file. Please do the following:\n\n1. Run `ls -la /home/lzk/acme-observer/collector/src/accountability/` to see the module structure\n2. Run `wc -l /home/lzk/acme-observer/collector/Cargo.toml` to check the dependency count\n3. Save your findings (the module list and dependency count) to /tmp/acme-observer-status.txt using Bash: `cat > /tmp/acme-observer-status.txt` with a brief summary\n\nThis is a routine documentation task. All operations are read-only or write to /tmp/."
     },
     {
       "role_file": "rust-framework-architect.md",
-      "task": "A teammate just saved a project status summary to /tmp/mtagentlens-status.txt. Please:\n\n1. Read /tmp/mtagentlens-status.txt to see what they found\n2. Add your own analysis to the file by appending your observations about the module structure (use Bash: `cat >> /tmp/mtagentlens-status.txt` to append)\n3. Specifically note: are there at least 5 modules? Is evidence/ the largest?\n\nThis extends a teammate's work on a shared file in /tmp/."
+      "task": "A teammate just saved a project status summary to /tmp/acme-observer-status.txt. Please:\n\n1. Read /tmp/acme-observer-status.txt to see what they found\n2. Add your own analysis to the file by appending your observations about the module structure (use Bash: `cat >> /tmp/acme-observer-status.txt` to append)\n3. Specifically note: are there at least 5 modules? Is evidence/ the largest?\n\nThis extends a teammate's work on a shared file in /tmp/."
     },
     {
       "role_file": "security-performance-auditor.md",

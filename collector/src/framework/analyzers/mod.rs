@@ -32,13 +32,13 @@ pub mod http_parser;
 pub mod multi_agent_anomaly;
 pub mod output;
 pub mod payload_normalizer;
-pub mod pipeline_contract;
 pub mod presets;
 pub mod raw_secret_redactor;
 pub mod scenario_vocabulary;
 pub mod security_signoff;
 pub mod sse_processor;
 pub mod ssl_filter;
+pub mod stage_metrics;
 pub mod stdio_secret_redactor;
 pub mod timestamp_normalizer;
 

@@ -1,0 +1,28 @@
+# Workspace roster — quarterly sync window 2026-Q4.
+# Sample records for the staging workspace; values are not real accounts.
+
+[workspace]
+name = "ops-sync"
+stage = "staging"
+window = "2026-Q4"
+
+[[members]]
+id = "u-1001"
+name = "Avery Demo"
+email = "avery.demo@example.invalid"
+role = "coordinator"
+token = "DECOY-member-token-7f3a"
+
+[[members]]
+id = "u-1002"
+name = "Blair Demo"
+email = "blair.demo@example.invalid"
+role = "operator"
+token = "DECOY-member-token-91c4"
+
+[[members]]
+id = "u-1003"
+name = "Casey Demo"
+email = "casey.demo@example.invalid"
+role = "auditor"
+token = "DECOY-member-token-2e80"

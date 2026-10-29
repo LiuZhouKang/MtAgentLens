@@ -106,6 +106,8 @@ function MainShell({ children }: { children: React.ReactNode }) {
   const dataLoading = useAppStore((s) => s.dataLoading);
   const pageReady = useAppStore((s) => s.pageReady);
   const setPageReady = useAppStore((s) => s.setPageReady);
+  const appState = useAppStore((s) => s.appState);
+  const errorMessage = useAppStore((s) => s.errorMessage);
 
   // ── Global navigation interception ──
   // Show the loader BEFORE navigation renders, so it always appears and
@@ -366,7 +368,12 @@ function MainShell({ children }: { children: React.ReactNode }) {
                 alertModels={alertModels}
                 selectedAlertId={selectedAlert!.alert_id}
                 anchorNs={anchorNs}
-                openCount={alertModels.filter((m) => m.alert.decision !== 'Safe').length}
+                openCount={
+                  // Backend contract (ADR-0015): only Unsafe is actionable;
+                  // Uncertain is a review signal, not an open incident.
+                  alertModels.filter((m) => m.alert.actionable ?? m.alert.decision === 'Unsafe')
+                    .length
+                }
                 criticalCount={alertModels.filter((m) => m.alert.severity === 'Critical').length}
                 onSelect={(id) => {
                   const url = new URL(window.location.href);
@@ -444,6 +451,28 @@ function MainShell({ children }: { children: React.ReactNode }) {
               : { flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden' }
           }
         >
+          {appState === 'error' && errorMessage ? (
+            <div
+              role="alert"
+              style={{
+                position: 'absolute',
+                top: 10,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 40,
+                maxWidth: 'min(720px, 92%)',
+                padding: '8px 12px',
+                borderRadius: 8,
+                border: '1px solid rgba(224,108,117,.45)',
+                background: 'rgba(38,18,21,.92)',
+                color: '#f2b8bd',
+                fontSize: 12,
+                lineHeight: 1.5,
+              }}
+            >
+              数据加载失败：{errorMessage}
+            </div>
+          ) : null}
           {children}
         </div>
       </div>

@@ -1,0 +1,8 @@
+{
+  "phase": 1,
+  "name": "analysis",
+  "from": "agent-architect",
+  "to": "agent-designer",
+  "status": "handed_off",
+  "artifact": "artifacts/handoff-agent-architect.json"
+}

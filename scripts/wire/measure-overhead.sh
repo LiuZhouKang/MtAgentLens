@@ -19,10 +19,14 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DURATION="${1:-45}"
 OUT="${2:-$ROOT/docs/evaluation/overhead-baseline.json}"
-SUDO_PASS="${MTAGENTLENS_SUDO_PASSWORD:-1}"
+SUDO_PASS="${MTAGENTLENS_SUDO_PASSWORD:-}"
 BIN="$ROOT/collector/build/release/mtagentlens"
 [ -x "$BIN" ] || BIN="$ROOT/collector/build/debug/mtagentlens"
 CLAUDE_ELF="$(readlink -f "$(command -v claude)")"
+LITE="${MTL_LITE:-0}"
+WORKLOAD_RUNS="${MTL_WORKLOAD_RUNS:-1}"
+IDLE_SECONDS="${MTL_IDLE_SECONDS:-0}"
+PROFILE_LABEL="full"; [ "$LITE" = "1" ] && PROFILE_LABEL="observer-off"
 WORK_DIR="$(mktemp -d /tmp/mtl-overhead.XXXXXX)"
 LOG="$WORK_DIR/record.log"
 
@@ -46,14 +50,15 @@ trap cleanup EXIT INT TERM
 
 # Start the collector. `record` always enables the web server; use a port that
 # is unlikely to collide with the dev server (7395).
-printf '%s\n' "$SUDO_PASS" | sudo -S -p '' "$BIN" record \
-  -c claude --binary-path "$CLAUDE_ELF" -o "$LOG" --server-port 7396 \
+RECORD_ARGS=(record -c claude --binary-path "$CLAUDE_ELF" -o "$LOG" --server-port 7396)
+[ "$LITE" = "1" ] && RECORD_ARGS+=(--disable-responsibility-observer)
+printf '%s\n' "$SUDO_PASS" | sudo -S -p '' "$BIN" "${RECORD_ARGS[@]}" \
   >"$WORK_DIR/collector.out" 2>&1 &
 SUDO_PID=$!
 
 # sudo may fork; find the real collector process. Do NOT use `pgrep -P | head -1`:
-# the collector spawns the eBPF programs and a Python ONNX inference server, and
-# the first child is one of those. Do NOT readlink /proc/PID/exe either: the
+# the collector spawns the eBPF programs, and the first child is one of those.
+# Do NOT readlink /proc/PID/exe either: the
 # collector runs as root and a non-root readlink returns EACCES. cmdline is
 # world-readable, so match its first argument instead.
 COLLECTOR_PID=""
@@ -119,10 +124,17 @@ SAMPLES=0
 RSS_SAMPLES="$WORK_DIR/rss-samples.txt"
 : > "$RSS_SAMPLES"
 
-# Fixed workload, started after the collector is attached.
-( cd /tmp && timeout 60 claude -p "Reply with exactly: PONG. Do not use tools." \
-    >"$WORK_DIR/claude.out" 2>&1 ) &
-WORKLOAD_PID=$!
+# Fixed workload, started after the collector is attached. Idle runs skip it.
+WORKLOAD_PID=""
+if [ "$IDLE_SECONDS" = "0" ]; then
+  (
+    for run in $(seq 1 "$WORKLOAD_RUNS"); do
+      cd /tmp && timeout 60 claude -p "Reply with exactly: PONG. Do not use tools." \
+        >>"$WORK_DIR/claude.out" 2>&1
+    done
+  ) &
+  WORKLOAD_PID=$!
+fi
 
 while [ $(( $(date +%s) - START_EPOCH )) -lt "$DURATION" ]; do
   RSS="$(tree_rss_kib)"
@@ -142,7 +154,7 @@ END_EPOCH="$(date +%s)"
 ELAPSED=$((END_EPOCH - START_EPOCH))
 [ "$ELAPSED" -gt 0 ] || ELAPSED=1
 
-wait "$WORKLOAD_PID" 2>/dev/null || true
+[ -n "$WORKLOAD_PID" ] && wait "$WORKLOAD_PID" 2>/dev/null || true
 
 # Graceful SIGINT so phase 2 finalizes and the log is complete.
 sudo -n kill -INT "$COLLECTOR_PID" 2>/dev/null || \
@@ -158,11 +170,13 @@ LOG_BYTES="$(stat -c %s "$LOG" 2>/dev/null || echo 0)"
 CPU_TICKS=$((END_TICKS - START_TICKS))
 
 python3 - "$OUT" "$CPU_TICKS" "$CLK_TCK" "$ELAPSED" "$PEAK_RSS" "$EVENTS" \
-  "$LOG_BYTES" "$BIN" "$DURATION" "$WORK_DIR" "$PEAK_PROCESSES" "$RSS_SAMPLES" <<'PY'
+  "$LOG_BYTES" "$BIN" "$DURATION" "$WORK_DIR" "$PEAK_PROCESSES" "$RSS_SAMPLES" \
+  "$PROFILE_LABEL" "$WORKLOAD_RUNS" "$IDLE_SECONDS" <<'PY'
 import hashlib, json, os, platform, subprocess, sys
 
 (out, cpu_ticks, clk_tck, elapsed, peak_rss_kib, events, log_bytes,
- binary, duration, work_dir, peak_processes, rss_samples) = sys.argv[1:]
+ binary, duration, work_dir, peak_processes, rss_samples,
+ profile, workload_runs, idle_seconds) = sys.argv[1:]
 
 cpu_ticks = int(cpu_ticks); clk_tck = int(clk_tck); elapsed = int(elapsed)
 peak_rss_kib = int(peak_rss_kib); events = int(events); log_bytes = int(log_bytes)
@@ -194,7 +208,13 @@ baseline = {
     "schema": "mtagentlens.overhead-baseline/1",
     "measured_at": __import__("datetime").datetime.now().astimezone().isoformat(),
     "workload": {
-        "description": "one claude -p turn (Reply with exactly: PONG. Do not use tools.)",
+        "profile": profile,
+        "description": (
+            "idle (no agent workload)" if int(idle_seconds) > 0
+            else f"{workload_runs} x claude -p turn (Reply with exactly: PONG. Do not use tools.)"
+        ),
+        "workload_runs": int(workload_runs),
+        "idle": int(idle_seconds) > 0,
         "duration_seconds_target": duration,
         "duration_seconds_measured": elapsed,
     },
@@ -221,8 +241,8 @@ baseline = {
     },
     "raw_workdir": work_dir,
     "caveat": ("CPU and RSS cover the whole collector process tree (the Rust "
-               "binary, the eBPF programs it spawns, and the Python ONNX "
-               "inference server); reaped children are counted through "
+               "binary and the eBPF programs it spawns); reaped children are "
+               "counted through "
                "cutime/cstime. Samples are once per second, so a very short-lived "
                "child can be missed. Event counts are lines beginning with '{' in "
                "the collector log. This baseline is a budget input, not a "

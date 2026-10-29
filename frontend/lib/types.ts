@@ -1,5 +1,5 @@
-// Mirrors backend types from collector/src/accountability/types/
-// Verified against actual Rust serde serialization format (2026-05-23)
+// Mirrors serialized backend types from collector/src/responsibility/types/.
+// Selected enum and field contracts are checked by scripts/check_ts_contract.py.
 
 // ═══ Phase Indicator (serde external tag) ═══
 
@@ -46,6 +46,7 @@ export type ResponsibilityEdgeType =
   | 'ViolationProvenance';
 
 export interface ResponsibilityEdge {
+  operation?: string | null;
   edge_id: string;
   edge_type: ResponsibilityEdgeType;
   source: string;
@@ -57,7 +58,7 @@ export interface ResponsibilityEdge {
 }
 
 export type MatchLevel =
-  'L1Exact' | 'L2Normalized' | 'L3Containment' | 'L4Basename' | 'L5Substring';
+  'L1Exact' | 'L2Normalized' | 'L3Containment' | 'L4Basename' | 'L5Substring' | 'ProcessLineage';
 
 export type DisplayProfile = 'SafeBaseline' | 'UnsafeByEngine' | 'ObserverJudged';
 export type AlertSeverity = 'Info' | 'Warning' | 'Critical';
@@ -71,6 +72,11 @@ export interface ResponsibilityAlert {
   timestamp_ns: number;
   display_profile: DisplayProfile;
   decision: AlertDecision;
+  /**
+   * Product contract: only `decision === 'Unsafe'` is actionable. Optional for
+   * older imported rows; prefer this over re-deriving from `decision`.
+   */
+  actionable?: boolean;
   severity: AlertSeverity;
   confidence: number;
   authority: AlertAuthority;
@@ -82,12 +88,15 @@ export interface ResponsibilityAlert {
   involved_agents: { agent_id: string; claimed_role: string | null }[];
   engine: EngineSection;
   timeline: BehaviorTimeline;
+  /** Present but empty under `/alerts?lean=1`; use the snapshot endpoint. */
   graph_snapshot: GraphSnapshot;
   phase: PhaseIndicator;
   provisional_ref: string | null;
 }
 
 export interface EngineSection {
+  /** Exact claims used to compose this alert; absent in historical runs. */
+  claim_ids?: string[];
   rule_verdicts: RuleVerdict[];
   pattern_verdicts: PatternVerdict[];
   classification_score: number;
@@ -95,9 +104,12 @@ export interface EngineSection {
   score_breakdown: ScoreBreakdown;
   /** LLM 观察者元数据（observer 判定，真实 db 可能缺失 → 可选） */
   observer_trigger_reason?: string | null;
-  deberta_score?: number | null;
   cusum_triggered?: boolean | null;
   progressive_fused?: number | null;
+  /** 六维 CUSUM 明细（后端 v14+，旧数据可能缺失）。 */
+  cusum_dimensions?: unknown;
+  /** Scoring formula version; offline analysis must filter on it. */
+  score_model_version?: string;
 }
 
 export interface ScoreBreakdown {
@@ -107,7 +119,20 @@ export interface ScoreBreakdown {
   evidence_score: number;
   role_score: number;
   repetition_score: number;
+  /** Observer/行为层附加分（后端可能缺省）。 */
+  behavioral_score?: number;
   total: number;
+  /** Fused value before the fixed logistic squash (audit field). */
+  raw_score?: number;
+  /** Squashed value before the evidence gate. Not a fitted probability. */
+  calibrated_score?: number;
+  /** Evidence-gate factor applied after the squash. */
+  gate_factor?: number;
+  /** Which gate formula produced gate_factor (v1/v2/off). */
+  gate_version?: string;
+  platt_a?: number;
+  platt_b?: number;
+  observer_adjusted?: boolean;
 }
 
 export interface RuleVerdict {
@@ -198,6 +223,9 @@ export interface Intent {
 }
 
 export interface Action {
+  outcome?: 'unknown' | 'attempted' | 'pending' | 'succeeded' | 'failed';
+  syscall_ret?: number | null;
+  syscall_name?: string | null;
   action_id: string;
   process_id: { pid: number; start_time_ns: number };
   action_type: string;
@@ -211,14 +239,15 @@ export interface Action {
 
 export type ClaimType =
   | 'PolicyViolation'
-  | 'AccountabilityAnomaly'
+  | 'ResponsibilityAnomaly'
   | 'SuspiciousDelegation'
   | 'TaintedContextUse'
   | 'UnauthorizedCapabilityUse'
   | 'BlockedAttempt';
 
-/** 实测 22 条 claim_state 分布：Inferred 18 / Confirmed 3 / Ambiguous 1。未知值由渲染侧灰显兜底。 */
-export type ClaimState = 'Inferred' | 'Confirmed' | 'Ambiguous';
+/** 后端 6 个 claim_state 变体；未知值由渲染侧灰显兜底。 */
+export type ClaimState =
+  'Observed' | 'Inferred' | 'Ambiguous' | 'Unproven' | 'Confirmed' | 'BlockedAttempt';
 
 export interface ResponsibilityClaim {
   claim_id: string;
@@ -246,8 +275,11 @@ export interface ResponsibilityClaim {
 export interface ResponsibilityTraceback {
   traceback_id: string;
   claim_id: string;
+  /** Legacy field name: evidence subgraph membership, not an ordered path. */
   chain_node_ids: string[];
+  /** Resolve actual edge endpoints; never zip with chain_node_ids. */
   chain_edge_ids: string[];
+  /** Inferred origin candidate, not independently verified ground truth. */
   root_cause_node_id: string;
   explanation_summary: string;
   confidence: number;

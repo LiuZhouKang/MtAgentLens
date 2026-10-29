@@ -12,6 +12,7 @@
 //   - execve(argv[0]) → Command
 //   - connect(addr) → Url { host, port }
 
+use crate::responsibility::provenance::envelope::CAPTURED_PATH_MAX_CHARS;
 use crate::responsibility::types::{ActionCandidateType, NormalizedArg};
 
 /// Extract normalized args from a tool_use input JSON value.
@@ -214,7 +215,8 @@ pub fn extract_action_args(
     let mut args = Vec::new();
 
     match action_type {
-        ActionCandidateType::FileRead
+        ActionCandidateType::FileOpen
+        | ActionCandidateType::FileRead
         | ActionCandidateType::FileWrite
         | ActionCandidateType::FileOverwrite
         | ActionCandidateType::FileDelete => {
@@ -223,7 +225,7 @@ pub fn extract_action_args(
             // against every other path (the empty string is a substring of
             // everything), manufacturing evidence.
             if let Some(path) = raw_args.first().filter(|path| !path.is_empty()) {
-                args.push(NormalizedArg::Path(normalize_action_path(path)));
+                push_action_path(&mut args, path);
             }
         }
 
@@ -232,10 +234,10 @@ pub fn extract_action_args(
             // destination would answer "what moved" but not "to where".
             // Empty paths are skipped for the same reason as above.
             if let Some(source) = raw_args.first().filter(|path| !path.is_empty()) {
-                args.push(NormalizedArg::Path(normalize_action_path(source)));
+                push_action_path(&mut args, source);
             }
             if let Some(destination) = raw_args.get(1).filter(|path| !path.is_empty()) {
-                args.push(NormalizedArg::Path(normalize_action_path(destination)));
+                push_action_path(&mut args, destination);
             }
         }
 
@@ -252,7 +254,7 @@ pub fn extract_action_args(
             // First arg is the binary path (argv[0])
             if let Some(bin_path) = raw_args.first() {
                 args.push(NormalizedArg::Command(extract_command_basename(bin_path)));
-                args.push(NormalizedArg::Path(normalize_action_path(bin_path)));
+                push_action_path(&mut args, bin_path);
             }
             // Scan remaining argv for URL patterns (e.g. curl https://...)
             // so ProcessExec of network tools can produce Network-boundary PBC.
@@ -279,6 +281,11 @@ pub fn extract_action_args(
         }
     }
 
+    if matches!(action_type, ActionCandidateType::FileOpen)
+        && let Some(flags) = raw_args.get(1).and_then(|flags| flags.parse::<i32>().ok())
+    {
+        args.push(NormalizedArg::OpenFlags(flags));
+    }
     args
 }
 
@@ -312,8 +319,20 @@ fn normalize_intent_path(path: &str) -> String {
 }
 
 /// Normalize a path from a syscall argument.
-fn normalize_action_path(path: &str) -> String {
+pub(crate) fn normalize_action_path(path: &str) -> String {
     normalize_intent_path(path)
+}
+
+/// Keep capture completeness separate from normalized syscall operands.
+fn push_action_path(args: &mut Vec<NormalizedArg>, path: &str) {
+    let normalized = normalize_action_path(path);
+    args.push(NormalizedArg::Path(normalized.clone()));
+    if path.len() >= CAPTURED_PATH_MAX_CHARS {
+        args.push(NormalizedArg::PathCaptureIncomplete {
+            normalized_path: normalized,
+            raw_byte_len: path.len(),
+        });
+    }
 }
 
 /// Extract the basename (last component) of a command path.
@@ -547,6 +566,26 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_action_args_keeps_raw_cap_length_path() {
+        // The producer caps captured paths at 126 bytes. Normalization strips
+        // the trailing slash, leaving 125 bytes, so the Path alone no longer
+        // looks like it may have been truncated.
+        let raw = format!("/{}", "a".repeat(124)) + "/";
+        assert_eq!(raw.len(), 126);
+        let args = extract_action_args(&ActionCandidateType::FileWrite, std::slice::from_ref(&raw));
+        assert!(
+            args.iter().any(
+                |a| matches!(a, NormalizedArg::Path(p) if p.as_str() == &raw[..raw.len() - 1])
+            )
+        );
+        assert!(
+            args.iter()
+                .any(|a| matches!(a, NormalizedArg::PathCaptureIncomplete { normalized_path, raw_byte_len } if normalized_path == &raw[..raw.len()-1] && *raw_byte_len == 126)),
+            "capture completeness must survive path normalization, got {args:?}"
+        );
+    }
+
+    #[test]
     fn test_extract_action_args_network_connect() {
         let args = extract_action_args(
             &ActionCandidateType::NetworkConnect,
@@ -596,6 +635,28 @@ mod tests {
     fn test_extract_command_basename_with_whitespace() {
         // Commands shouldn't have leading/trailing whitespace after trim
         assert_eq!(extract_command_basename("  git  "), "git");
+    }
+
+    #[test]
+    fn capture_metadata_does_not_add_a_rename_operand() {
+        let source = format!("/{}", "a".repeat(124)) + "/";
+        let args = extract_action_args(
+            &ActionCandidateType::FileRename,
+            &[source, "/tmp/destination".into()],
+        );
+        let paths: Vec<_> = args
+            .iter()
+            .filter_map(|arg| match arg {
+                NormalizedArg::Path(path) => Some(path.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            paths.len(),
+            2,
+            "capture provenance is metadata, not a third rename operand"
+        );
+        assert_eq!(paths[1], "/tmp/destination");
     }
 
     #[test]

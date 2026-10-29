@@ -53,6 +53,7 @@ pub mod process;
 pub mod ssl;
 pub mod stdio;
 pub mod system; // Add system runner for CPU and memory monitoring
+pub mod targets; // Shared CLI-to-helper argument construction
 
 pub use agent::AgentRunner; // Export AgentRunner
 pub use fake::FakeRunner; // Export FakeRunner

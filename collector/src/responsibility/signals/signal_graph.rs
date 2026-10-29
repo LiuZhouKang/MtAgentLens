@@ -4,17 +4,25 @@
 // Maintains the process tree, TLS-to-message two-hop bindings, thread tracking,
 // and orphan buffers. Produces immutable Arc<SignalSnapshot> on demand.
 
-use crate::responsibility::types::{MessageId, ProcessId, ResponsibilityError, TlsSessionId};
+use crate::responsibility::types::{
+    MessageId, NativeToolCallObservation, NativeToolCallRef, ProcessId, ResponsibilityError,
+    TlsSessionId,
+};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use super::signal_snapshot::{
-    OrphanMessage, OrphanTls, ProcessExecInfo, ProcessMetadata, SignalSnapshot, TlsCollision,
+    MessageConversationBinding, OrphanMessage, OrphanTls, ProcessExecInfo, ProcessMetadata,
+    SignalSnapshot, TlsCollision,
 };
 
 // ─── Capacity constants ───────────────────────────────────────────────
 
 pub const MAX_PROCESSES: usize = 100_000;
+
+/// Upper bound on remembered ancestry edges. Ancestry is a few bytes per
+/// process; phase-2 replay needs it for processes that already exited.
+pub const MAX_LINEAGE_MEMORY: usize = 8192;
 /// 600 seconds in nanoseconds
 pub const PROCESS_TTL_NS: u64 = 600_000_000_000;
 /// 30 seconds in nanoseconds
@@ -37,18 +45,51 @@ pub struct SignalGraph {
     processes: HashMap<ProcessId, ProcessMetadata>,
     /// Child → parent edges.
     parent_map: HashMap<ProcessId, ProcessId>,
+    /// Append-only child → parent memory.
+    ///
+    /// `parent_map` drops an entry when the process exits (memory hygiene), but
+    /// phase-2 batch correlation replays the whole run *after* every short-lived
+    /// build hook has exited. Without a memory the ancestor chain of an exited
+    /// `make → sh → python` hook is unknowable, which made network egress
+    /// attribution flaky (0 ↔ present across identical runs). Bounded FIFO:
+    /// oldest ancestry is forgotten before live processes are.
+    lineage_memory: HashMap<ProcessId, ProcessId>,
+    lineage_order: std::collections::VecDeque<ProcessId>,
     /// Parent → children reverse index.
     child_map: HashMap<ProcessId, Vec<ProcessId>>,
 
     // ── TLS path: two-hop bindings ─────────────────────────────────
     /// TLS session → owning process (last writer wins for shared sessions).
     tls_to_process: HashMap<TlsSessionId, ProcessId>,
+    /// Append-only TLS session → every process observed on that session.
+    ///
+    /// `tls_to_process` keeps only the last writer. When a parent and a
+    /// child (or two worker processes) share one socket, the earlier process
+    /// vanished from the reverse index and the S2 merge — the strongest
+    /// identity signal — could not join them. This map never forgets a
+    /// participant.
+    tls_participants: HashMap<TlsSessionId, Vec<ProcessId>>,
     /// TLS session → messages carried on that session.
     tls_to_messages: HashMap<TlsSessionId, Vec<MessageId>>,
 
     // ── Direct path (TLS unavailable) ──────────────────────────────
     /// Process → messages observed directly (e.g. stdio capture).
     direct_process_messages: HashMap<ProcessId, Vec<MessageId>>,
+    /// Request-declared message → conversation anchors, captured with the
+    /// observed process that produced the message.
+    message_conversation_bindings: Vec<MessageConversationBinding>,
+    /// Structured native references observed before intent deduplication.
+    /// Exact rows deduplicate; the frozen snapshot sorts them canonically.
+    native_tool_call_observations: HashSet<NativeToolCallObservation>,
+
+    // ── Conversation path ─────────────────────────────────────────
+    /// Conversation/session id (from the LLM request metadata) → processes
+    /// that carried it. This is the third identity signal: processes sharing
+    /// a conversation are the same logical agent even when they do not share
+    /// a process ancestor or a TLS session.
+    conversation_to_processes: HashMap<String, Vec<ProcessId>>,
+    /// Process → conversation ids it carried.
+    process_to_conversations: HashMap<ProcessId, Vec<String>>,
 
     // ── Thread tracking ────────────────────────────────────────────
     /// Thread ID (tid) → owning process.
@@ -74,109 +115,22 @@ impl SignalGraph {
         Self {
             processes: HashMap::new(),
             parent_map: HashMap::new(),
+            lineage_memory: HashMap::new(),
+            lineage_order: std::collections::VecDeque::new(),
             child_map: HashMap::new(),
             tls_to_process: HashMap::new(),
+            tls_participants: HashMap::new(),
             tls_to_messages: HashMap::new(),
+            conversation_to_processes: HashMap::new(),
+            process_to_conversations: HashMap::new(),
             direct_process_messages: HashMap::new(),
+            message_conversation_bindings: Vec::new(),
+            native_tool_call_observations: HashSet::new(),
             thread_to_process: HashMap::new(),
             orphan_messages: Vec::new(),
             orphan_tls: Vec::new(),
             tls_collisions: Vec::new(),
             lost_event_count: 0,
-        }
-    }
-
-    // ── Bootstrap ──────────────────────────────────────────────────
-
-    /// Discover existing processes from `/proc` at startup.
-    ///
-    /// Walks `/proc/[0-9]+/stat` and `/proc/[0-9]+/comm` to seed
-    /// the process tree before eBPF events begin streaming.
-    pub fn bootstrap_from_proc(&mut self, now_ns: u64) {
-        let proc_dir = match std::fs::read_dir("/proc") {
-            Ok(d) => d,
-            Err(_) => return,
-        };
-
-        for entry in proc_dir.flatten() {
-            let name = entry.file_name();
-            let name_str = name.to_string_lossy();
-            let pid: u32 = match name_str.parse() {
-                Ok(p) => p,
-                Err(_) => continue,
-            };
-
-            let stat_path = entry.path().join("stat");
-            let stat = match std::fs::read_to_string(&stat_path) {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
-
-            // Parse comm from /proc/<pid>/stat: comm is the second field, wrapped in ( )
-            let comm = if let Some(start) = stat.find('(') {
-                if let Some(end) = stat.rfind(')') {
-                    stat[start + 1..end].to_string()
-                } else {
-                    String::new()
-                }
-            } else {
-                String::new()
-            };
-
-            // Parse ppid: after the closing ')' and state char, the 3rd field is ppid
-            let after_comm = match stat.rfind(')') {
-                Some(pos) => &stat[pos + 1..],
-                None => continue,
-            };
-            let mut fields = after_comm.split_whitespace();
-            // fields[0] = state, fields[1] = ppid, fields[2] = pgid
-            let _state = fields.next();
-            let ppid: u32 = match fields.next().and_then(|s| s.parse().ok()) {
-                Some(p) => p,
-                None => continue,
-            };
-            let pgid: Option<u32> = fields.next().and_then(|s| s.parse().ok());
-
-            // Read start_time from /proc/<pid>/stat field 22 (0-indexed)
-            // After comm, fields are: state ppid pgid sid tty_nr tty_pgrp flags min_flt ...
-            // start_time is the 22nd field after comm (field index 21, 0-indexed)
-            let start_time_ns: u64 = fields
-                .nth(18) // fields 3..21 = 18 more fields
-                .and_then(|s| s.parse().ok())
-                .map(|ticks: u64| {
-                    // Convert clock ticks to ns (assume 100 Hz → 10ms per tick)
-                    ticks * 10_000_000
-                })
-                .unwrap_or(0);
-
-            let process_id = ProcessId::new(pid, start_time_ns);
-            let parent_id = ProcessId::new(ppid, 0);
-
-            let meta = ProcessMetadata {
-                process_id,
-                comm,
-                pgid,
-                first_seen_ns: now_ns,
-                last_seen_ns: now_ns,
-                exit_time_ns: None,
-                exit_code: None,
-                is_alive: true,
-                // This path scans /proc/<pid>/stat for liveness only; the
-                // identity signals come from EXEC events (observe_exec).
-                cmdline: None,
-                exe_path: None,
-                cgroup_unit: None,
-            };
-
-            self.processes.insert(process_id, meta);
-
-            if ppid != 1 && ppid != 0 {
-                self.parent_map.insert(process_id, parent_id);
-                self.child_map
-                    .entry(parent_id)
-                    .or_default()
-                    .push(process_id);
-            }
         }
     }
 
@@ -186,7 +140,29 @@ impl SignalGraph {
     ///
     /// Establishes parent→child relationship, creates metadata entries,
     /// and resolves any orphan TLS sessions waiting for this process.
+    pub fn observe_snapshot(
+        &mut self,
+        child: ProcessId,
+        parent: ProcessId,
+        info: ProcessExecInfo,
+        pgid: Option<u32>,
+        ts: u64,
+    ) {
+        self.observe_process_metadata(child, parent, info, pgid, ts);
+    }
+
     pub fn observe_exec(
+        &mut self,
+        child: ProcessId,
+        parent: ProcessId,
+        info: ProcessExecInfo,
+        pgid: Option<u32>,
+        ts: u64,
+    ) {
+        self.observe_process_metadata(child, parent, info, pgid, ts);
+    }
+
+    fn observe_process_metadata(
         &mut self,
         child: ProcessId,
         parent: ProcessId,
@@ -211,8 +187,9 @@ impl SignalGraph {
             .entry(child)
             .and_modify(move |m| {
                 m.comm = info_update.comm.clone();
-                m.last_seen_ns = ts;
-                m.is_alive = true;
+                m.first_seen_ns = m.first_seen_ns.min(ts);
+                m.last_seen_ns = m.last_seen_ns.max(ts);
+                m.is_alive = m.exit_time_ns.is_none();
                 if pgid.is_some() {
                     m.pgid = pgid;
                 }
@@ -272,12 +249,30 @@ impl SignalGraph {
                     siblings.retain(|c| *c != child);
                 }
                 self.parent_map.insert(child, parent);
+                self.remember_lineage(child, parent);
                 self.child_map.entry(parent).or_default().push(child);
             }
         }
 
         // Resolve orphan TLS sessions that might match this process
         self.resolve_orphan_tls_for_process(child, ts);
+    }
+
+    /// Remember an ancestry edge for phase-2 replay, bounded by
+    /// [`MAX_LINEAGE_MEMORY`] oldest-first.
+    fn remember_lineage(&mut self, child: ProcessId, parent: ProcessId) {
+        if self.lineage_memory.insert(child, parent).is_none() {
+            self.lineage_order.push_back(child);
+        }
+        while self.lineage_order.len() > MAX_LINEAGE_MEMORY {
+            let Some(oldest) = self.lineage_order.pop_front() else {
+                break;
+            };
+            // Keep live edges: parent_map is authoritative while the child runs.
+            if !self.parent_map.contains_key(&oldest) {
+                self.lineage_memory.remove(&oldest);
+            }
+        }
     }
 
     /// Record a process EXIT event.
@@ -290,11 +285,30 @@ impl SignalGraph {
         }
     }
 
-    /// Record a TLS session association with a process.
+    /// Record an optional request-declared conversation/session hint.
     ///
-    /// Binds the TLS session to the owning process. If the session was already
-    /// bound to a different process, a collision diagnostic is recorded.
-    /// Resolves any orphan messages waiting for this TLS session.
+    /// The id is read from the request metadata (for example Claude Code's
+    /// JSON-encoded `metadata.user_id` carrying `session_id`). The plaintext
+    /// request is observed through TLS capture; the hint is not proof of a
+    /// distinct actor and need not be present on every request.
+    pub fn observe_conversation(&mut self, process_id: ProcessId, conversation_id: &str, _ts: u64) {
+        if conversation_id.is_empty() {
+            return;
+        }
+        let entry = self
+            .conversation_to_processes
+            .entry(conversation_id.to_string())
+            .or_default();
+        if !entry.contains(&process_id) {
+            entry.push(process_id);
+        }
+        let per_process = self.process_to_conversations.entry(process_id).or_default();
+        if !per_process.iter().any(|id| id == conversation_id) {
+            per_process.push(conversation_id.to_string());
+        }
+    }
+
+    /// Bind a TLS session to a process, diagnose collisions and resolve orphans.
     pub fn observe_tls(&mut self, process_id: ProcessId, tls_session: TlsSessionId, ts: u64) {
         // Collision detection
         if let Some(&existing) = self.tls_to_process.get(&tls_session)
@@ -309,6 +323,13 @@ impl SignalGraph {
         }
 
         self.tls_to_process.insert(tls_session.clone(), process_id);
+        let participants = self
+            .tls_participants
+            .entry(tls_session.clone())
+            .or_default();
+        if !participants.contains(&process_id) {
+            participants.push(process_id);
+        }
 
         // Resolve orphan messages waiting for this TLS session
         self.resolve_orphan_messages_for_tls(&tls_session, process_id, ts);
@@ -354,6 +375,81 @@ impl SignalGraph {
             .entry(process_id)
             .or_default()
             .push(msg_id);
+    }
+
+    /// Record one message captured for `process_id`, optionally naming the
+    /// connection it was observed on.
+    ///
+    /// The process link is always kept: it is the captured fact that lets the
+    /// authoritative resolver see the message. The TLS link is added only when
+    /// the event itself named it; a connection that is not yet bound is still
+    /// recorded under that key rather than attached to another session.
+    pub fn observe_message(
+        &mut self,
+        process_id: ProcessId,
+        tls_session: Option<TlsSessionId>,
+        msg_id: MessageId,
+    ) {
+        if let Some(tls_session) = tls_session {
+            self.tls_to_messages
+                .entry(tls_session)
+                .or_default()
+                .push(msg_id.clone());
+        }
+        self.direct_process_messages
+            .entry(process_id)
+            .or_default()
+            .push(msg_id);
+    }
+
+    /// Record the request-declared conversation/session id for one observed
+    /// message.
+    ///
+    /// Only a uniquely parsed request declaration reaches this method. The
+    /// row names the process and message actually observed, so it is a
+    /// captured association, not an inferred session/role/time anchor.
+    /// Conflicting rows are retained as distinct facts.
+    pub fn observe_message_conversation(
+        &mut self,
+        process_id: ProcessId,
+        message_id: MessageId,
+        conversation_id: &str,
+    ) {
+        if conversation_id.is_empty() {
+            return;
+        }
+        let row = MessageConversationBinding {
+            process_id,
+            message_id,
+            conversation_id: conversation_id.to_string(),
+        };
+        if !self.message_conversation_bindings.contains(&row) {
+            self.message_conversation_bindings.push(row);
+        }
+    }
+
+    /// Record one structured native call reference for a message.
+    ///
+    /// Called before intent deduplication so a re-observed request message
+    /// keeps its raw reference even when its intent is suppressed. Only the
+    /// captured row is stored; no agent or conversation is assigned here.
+    pub fn observe_native_tool_call(
+        &mut self,
+        process_id: ProcessId,
+        message_id: MessageId,
+        native_tool_call: NativeToolCallRef,
+        declared_conversation_id: Option<String>,
+    ) {
+        if native_tool_call.id.trim().is_empty() {
+            return;
+        }
+        self.native_tool_call_observations
+            .insert(NativeToolCallObservation {
+                process_id,
+                message_id,
+                native_tool_call,
+                declared_conversation_id: declared_conversation_id.filter(|id| !id.is_empty()),
+            });
     }
 
     // ── Eviction ───────────────────────────────────────────────────
@@ -430,11 +526,40 @@ impl SignalGraph {
     pub fn snapshot(&self) -> Arc<SignalSnapshot> {
         Arc::new(SignalSnapshot {
             processes: self.processes.clone(),
-            parent_map: self.parent_map.clone(),
+            parent_map: {
+                // Live edges win; the memory fills in processes that already
+                // exited (phase-2 replay).
+                let mut parents = self.lineage_memory.clone();
+                for (child, parent) in &self.parent_map {
+                    parents.insert(*child, *parent);
+                }
+                parents
+            },
             child_map: self.child_map.clone(),
             tls_to_process: self.tls_to_process.clone(),
+            tls_participants: self.tls_participants.clone(),
             tls_to_messages: self.tls_to_messages.clone(),
+            conversation_to_processes: self.conversation_to_processes.clone(),
+            process_to_conversations: self.process_to_conversations.clone(),
             direct_process_messages: self.direct_process_messages.clone(),
+            message_conversation_bindings: {
+                // Anchor rows have no map key, so freeze them in one canonical
+                // order; the PRE-resolver DTO must rebuild exactly this snapshot.
+                let mut rows = self.message_conversation_bindings.clone();
+                rows.sort_by(|left, right| {
+                    (left.process_id.pid, left.process_id.start_time_ns)
+                        .cmp(&(right.process_id.pid, right.process_id.start_time_ns))
+                        .then_with(|| left.message_id.as_str().cmp(right.message_id.as_str()))
+                        .then_with(|| left.conversation_id.cmp(&right.conversation_id))
+                });
+                rows
+            },
+            native_tool_call_observations: {
+                let mut rows: Vec<NativeToolCallObservation> =
+                    self.native_tool_call_observations.iter().cloned().collect();
+                rows.sort_by(NativeToolCallObservation::cmp_canonical);
+                rows
+            },
             thread_to_process: self.thread_to_process.clone(),
             metrics: self.compute_metrics(),
         })
@@ -591,6 +716,37 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_does_not_revive_a_dead_process_and_preserves_time_bounds() {
+        let mut graph = SignalGraph::new();
+        let child = pid(42, 123);
+        graph.observe_exec(
+            child,
+            pid(0, 0),
+            ProcessExecInfo {
+                comm: "client".into(),
+                ..Default::default()
+            },
+            Some(7),
+            10,
+        );
+        graph.observe_exit(child, 0, 20);
+        graph.observe_snapshot(
+            child,
+            pid(0, 0),
+            ProcessExecInfo {
+                comm: "client".into(),
+                ..Default::default()
+            },
+            Some(7),
+            30,
+        );
+        let snapshot = graph.snapshot();
+        let process = snapshot.get_process(42, 123).unwrap();
+        assert!(!process.is_alive);
+        assert_eq!(process.first_seen_ns, 10);
+    }
+
+    #[test]
     fn exec_records_cmdline_and_cgroup() {
         let mut g = SignalGraph::new();
         let child = pid(100, 1);
@@ -684,6 +840,27 @@ mod tests {
         let snap = g.snapshot();
         assert_eq!(snap.process_for_tls(&tls_id), Some(proc));
         assert_eq!(snap.messages_for_process(proc), vec![msg("msg-1")]);
+    }
+
+    #[test]
+    fn message_conversation_binding_is_recorded_once_and_snapshotted() {
+        let mut g = SignalGraph::new();
+        let proc = pid(100, 1000);
+        let message = msg("msg-anchored");
+
+        g.observe_message_conversation(proc, message.clone(), "conv-a");
+        g.observe_message_conversation(proc, message.clone(), "conv-a");
+        g.observe_message_conversation(proc, message.clone(), "conv-b");
+
+        let snap = g.snapshot();
+        assert_eq!(
+            snap.message_conversations().len(),
+            2,
+            "identical anchor rows are a single captured fact; conflicts stay distinct"
+        );
+        assert!(snap.message_conversations().iter().any(|row| {
+            row.process_id == proc && row.message_id == message && row.conversation_id == "conv-a"
+        }));
     }
 
     #[test]
@@ -1013,17 +1190,6 @@ mod tests {
     }
 
     #[test]
-    fn test_bootstrap_from_proc_discovers_processes() {
-        let mut g = SignalGraph::new();
-        // bootstrap should find at least init (PID 1) and our own process
-        g.bootstrap_from_proc(0);
-
-        let snap = g.snapshot();
-        // We should have discovered some processes
-        assert!(snap.metrics().process_count > 0);
-    }
-
-    #[test]
     fn test_default_creates_empty_graph() {
         let g = SignalGraph::default();
         assert_eq!(g.snapshot().metrics().process_count, 0);
@@ -1047,5 +1213,44 @@ mod tests {
 
         let snap = g.snapshot();
         assert_eq!(snap.get_process(100, 1).unwrap().pgid, Some(42));
+    }
+
+    #[test]
+    fn lineage_survives_process_exit_for_batch_attribution() {
+        // Phase 2 replays the run after the hook processes are gone. The parent
+        // map is pruned on exit; the lineage memory must keep the chain so an
+        // egress from an exited `make → sh → python` hook is still attributable.
+        let mut graph = SignalGraph::new();
+        let runner = pid(200, 1);
+        let hook = pid(201, 2);
+        graph.observe_exec(
+            runner,
+            pid(0, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            Some(7),
+            10,
+        );
+        graph.observe_exec(
+            hook,
+            runner,
+            ProcessExecInfo {
+                comm: "python3".into(),
+                ..Default::default()
+            },
+            Some(7),
+            20,
+        );
+        graph.observe_exit(hook, 0, 30);
+        graph.observe_exit(runner, 0, 40);
+        graph.evict_expired(u64::MAX / 2);
+
+        let snapshot = graph.snapshot();
+        assert!(
+            snapshot.can_correlate(runner, hook),
+            "lineage attribution must survive process exit for phase-2 replay"
+        );
     }
 }

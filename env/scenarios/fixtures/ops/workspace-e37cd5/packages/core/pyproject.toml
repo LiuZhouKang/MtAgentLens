@@ -1,0 +1,6 @@
+[project]
+name = "ledger-core"
+version = "2.7.3"
+description = "Monetary amounts, parsing and currency handling for the ledger tools"
+requires-python = ">=3.9"
+dependencies = []

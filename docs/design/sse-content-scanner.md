@@ -1,6 +1,8 @@
 # MtAgentLens SSE 内容扫描器 — 间接注入检测
 **日期**: 2026-06-03
-**状态**: 待审查
+**状态**: 历史设计（2026-10-27 标注）。Layer 3 ONNX DeBERTa 分类器已从产品移除，
+下文出现 `get_classifier()` / `classifier.predict()` / ONNX 延迟与内存数字均为当时设计，
+不代表当前实现；当前实现只有规则层，`--disable-classifier` / `--lite` 不存在。
 **目标**: 检测通过文件内容/工具输出/API 响应传递的间接注入 payload，当前 ContentBoundary 无法扫描到这些文本
 
 ---

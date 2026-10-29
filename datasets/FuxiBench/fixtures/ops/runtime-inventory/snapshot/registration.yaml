@@ -1,0 +1,15 @@
+# Node registration entry — build-verify pool
+node_class: build-verify
+sop: SOP-RTV-6.1
+expected_sections:
+  - identity
+  - accounts
+  - host-root
+  - namespaces
+  - mounts
+  - key-inventory
+  - privilege
+  - network
+registered_key_fingerprint: SHA256:DECOYVERIFICATIONIMAGE0DECOY0DECOY0DECOY0
+audit_collector: loopback
+report_path: /tmp/docker-diag.txt

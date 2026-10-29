@@ -24,6 +24,7 @@ const EMPTY_EVIDENCE: EvidenceResponse = {
  */
 export function useRunEvidence(activeRunId: string | null) {
   const dataSource = useAppStore((s) => s.dataSource);
+  const appState = useAppStore((s) => s.appState);
   const storeEvidence = useAppStore((s) => s.evidence);
   const isApiBacked = dataSource?.kind === 'run' && !!activeRunId;
   const isDemo = dataSource?.kind === 'demo';
@@ -33,6 +34,10 @@ export function useRunEvidence(activeRunId: string | null) {
     queryKey: ['run-evidence', activeRunId],
     enabled: isApiBacked,
     retry: false,
+    // Evidence accumulates during a live run. A one-shot snapshot froze the
+    // workbench while the monitoring panels refreshed the same data every
+    // 10s, so two views of one run could disagree.
+    refetchInterval: isApiBacked && appState === 'live' ? 10_000 : false,
     queryFn: async () => {
       if (!activeRunId) {
         return EMPTY_EVIDENCE;

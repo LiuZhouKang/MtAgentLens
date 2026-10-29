@@ -1,43 +1,55 @@
-# MtAgentLens 文档
+# 文档
 
-## 从这里开始
+按你要完成的任务选择入口。使用指南、技术参考和维护历史分别导航；历史报告不代表当前版本状态。
 
-| 文档 | 说明 |
-|------|------|
-| [../README.md](../README.md) | 项目概述、快速开始、FuxiBench 结果 |
-| [architecture.md](architecture.md) | 系统架构：eBPF 探针 → Rust 流式引擎 → 责任图 → 前端 |
-| [HANDOFF.md](HANDOFF.md) | **当前交接**（新会话唯一入口） |
-| [adr/README.md](adr/README.md) | 架构决策记录（ADR 0001–0014） |
-| [capabilities.json](capabilities.json) | 机器可读能力清单与已知限制 |
+## 使用
 
-## 设计与评估
+| 任务 | 文档 |
+|---|---|
+| 安装、构建和首次采集 | [项目 README](../README.md#快速开始) |
+| 配置 collector、查看命令与回放 | [collector](../collector/README.md) |
+| 检查探针与底层采集 | [bpftools](../bpftools/README.zh-CN.md) |
+| 运行 benchmark 场景 | [执行环境](../env/README.md) |
+| 冻结输入和对比评估 | [compare](../compare/README.md) |
+| 理解场景标注与数据来源 | [FuxiBench](../datasets/FuxiBench/README.md) |
+| 报告漏洞、了解数据处理边界 | [安全策略](../SECURITY.md) |
 
-| 文档 | 说明 |
-|------|------|
-| [design/experiment-design.md](design/experiment-design.md) | 实验设计 v5（RQ 驱动、标准指标、Bootstrap 范围） |
-| [evaluation/measurement-isolation.md](evaluation/measurement-isolation.md) | 实验隔离：clean profile + inode 副本 + 唯一 comm |
-| [evaluation/fpr-baseline.json](evaluation/fpr-baseline.json) | 隔离后的 20 场景良性 FPR（0/20） |
-| [evaluation/overhead-baseline.json](evaluation/overhead-baseline.json) | 端到端开销基线 |
-| [design/scoring-engine.md](design/scoring-engine.md) | 六维评分引擎 |
-| [design/sse-content-scanner.md](design/sse-content-scanner.md) | SSE 内容扫描器 |
-| [design/analyzer-dashboards.md](design/analyzer-dashboards.md) | Analyzer 仪表板 |
-| [design/db-optimization.md](design/db-optimization.md) | DB 体积与索引 |
-| [design/analyzers/](design/analyzers/) | Analyzer 管线契约与当前实现设计；未实现提案见 `superpowers/archive/design/` |
+## 开发参考
 
-## 安全与论文
+| 主题 | 文档 |
+|---|---|
+| 开发环境、测试与贡献规则 | [贡献指南](../CONTRIBUTING.md) |
+| 系统模块和数据流 | [架构](architecture.md) |
+| 已实现能力与限制 | [能力清单](capabilities.json) |
+| 架构决策及变更理由 | [ADR](adr/README.md) |
+| 前端开发 | [frontend](../frontend/README.md) |
+| 验证、发布与维护脚本 | [脚本目录](../scripts/README.md) |
+| 威胁模型 | [安全设计](security/threat-model.md) |
+| 运行级归因标注 | [annotator](../tools/annotator/README.md) |
 
-| 文档 | 说明 |
-|------|------|
-| [security/threat-model.md](security/threat-model.md) | 威胁模型与逐项缓解 |
-| [security/openSSF-self-assessment.md](security/openSSF-self-assessment.md) | OpenSSF 自评 |
-| [../SECURITY.md](../SECURITY.md) | 漏洞报告与残余风险 |
-| [safi/README.md](safi/README.md) | SAFI：安全不对称文件注入框架 |
-| [paper/](paper/) | 论文初稿（作者稿，指标以 `compare/results/paper/standard_evaluation_v5.json` 为准） |
-| [决赛文档/](决赛文档/) | 比赛提交时的冻结文档（TeX/PDF/assets；数字与路径按当时状态保留） |
-| [demo/](demo/) | 演示截图、视频与 [讲解稿](demo/讲解稿.md) |
+## 维护与研究记录
 
-## 规划历史
+- [**当前实验与论文证据入口**](evaluation/CURRENT-EVIDENCE.md)：T4/T5/T6/T7/T7-S/T8/PBC 的状态、权威路径和图/表索引——**当前只看这一页**。
+- [**结果交付目录**](../compare/results/README.md)：每个实验的 README、MANIFEST、原始数据、图/表与复现脚本。
+- [最后一份有效 RC（2026-10-25 fix2）](evaluation/rc-2026-10-25-fix2/README.md)：binary `db3191bb…` 的冻结身份、协议与结果；历史 RC 只作对照，不作为当前构建结论。
+- [AI/CODEX/DSH 历史交接归档](archive/ai-2026-10-30/README.md)：已移出顶层，不是当前入口。
+- [标注数据集 release](evaluation/annotation-dataset-release.md)与[运行级 codebook `pilot/1`](../tools/annotator/PILOT-CODEBOOK.md)：`mtagentlens.annotation-dataset/1` 消费契约与规则冻结。
+- [实验方法](evaluation/experimental-design.md)与[测量隔离](evaluation/measurement-isolation.md)：后续实验的设计参考，具体适用性以冻结版本为准。
+- [意见5完整开销结果](evaluation/EXPERIMENT-SUITE-7-REVISED-2026-10-26.md#66-实测结果2026-10-28-完成)：36/36 正式条件已完成，T8/F2 在 `compare/results/overhead/raw/full-system/report/`；TLS 微基准与其他探针短诊断已实测，旧 60 条件方案不再执行。
+- [Overhead 中文报告](../compare/results/overhead/README.md)：14 张独立科研图、8 张表、完整设计/结果/写作建议，供论文 §6.4/表12 与相关图改写。
+- [复现手册](evaluation/REPRODUCE.md)：每个离线数字对应的命令与期望输出。
+- [证据索引](evaluation/EVIDENCE-INDEX.md)：审稿意见 → 证据文档 → 产物 → 门禁测试一页速查。
+- [2026-10-25 会话工作日志](evaluation/session-log-2026-10-25.md)：逐轮证据链（交接文档已精简）。
+- [论文工作区](paper/README.md)：研究与修稿材料。关键文件：
+  - [claim-evidence-matrix.md](paper/claim-evidence-matrix.md)：主张-证据矩阵（当前结论只看此文件）；
+  - [claim-evidence-matrix-archive.md](paper/claim-evidence-matrix-archive.md)：历史测量/审计存档（不得引用）；
+  - [claims.json](paper/claims.json) + `scripts/evaluation/verify_claims.py`：机器可校验的数字层（门禁内置）；
+  - [数字审计-2026-10-25.md](paper/数字审计-2026-10-25.md)：初稿中不可引用数字与替换口径；
+  - [修改说明-草稿.md](paper/修改说明-草稿.md) §0.4：审稿意见逐条状态；
+  - [能力矩阵-同级方法.md](paper/能力矩阵-同级方法.md)：同级方法输入/单元/输出/可复现性对比；
+  - [根因指标定义.md](paper/根因指标定义.md)：E6 指标定义与落地顺序。
+- [历史设计与评审](superpowers/archive/)：已被替代的方案和交接，不是当前任务入口。
+- [历史测量](evaluation/)：含旧基线、试点与审计；不作为当前效果或性能结论。
+- [比赛材料](决赛文档/)与[演示](demo/)：提交和展示记录。
 
-| 文档 | 说明 |
-|------|------|
-| [superpowers/README.md](superpowers/README.md) | 当前交接 + `archive/`（旧交接、plans、specs、spikes） |
+新增文档优先补入现有主题，维护规则见[贡献指南](../CONTRIBUTING.md#文档与仓库维护)。导航按读者任务组织，参考 [Diátaxis](https://diataxis.fr/)；不要求为了凑目录结构增加文件。

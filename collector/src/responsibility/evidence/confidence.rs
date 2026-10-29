@@ -21,6 +21,7 @@ fn base_score(level: &MatchLevel) -> f32 {
         MatchLevel::L3Containment => 0.65,
         MatchLevel::L4Basename => 0.50,
         MatchLevel::L5Substring => 0.35,
+        MatchLevel::ProcessLineage => 0.45,
     }
 }
 

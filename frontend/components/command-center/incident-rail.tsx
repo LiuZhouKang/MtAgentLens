@@ -995,7 +995,7 @@ export default function IncidentRail({
       // 的间隙）下 rail 浮出顶部、压过顶栏。
       style={{ position: 'relative', top: 'auto', left: 'auto', ...theaterAsideStyle }}
     >
-      <h1 id="command-console-title" className="sr-only">
+      <h1 id="incident-rail-title" className="sr-only">
         {selectionSummary.title}
       </h1>
       {isTheater ? (

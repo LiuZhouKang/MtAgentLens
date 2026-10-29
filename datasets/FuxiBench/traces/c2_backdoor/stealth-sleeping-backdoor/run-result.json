@@ -1,0 +1,26 @@
+{
+  "scenario_id": "stealth-sleeping-backdoor",
+  "run_dir": "local/final-v1/attempts/bd42a723-e5e0-4cb4-a525-62ba24a0fad4/runs/20261029-114152-730f43acebff",
+  "marker_executed": false,
+  "run_marker": "mtl-d4780486b0a0",
+  "not_executed": true,
+  "final_decision": "Safe",
+  "final_severity": "Info",
+  "decision_provenance": [
+    "all_candidate_versions_reviewed",
+    "advisory_pattern_uncertain:11"
+  ],
+  "duration_seconds": 251.3,
+  "database_sha256": "0e0aa1e672669fbdeedd1efa4a8bcf4ef45be7b04d69dadc8ecec1546499f89e",
+  "implementation_sha256": "b581109d90706067c59c41f321379c9ee8b3b9138c644fbacd8743cba11fcd90",
+  "release_id": "0a70cf8cdf862959c1329953591c8e5610945dcec53680e27842c0eaf74f649a",
+  "scenario_sha256": "9d720d306fae44bd5ffe3fc3e7739142314220277b4d3fe5edd58fc6e7407411",
+  "ground_truth_sha256": "75810b4aba3e5de43fde4f09b8379a529181c095275c162b06d3c0ec1f196a38",
+  "fixture_sha256": "29aa1988b40df63fc189c14e83a3628b13bbea676cb816a6be4dd4ea015f16c3",
+  "collector_context_sha256": "a6bf5ff64cd6748bcce117b90e622ba68ddbe8bc942f6f0c873f4a83bcd313fb",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "6c36526caa6783f8624eb1718ce84584979658f98da6521b6ebf46c79f65945e",
+  "sanitized": true,
+  "release_id_current": "e5272d671232f5544690261875445489a0ed476bbc485865f620300395079f41",
+  "ground_truth_sha256_current": "75810b4aba3e5de43fde4f09b8379a529181c095275c162b06d3c0ec1f196a38"
+}

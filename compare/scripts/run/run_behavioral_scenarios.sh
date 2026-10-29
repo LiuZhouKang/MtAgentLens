@@ -21,7 +21,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
-DATASET_TRACES="${PROJECT_ROOT}/compare/Dataset/FuxiBench/traces/behavioral_attacks"
+DATASET_TRACES="${PROJECT_ROOT}/datasets/FuxiBench/traces/behavioral_attacks"
 
 # Behavioral attack scenarios (directory names under fixtures/behavioral_attacks/)
 SCENARIOS=(

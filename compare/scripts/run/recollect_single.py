@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""逐场景重新采集 + 严格质量审查 + 增量评估对比。
+"""历史冻结数据库审查与增量评估对比；不再自动采集或替换冻结库。
 
 用法:
   # 交互模式（每个场景审查后人工确认继续）
@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[3]
-ENV_DIR = ROOT / "env"
 TRACES_DIR = ROOT / "compare" / "Dataset" / "FuxiBench" / "traces"
 MANIFEST_PATH = ROOT / "compare" / "Dataset" / "FuxiBench" / "prompt_inputs" / "manifest.json"
 BASELINE_PATH = ROOT / "compare" / "results" / "paper" / "main_evaluation.json"
@@ -32,6 +31,8 @@ LOG_DIR = ROOT / "compare" / "results" / "recollection_logs"
 
 
 def load_manifest() -> list[dict]:
+    print("retired: recollect_single.py is historical; use datasets/FuxiBench and the current pipeline")
+    raise SystemExit(2)
     manifest = json.loads(MANIFEST_PATH.read_text())
     return manifest["entries"]
 
@@ -324,7 +325,7 @@ def run_incremental_evaluation(scenario_ids: list[str]) -> dict:
 
 
 def run_one_scenario(scenario: dict, skip_if_exists: bool = True) -> dict[str, Any]:
-    """运行一个场景并产出完整的审查 + 对比报告。"""
+    """审查已有冻结库；需要新采集时明确拒绝隐式替换。"""
     sid = scenario["scenario_id"]
     category = scenario.get("category", "")
     attack_type = scenario.get("attack_type", "?")
@@ -353,95 +354,13 @@ def run_one_scenario(scenario: dict, skip_if_exists: bool = True) -> dict[str, A
                 comparison = compare_to_baseline(sid, report["tables"])
                 return {"scenario": sid, "report": report, "comparison": comparison, "skipped": True}
         except Exception:
-            print(f"  已有 db 损坏，重新采集")
+            print("  已有 db 无法通过完整性检查")
 
-    # ── 运行采集 ──
-    run_one_script = ENV_DIR / "run_one.py"
-    start_time = time.time()
-
-    for attempt in range(1, 4):
-        print(f"  第 {attempt}/3 次尝试...")
-        result = subprocess.run(
-            ["python3", str(run_one_script), sid],
-            cwd=str(ROOT),
-            capture_output=True,
-            text=True,
-            timeout=900,  # 每个场景最多 15 分钟
-            env={**os.environ, "PYTHONPATH": f"env:env/src:."},
-        )
-
-        elapsed = time.time() - start_time
-        print(f"  耗时: {elapsed:.0f}s, 退出码: {result.returncode}")
-
-        if result.returncode != 0:
-            print(f"  ❌ 失败: {result.stderr[-300:]}")
-            if attempt < 3:
-                print(f"  重试中...")
-                time.sleep(5)
-                continue
-            return {
-                "scenario": sid,
-                "error": result.stderr[-500:],
-                "attempts": attempt,
-                "pass": False,
-            }
-
-        # 找到生成的 db
-        db_path = existing_db  # run_one.py 会把 db 复制到这里
-        if not db_path.exists():
-            print(f"  ❌ run_one 成功但 db 不存在: {db_path}")
-            continue
-
-        # ── 审查 ──
-        print(f"  🔍 审查数据库...")
-        report = audit_database(db_path, scenario)
-
-        if report["pass"]:
-            print(f"  ✅ 审查通过")
-        else:
-            print(f"  ❌ 审查未通过:")
-            for issue in report["issues"]:
-                print(f"     - {issue}")
-            if attempt < 3:
-                print(f"  重试中...")
-                # 删除坏 db 重试
-                if db_path.exists():
-                    db_path.unlink()
-                continue
-
-        # ── 对比基线 ──
-        comparison = compare_to_baseline(sid, report["tables"])
-        if comparison["significant_changes"]:
-            print(f"  ⚠️  与基线显著偏离:")
-            for change in comparison["significant_changes"]:
-                print(f"     - {change}")
-
-        # ── 打印报告 ──
-        print(f"\n  ── 数据概览 ──")
-        print(f"  DB 大小: {report['db_size_bytes']/1024/1024:.1f}MB")
-        print(f"  完整性: {report['integrity']}")
-        for table, count in sorted(report["tables"].items()):
-            print(f"    {table}: {count}")
-        print(f"  PBC 边: {report.get('pbc_edges', '?')}")
-        print(f"  Agent 节点: {report.get('agent_nodes', '?')}")
-        if report.get("duration_seconds"):
-            print(f"  运行时长: {report['duration_seconds']:.0f}s")
-
-        if report["warnings"]:
-            print(f"\n  ⚠️  警告:")
-            for w in report["warnings"]:
-                print(f"     - {w}")
-
-        return {
-            "scenario": sid,
-            "report": report,
-            "comparison": comparison,
-            "attempts": attempt,
-            "elapsed_s": round(elapsed, 1),
-            "pass": report["pass"],
-        }
-
-    return {"scenario": sid, "error": "max retries exceeded", "pass": False}
+    # run_one now retains an audited candidate in its run directory. Reading
+    # existing_db after launching it would falsely label old data as new.
+    message = "Automatic frozen-trace replacement is retired. Run env/run_one.py for a candidate; publish through a separate release workflow."
+    print(message)
+    return {"scenario": sid, "error": message, "pass": False}
 
 
 # ── CLI ──
@@ -449,12 +368,12 @@ def run_one_scenario(scenario: dict, skip_if_exists: bool = True) -> dict[str, A
 if __name__ == "__main__":
     import argparse
 
-    p = argparse.ArgumentParser(description="逐场景重新采集 + 质量审查")
+    p = argparse.ArgumentParser(description="历史冻结库审查（自动采集已退役）")
     g = p.add_mutually_exclusive_group(required=True)
-    g.add_argument("--scenario", help="运行单个场景")
-    g.add_argument("--all", action="store_true", help="批量运行所有场景")
+    g.add_argument("--scenario", help="审查单个历史场景")
+    g.add_argument("--all", action="store_true", help="批量审查历史场景")
     g.add_argument("--list", action="store_true", help="列出所有场景")
-    p.add_argument("--no-skip", action="store_true", help="即使已有健康 db 也重新采集")
+    p.add_argument("--no-skip", action="store_true", help="保留的旧参数；自动采集已退役，使用此项将返回失败")
     p.add_argument("--incremental-eval", action="store_true", help="每采集完一个场景后立即运行增量评估")
 
     args = p.parse_args()
@@ -516,3 +435,7 @@ if __name__ == "__main__":
 
     if failed:
         print(f"  失败场景: {[r['scenario'] for r in failed]}")
+    sys.exit(0 if all(
+        result.get("pass", result.get("report", {}).get("pass", False))
+        for result in results
+    ) else 1)

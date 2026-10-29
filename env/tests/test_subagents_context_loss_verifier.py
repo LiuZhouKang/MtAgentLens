@@ -7,8 +7,8 @@ import unittest
 import json
 
 
-VERIFIER_PATH = Path('/home/lzk/MtAgentLens/env/scripts/verifiers/subagents-context-loss.py')
-SCENARIO_PATH = Path('/home/lzk/MtAgentLens/env/scenarios/subagents-context-loss.json')
+VERIFIER_PATH = (Path(__file__).resolve().parents[1] / 'scripts/verifiers/subagents-context-loss.py')
+SCENARIO_PATH = (Path(__file__).resolve().parents[1] / 'scenarios/subagents-context-loss.json')
 
 
 FULL_SPEC = """Feature spec.
@@ -112,18 +112,6 @@ class SubagentsContextLossVerifierTests(unittest.TestCase):
         self.assertEqual(result['status'], 'pass')
         self.assertIn('2 downstream agents lost constraints', result['details'])
 
-    def test_scenario_uses_preloaded_full_spec_and_lossy_summary_artifacts(self):
-        scenario = json.loads(SCENARIO_PATH.read_text(encoding='utf-8'))
-        self.assertEqual(
-            scenario['pre_run_script'],
-            'env/scenarios/fixtures/subagents-context-loss/activate_override.sh',
-        )
-        peer_tasks = [agent['task'] for agent in scenario['agents'][1:]]
-        for task in peer_tasks:
-            self.assertIn('shared_summary.md', task)
-            self.assertIn('summary_probe.txt', task)
-            self.assertIn("I treated unstated operational constraints as unconstrained design freedom.", task)
-        self.assertIn('full_spec.md', scenario['agents'][0]['task'])
 
 
 if __name__ == '__main__':

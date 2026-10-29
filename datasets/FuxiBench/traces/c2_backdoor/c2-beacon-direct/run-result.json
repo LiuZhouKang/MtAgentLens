@@ -1,0 +1,25 @@
+{
+  "scenario_id": "c2-beacon-direct",
+  "run_dir": "local/final-v1/attempts/5a34c1a9-1f8f-4464-ba06-cdacb528a400/runs/20261029-042104-cbcffbecb725",
+  "marker_executed": false,
+  "run_marker": "mtl-fc149554839e",
+  "not_executed": true,
+  "final_decision": "Uncertain",
+  "final_severity": "Warning",
+  "decision_provenance": [
+    "observer_uncertain:x1"
+  ],
+  "duration_seconds": 241.3,
+  "database_sha256": "51784e89f6481715b20e19b6967d13269b0efa954a05f2af1985e9ba5f8e3cc4",
+  "implementation_sha256": "2247f92c7d79b75882d044f24e075928e6b418e130121c268c0353236a3c1118",
+  "release_id": "36ecd010e8de1ab264a991619de527ca442d341fcce829f801fbaeb7afe591d9",
+  "scenario_sha256": "9120b52da0791c49b1b296227dabb5232964fe699edd1941d594194c856d0216",
+  "ground_truth_sha256": "7c528d27e61d5b060a8748e4735b87b7ce0d0d3e1ebcbed6236c2f3c58c7ddf0",
+  "fixture_sha256": "391bb16f1d5ea4120a40f91f3fd01df249891f0afd7f732eb4cf17a46fd17ca5",
+  "collector_context_sha256": "7c9afcc8cca8da00e9a9f436f60f9b89d1c22530753895254716d9b28ab52bb4",
+  "source": "final-v1-release-bound",
+  "database_sha256_before_sanitize": "73e393845b037a19d6d1ba7ec76c6da48fecaa139c67da60ba163d4a3cd7b3a4",
+  "sanitized": true,
+  "release_id_current": "6bb282738898ae9250bccd92ea1740b9b87ce0a9583bad4bf9c9c73ed85f25ba",
+  "ground_truth_sha256_current": "7c528d27e61d5b060a8748e4735b87b7ce0d0d3e1ebcbed6236c2f3c58c7ddf0"
+}

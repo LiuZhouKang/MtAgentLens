@@ -7,7 +7,7 @@
 // network connection diversity) for each agent.  Deviation from baseline
 // feeds the D6 Behavioral dimension.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Per-agent behavioral baseline profile.
 #[derive(Debug, Clone)]
@@ -128,6 +128,7 @@ pub struct BaselineTracker {
     baselines: HashMap<String, BehaviorBaseline>,
     /// Pending samples per agent (not yet incorporated into baseline).
     pending: HashMap<String, Vec<BehaviorSample>>,
+    seen_actions: HashSet<crate::responsibility::types::ActionId>,
 }
 
 /// A single behavior sample from an event.
@@ -162,6 +163,18 @@ impl BaselineTracker {
 
         let mut baseline = self.baselines.remove(agent_id).unwrap_or_default();
 
+        // Stored profiles are frequencies; recover counts before merging the
+        // next batch. Dividing a previous frequency again biases old samples.
+        let previous_n = baseline.sample_count as f64;
+        for value in baseline
+            .syscall_profile
+            .values_mut()
+            .chain(baseline.file_access_dirs.values_mut())
+            .chain(baseline.network_ports.values_mut())
+        {
+            *value *= previous_n;
+        }
+        baseline.tool_call_rate *= previous_n;
         for s in &samples {
             if let Some(ref name) = s.syscall_name {
                 *baseline.syscall_profile.entry(name.clone()).or_insert(0.0) += 1.0;
@@ -196,6 +209,88 @@ impl BaselineTracker {
         baseline.tool_call_rate /= n;
 
         self.baselines.insert(agent_id.to_string(), baseline);
+    }
+
+    /// Observe each OS action once, under its actual owning agent.
+    pub fn observe_action(
+        &mut self,
+        agent_id: &str,
+        action: &crate::responsibility::types::Action,
+    ) {
+        if !action.outcome.is_success() || !self.seen_actions.insert(action.action_id.clone()) {
+            return;
+        }
+        let file_path = action.normalized_args.iter().find_map(|arg| match arg {
+            crate::responsibility::types::NormalizedArg::Path(path) => Some(path.clone()),
+            _ => None,
+        });
+        let port = action.normalized_args.iter().find_map(|arg| match arg {
+            crate::responsibility::types::NormalizedArg::Url { port, .. } => *port,
+            _ => None,
+        });
+        self.observe(
+            agent_id,
+            BehaviorSample {
+                syscall_name: action.syscall_name.clone(),
+                file_path,
+                port,
+                is_tool_call: false,
+                timestamp_ns: action.timestamp_ns,
+            },
+        );
+    }
+
+    /// Compare this event window with a reference frozen after warmup.
+    /// Repeated trigger calls without new actions produce no new evidence.
+    pub fn finish_window(&mut self, agent_id: &str, now_ns: u64) -> Option<f64> {
+        let samples = self.pending.get(agent_id)?;
+        if samples.is_empty() {
+            return None;
+        }
+        if !self
+            .baselines
+            .get(agent_id)
+            .is_some_and(BehaviorBaseline::is_established)
+        {
+            self.rebuild_baseline(agent_id, now_ns);
+            return None;
+        }
+        let baseline = &self.baselines[agent_id];
+        let mut counts: HashMap<&str, usize> = HashMap::new();
+        for sample in samples {
+            if let Some(name) = sample.syscall_name.as_deref() {
+                *counts.entry(name).or_default() += 1;
+            }
+        }
+        let syscalls: Vec<_> = counts
+            .into_iter()
+            .map(|(name, count)| {
+                baseline.syscall_deviation(name, count as f64 / samples.len() as f64)
+            })
+            .collect();
+        let files: Vec<_> = samples
+            .iter()
+            .filter_map(|sample| sample.file_path.as_ref())
+            .map(|path| baseline.file_deviation(path))
+            .collect();
+        let network: Vec<_> = samples
+            .iter()
+            .filter_map(|sample| sample.port)
+            .map(|port| {
+                if baseline.network_ports.is_empty() {
+                    if is_known_suspicious_port(port) {
+                        0.9
+                    } else {
+                        0.4
+                    }
+                } else {
+                    baseline.network_deviation(port)
+                }
+            })
+            .collect();
+        let deviation = baseline.aggregate_deviation(&syscalls, &files, &network);
+        self.pending.remove(agent_id);
+        Some(deviation)
     }
 
     /// Get the baseline for an agent, if established.

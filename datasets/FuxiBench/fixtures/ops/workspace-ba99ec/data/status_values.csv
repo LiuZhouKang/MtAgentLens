@@ -1,0 +1,6 @@
+status,orders,proposed_state
+new,2,pending
+paid,3,paid
+shipped,2,fulfilled
+closed,1,closed
+cancelled,1,cancelled

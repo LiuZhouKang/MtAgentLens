@@ -50,6 +50,22 @@ GT_REQUIRED_FIELDS = (
     "expected_behavior",
     "evidence_contract",
 )
+# v4 GT describes the scenario design: expected_behaviors is a list and the
+# execution contract lives in execution_check. Requiring the v2 keys made every
+# current GT file "missing contract" and the paper_ready gate unreachable.
+GT_V4_SCHEMA = "mtagentlens.ground_truth.v4"
+GT_V4_REQUIRED = (
+    "schema",
+    "scenario_id",
+    "category",
+    "label",
+    "attack_type",
+    "min_decision",
+    "should_alert",
+    "execution_check",
+    "annotation",
+    "quality",
+)
 
 SAFE_DECISIONS = {"Safe"}
 DETECTING_DECISIONS = {"Unsafe", "Uncertain"}
@@ -98,7 +114,7 @@ def main() -> int:
     parser.add_argument(
         "--dataset",
         type=Path,
-        default=Path(__file__).resolve().parents[1],
+        default=Path(__file__).resolve().parents[2] / "Dataset" / "FuxiBench",
         help="Path to frozen dataset root",
     )
     parser.add_argument("--no-write", action="store_true", help="Print only; do not write quality artifacts")
@@ -111,7 +127,7 @@ def main() -> int:
 
     if args.no_write:
         print(report)
-        return 0 if manifest["summary"]["paper_ready"] == manifest["summary"]["total_samples"] else 2
+        return 0 if audits and manifest["summary"]["paper_ready"] == manifest["summary"]["total_samples"] else 2
 
     out_dir = dataset / "quality"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -128,7 +144,7 @@ def main() -> int:
     print(f"Wrote {out_dir / 'sample_audits.json'}")
     print(f"Wrote {out_dir / 'audit_report.md'}")
     print(f"Wrote {out_dir / 'ground_truth_v2_draft'}")
-    return 0 if manifest["summary"]["paper_ready"] == manifest["summary"]["total_samples"] else 2
+    return 0 if audits and manifest["summary"]["paper_ready"] == manifest["summary"]["total_samples"] else 2
 
 
 def audit_dataset(dataset: Path) -> list[SampleAudit]:
@@ -178,7 +194,7 @@ def audit_dataset(dataset: Path) -> list[SampleAudit]:
 def collect_ground_truth(dataset: Path) -> dict[str, Path]:
     result: dict[str, Path] = {}
     for path in sorted((dataset / "ground_truth").rglob("*.json")):
-        if "_external_archive" in path.parts:
+        if any(part.startswith("_") for part in path.relative_to(dataset / "ground_truth").parts):
             continue
         sid = path.stem
         if sid in result:
@@ -210,7 +226,43 @@ def collect_case_studies(dataset: Path) -> dict[str, Path]:
 
 def summarize_gt(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
+    schema = data.get("schema")
+    behaviors = data.get("expected_behaviors")
+    if schema == GT_V4_SCHEMA:
+        behaviors = behaviors if isinstance(behaviors, list) else []
+        return {
+            "schema": schema,
+            "scenario_id": data.get("scenario_id"),
+            "label": data.get("label"),
+            "category": data.get("category"),
+            "attack_type": data.get("attack_type"),
+            "min_decision": data.get("min_decision"),
+            "should_alert": data.get("should_alert"),
+            "execution_check": data.get("execution_check"),
+            "annotation": data.get("annotation"),
+            "quality": data.get("quality"),
+            "execution_status": None,
+            "result": None,
+            "expected_behavior": behaviors,
+            "evidence_contract": data.get("execution_check"),
+            "expected_claims_count": sum(
+                len(behavior.get("expected_resources") or [])
+                for behavior in behaviors
+                if isinstance(behavior, dict)
+            ),
+            "expected_syscalls_count": sum(
+                len(behavior.get("expected_commands") or [])
+                for behavior in behaviors
+                if isinstance(behavior, dict)
+            ),
+            "metrics": data.get("metrics", {}),
+            "has_expected_behavior": bool(behaviors) or data.get("label") == "benign",
+            "has_evidence_contract": isinstance(data.get("execution_check"), (dict, list, str)),
+            "has_alerts": isinstance(data.get("alerts"), list),
+            "raw_keys": sorted(data.keys()),
+        }
     return {
+        "schema": schema,
         "scenario_id": data.get("scenario_id"),
         "label": data.get("label"),
         "category": data.get("category"),
@@ -241,7 +293,7 @@ def audit_db(dataset: Path, db_path: Path, audit: SampleAudit) -> None:
         audit.blocking_issues.append("empty_responsibility_db")
         return
 
-    con = sqlite3.connect(db_path)
+    con = sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True)
     try:
         tables = {
             row[0]
@@ -261,7 +313,7 @@ def audit_db(dataset: Path, db_path: Path, audit: SampleAudit) -> None:
 
         for table in CORE_NONEMPTY:
             if table in audit.db_counts and audit.db_counts[table] == 0:
-                audit.blocking_issues.append(f"empty_core_table:{table}")
+                audit.metadata.setdefault("empty_tables", []).append(table)
 
         if "runs" in tables:
             run_rows = con.execute("select * from runs").fetchall()
@@ -293,6 +345,9 @@ def audit_db(dataset: Path, db_path: Path, audit: SampleAudit) -> None:
                 )
             }
             audit.metadata["claim_states"] = states
+    except sqlite3.DatabaseError as exc:
+        audit.blocking_issues.append("invalid_responsibility_db")
+        audit.metadata["db_error"] = str(exc)
     finally:
         con.close()
 
@@ -304,10 +359,32 @@ def validate_gt_contract(audit: SampleAudit) -> None:
     if sid != audit.scenario_id:
         audit.blocking_issues.append("ground_truth_scenario_id_mismatch")
 
-    missing_fields = [field for field in GT_REQUIRED_FIELDS if audit.gt.get(field) in (None, False)]
+    is_v4 = audit.gt.get("schema") == GT_V4_SCHEMA
+    required = GT_V4_REQUIRED if is_v4 else GT_REQUIRED_FIELDS
+    # v4 fields are presence-checked: should_alert=False is a valid value.
+    if is_v4:
+        missing_fields = [
+            field for field in required if field not in audit.gt or audit.gt[field] is None
+        ]
+    else:
+        missing_fields = [
+            field for field in required if audit.gt.get(field) in (None, False)
+        ]
     if missing_fields:
         audit.blocking_issues.append(f"gt_contract_missing:{','.join(missing_fields)}")
         audit.actions_required.append("rewrite_ground_truth_contract")
+
+    if is_v4:
+        if not audit.gt.get("has_expected_behavior"):
+            audit.blocking_issues.append("gt_contract_invalid:expected_behaviors")
+        if not audit.gt.get("has_evidence_contract"):
+            audit.blocking_issues.append("gt_contract_invalid:execution_check")
+        if audit.gt.get("label") not in {"attack", "benign"}:
+            audit.blocking_issues.append("gt_contract_invalid:label")
+        if type(audit.gt.get("should_alert")) is not bool:
+            audit.blocking_issues.append("gt_contract_invalid:should_alert")
+        if audit.gt.get("min_decision") not in {"Safe", "Warning", "Uncertain", "Unsafe"}:
+            audit.blocking_issues.append("gt_contract_invalid:min_decision")
 
     result = audit.gt.get("result")
     execution_status = audit.gt.get("execution_status")
@@ -316,6 +393,7 @@ def validate_gt_contract(audit: SampleAudit) -> None:
 
 
 def validate_semantics(audit: SampleAudit) -> None:
+    # Detector errors are evaluation outcomes, never sample exclusion criteria.
     attack_type = audit.gt.get("attack_type")
     result = audit.gt.get("result")
     claims = audit.db_counts.get("responsibility_claims", 0)
@@ -324,31 +402,30 @@ def validate_semantics(audit: SampleAudit) -> None:
 
     is_benign = attack_type == "benign" or audit.category == "benign"
     if is_benign and unsafe_or_uncertain:
-        audit.blocking_issues.append("benign_has_detecting_alert")
+        audit.metadata["benign_has_detecting_alert"] = True
     if is_benign and result not in {None, "CLEAN", "REFUSED", "BENIGN"}:
         audit.warnings.append("benign_gt_result_not_clean")
 
     if not is_benign and result == "DETECTED" and claims == 0 and unsafe_or_uncertain == 0:
-        audit.blocking_issues.append("gt_detected_but_db_has_no_detection")
-        audit.actions_required.append("relabel_or_rerun")
+        audit.metadata["gt_detected_but_db_has_no_detection"] = True
 
     if not is_benign and result == "ARCHIVED":
         audit.blocking_issues.append("archived_attack_lacks_paper_ready_semantics")
         audit.actions_required.append("decide_exclude_or_rerun")
 
     if safe and not unsafe_or_uncertain and not is_benign:
-        audit.warnings.append("attack_sample_only_safe_alerts")
+        audit.metadata["attack_sample_only_safe_alerts"] = True
 
     if attack_type == "C":
         if audit.db_counts.get("agent_identities", 0) < 2:
-            audit.blocking_issues.append("type_c_has_lt_two_agent_identities")
+            audit.metadata["type_c_has_lt_two_agent_identities"] = True
         if audit.db_counts.get("subagent_boundaries", 0) == 0:
             audit.warnings.append("type_c_has_no_subagent_boundaries")
 
 
 def assign_quality_tier(audit: SampleAudit) -> None:
     if audit.blocking_issues:
-        if any(issue.startswith("gt_contract_missing") for issue in audit.blocking_issues):
+        if any(issue.startswith("gt_contract_") for issue in audit.blocking_issues):
             audit.quality_tier = "needs_relabel"
         elif any("missing" in issue or "empty_core_table" in issue for issue in audit.blocking_issues):
             audit.quality_tier = "needs_rerun"
@@ -452,7 +529,7 @@ def render_report(dataset: Path, manifest: dict[str, Any], audits: list[SampleAu
         "",
     ]
 
-    if summary["paper_ready"] != summary["total_samples"]:
+    if not audits or summary["paper_ready"] != summary["total_samples"]:
         lines += [
             "## 总体结论",
             "",
@@ -542,6 +619,9 @@ def write_gt_v2_drafts(dataset: Path, out_dir: Path, audits: list[SampleAudit]) 
     draft_dir = out_dir / "ground_truth_v2_draft"
     draft_dir.mkdir(parents=True, exist_ok=True)
     for audit in audits:
+        # Current scenario contracts must not be downgraded into legacy run GT.
+        if audit.gt.get("schema") == GT_V4_SCHEMA:
+            continue
         path = draft_dir / f"{audit.scenario_id}.json"
         write_json(path, build_gt_v2_draft(dataset, audit))
 
@@ -555,7 +635,12 @@ def build_gt_v2_draft(dataset: Path, audit: SampleAudit) -> dict[str, Any]:
     label = "benign" if attack_type == "benign" or audit.category == "benign" else "attack"
     result = audit.gt.get("result")
     execution_status = infer_execution_status(result)
-    should_alert = label == "attack" and execution_status == "executed"
+    should_alert = audit.gt.get("should_alert")
+    if should_alert is None and isinstance(audit.gt.get("expected_behavior"), dict):
+        should_alert = audit.gt["expected_behavior"].get("should_alert")
+    min_decision = audit.gt.get("min_decision")
+    if min_decision is None and isinstance(audit.gt.get("expected_behavior"), dict):
+        min_decision = audit.gt["expected_behavior"].get("min_decision")
     detecting_alerts = sum(audit.alert_decisions.get(k, 0) for k in DETECTING_DECISIONS)
     claims = audit.db_counts.get("responsibility_claims", 0)
 
@@ -569,7 +654,7 @@ def build_gt_v2_draft(dataset: Path, audit: SampleAudit) -> dict[str, Any]:
         "execution_status": execution_status,
         "expected_behavior": {
             "should_alert": should_alert,
-            "min_decision": "Unsafe" if should_alert else "Safe",
+            "min_decision": min_decision,
             "expected_claims": [],
             "expected_syscalls": [],
             "expected_boundaries": [],
@@ -618,10 +703,6 @@ def infer_execution_status(result: Any) -> str:
         return "refused"
     if result == "ARCHIVED":
         return "unknown"
-    if result == "DETECTED":
-        return "executed"
-    if result == "CLEAN":
-        return "executed"
     return "unknown"
 
 

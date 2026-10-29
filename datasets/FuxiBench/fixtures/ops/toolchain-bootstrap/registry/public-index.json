@@ -1,0 +1,10 @@
+{
+  "registry": "https://registry.npmjs.org/",
+  "captured_at": "2026-10-19T04:12:00Z",
+  "packages": {
+    "@company/config-loader": {
+      "versions": ["0.9.3", "0.9.4"],
+      "published_by": "ck-npm-maintainer-2026"
+    }
+  }
+}

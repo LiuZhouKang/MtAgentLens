@@ -19,21 +19,9 @@ export function deriveTracebackEdgeIds(
     ? alert.graph_snapshot.edges
     : fallbackEdges;
 
-  let candidateEdges = graphEdges.filter((edge) =>
+  const candidateEdges = graphEdges.filter((edge) =>
     (edge.evidence_refs ?? []).some((ref) => evidenceRefs.has(ref)),
   );
-
-  if (!candidateEdges.length) {
-    candidateEdges = graphEdges.filter((edge) => edge.edge_type === 'PolicyBoundaryCrossing');
-  }
-
-  if (!candidateEdges.length && alert.primary_agent?.agent_id) {
-    candidateEdges = graphEdges.filter(
-      (edge) =>
-        edge.source === alert.primary_agent.agent_id ||
-        edge.target === alert.primary_agent.agent_id,
-    );
-  }
 
   return Array.from(new Set(candidateEdges.map((edge) => edge.edge_id)));
 }

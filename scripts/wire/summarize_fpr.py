@@ -12,7 +12,7 @@ is missing, the script exits non-zero rather than reporting a partial rate.
 
 Usage:
     python3 scripts/wire/summarize_fpr.py env/fpr-runs/p05-baseline \
-        --out-dir docs/evaluation --name fpr-baseline
+        --out-dir local/history/experiments/fpr --name fpr-baseline
 """
 from __future__ import annotations
 
@@ -145,7 +145,7 @@ def notable_alerts(db_path: str) -> list[dict]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("run_dir", help="directory containing results.jsonl")
-    parser.add_argument("--out-dir", default=str(ROOT / "docs/evaluation"))
+    parser.add_argument("--out-dir", default=str(ROOT / "local/history/experiments/fpr"))
     parser.add_argument("--name", default="fpr-baseline")
     parser.add_argument("--previous", default=None, help="previous baseline JSON")
     args = parser.parse_args()

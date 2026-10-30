@@ -121,7 +121,7 @@ that corpus; it is unit-tested and awaits the P1.2 recollection.
   display profile and title severity, the diagnostics snapshot semantics, and
   the replay provisional→authoritative delegation mapping.
 - `scripts/wire/check_baselines.py` (verify gate 10) fails if either
-  machine-readable measurement artifact (`docs/evaluation/fpr-baseline.json`,
+  machine-readable measurement artifact (`collector/tests/fixtures/baselines/fpr-baseline.json`,
   `compare/results/paper/standard_evaluation_v5.json`) calls Warning+
   actionable or omits the `warning_plus` bucket.
 - This ADR's numbers are reproducible with

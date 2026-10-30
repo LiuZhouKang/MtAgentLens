@@ -3,7 +3,7 @@
 # =============================================================================
 # Measure the NETWORK_* producer's event volume.
 # =============================================================================
-# Produces the numbers in docs/evaluation/network-noise-budget.json. Run it
+# Prints network-noise diagnostics; save new measurements under local/. Run it
 # outside the harness sandbox (systemd transient unit for the workload).
 #
 # Method: the tracer runs in the same filter mode the collector uses for

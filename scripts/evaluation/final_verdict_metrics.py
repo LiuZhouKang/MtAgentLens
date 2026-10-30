@@ -9,8 +9,8 @@ the collector writes one verdict per run; this script reads only that.
 
 Usage:
     python3 scripts/evaluation/final_verdict_metrics.py \
-        --benign docs/evaluation/fpr-2026-10-20-final/runs/results.jsonl \
-        --attack docs/evaluation/pilot-2026-10-20/results-10atk.jsonl
+        --benign local/history/experiments/fpr/results.jsonl \
+        --attack local/history/experiments/pilot/results-10atk.jsonl
 
 Each input is the runner's JSONL. Conditional rates use healthy binary
 decisions. The all_attempts section retains missing captures, abstentions,

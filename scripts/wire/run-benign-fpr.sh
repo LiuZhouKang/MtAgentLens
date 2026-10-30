@@ -6,7 +6,7 @@
 # Runs every scenario under env/scenarios/benign/ with the real eBPF collector
 # and records the alert rows straight from SQLite. Requires sudo (eBPF) and a
 # live LLM endpoint; therefore this is NOT part of scripts/verify.sh. The
-# committed artifact docs/evaluation/fpr-baseline.json is the measured record.
+# committed artifact collector/tests/fixtures/baselines/fpr-baseline.json is the measured record.
 #
 # Usage:
 #   ./scripts/wire/run-benign-fpr.sh [output_dir]

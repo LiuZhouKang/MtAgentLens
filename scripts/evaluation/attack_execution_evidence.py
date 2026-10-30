@@ -13,7 +13,7 @@ per-run indicators of execution:
 
 Usage:
     python3 scripts/evaluation/attack_execution_evidence.py \
-        docs/evaluation/pilot-.../results.jsonl
+        local/history/experiments/pilot/results.jsonl
 
 Each row gets `execution` = executed | weak_partial | not_executed | unobserved,
 with the matched indicators. `executed` requires a secret-class read or a

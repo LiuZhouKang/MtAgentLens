@@ -38,4 +38,4 @@ FuxiBench 当前包含 93 个场景，设计标签为 58 attack、35 benign。�
 
 进程 CPU 的“单核 100%”口径与相对应用基线的 slowdown 分开解释。探针短诊断、微基准和完整系统测量分别命名，避免用一个结果代替另一个实验。
 
-[复现手册](REPRODUCE.md)列出命令、输入与输出；[审稿证据索引](EVIDENCE-INDEX.md)按问题定位材料。历史 RC 的数值保留其原有构建和数据身份，见[历史记录说明](HISTORICAL-README-2026-10-21.md)。
+[复现手册](REPRODUCE.md)列出命令、输入与输出；[审稿证据索引](EVIDENCE-INDEX.md)按问题定位材料。历史 RC 的数值保留其原有构建和数据身份，见[历史记录说明](README.md)。

@@ -35,4 +35,4 @@ MtAgentLens 在 Linux 上采集 Agent 的 TLS 明文、进程、文件和网络�
 结果表与图统一维护在 `compare/results/`，本目录引用其入口。
 
 旧交接、逐轮进度和已替代的实施计划通过 Git 历史追溯，不再作为现行文档保存。
-保留的历史实验记录见 [实验记录说明](evaluation/HISTORICAL-README-2026-10-21.md)。
+实验导航与历史来源说明见 [实验文档](evaluation/README.md)。

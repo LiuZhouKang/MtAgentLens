@@ -22,8 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 WIRE_DIR = ROOT / "collector" / "tests" / "fixtures" / "wire"
 BENIGN_DIR = ROOT / "env" / "scenarios" / "benign"
-FPR_PATH = ROOT / "docs" / "evaluation" / "fpr-baseline.json"
-OVERHEAD_PATH = ROOT / "docs" / "evaluation" / "overhead-baseline.json"
+FPR_PATH = WIRE_DIR.parent / "baselines" / "fpr-baseline.json"
+OVERHEAD_PATH = WIRE_DIR.parent / "baselines" / "overhead-baseline.json"
 
 failures: list[str] = []
 

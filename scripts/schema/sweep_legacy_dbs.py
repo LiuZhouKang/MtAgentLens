@@ -66,7 +66,7 @@ def main() -> int:
     parser.add_argument(
         "--out",
         type=pathlib.Path,
-        default=ROOT / "docs" / "evaluation" / "schema-adoption-sweep.json",
+        default=ROOT / "local" / "history" / "validation" / "schema-adoption-sweep.json",
     )
     args = parser.parse_args()
 

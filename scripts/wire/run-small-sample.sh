@@ -11,13 +11,13 @@
 #   overhead 5 idle + 5 load runs with the Observer off (optional; costs more)
 #
 # Usage: scripts/wire/run-small-sample.sh [--with-overhead] [stage ...]
-# Output: docs/evaluation/fresh-<date>/ (manifest.json + stage artifacts)
+# Output: local/history/validation/fresh-<date>/ (manifest.json + stage artifacts)
 # =============================================================================
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DATE="$(date +%Y-%m-%d)"
-OUT="${MTL_SAMPLE_OUT:-$ROOT/docs/evaluation/fresh-$DATE}"
+OUT="${MTL_SAMPLE_OUT:-$ROOT/local/history/validation/fresh-$DATE}"
 WITH_OVERHEAD=0
 STAGES=()
 for arg in "$@"; do

@@ -98,13 +98,11 @@ fn frozen_corpus_decodes_within_budget() {
 #[test]
 fn committed_overhead_baseline_is_complete() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .join("docs/evaluation/overhead-baseline.json");
+        .join("tests/fixtures/baselines/overhead-baseline.json");
     let bytes = fs::read(&path).unwrap_or_else(|error| {
         panic!(
             "missing overhead baseline at {}: {error} \
-             (run ./scripts/wire/measure-overhead.sh)",
+             (restore the committed tests/fixtures/baselines fixture)",
             path.display()
         )
     });

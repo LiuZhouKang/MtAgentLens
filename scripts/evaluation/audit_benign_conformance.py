@@ -10,9 +10,9 @@ Such runs are reported separately and excluded from the conformant FPR.
 
 Usage:
     python3 scripts/evaluation/audit_benign_conformance.py \
-        --results docs/evaluation/fpr-.../results.jsonl \
+        --results local/history/experiments/fpr/results.jsonl \
         --dataset datasets/FuxiBench \
-        --out docs/evaluation/fpr-.../conformance.json
+        --out local/history/experiments/fpr/conformance.json
 """
 
 from __future__ import annotations

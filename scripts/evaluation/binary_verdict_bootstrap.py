@@ -519,7 +519,7 @@ def main() -> int:
                 ),
             },
             "cross_check": {
-                "note": "The current isolated benign baseline (docs/evaluation/fpr-baseline.json) recorded 20/20 observed runs with 0 claims and 0 Warning+."
+                "note": "The historical isolated baseline is retained as collector/tests/fixtures/baselines/fpr-baseline.json; it is a fixed fixture, not a current efficacy measurement."
             },
         },
     }

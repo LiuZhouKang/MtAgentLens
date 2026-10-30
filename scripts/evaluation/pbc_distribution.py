@@ -888,9 +888,9 @@ env/.venv/bin/python -m pytest compare/tests/test_pbc_distribution.py -q
 `datasets/FuxiBench/traces/` 的旧 responsibility.db 并统计
 `PolicyBoundaryCrossing` 边；旧语料已不在（该目录仅剩 2 个 db），且旧的
 220/396.7 数字被审计判定为重复建边口径问题。本脚本已替换为 fix4 冻结 checkpoint
-口径；旧输出 `docs/evaluation/pbc-distribution-2026-10-19.json` 仅作历史字节保留，
+口径；旧输出 `docs/evaluation/pbc-distribution-2026-10-19.json` 已退出现行文档，可从 Git 历史追溯，
 不得引用。注意：旧脚本当时是**未跟踪的工作区文件**（不在 git HEAD 中），因此本替换
-无法从 git 历史找回旧源码；旧输出 artifact 仍在，可作为历史证据。本次替换由
+无法从 git 历史找回旧源码；旧输出 artifact 可从其提交历史查询。本次替换由
 task-14 明确授权。
 """
 

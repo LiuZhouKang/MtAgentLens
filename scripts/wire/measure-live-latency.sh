@@ -12,7 +12,7 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-OUT="${1:-$ROOT/docs/evaluation/live-latency.json}"
+OUT="${1:-$ROOT/local/history/experiments/live-latency-$(date +%Y%m%d-%H%M%S)/live-latency.json}"
 shift || true
 SCENARIOS=("$@")
 if [ "${#SCENARIOS[@]}" -eq 0 ]; then

@@ -451,7 +451,7 @@ python3 scripts/evaluation/build_dataset_release.py --out /tmp/mtagentlens-datas
 
 [开销报告](compare/results/overhead/README.md)分别给出 2026-10-28 冻结完整系统批次与 2026-10-29 Collector 稳态补测。固定本地负载下，三次 Collector 稳态单核 CPU 均值为 0.661%；该结果包含 Rust Collector 和两个采集子进程，不代表完整系统或任意真实 Agent 流量。完整系统批次另按并发档位报告 CPU、内存与证据关联情况，具体负载、测量窗口和组件分账见报告。
 
-冻结结果不等于当前新构建已重新测量；测试中的合成吞吐预算仅用于回归检查。[当前实验状态](docs/evaluation/CURRENT-EVIDENCE.md)与[工程维护](docs/superpowers/README.md)分别记录实验依据和开发材料；[旧评估](docs/evaluation/HISTORICAL-README-2026-10-21.md)仅供追溯。
+冻结结果不等于当前新构建已重新测量；测试中的合成吞吐预算仅用于回归检查。[当前实验状态](docs/evaluation/CURRENT-EVIDENCE.md)与[工程维护](docs/superpowers/README.md)分别记录实验依据和开发材料；[实验文档](docs/evaluation/README.md)仅供追溯。
 
 ---
 

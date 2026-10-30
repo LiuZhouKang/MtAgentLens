@@ -4,9 +4,9 @@
 # Measure collector overhead on a fixed, real workload (P0.5 deliverable 7)
 # =============================================================================
 # Runs `mtagentlens record` against one `claude -p` turn and samples the
-# collector's CPU time and resident memory once per second. The resulting JSON
-# is the committed baseline; scripts/wire/check_baselines.py asserts it is
-# complete and collector/tests/overhead_gate.rs enforces the offline part.
+# collector's CPU time and resident memory once per second. New JSON is written
+# under local/ by default; committed historical fixtures are updated separately
+# after review. check_baselines.py and overhead_gate.rs validate those fixtures.
 #
 # This needs sudo (eBPF) and a live LLM endpoint, so it is NOT part of
 # scripts/verify.sh. Run it deliberately when the collector changes.
@@ -18,7 +18,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DURATION="${1:-45}"
-OUT="${2:-$ROOT/docs/evaluation/overhead-baseline.json}"
+OUT="${2:-$ROOT/local/history/experiments/overhead-$(date +%Y%m%d-%H%M%S)/overhead.json}"
 SUDO_PASS="${MTAGENTLENS_SUDO_PASSWORD:-}"
 BIN="$ROOT/collector/build/release/mtagentlens"
 [ -x "$BIN" ] || BIN="$ROOT/collector/build/debug/mtagentlens"

@@ -1,14 +1,8 @@
-> **Status 2026-10-29**：T5 IdentityBench 已 **estimable**（30 multi，C0–C4；`compare/results/identity/README.md`）；T6 AttributionBench **not_estimable**（detector 0 root/0 entry，`compare/results/attribution/README.md`）；T7 PBC estimable；T8 overhead estimable；T4-app 已 **partial 完成**（M 与 R-Judge A2 binary，`compare/results/external/baselines/`）；T7 ablation 已 **estimable（two-endpoint：ranking + operating point，0 新增付费调用）**，见 `compare/results/ablation/README.md`；sensitivity 已 **estimable（110 点阈值 + 六维权重/gate OAT + 1000 次 LHS，fixed recorded Observer）**，见 `compare/results/sensitivity/README.md`。本文以下状态表保留为设计时记录。
+# 冻结实验协议：Revision 2
 
-> **文件组织更新（2026-10-29）**：开销实验统一存放于 [compare/results/overhead/](../../compare/results/overhead/README.md)。当前采用一张综合图与精简分账表；下文旧 F2、14 图／8 表名称仅指历史导出，旧图表已归档。原始数值与冻结证据保留。
+本文件保留 2026-10-26 起实验设计与执行条件。部分章节含当时的阶段状态；当前完成情况及可引用结果见[结果总览](CURRENT-EVIDENCE.md)，图表和原始数据见[实验交付](../../compare/results/README.md)。
 
-# MtAgentLens 七项分派任务实验设计（Revision 2，已吸收对抗审）
-
-> 日期：2026-10-26。  
-> 本文件是被清理后的执行协议之一；总入口见 `docs/archive/engineering/handoffs/FINAL-CODEX-HANDOFF-2026-10-26.md`。旧草稿已清理，不再作为口径。接手复核合同见总入口 §11；冲突处以其为准。
-> 关键修正：**7 项是分派子任务，不是 7 条原始审稿意见**；**当前分母尚未冻结**；**C0 不是第 8 个检测实验**；**检测主 endpoint 不再是 4–10 个 Unsafe 的 TPR**；**5 张结果表，不是 7 张**。
-
-> **2026-10-28 意见 5 执行结果（已实测完成，非计划）**：§6 为用户确认的精简开销协议。正式批次 `compare/results/overhead/raw/full-system/` 已完成 **36/36 条件**、15 配对区组、372 个 Agent 实例；execution report `complete=true`，T8/F2 由 `overhead_report.py` 严格完整模式导出到 `compare/results/overhead/raw/full-system/report/`（`T8.md`/`T8.csv`/`F2.pdf|svg|png`）；论文写作版见 [开销实验统一报告](../../compare/results/overhead/README.md)（14 张独立图 + 8 张表）。最后一次 32 并发 C3 曾被 300 s harness 关闭上限截断；按固定恢复规则归档该尝试并用 600 s 上限重跑同一冻结条件，矩阵与测量口径未改，失败尝试的费用与部分数据保留。正式 36 条件峰时费用上界合计 **$0.6204**（含归档失败尝试 $0.0309）；本实验全部 cohort（含校准/pilot/丢弃批次/恢复）合计 **$1.6465**（观测/已知 usage 上界 $1.0265 + 未计量请求准备金 $0.62），预算 $5。其他实验不变。详细结果见 §6.6。
+§6 是完整开销批次所引用的冻结协议，协议标识 `EXPERIMENT-SUITE-7-REVISED-2026-10-26 §6` 保持不变。当前开销展示与解释由[开销报告](../../compare/results/overhead/README.md)维护。历史执行指令不构成新的运行任务。
 
 ---
 

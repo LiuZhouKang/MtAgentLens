@@ -153,5 +153,5 @@ cargo clippy             # Lint
 
 - [系统架构](../docs/architecture.md)
 - [评分引擎设计](../docs/design/scoring-engine.md)
-- [SAFI 攻击框架](../docs/safi/README.md)
+- [SAFI 攻击框架](../docs/materials/safi/README.md)
 - [文档索引](../docs/README.md)

@@ -1,12 +1,6 @@
-# Analyzer Composition (current)
+# Analyzer Composition
 
-> **Last verified against code**: 2026-10-22
->
-> The 2026-06 design that described `PipelineBuilder`, `PipelineOrchestrator`,
-> `EventSource`, `StageContract` and `SharedStateStore` was never implemented.
-> It stayed green because its only test compared the design to itself. It was
-> removed on 2026-10-22; the original text is archived at
-> `docs/archive/engineering/design/ANALYZER_PIPELINE_CONTRACT-2026-06-design.md`.
+This document describes the current composition contract; the implementation is assembled in `collector/src/main.rs`.
 
 ## Where the chain is composed
 

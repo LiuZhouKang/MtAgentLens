@@ -1,47 +1,27 @@
 # 论文工作区
 
-> 实验状态与权威结果路径见 [`docs/evaluation/CURRENT-EVIDENCE.md`](../evaluation/CURRENT-EVIDENCE.md)；论文主张与证据对应关系见 [`claim-evidence-matrix.md`](claim-evidence-matrix.md)。本目录只放论文写作、审稿回复和修改材料。
+本目录保留论文原件、修订工作稿和主张依据。当前实验状态见[实验入口](../evaluation/CURRENT-EVIDENCE.md)；论文中的每个主张先对照[主张矩阵](claim-evidence-matrix.md)，逐条审稿依据见[回复证据](REVIEW-RESPONSE-EVIDENCE-2026-10-26.md)。
 
-## 1. 审稿与回复
+## 原件与工作稿
 
-| 文件 | 用途 |
+- [原始材料](originals/README.md)：原始DOC/PDF、审稿TXT/XLSX和相关图像，保留原文。
+- [审稿意见原文](originals/审稿意见.txt)与[作者规划对照](originals/审稿意见.md)：原始意见与规划分开理解。
+- [正文替换工作稿](revision-package.md)：包含待编辑段落，使用时与最终结果核对。
+- [修订要点](修改说明-草稿.md)：组织本轮方法、实验与图表修改，不表示已经合入最终 Word。
+
+## 主张、方法与数字
+
+| 材料 | 用途 |
 |---|---|
-| [`审稿意见.md`](审稿意见.md) / [`审稿意见.txt`](审稿意见.txt) / [`审稿意见.xlsx`](审稿意见.xlsx) | 原始审稿意见 |
-| [`REVIEW-RESPONSE-EVIDENCE-2026-10-26.md`](REVIEW-RESPONSE-EVIDENCE-2026-10-26.md) | 逐条审稿意见 → 当前证据 → 可写口径 |
-| [`response-letter-notes.md`](response-letter-notes.md) | 回复信写作笔记 |
-| [`修改说明-草稿.md`](修改说明-草稿.md) | 论文修改说明草稿；引用前先核对当前证据页 |
+| [主张矩阵](claim-evidence-matrix.md) | 系统贡献、实验证据与可写范围 |
+| [回复证据](REVIEW-RESPONSE-EVIDENCE-2026-10-26.md) | 原始审稿问题对应的当前结果与尚缺证据 |
+| [判定流程](decision-procedure.md) | 分数、候选证据与最终裁决语义 |
+| [身份与根因实验说明](身份解析与根因溯源实验总说明.md) | 身份评价、根因指标与方法范围 |
+| [根因指标定义](根因指标定义.md) | Root/Entry/Chain计分定义；不代表已有准确率 |
+| [同级方法矩阵](能力矩阵-同级方法.md) | 输入层级、实际实现与可复现性比较 |
+| [claims.json](claims.json) | 历史fix4的54条机器登记，非当前93场景结果 |
+| [开销claims](claims-overhead-2026-10-28.json) | 独立开销批次的机器登记 |
 
-## 2. 稿件
+正式结果在 [compare/results](../../compare/results/README.md) 中维护；图表、MANIFEST、机器指标和原始数据按实验查找，避免在工作稿中维护另一套数字。
 
-| 文件 | 说明 |
-|---|---|
-| [`软件学报初稿.doc`](软件学报初稿.doc) / [`软件学报初稿.pdf`](软件学报初稿.pdf) | 软件学报初稿 |
-| [`thy软件学报24最终稿.doc`](thy软件学报24最终稿.doc) | 历史最终稿候选；以当前修改说明为准 |
-| [`revision-package.md`](revision-package.md) | 正文替换稿/表图落点 |
-| [`decision-procedure.md`](decision-procedure.md) | 判定流程说明 |
-
-## 3. 数字与主张
-
-| 文件 | 用途 |
-|---|---|
-| [`claim-evidence-matrix.md`](claim-evidence-matrix.md) | 主张-证据矩阵（记录可用主张及其证据） |
-| [`claim-evidence-matrix-archive.md`](claim-evidence-matrix-archive.md) | 历史矩阵（不得引用） |
-| [`claims.json`](claims.json) | 机器可校验数字层 |
-| [`数字审计-2026-10-25.md`](数字审计-2026-10-25.md) | 初稿数字审计 |
-| [`数字修正-2026-10-25.md`](数字修正-2026-10-25.md) | 数字替换记录 |
-
-## 4. 图表与实验
-
-- 主实验结果：`compare/results/{ablation,sensitivity,overhead,identity}/`
-- 论文图表：`local/final-v1/paper/` 与各实验目录的 `figures/`、`tables/`
-- 参数敏感性 Figure 8：[`compare/results/sensitivity/figures/fig8_sensitivity.png`](../../compare/results/sensitivity/figures/fig8_sensitivity.png)
-- T7 消融 Figure 7：[`compare/results/ablation/figures/fig7_ablation.png`](../../compare/results/ablation/figures/fig7_ablation.png)
-
-## 5. 历史材料
-
-- [`claim-evidence-matrix-archive.md`](claim-evidence-matrix-archive.md)
-- [`根因分析.md`](根因分析.md)、[`根因指标定义.md`](根因指标定义.md)
-- [`annotation-protocol.md`](annotation-protocol.md)
-- AI/CODEX 交接不放在本目录：见 [`docs/archive/engineering/`](../archive/engineering/README.md)
-
-写作规则：新数字先进入 `CURRENT-EVIDENCE.md` 或 `claims.json`，再写进正文；历史数字不得直接复用。
+比赛与演示材料分别见[比赛](../materials/competition/)和[演示](../materials/demo/)，SAFI原研究稿见[SAFI](../materials/safi/)。它们保留各自历史语境，不充当当前测量记录。

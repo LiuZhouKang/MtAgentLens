@@ -63,7 +63,7 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
 
 ## 功能演示
 
-[![MtAgentLens 完整功能演示（约 1 分 48 秒）](docs/demo/demo.png)](docs/demo/demo.mp4)
+[![MtAgentLens 完整功能演示（约 1 分 48 秒）](docs/materials/demo/demo.png)](docs/materials/demo/demo.mp4)
 
 *完整功能演示（约 1 分 48 秒）：eBPF 内核级零插桩采集 → 跨进程责任图构建 → 结构化告警与证据回溯的端到端流程*
 
@@ -428,7 +428,7 @@ MtAgentLens/
 | [架构设计](docs/architecture.md) | 系统架构全貌——eBPF → Rust → 因果分析 → 前端 |
 | [实验设计](docs/design/experiment-design.md) | RQ 驱动的实验方案 |
 | [评分引擎](docs/design/scoring-engine.md) | 6 维分诊评分 · PBC 图事实 · 固定 logistic 压缩（非拟合校准） |
-| [SAFI 框架](docs/safi/README.md) | 安全不对称文件注入——攻击载荷迁移方法论 |
+| [SAFI 框架](docs/materials/safi/README.md) | 安全不对称文件注入——攻击载荷迁移方法论 |
 | [文档索引](docs/README.md) | 全部文档导航 |
 
 ---
@@ -580,5 +580,5 @@ eBPF 内核程序（`bpftools/*.bpf.c`）按文件头 SPDX 声明使用 **GPL-2.
 
 - 漏洞报告与安全默认值：[`SECURITY.md`](SECURITY.md)
 - 威胁模型（STRIDE + 代码坐标）：[`docs/security/threat-model.md`](docs/security/threat-model.md)
-- OpenSSF 自评：[`docs/security/openSSF-self-assessment.md`](docs/security/openSSF-self-assessment.md)
+- 安全设计： [威胁模型](docs/security/threat-model.md)
 - 贡献流程与唯一门禁：[`CONTRIBUTING.md`](CONTRIBUTING.md)、`./scripts/verify.sh`

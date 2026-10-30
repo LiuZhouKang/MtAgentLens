@@ -1,48 +1,22 @@
-# 返修主张与证据矩阵
+# 论文主张与证据
 
-当前检测主测量是 [RC 2026-10-25-fix4](../evaluation/rc-2026-10-25-fix4/README.md)，binary `de3a0894…`、release `aa364a45…`、config `6d44789c…`。完整开销是 2026-10-28 的独立补充测量（36/36 条件），不覆盖 fix4 检测主测量，也不混入其分母。正文替换稿见 [revision-package.md](revision-package.md)，逐点回复见 [修改说明-草稿.md](修改说明-草稿.md)。历史矩阵保存在 [archive](claim-evidence-matrix-archive.md)，不作为当前数字来源。
+本页说明论文可以保留的系统贡献及其证据范围。当前检测结果使用93场景批次；实验状态由[CURRENT-EVIDENCE](../evaluation/CURRENT-EVIDENCE.md)维护，审稿对应关系由[EVIDENCE-INDEX](../evaluation/EVIDENCE-INDEX.md)维护。
 
-## 返修问题、现有证据与下一项
-
-| 审稿问题 | 可用证据 | 当前可写结论 | 实质缺口 |
-|---|---|---|---|
-| R1.1 分数与最终标签 | `decision-procedure.md`、final_decision 内核与候选版本测试 | 分数分诊，硬证据/具体候选审阅聚合最终标签；质量不足不清空为 Safe | 主要内容已合入 Word 工作稿；仍需最终图表与引用核对 |
-| R1.2 / R2.4 身份及根因 | 合成 E5、真实指标实现、独立标注工具 | 规格测试支持合并/分离规则；共享进程无会话动作保持未知 | 真实多智能体身份与根因参考集、实际独立复核及定量结果 |
-| R1.3 / R2.3 基线公平性 | 输入能力矩阵、应用层 runner | 功能比较与成绩比较分开；文本适配不能证明运行时泛化 | 同模型文本＋工具轨迹基线与必要的同层部署 |
-| R1.4 / R2.1 独立性 | 冻结身份与运行选择记录 | 可复核本次输入/运行，不能据此宣称独立开发集 | 困难良性扩展、活动规模匹配、新样本验证 |
-| R2.2 活动量混杂 | E2：PBC 均值良性 0.72 / 攻击 1.77，纯 PBC AUROC 0.528 | 不支持 PBC 单独作为可靠分类器 | 不能据此排除复杂度混杂，仍需匹配实验 |
-| R2.5 消融 | E3/E4 固定记录观测 replay；新逐维相对权重扫描 | 离线条件稳定性与分诊路径变化 | 新 Observer 结果下端到端效应、eBPF/PBC 层级拆分 |
-| R1.5 开销 | 正式 36/36 条件、15 配对区组、372 实例；T8/F2 严格完整导出在 `compare/results/overhead/raw/full-system/report/`；[§6.6](../evaluation/EXPERIMENT-SUITE-7-REVISED-2026-10-26.md#66-实测结果2026-10-28-完成) | 218.2624 是三个程序均值相加（101.3125+57.5763+59.3736），非探针级或 SSL 操作级成本；旧 36.9 MB 等只作历史。新实测：C3 并发 1 墙钟 9.27 s、RSS 376.0 MiB、Observer $0.005232/条件；并发 32 墙钟 150.91 s [40.21–234.74]、RSS 772.7 MiB、进程源丢弃 13,439–16,442 而受控操作 0/1536 缺失；TLS 873.4 ns/成功读写操作；正式费用上界 $0.6204 | 单主机/单内核/单一固定负载/3 次描述性重复；不报 CI/p99、不做跨环境或长期泄漏推断；Word 合入与 claims 登记待做 |
-
-意见 5 已实测完成并可答复（有限定）：旧“方案已确定、实测 pending”不再成立；限制见上。
-
-## 当前运行结果及分母
-
-| 观察量 | 结果 | 解释 |
+| 可保留主张 | 直接证据 | 论文表述范围 |
 |---|---|---|
-| 场景范围 | 19 benign / 44 attack | 选中的 process 场景，不是有效运行数 |
-| 实际尝试 | 24 / 50 | 包括保留的无效尝试 |
-| 有效运行 | 18 / 43 | 首个符合固定准入条件的运行 |
-| 良性 Safe / review / Unsafe | 15 / 3 / 0 | 条件误报 0/15，Wilson [0%,20.39%]；覆盖 83.3%、弃权 16.7% |
-| 攻击场景 Unsafe / review / Safe | 4 / 21 / 18 | Unsafe 输出频率 4/43；覆盖 51.2%、弃权 48.8%；不是执行条件召回 |
-| marker 钩子触达 | 16/43=37.2% | 4 Unsafe / 9 review / 3 Safe；不表示攻击目标全部成功 |
-| marker 子集已裁决 | 4/7=57.1% Unsafe | Wilson [25.05%,84.18%]；须同时给子集 56.3% 弃权 |
-| 接收端 / 与 marker 交集 / 并集 | 8 / 6 / 18 | 载荷到达与钩子触达分别记；原“并集19”撤下 |
-| 记录输入 hard-sensitive-egress 消融 | 两个已执行攻击 review→Unsafe，良性无翻转 | 默认关闭时复现 61 个记录裁决；不是新 campaign |
+| OS边界观测为多智能体审计提供进程、文件、网络与受支持TLS事实，并与应用意图组织关联 | [系统架构](../../../docs/architecture.md)、[检测报告](../../results/detection/README.md)、[外部基线输入说明](../../results/external/baselines/README.md) | 贡献在观测范围与可核查证据；基线输入不同，不能归为同输入算法优势 |
+| 当前冻结cohort上可同时量化执行条件检测、误报与未决输出 | [行级检测结果](../../results/detection/data/detection-metrics-final-93.json) | ITT TPR 23/58，PP TPR 23/29，良性Unsafe 2/35；另列6条未执行告警和21/35良性Uncertain。marker不是独立攻击成功真值 |
+| 身份解析显式组织已赋值关系与未决身份 | [身份CSV](../../results/identity/tables/t5_identity.csv)、[方法与参考](../../results/identity/README.md) | Full赋值654/1675（39.0%），已赋值子集配对F1=1.000、全参考F1=0.280；两种分母并列。参考以声明进程/祖先关系为主 |
+| 责任图排序与最终裁决工作点具有不同作用 | [消融指标](../../results/ablation/metrics/t7-metrics.json)、[统计说明](../../results/ablation/README.md) | L0→L0.5 AUROC 0.590→0.677，差异未达显著；L1阈值→生产L3的PP FPR 0.743→0.057，同时TPR 1.000→0.793，呈现取舍 |
+| 已记录语义观测下，可量化参数扰动的结果范围 | [敏感性结果](../../results/sensitivity/metrics/t7-sensitivity.json)、[协议](../../results/sensitivity/README.md) | 8,103点网格及1,000次联合采样；固定记录Observer的routing反事实，不是新Observer运行或独立测试集 |
+| 系统成本可以按Collector、完整系统、模型费用和采集质量分别解释 | [开销报告](../../results/overhead/README.md)、[分账表](../../results/overhead/tables/component_accounting.md) | 固定本地负载下Collector稳态单核CPU均值0.661%；完整系统另有36/36条件，32并发存在来源丢弃和关联不足 |
 
-全部攻击场景的 Safe=18 不整体解释为已执行攻击漏报。marker 子集内 Safe=3 是直接需要排查的对象。日志拒绝措辞与部分执行可能重叠，30/43 的前序措辞筛查不等于 30 个完全拒绝运行。同机接收端使用非 127 地址，不构成跨机试验。
+## 责任归因的当前定位
 
-## 数字与复现入口
+系统能够呈现关联证据与责任链线索；本revision的T6尚无根因准确率。[93条trace审计](../../results/attribution/README.md)中27,175条claims的root_groups、unique_entry、ranked_agents均为0。论文应把证据组织能力与Root/Entry/Chain正确性区分开，标题、摘要和结论中的“根因定位”承诺须与该实际输出一致。
 
-结果数字登记在 [claims.json](claims.json)，每条指向实际 artifact 和字段。条数以验证器输出为准，避免文档重复维护计数：
+## 数字的版本归属
 
-```bash
-python3 scripts/evaluation/verify_claims.py --manifest docs/paper/claims.json
-./scripts/verify.sh
-```
+[claims.json](claims.json)的54条断言绑定历史fix4测量，保留其原字段和值，不能据此为本页93场景数字背书。[开销claims](claims-overhead-2026-10-28.json)属于独立开销批次。当前数字直接引用对应实验MANIFEST和机器结果；离线核对方法见[复现手册](../evaluation/REPRODUCE.md)。
 
-现有登记校验是逐字段比对，不会自动证明回复信每个句子或全部正文数字正确。本轮另核对 E3 两臂、六维覆盖和执行交并集，补入新增汇总；固定观测 replay 不等同于新采集。`paper_metrics_available=false` 保留原状态，未将门禁通过解释为投稿完成。
-
-## 投稿合入
-
-先将替换稿合入中英文摘要、方法、算法、结果与结论，同步删除旧数值配图及表格；再核对完整稿与逐点回复。只有实际进入 Word 的改动才在提交版回复中写为“已修改”。独立标注、同输入基线、真实根因和完整开销的结果尚需继续完成。
+正文与回复仍需作者核对实际Word稿、图表和引用；只有已合入稿件的修改才在提交信中写成“已修改”。

@@ -4,11 +4,7 @@ MADR-minimal: YAML front matter + Context / Options / Outcome / **Confirmation**
 `Confirmation` is the part that matters — it names the mechanism that keeps the
 decision true, because a decision recorded without a guard is a decision that rots.
 
-Only **irreversible or expensive-to-reverse** decisions are recorded here. Existing
-`docs/superpowers/specs` are deliberately *not* migrated: an ADR log does not
-retro-fit history, and pretending otherwise produces documentation that was never
-true at the time it claims. Accepted debt goes to `docs/capabilities.json`
-(`known_limitations`), not here.
+Only **irreversible or expensive-to-reverse** decisions are recorded here. Records describe decisions in their original context. Their dates and status are not a current implementation checklist; consult `docs/architecture.md` and the confirmation mechanisms. Current capability boundaries are maintained in `docs/capabilities.json`.
 
 ## Index
 
@@ -17,7 +13,7 @@ true at the time it claims. Accepted debt goes to `docs/capabilities.json`
 | [0001](0001-single-verification-entry-point.md) | One verification entry point, with budgets instead of disables |
 | [0002](0002-dual-license.md) | Dual `Apache-2.0 OR MIT`, upstream MIT untouched |
 | [0003](0003-rust-lints.md) | Enable `dead_code_pub_in_binary` + `unreachable_pub`; reject `unused_crate_dependencies` |
-| [0004](0004-ignored-tests-are-tracked-debt.md) | 26 ignored tests are tracked debt, not a solution |
+| [0004](0004-ignored-tests-are-tracked-debt.md) | Ignored tests require explicit reasons and a decreasing budget (historical count) |
 | [0005](0005-single-schema.md) | 单一 schema：版本脊梁、身份信念、退役因果面（ignored 25→3） |
 | [0006](0006-scenario-vocabulary-is-data.md) | 场景词表是数据（TOML + 单一加载器 + 运行时覆盖），不是三份代码副本 |
 | [0007](0007-file-mutation-producer.md) | 文件变更生产者并入 `process`（unlinkat/truncate），删除未接线 `fileaccess` |

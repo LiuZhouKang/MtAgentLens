@@ -16,7 +16,7 @@ base64 change must not proceed on assumed numbers.
 Usage:
     python3 -I scripts/wire/measure_payload_sizes.py --captures /tmp/p05 \
         --fixtures collector/tests/fixtures/wire \
-        --out docs/superpowers/spikes/2026-10-17-p1-base64-size.md
+        --out local/history/tooling/spikes/payload-sizes.md
 """
 from __future__ import annotations
 

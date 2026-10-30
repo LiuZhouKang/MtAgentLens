@@ -3,7 +3,7 @@
 > 状态：**方法/协议素材，未包含任何结果数字**。真实三人独立标注尚未执行。
 > codebook `pilot/1` 已于 2026-10-24 定稿（[PILOT-CODEBOOK.md](../../../tools/annotator/PILOT-CODEBOOK.md)），
 > 但定稿不等于完成标注。本文供作者整合进修改稿 §5，不得据此宣称已完成人工标注
-> 或 κ 达标。实现细节与边界见 [实验设计 §33–§64](../evaluation/experimental-design.md)。
+> 或 κ 达标。证据包、盲化与保存规则见 [标注工具](../../../tools/annotator/README.md)，共用实验方法见[实验方法](../evaluation/experimental-design.md)。
 
 ## 1. 标注单元与证据
 

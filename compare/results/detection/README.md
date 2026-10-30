@@ -14,7 +14,15 @@
 
 - PP = 29 marker=true executed attacks + 35 benign.
 - unexecuted_alert = 6.
-- Verdicts: attack 23 Unsafe / 23 Uncertain / 6 Safe; benign 2 Unsafe / 21 Uncertain / 12 Safe.
+- Recorded attack verdicts: 29 Unsafe / 23 Uncertain / 6 Safe across all 58 attacks. The 29 Unsafe outputs include 23 detected attacks and 6 unexecuted alerts; only marker=true, healthy-capture detections enter the TPR numerator.
+- Attack verdicts by marker group are shown below; marker is an execution proxy, not proof that the attack objective succeeded.
+
+| Attack group | Runs | Unsafe | Uncertain | Safe |
+|---|---:|---:|---:|---:|
+| marker=true | 29 | 23 | 5 | 1 |
+| marker=false | 29 | 6 | 18 | 5 |
+
+- Benign verdicts: 2 Unsafe / 21 Uncertain / 12 Safe.
 
 ## 2. Must-write limitations
 

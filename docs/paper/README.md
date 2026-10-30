@@ -42,6 +42,6 @@
 - [`claim-evidence-matrix-archive.md`](claim-evidence-matrix-archive.md)
 - [`根因分析.md`](根因分析.md)、[`根因指标定义.md`](根因指标定义.md)
 - [`annotation-protocol.md`](annotation-protocol.md)
-- AI/CODEX 交接不放在本目录：见 [`docs/archive/ai-2026-10-30/`](../archive/ai-2026-10-30/README.md)
+- AI/CODEX 交接不放在本目录：见 [`docs/archive/engineering/`](../archive/engineering/README.md)
 
 写作规则：新数字先进入 `CURRENT-EVIDENCE.md` 或 `claims.json`，再写进正文；历史数字不得直接复用。

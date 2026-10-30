@@ -13,7 +13,7 @@
 
 本表混合工程缺口、历史修稿事项与待补实验。优先级不代表这些工作都属于当前
 产品工程阶段；处理前须复核代码和证据。当时的工程执行顺序见
-[归档工程收口审查](../archive/ai-2026-10-30/superpowers/ENGINEERING-REVIEW-2026-10-22-CODEX.md#8-w2w5-接续实施与验收)。
+[归档工程收口审查](../archive/engineering/reviews/ENGINEERING-REVIEW-2026-10-22-CODEX.md#8-w2w5-接续实施与验收)。
 以下登记项和 DONE/TODO 描述各自记录时的状态，不代表当前版本已经重新测量；
 不再维护容易漂移的手工总数。当前实验状态与证据以
 [CURRENT-EVIDENCE.md](../evaluation/CURRENT-EVIDENCE.md) 为准。

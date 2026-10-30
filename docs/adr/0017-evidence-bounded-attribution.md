@@ -7,7 +7,7 @@ date: 2026-10-26
 
 ## Context
 
-当前检测链已含 ActionOutcome、候选引用／版本、CapabilityEnvelope、内容provenance、两阶段身份与traceback，但不同层丢失操作结果、内容完整性、任务授权和会话粒度。traceback的单个root与成员集合不足以支持唯一根因或任意有序链主张。详见[最终交接](../archive/ai-2026-10-30/research/FINAL-CODEX-HANDOFF-2026-10-26.md)。
+当前检测链已含 ActionOutcome、候选引用／版本、CapabilityEnvelope、内容provenance、两阶段身份与traceback，但不同层丢失操作结果、内容完整性、任务授权和会话粒度。traceback的单个root与成员集合不足以支持唯一根因或任意有序链主张。详见[最终交接](../archive/engineering/handoffs/FINAL-CODEX-HANDOFF-2026-10-26.md)。
 
 用户已确认仅eBPF观测边界并授权按本方案分阶段实施。本ADR记录实施约束，不修改ADR0015／0016，也不宣称各项能力已经完成。当前行为与已知局限继续以代码和验证产物为准。
 

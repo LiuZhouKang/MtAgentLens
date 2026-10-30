@@ -34,7 +34,7 @@
 | 意见 1 判定流程 | [`../paper/decision-procedure.md`](../paper/decision-procedure.md)；`collector/src/responsibility/classification/final_decision.rs` | — | `cargo test`（final_decision/classification 套件） |
 | 意见 2 前半 身份判据 | [`e5-identity-microbenchmark.md`](e5-identity-microbenchmark.md)（T1–T6 全 F1=1.000） | 旧 e5-identity 工作包已删除；可用 REPRODUCE §3 重算 | `compare/tests/test_e5_identity_microbenchmark.py`（7）；resolver 单测 |
 | 意见 2 后半 根因定量 | [`../paper/根因指标定义.md`](../paper/根因指标定义.md) | —（E6/运行级根因待付费 campaign） | `compare/tests/test_root_cause_metrics.py`（12） |
-| 意见 3 前半 基线公平性 | [`../paper/意见3-应用层基线-全球调研与落地方案.md`](../paper/意见3-应用层基线-全球调研与落地方案.md) §9 | `local/e8-dryrun/`（dry-run 2 trace/0 label） | `compare/tests/test_app_baseline.py`（13） |
+| 意见 3 前半 基线公平性 | [`../paper/意见3-应用层基线-全球调研与落地方案.md`](../paper/意见3-应用层基线-全球调研与落地方案.md) §9 | `local/history/experiments/e8-dryrun/`（dry-run 2 trace/0 label） | `compare/tests/test_app_baseline.py`（13） |
 | 意见 3 后半 InjecAgent 协议 | [`experimental-design.md`](experimental-design.md)（协议审计） | `compare/results/external/InjecAgent/results.json`（canonical TPR 0.8605；`injecagent_final.json` 的 0.9934 不得引用） | 记录于设计文档 |
 | 具体意见 同级方法 | [`../paper/能力矩阵-同级方法.md`](../paper/能力矩阵-同级方法.md) | — | —（文档级，复现待额度） |
 | 意见 4 指标核对 | [`../paper/数字审计-2026-10-25.md`](../paper/数字审计-2026-10-25.md) | `docs/paper/claims.json`（54 条） | `test_paper_claims_artifact.py`（2）+ `test_metrics_reproducible.py` + `verify_claims` 54/54 |

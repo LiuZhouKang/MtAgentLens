@@ -1,12 +1,9 @@
 # 工程维护
 
-当前状态入口是 [docs/evaluation/CURRENT-EVIDENCE.md](../evaluation/CURRENT-EVIDENCE.md)。本目录保留执行材料；已被替代的 AI 交接和评审已移至 [archive/ai-2026-10-30/](../archive/ai-2026-10-30/README.md)。
+本页保留开发维护入口。工程操作见[贡献指南](../../CONTRIBUTING.md)，模块关系见[系统架构](../architecture.md)，长期约束见[ADR](../adr/README.md)。实验状态和冻结证据以[当前证据入口](../evaluation/CURRENT-EVIDENCE.md)为准。
 
-| 材料 | 职责 |
-|---|---|
-| [缺口登记](GAP-REGISTER.md) | 已登记问题；处理前复核源码，避免按旧状态重复开单 |
-| [GT 复核工作单](GT-REVIEW-PACKET-2026-10-22.md) | 待未来标注工具阶段使用，不是已完成人工签署 |
+[缺口登记](GAP-REGISTER.md)保存历史问题及其记录时状态；处理任何条目前先复核当前源码、测试和证据，不按旧 DONE/TODO 重复执行或宣称验收。
 
-[历史记录](archive/reviews/)保存被替代的交接、进度和审计；其他旧方案在 [archive/](archive/)。历史中的“完成”“唯一入口”和实验数字仅描述当时状态。
+交接、计划、审查、未签署 GT 工作单与逐轮会话已统一进入[工程历史归档](../archive/engineering/README.md)，其他历史材料从[历史总入口](../archive/README.md)查找。归档中的任务指令不作为当前工作授权。
 
-不为每轮工作新建交接文件。工程变更维护在现有主题文档，实验状态更新到 `docs/evaluation/CURRENT-EVIDENCE.md`；长期决策进入 ADR，本地会话和临时工作记录进入 `local/`。
+工程变更维护在现有主题文档，实验状态更新到 `docs/evaluation/CURRENT-EVIDENCE.md`，长期决策进入 ADR；本地工具工件与临时记录由 `local/README.md` 导航。不为每轮工作新增交接入口。

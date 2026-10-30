@@ -27,7 +27,7 @@
 > 当前入口已切到canonical两类型包，多Agent检测队列29＝22 attack（A11/B11）＋7 benign。
 > 包恢复哈希核验的原始标注输入，禁止全局IP改写；prompt重建并校验源字节。
 > Rust候选按id＋version复审，未评完的当前候选阻止Safe。真实process内核负载证据在
-> `local/readiness-2026-10-26/system-load/report.json`，仅支持该受控路径的采集结论。
+> `local/history/validation/readiness-2026-10-26/system-load/report.json`，仅支持该受控路径的采集结论。
 > **E6仍有协议/接线缺口，不只是付费等待**：运行标注root_actor强制null，不能产生逻辑根因参考。
 > 历史E9-system只覆盖process，不覆盖TLS/Observer与语义告警延迟；ONNX现已移除，不是待补测组件。E11没有同级动态系统部署runner。
 > 正式准入与命令统一见[最终实验清单](../evaluation/final-rc-checklist.md)，下文旧Type C/23场景描述均为历史范围。
@@ -216,7 +216,7 @@ split、unattributed）；需要多智能体 run（RC-fix5 付费）与独立参
 - 能力矩阵：[能力矩阵-同级方法](能力矩阵-同级方法.md)；应用层基线方案：
   [意见3-应用层基线](意见3-应用层基线-全球调研与落地方案.md) §9。
 - E8 harness：`compare/tests/test_app_baseline.py`（**13 个测试函数**）已就绪；
-  dry-run 产物 `local/e8-dryrun/summary.json` 为 `records=2, judged=0, labels={}`——
+  dry-run 产物 `local/history/experiments/e8-dryrun/summary.json` 为 `records=2, judged=0, labels={}`——
   **只证明流程可跑，不是结果**。
 
 **今晚新增**：输入侧已冻结（FuxiBench 2.0 包；当前release身份见release.json），9 个检测排除场景已定；
@@ -428,7 +428,7 @@ provenance/门控对照），零付费；数据集 2.0 不增加 run，也不改
 未重建（85/dev43/test50，label/type 变化不影响 family）；本轮不产生新消融或同级实跑数据。
 
 **仍缺**：真实 C0 93 run 上的 L0–L3 导出与 ΔAUROC/Holm（代码与合成门禁已就绪，
-见 `docs/archive/ai-2026-10-30/research/CODEX-FINAL-ROUND-2026-10-27.md` §5.2）；L0 固定阈值 TPR/FPR 尚未确定；
+见 `docs/archive/engineering/handoffs/CODEX-FINAL-ROUND-2026-10-27.md` §5.2）；L0 固定阈值 TPR/FPR 尚未确定；
 20-run live Observer 子样本预算；1 个最接近方法的复现或客观不可复现理由（E11，需适配+训练）；
 论文 §6.2/表 9/10 文字。
 

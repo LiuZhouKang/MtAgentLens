@@ -5,7 +5,7 @@
 # MtAgentLens 七项分派任务实验设计（Revision 2，已吸收对抗审）
 
 > 日期：2026-10-26。  
-> 本文件是被清理后的执行协议之一；总入口见 `docs/archive/ai-2026-10-30/research/FINAL-CODEX-HANDOFF-2026-10-26.md`。旧草稿已清理，不再作为口径。接手复核合同见总入口 §11；冲突处以其为准。  
+> 本文件是被清理后的执行协议之一；总入口见 `docs/archive/engineering/handoffs/FINAL-CODEX-HANDOFF-2026-10-26.md`。旧草稿已清理，不再作为口径。接手复核合同见总入口 §11；冲突处以其为准。
 > 关键修正：**7 项是分派子任务，不是 7 条原始审稿意见**；**当前分母尚未冻结**；**C0 不是第 8 个检测实验**；**检测主 endpoint 不再是 4–10 个 Unsafe 的 TPR**；**5 张结果表，不是 7 张**。
 
 > **2026-10-28 意见 5 执行结果（已实测完成，非计划）**：§6 为用户确认的精简开销协议。正式批次 `compare/results/overhead/raw/full-system/` 已完成 **36/36 条件**、15 配对区组、372 个 Agent 实例；execution report `complete=true`，T8/F2 由 `overhead_report.py` 严格完整模式导出到 `compare/results/overhead/raw/full-system/report/`（`T8.md`/`T8.csv`/`F2.pdf|svg|png`）；论文写作版见 [开销实验统一报告](../../compare/results/overhead/README.md)（14 张独立图 + 8 张表）。最后一次 32 并发 C3 曾被 300 s harness 关闭上限截断；按固定恢复规则归档该尝试并用 600 s 上限重跑同一冻结条件，矩阵与测量口径未改，失败尝试的费用与部分数据保留。正式 36 条件峰时费用上界合计 **$0.6204**（含归档失败尝试 $0.0309）；本实验全部 cohort（含校准/pilot/丢弃批次/恢复）合计 **$1.6465**（观测/已知 usage 上界 $1.0265 + 未计量请求准备金 $0.62），预算 $5。其他实验不变。详细结果见 §6.6。
@@ -19,7 +19,7 @@
 - multi 30=22 attack+8 benign；`handoff-unicode` 已经 3 路盲标（27/27 benign）+裁决，成为第 8 个 multi benign。旧 23 Type C =22 attack multi + handoff（现 benign），不是 23 attack。
 - 旧 84=58+26 仅历史；不再混用。
 - 93 全 `paper_ready` 是**机械判据**；`identity-confusion` notes 仍有 A/C 歧义/registry 不可达/needs_human_review，不能把机械 flag 当完整科学裁决。
-- 独立验收：A2/A4/A7/A8 通过；A6 `/tmp` blind prepare 已修复（`repo_rel` 支持外部 work，回归测试通过）；A5 env 声明 491 但所列 4 文件实际 298（全量 870 通过）。见 `local/audit-2026-10-27/G0-VERIFICATION.md`。
+- 独立验收：A2/A4/A7/A8 通过；A6 `/tmp` blind prepare 已修复（`repo_rel` 支持外部 work，回归测试通过）；A5 env 声明 491 但所列 4 文件实际 298（全量 870 通过）。见 `local/history/audits/audit-2026-10-27/G0-VERIFICATION.md`。
 - AppBench 当前只保留 R-Judge A2：93 records/186 model calls；输入消融已删除。
 
 ### 0.2 执行状态

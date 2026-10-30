@@ -167,7 +167,7 @@ rm -f /tmp/store.sqlite
 
 ## 10. 不能离线复现的部分（必须等额度/真人）
 
-- campaign（TPR/FPR/开销/执行链）→ `docs/evaluation/CURRENT-EVIDENCE.md` + `docs/archive/ai-2026-10-30/handoffs/HANDOFF-NEXT-SESSION.md`；
+- campaign（TPR/FPR/开销/执行链）→ `docs/evaluation/CURRENT-EVIDENCE.md` + `docs/archive/engineering/handoffs/HANDOFF-NEXT-SESSION.md`；
 - E6 跨机根因、E7（已取消新场景）、E8 应用层基线、E11 同级方法复现（E9 完整开销已于 2026-10-28 完成，见 §6b）；
 - Type C/多智能体检测与归因（需最终付费 campaign）；
 - 真人独立标注、第四方裁决、分字段人类 κ、attestation（**本轮明确不做**）。

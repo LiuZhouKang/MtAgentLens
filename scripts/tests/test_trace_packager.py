@@ -5,7 +5,7 @@ The fake replay executable and the monkeypatched
 ``run_artifacts.validate_run_binding`` are explicit driver fixtures for
 lifecycle and rejection tests. They are not evidence that real run artifacts or
 the Rust recorder validator accepted a recording. Existing real replay CLI
-evidence remains ``local/readiness-2026-10-26/team/strict-recording-green.log``.
+evidence remains ``local/history/validation/readiness-2026-10-26/team/strict-recording-green.log``.
 """
 from __future__ import annotations
 

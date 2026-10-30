@@ -32,7 +32,6 @@
 - [**当前实验与论文证据入口**](evaluation/CURRENT-EVIDENCE.md)：T4/T5/T6/T7/T7-S/T8/PBC 的状态、权威路径和图/表索引。
 - [**结果交付目录**](../compare/results/README.md)：每个实验的 README、MANIFEST、原始数据、图/表与复现脚本。
 - [历史 RC（2026-10-25 fix2）](evaluation/rc-2026-10-25-fix2/README.md)：binary `db3191bb…` 的冻结身份、协议与结果；历史 RC 只作对照，不作为当前构建结论。
-- [AI/CODEX/DSH 历史交接归档](archive/ai-2026-10-30/README.md)：已移出顶层，不是当前入口。
 - [标注数据集 release](evaluation/annotation-dataset-release.md)与[运行级 codebook `pilot/1`](../tools/annotator/PILOT-CODEBOOK.md)：`mtagentlens.annotation-dataset/1` 消费契约与规则冻结。
 - [实验方法](evaluation/experimental-design.md)与[测量隔离](evaluation/measurement-isolation.md)：后续实验的设计参考，具体适用性以冻结版本为准。
 - [意见5完整开销结果](evaluation/EXPERIMENT-SUITE-7-REVISED-2026-10-26.md#66-实测结果2026-10-28-完成)：36/36 正式条件已完成，T8/F2 在 `compare/results/overhead/raw/full-system/report/`；TLS 微基准与其他探针短诊断已实测，旧 60 条件方案不再执行。
@@ -47,8 +46,8 @@
   - [修改说明-草稿.md](paper/修改说明-草稿.md) §0.4：审稿意见逐条状态；
   - [能力矩阵-同级方法.md](paper/能力矩阵-同级方法.md)：同级方法输入/单元/输出/可复现性对比；
   - [根因指标定义.md](paper/根因指标定义.md)：E6 指标定义与落地顺序。
-- [历史会话工作日志](evaluation/session-log-2026-10-25.md)：保留当时逐轮证据，不代表当前版本状态。
-- [历史设计与评审](superpowers/archive/)：已被替代的方案和交接，不是当前任务入口。
+- [历史会话工作日志](archive/engineering/sessions/session-log-2026-10-25.md)：保留当时逐轮证据，不代表当前版本状态。
+- [历史总入口](archive/README.md)：工程交接、设计、评审与会话分类导航；历史状态不代表当前任务。
 - [历史测量](evaluation/)：含旧基线、试点与审计；不作为当前效果或性能结论。
 - [比赛材料](决赛文档/)与[演示](demo/)：提交和展示记录。
 

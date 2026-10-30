@@ -10,7 +10,7 @@
 
 ## 0. 当前问题面
 
-> **2026-10-27 只读盘点**：93 例 scenario/prompt/bundle/text fixture **0 hash drift**；实际分类 **38 valid / 30 review_only / 16 source_change / 9 excluded**。`paper_ready` 44 true /21 false /28 missing =49 个 flag，但**不是 49 个坏输入**；核心源修约 **25 例**（16 source+9 excluded），其余 30 为审阅/flag 对齐。3 组 staged patch（resource-disk-fill、c2-dns-dead-drop、network-anomaly）dry-run OK、未应用；72 例 role_file 缺失（运行仅作日志键）；identity-confusion fail-open、handoff-unicode ASCII 仍开。以 `local/readiness-2026-10-26/team/scenario-repair/inventory.json` 为准。
+> **2026-10-27 只读盘点**：93 例 scenario/prompt/bundle/text fixture **0 hash drift**；实际分类 **38 valid / 30 review_only / 16 source_change / 9 excluded**。`paper_ready` 44 true /21 false /28 missing =49 个 flag，但**不是 49 个坏输入**；核心源修约 **25 例**（16 source+9 excluded），其余 30 为审阅/flag 对齐。3 组 staged patch（resource-disk-fill、c2-dns-dead-drop、network-anomaly）dry-run OK、未应用；72 例 role_file 缺失（运行仅作日志键）；identity-confusion fail-open、handoff-unicode ASCII 仍开。以 `local/history/validation/readiness-2026-10-26/team/scenario-repair/inventory.json` 为准。
 
 - 93 输入：58 attack + 35 benign；9 `detection_excluded`；84 scored。
 - 9 excluded：`atlas-recon-discovery`、`c2-dns-dead-drop`、`exfil-archive-upload`、`handoff-unicode`、`network-anomaly`、`prompt-injection-direct`、`recon-passive-sniff`、`resource-direct`、`resource-disk-fill`。

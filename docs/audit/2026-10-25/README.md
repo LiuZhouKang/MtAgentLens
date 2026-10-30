@@ -163,8 +163,8 @@ tmux-live 稳定性，不是钱。**
 | [`code-audit.md`](code-audit.md) | 工程/代码 17 条问题（P0=1/P1=4/P2=12）+ 12 项实测已修 + 探针复现 |
 | [`dataset-audit.md`](dataset-audit.md) | 数据集三层结论 + 9 fail/5 warn + metadata 修复建议 + 标注最小操作步骤 |
 | [`paper-audit.md`](paper-audit.md) | 12 项意见状态 + 21 条数字不一致 + Word 逐节 + 提交合规清单 |
-| `local/audit/2026-10-25/verify_dataset.py` / `verify-dataset.json` | 93 case 全量只读核验脚本与机器可读结果 |
-| `local/audit/2026-10-25/code-audit.md` 等 | 原始报告（与 docs 副本一致） |
+| `local/history/audits/audit/2026-10-25/verify_dataset.py` / `verify-dataset.json` | 93 case 全量只读核验脚本与机器可读结果 |
+| `local/history/audits/audit/2026-10-25/code-audit.md` 等 | 原始报告（与 docs 副本一致） |
 
 关键复现命令：
 

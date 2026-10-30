@@ -1443,7 +1443,7 @@ named this destination`；system prompt 说明"应权衡 detail 描述的事实�
 - 单测：`compare/tests/test_model_preflight.py`（4 项：成功/402/quota/credit/401/5xx）。
 - 实测（本轮，额度仍为 0）：`pilot_observer` 直接输出
   `[abort] model preflight: insufficient_balance; campaign not started`，
-  `local/pf` 下只有 `model-preflight.json` 与 `campaign-aborted.json`，**没有产生任何 run**。
+  `local/history/preflights/pf` 下只有 `model-preflight.json` 与 `campaign-aborted.json`，**没有产生任何 run**。
 
 代价与边界：预检消耗 1 个 token；预检只判断"能不能开始"，不保证后续 run 不失败
 （供应商可能在 campaign 中途变更），所以 §82 的 fail-fast 仍然保留，两者是分层防线。

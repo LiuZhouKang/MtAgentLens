@@ -31,7 +31,7 @@ find results -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 ## Exclusions
 
 - `local/final-v1/`：完整运行现场/历史中间结果；包内只保留必要 raw 副本。
-- `docs/archive/ai-2026-10-30/`：AI 交接归档，不属于实验交付。
+- `docs/archive/engineering/`：AI 交接归档，不属于实验交付。
 - `compare/docs/` 中部分历史文档仍保留 `local/...` 文字路径；这是历史命令，不是包内依赖。
 
 ## Entry

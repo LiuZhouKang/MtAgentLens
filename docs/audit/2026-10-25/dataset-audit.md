@@ -2,7 +2,7 @@
 
 - 审计时间：2026-10-25 19:13–19:35（Asia/Shanghai）
 - 审计对象：`datasets/FuxiBench`（声称 v1.4.0）、`local/workpackages/2026-10-25-sink-release2/FuxiBench`（RC fix4 输入，release_id `aa364a45…`）、`tools/annotator/`、`local/workpackages/2026-10-24-pilot-codebook-v1/`
-- 审计方式：脚本 + 只读命令核验，**不采信文档自述**；本地核验脚本 `local/audit/2026-10-25/verify_dataset.py`，原始结果 `local/audit/2026-10-25/verify-dataset.json`（本地产物，不随仓库分发）
+- 审计方式：脚本 + 只读命令核验，**不采信文档自述**；本地核验脚本 `local/history/audits/audit/2026-10-25/verify_dataset.py`，原始结果 `local/history/audits/audit/2026-10-25/verify-dataset.json`（本地产物，不随仓库分发）
 - 边界：**未修改** `compare/Dataset/`、**未修改** release 目录、未 commit/push。唯一一次副作用见 §7 披露（studio 冒烟启动写入了 pilot `records.sqlite` 的 SQLite 头，逻辑行数不变）。
 
 ---
@@ -99,7 +99,7 @@
 
 ### 2.3 prompt_inputs 一致性（对应任务 3，脚本全量 93 case）
 
-脚本：`local/audit/2026-10-25/verify_dataset.py`（`P_prompt_inputs` 段）。运行结果（`verify-dataset.json`）：
+脚本：`local/history/audits/audit/2026-10-25/verify_dataset.py`（`P_prompt_inputs` 段）。运行结果（`verify-dataset.json`）：
 
 | 检查 | 通过 | 失败 | 说明 |
 |---|---|---|---|
@@ -315,7 +315,7 @@ python3 scripts/evaluation/annotation_release_consumer.py --root local/workpacka
 
 ```bash
 cd /home/lzk/MtAgentLens
-python3 local/audit/2026-10-25/verify_dataset.py --json local/audit/2026-10-25/verify-dataset.json
+python3 local/history/audits/audit/2026-10-25/verify_dataset.py --json local/history/audits/audit/2026-10-25/verify-dataset.json
 # 结果：fail=9 warn=5（问题表 A-01…E-01 的机器可读版）
 
 python3 compare/scripts/build/refresh_prompt_input_hashes.py --check   # 323 drift
@@ -325,7 +325,7 @@ python3 -m tools.annotator release-verify --root local/workpackages/2026-10-24-p
 python3 scripts/evaluation/annotation_release_consumer.py --root local/workpackages/2026-10-24-pilot-codebook-v1/release
 ```
 
-脚本会写 `verify-dataset.json`（在 `local/audit/2026-10-25/` 内，不进仓库、不改数据集/release）。
+脚本会写 `verify-dataset.json`（在 `local/history/audits/audit/2026-10-25/` 内，不进仓库、不改数据集/release）。
 
 ---
 
@@ -341,4 +341,4 @@ python3 scripts/evaluation/annotation_release_consumer.py --root local/workpacka
 ## 7. 副作用披露
 
 - 为验证 studio 可用性，我执行过一次 `serve --mode studio --port 8799` 冒烟（HTTP 200，随后 timeout 退出）。该命令打开了 `local/workpackages/2026-10-24-pilot-codebook-v1/records.sqlite` 并写入 SQLite 头（文件 sha256 `17e3ea5c…` → `c5e44868…`，字节数 1,732,608 不变）；逻辑内容未变（只读查询：`bundle_revisions=6`、`bundle_tasks=2`、`review_attestations=0`，与 release/counts 一致）。**没有修改 `compare/Dataset/`、release 目录或任何 GT。** 若要求该 pilot store 字节级不变，应从 git/本地备份恢复或重跑 pilot 生成。
-- `verify_dataset.py` 只读数据集与 release；输出写在 `local/audit/2026-10-25/`。
+- `verify_dataset.py` 只读数据集与 release；输出写在 `local/history/audits/audit/2026-10-25/`。

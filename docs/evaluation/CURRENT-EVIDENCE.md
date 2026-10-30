@@ -37,6 +37,6 @@
 
 历史 AI 交接、CODEX/DSH 交接、旧轮次审计和旧 E3 记录统一放在：
 
-- [`docs/archive/ai-2026-10-30/README.md`](../archive/ai-2026-10-30/README.md)
+- [`docs/archive/engineering/README.md`](../archive/engineering/README.md)
 
 这些文件**不是当前入口**，只用于追溯；新文档请写回本页或对应主题目录。

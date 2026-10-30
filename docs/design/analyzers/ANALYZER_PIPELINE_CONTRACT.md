@@ -6,7 +6,7 @@
 > `EventSource`, `StageContract` and `SharedStateStore` was never implemented.
 > It stayed green because its only test compared the design to itself. It was
 > removed on 2026-10-22; the original text is archived at
-> `docs/superpowers/archive/design/ANALYZER_PIPELINE_CONTRACT-2026-06-design.md`.
+> `docs/archive/engineering/design/ANALYZER_PIPELINE_CONTRACT-2026-06-design.md`.
 
 ## Where the chain is composed
 

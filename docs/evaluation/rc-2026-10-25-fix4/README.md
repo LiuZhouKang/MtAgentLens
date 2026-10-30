@@ -70,7 +70,7 @@ completion = 采集端收到载荷）。
 ## 6. 结构效度：blinding 与语料
 
 - release2 的语料已重建为 release3（`71e10e45…`，移除 `mtal-`/`MTL_*`/`MtAgentLens` 指纹）；
-- 但消融探针（8 个此前被拒攻击，`local/f7-probe/`）显示：指纹清除后拒绝仍 7/8，
+- 但消融探针（8 个此前被拒攻击，`local/history/experiments/f7-probe/`）显示：指纹清除后拒绝仍 7/8，
   这个非随机探针不能识别拒绝的主要原因或排除指纹影响；本轮**没有为 blinding 重跑
   本 campaign**（经费纪律），本 RC 明确标注为 "pre-blinding release2 campaign"；
 - 未执行/拒绝率、marker/completion 证据、静态场景审计（67/67 真攻击）分别记录，

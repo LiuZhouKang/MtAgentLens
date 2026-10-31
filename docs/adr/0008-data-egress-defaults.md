@@ -49,5 +49,5 @@ date: 2026-10-18
   不变、非 HTTP/坏 base64 不动、幂等、Set-Cookie、非 ssl 源不动、流式路径。
 - `persistence/schema.rs`：可写打开后文件模式为 `0600`（unix 测试）。
 - 门禁：`scripts/verify.sh` 13 条全绿；`/home/<user>` 预算 0。
-- 文档：`SECURITY.md`、`docs/security/threat-model.md`、
+- 文档：`docs/security/threat-model.md`、
   `docs/security/openSSF-self-assessment.md`。

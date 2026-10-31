@@ -39,7 +39,7 @@ fi
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
 install -m 0755 "$BIN" "$STAGE/mtagentlens"
-for doc in README.md SECURITY.md LICENSE-APACHE LICENSE-MIT; do
+for doc in README.md LICENSE-APACHE LICENSE-MIT; do
   [ -f "$ROOT/$doc" ] && install -m 0644 "$ROOT/$doc" "$STAGE/$doc"
 done
 

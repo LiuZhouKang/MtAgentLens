@@ -63,8 +63,8 @@ python3 scripts/audit_deps.py all
 ## 提交与安全
 
 提交保持单一目的，说明修改原因与验证结果；常规提交使用 Conventional Commits。
-安全问题按 [SECURITY.md](../SECURITY.md) 报告；测试凭据必须使用合成值。
-新增捕获数据外发路径时，同步安全策略与[威胁模型](../docs/security/threat-model.md)。
+安全问题按 [威胁模型与安全报告](../docs/security/threat-model.md) 报告；测试凭据必须使用合成值。
+新增捕获数据外发路径时，同步[威胁模型](../docs/security/threat-model.md)中的字段和外发边界。
 
 项目代码采用 [Apache-2.0](../LICENSE-APACHE) 或 [MIT](../LICENSE-MIT) 双许可；
 数据、文档与第三方代码的适用范围见 [README 许可证说明](../README.md#许可证)。

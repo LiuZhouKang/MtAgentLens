@@ -13,7 +13,7 @@ MtAgentLens 在 Linux 上采集 Agent 的 TLS 明文、进程、文件和网络�
 | 理解判定逻辑 | [评分与判定](design/scoring-engine.md) |
 | 开发、测试与发布 | [开发与维护](../scripts/README.md) |
 | 开发前端 | [前端说明](../frontend/README.md) |
-| 检查安全边界 | [威胁模型](security/threat-model.md)、[安全策略](../SECURITY.md) |
+| 检查安全边界 | [威胁模型与安全报告](security/threat-model.md) |
 | 查询能力约束与设计理由 | [能力清单](capabilities.json)、[架构决策](adr/README.md) |
 
 ## 数据、实验与论文

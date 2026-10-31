@@ -38,7 +38,7 @@ date: 2026-10-19
 
 ## Consequences
 
-- 没有 MR 门禁；贡献者与发布者在本地运行唯一入口。`CONTRIBUTING.md` 与
+- 没有 MR 门禁；贡献者与发布者在本地运行唯一入口。`scripts/README.md` 与
   OpenSSF 自评已同步。
 - 未来若接入任何 CI，只需让它逐字调用 `scripts/verify.sh`（ADR-0001 仍然
   成立），不改变门禁语义。

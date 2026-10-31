@@ -39,6 +39,10 @@ MtAgentLens 以较高权限观察不可信进程，处理可能包含秘密的�
 
 链的实际顺序见 [main.rs](../../collector/src/main.rs)。脱敏仅作用于接入该 analyzer 的路径，不能推广到直接运行 helper、历史原始记录或其他离线副本。`fd_target`、`comm`、argv 等自由文本也可能泄露秘密；跨 TLS 记录或 stdio read/write 拆分的内容没有完整脱敏保证。
 
+TLS 头脱敏覆盖 Authorization、Proxy-Authorization、Cookie、Set-Cookie 和 X-Api-Key。
+stdio 的 JSON 模式保留结构，对敏感键和值应用既有规则；未识别的随机串及用 JSON unicode
+转义表示的敏感键可能保留。GenAI 导出默认仅含标识符、枚举、计数与时间戳。
+
 服务默认绑定 `127.0.0.1:7395`，`MTAGENTLENS_BIND` 可改变地址，源码会提示非回环绑定。远程访问需要部署方提供认证、加密及访问控制；不要直接公开原始事件或运行库接口。
 
 ## Observer 的外发通路
@@ -61,4 +65,4 @@ BPF 程序受 verifier 限制，但 verifier 通过不证明捕获语义正确�
 - 改身份信号、委派授权或最终裁决：区分观测事实、声明与推断，验证作用域和代际。
 - 改 BPF hook、缓冲容量或解析边界：实际加载并记录内核与丢失诊断。
 
-现有工程门禁与冻结实验分别见 [贡献指南](../../CONTRIBUTING.md) 和 [当前证据入口](../evaluation/CURRENT-EVIDENCE.md)。两者都不能代替上述残余风险说明。
+现有工程门禁与冻结实验分别见 [贡献指南](../../scripts/README.md) 和 [当前证据入口](../evaluation/CURRENT-EVIDENCE.md)。两者都不能代替上述残余风险说明。

@@ -39,8 +39,10 @@ The tree was legally incoherent:
 - `LICENSE-MIT` added; the Apache text lives in `LICENSE-APACHE` (the duplicate `LICENSE` file was removed in the 2026-10-19 cleanup).
 - 163 project-owned files aligned to the dual header.
 - The 31 upstream files keep `MIT` **and their eunomia-bpf copyright** — untouched.
-- eBPF C programs keep `GPL-2.0 OR BSD-3-Clause` (BPF helpers require a
-  GPL-compatible licence) — untouched.
+- eBPF files retain their individual SPDX declarations: `process.bpf.c` and
+  `stdiocap.bpf.c` use `GPL-2.0 OR BSD-3-Clause`; `tls_capture.bpf.c` and the
+  userspace loaders use `LGPL-2.1 OR BSD-2-Clause`. The project dual licence
+  does not replace these upstream declarations.
 - `latency.rs`'s `GPL-3.0-or-later` header was corrected to the project licence:
   the file carries no third-party attribution and is the project's own
   (currently unregistered) code. **If that file was in fact derived from a GPL-3

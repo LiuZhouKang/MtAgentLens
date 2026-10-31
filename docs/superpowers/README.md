@@ -1,5 +1,5 @@
 # 开发入口
 
-开发、测试、发布和文档维护统一见[贡献指南](../../CONTRIBUTING.md)。系统结构见[架构说明](../architecture.md)，长期设计决策见[ADR](../adr/README.md)。
+开发、测试、发布和文档维护统一见[贡献指南](../../scripts/README.md)。系统结构见[架构说明](../architecture.md)，长期设计决策见[ADR](../adr/README.md)。
 
 本页保留旧入口兼容。新的交接、AI 提示词、逐轮进度和实施计划不进入项目文档；历史版本可通过 Git 查询。

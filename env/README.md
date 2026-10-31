@@ -4,7 +4,7 @@
 
 ## 快速开始
 
-以下命令均在仓库根目录执行；先按[贡献指南](../CONTRIBUTING.md#环境)安装依赖。
+以下命令均在仓库根目录执行；先按[贡献指南](../scripts/README.md#环境)安装依赖。
 
 ```bash
 # 1. 配置 API 密钥
@@ -167,8 +167,7 @@ env/
 │
 ├── docs/                       ← 文档
 │   ├── schema.md               ← 场景 JSON Schema 规范
-│   ├── methodology.md          ← 基准方法论
-│   └── contributing.md         ← 场景贡献指南
+│   └── methodology.md          ← 基准方法论
 │
 ├── scripts/                    ← 工具脚本
 │   ├── task_wrapper.sh         ← tmux agent 生命周期管理
@@ -187,4 +186,46 @@ env/
 
 - [Schema 规范](docs/schema.md) — 场景 JSON Schema 完整字段说明
 - [基准方法论](docs/methodology.md) — 设计哲学、分类体系、评估矩阵
-- [贡献指南](docs/contributing.md) — 如何贡献新场景、CC-BOS 策略、Verifier 编写规范
+- [场景贡献](#场景贡献) — 新场景开发、判定证据与纳入流程
+
+## 场景贡献
+
+仓库环境、提交要求与验收入口统一见[贡献指南](../scripts/README.md)。
+本页仅说明新场景开发；当前 FuxiBench 的分类与标注规则见[数据集](../datasets/FuxiBench/README.md)。
+
+### 开发位置
+
+在仓库根目录安装开发依赖后，从 `env/` 运行脚手架：
+
+```bash
+cd env
+.venv/bin/mtagentlens-benchmark scaffold --category <category> --name <scenario-id>
+```
+
+脚手架默认生成 `single_agent` 场景；多 Agent 使用 `--mode agent_teams`
+或 `--mode subagents`，同时设置 `--agents`。生成内容位于 `env/scenarios/`，
+fixture 位于 `env/scenarios/fixtures/<scenario-id>/`。
+不要直接修改 FuxiBench 中已经用于实验的场景或盲标输入。
+
+### 场景与判定
+
+- 明确合法任务、攻击入口、权限边界和预期可观测行为；良性场景同样需要独立成功条件。
+- 用 `{{FIXTURE_DIR}}` 引用输入资源，凭据和外传目标使用合成数据与受控环境。
+- 单独定义“攻击是否执行”与“检测是否报警”，不能用报警反推攻击成功。
+  API 限流、未启动采集或证据缺失应单独记录，不能计成成功。
+- 按实际研究问题选择语言和 Agent 模式，无需为每个场景增加文言文或多 Agent 变体。
+
+Verifier 放在 `env/scripts/verifiers/`。现有代码包含函数式与注册类两种形式：
+函数式接收 `run_dir`、`scenario_dir`、`events`；注册类继承
+`BaseVerifier` 并返回 `VerificationResult`。沿用相邻场景及其实际加载入口，
+不要只添加未被运行器调用的实现。
+
+提交时说明预期、原始证据位置、运行环境和失败原因。报告重复次数及每次结果，
+不以固定“2/3 成功”阈值替代稳定性分析，也不把开发试跑混入正式结果。
+
+### 验证与纳入
+
+运行相关 verifier 和场景测试，再按根贡献指南运行完整离线门禁。
+真实 Agent 试跑可能调用付费 API，需遵守对应实验预算和运行配置。
+正式纳入数据集时同步场景清单、标签、标注来源与测试；流程见
+[标注说明](../datasets/FuxiBench/docs/annotation.md)和[来源说明](../datasets/FuxiBench/docs/provenance.md)。

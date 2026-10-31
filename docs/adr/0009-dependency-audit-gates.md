@@ -79,7 +79,7 @@ non-empty budget is a visible debt, not a normal condition.
   this exact advisory does not apply — in writing, next to a number that must
   be lowered when it stops applying.
 - Local `verify.sh` stays green without network, so contributors can work
-  offline; the audit is an explicit command in `CONTRIBUTING.md`.
+  offline; the audit is an explicit command in `scripts/README.md`.
 - The honest status of "no known unfixed vulnerabilities" is *conditionally
   satisfied*: satisfied only after `scripts/audit_deps.py all` runs green on
   the build host before release. There is no CI runner (ADR-0014).
@@ -91,5 +91,5 @@ non-empty budget is a visible debt, not a normal condition.
 - `python3 scripts/audit_deps.py all` fails on a live, unbudgeted advisory and
   on a stale budget entry; tests for both behaviours live in
   `scripts/tests/test_audit_deps.py` and run inside verify.sh gate 14.
-- `CONTRIBUTING.md` names the exact command, so a release run and a local run
+- `scripts/README.md` names the exact command, so a release run and a local run
   cannot drift.

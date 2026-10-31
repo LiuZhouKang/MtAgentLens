@@ -16,7 +16,7 @@
 
 从系统调用到责任归因 —— 在 OS 边界采集可验证的运行事实
 
-<a href="LICENSE-APACHE"><img src="https://img.shields.io/badge/license-Apache_2.0-007ec6?logo=apache&logoColor=white" alt="Apache 2.0"></a>
+<a href="LICENSE-APACHE"><img src="https://img.shields.io/badge/license-Apache_2.0_OR_MIT-007ec6?logo=apache&logoColor=white" alt="Apache-2.0 OR MIT"></a>
 <a href="#架构"><img src="https://img.shields.io/badge/eBPF-0a0b10?logo=linux&logoColor=white" alt="eBPF"></a>
 <a href="#架构"><img src="https://img.shields.io/badge/Rust-CE422B?logo=rust&logoColor=white" alt="Rust"></a>
 <a href="#架构"><img src="https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white" alt="Next.js"></a>
@@ -418,7 +418,7 @@ MtAgentLens/
 ├── rust-toolchain.toml
 ├── Dockerfile / Dockerfile.dev
 ├── Makefile
-├── LICENSE-APACHE (Apache-2.0 + BPF GPL 例外)
+├── LICENSE-APACHE (Apache-2.0；与 MIT 二选一)
 └── LICENSE-MIT
 ```
 
@@ -560,7 +560,12 @@ docker run --rm -it -v $(pwd):/workspace -w /workspace \
 
 本项目源代码采用 **Apache-2.0 OR MIT** 双许可。详见 [LICENSE-APACHE](LICENSE-APACHE) 与 [LICENSE-MIT](LICENSE-MIT)。
 
-eBPF 内核程序（`bpftools/*.bpf.c`）按文件头 SPDX 声明使用 **GPL-2.0 OR BSD-3-Clause**。用户态 eBPF 加载器跟随 libbpf 的双许可证（**LGPL-2.1 OR BSD-2-Clause**）。
+eBPF 组件按各文件头的 SPDX 声明使用许可：`process.bpf.c`、`stdiocap.bpf.c`
+采用 **GPL-2.0 OR BSD-3-Clause**；`tls_capture.bpf.c` 及三个用户态加载器
+采用 **LGPL-2.1 OR BSD-2-Clause**。这些声明不由项目代码双许可替代。
+
+FuxiBench 的场景、标签与证据采用 **CC-BY-4.0**，见[数据集许可](datasets/FuxiBench/LICENSE)。
+数据包内保留代码许可全文，便于独立分发。第三方代码以其文件头及所在目录许可为准。
 
 ### 技术文档与演示材料
 
@@ -581,5 +586,4 @@ eBPF 内核程序（`bpftools/*.bpf.c`）按文件头 SPDX 声明使用 **GPL-2.
 
 - 漏洞报告与安全默认值：[`SECURITY.md`](SECURITY.md)
 - 威胁模型（STRIDE + 代码坐标）：[`docs/security/threat-model.md`](docs/security/threat-model.md)
-- 安全设计： [威胁模型](docs/security/threat-model.md)
-- 贡献流程与唯一门禁：[`CONTRIBUTING.md`](CONTRIBUTING.md)、`./scripts/verify.sh`
+- 贡献流程与唯一门禁：[`scripts/README.md`](scripts/README.md)、`./scripts/verify.sh`

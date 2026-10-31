@@ -1,4 +1,76 @@
-# scripts/
+# 开发与维护
+
+先阅读[系统架构](../docs/architecture.md)和[架构决策](../docs/adr/README.md)。
+当前文档导航见 [docs/README.md](../docs/README.md)，实验状态见[当前证据](../docs/evaluation/CURRENT-EVIDENCE.md)。
+
+## 环境
+
+需要 Rust 1.85+、clang/LLVM、libelf、zlib、OpenSSL、zstd 开发库、
+Node.js ≥22.13.0、npm 和 Python 3.10+（含 venv）。在仓库根目录执行：
+
+```bash
+git submodule update --init --recursive
+python3 -m venv env/.venv
+env/.venv/bin/python -m pip install -e './env[dev]' -r compare/requirements-test.txt
+make build
+```
+
+`libbpf/`、`bpftool/` 是子模块。Rust 产物位于 `collector/build/`；
+eBPF 单程序构建使用 `make .output/bin/<name>`。
+更多操作见[维护脚本](#维护脚本)与各模块 README。
+
+## 修改与验证
+
+1. 按现有设计做最小完整修改；功能修复先复现问题并补聚焦回归测试。
+2. 先运行受影响模块的检查；提交前运行完整离线门禁：
+
+   ```bash
+   ./scripts/verify.sh
+   ```
+
+3. 修复失败根因，不通过忽略测试、放宽 lint 或提高预算换取通过。
+4. 修改 eBPF 时真实加载验证 verifier，并记录内核与权限条件。
+   数据库改动先读[单一 schema 决策](../docs/adr/0005-single-schema.md)，
+   对外来数据库先只读分类，不能直接执行 DDL。
+
+完整门禁需要本地实验资料；仅源码检出不包含所有大体积数据库。
+缺少数据时按失败项与[复现手册](../docs/evaluation/REPRODUCE.md)补齐相应输入，
+不要伪造记录或重新生成历史证据。普通 FuxiBench 目录无需发布标识或全包校验清单。
+
+发布前另运行网络依赖审计：
+
+```bash
+python3 scripts/audit_deps.py all
+```
+
+审计例外集中在 `scripts/audit-budget.json`，必须有理由并随修复移除。
+修改构建、嵌入资源或子模块后，使用 `./scripts/check_fresh_clone.sh` 检查隔离副本；
+该检查需要软件源或缓存，不等同于位级可复现。
+
+## 文档与数据
+
+- 优先更新已有主题文档，不新增一轮一份的计划、交接或“最终报告”。
+- 用户入门看根 README，模块操作看模块 README，设计取舍记 ADR。
+  架构或行为变化同步相关 README、架构文档、能力清单与 ADR。
+- [场景贡献](../env/README.md#场景贡献)说明新场景开发；FuxiBench 当前标签、
+  标注和来源规则在[数据集目录](../datasets/FuxiBench/README.md)维护。
+- 正式结果放在 `compare/results/<实验>/`；运行现场和本机备份按 `local/README.md` 组织。
+  不提交数据库、运行日志、模型缓存、构建产物或真实凭据。
+- 场景 fixture、盲标源文件和冻结实验记录属于实验输入或证据，不能作为重复文档改写。
+- `compare/docs/` 是交付文档副本，按其 `SOURCE-NOTES.md` 同步；迁移文件时修复引用和调用。
+- 手写文档优先中文，代码标识符和简短代码注释使用英文。
+
+## 提交与安全
+
+提交保持单一目的，说明修改原因与验证结果；常规提交使用 Conventional Commits。
+安全问题按 [SECURITY.md](../SECURITY.md) 报告；测试凭据必须使用合成值。
+新增捕获数据外发路径时，同步安全策略与[威胁模型](../docs/security/threat-model.md)。
+
+项目代码采用 [Apache-2.0](../LICENSE-APACHE) 或 [MIT](../LICENSE-MIT) 双许可；
+数据、文档与第三方代码的适用范围见 [README 许可证说明](../README.md#许可证)。
+保留原有版权、SPDX 和第三方许可文件。
+
+## 维护脚本
 
 | 路径 | 用途 | 何时运行 |
 |------|------|----------|

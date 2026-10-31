@@ -870,3 +870,66 @@ def test_verify_and_consume_reject_resealed_scenario_split_leakage(tmp_path):
     for reader in (verify_annotation_release, consume_annotation_release):
         with pytest.raises(ValueError, match='scenario.*split|split.*scenario'):
             reader(root)
+
+
+def test_unbound_bundle_exports_and_consumes_without_claiming_dataset_release(tmp_path):
+    from scripts.evaluation.annotation_release_consumer import verify_release as independent_verify
+
+    spec = fixture_inputs(tmp_path)
+    dataset = spec['release_root']
+    (dataset / 'release.json').unlink()
+    (dataset / 'scenarios').mkdir()
+    (dataset / 'scenarios/scenario.json').write_text('{"id":"scenario"}')
+    spec['binding']['data_release_id'] = None
+    bundle_dir = tmp_path / 'unbound-bundle'
+    build_bundle(bundle_dir, **spec)
+    store = RecordStore(tmp_path / 'records.sqlite')
+    task = store.register_bundle(bundle_dir)
+    store.save(task, 'model-a', annotation(), method='model_proposal', expected_revision=None)
+    out = tmp_path / 'annotation-export'
+    manifest = build_annotation_release(tmp_path / 'records.sqlite', out)
+    assert manifest['cases'][0]['binding']['data_release_id'] is None
+    assert verify_annotation_release(out) == manifest
+    assert consume_annotation_release(out)[0]['binding']['data_release_id'] is None
+    result = independent_verify(out)
+    assert result['problems'] == []
+
+
+def test_mixed_historical_and_unbound_bundles_keep_distinct_identities(tmp_path):
+    from scripts.evaluation.annotation_release_consumer import verify_release as independent_verify
+    env = make_store(tmp_path, count=1)
+    base = tmp_path / 'unbound-input'
+    base.mkdir()
+    spec = fixture_inputs(base)
+    dataset = spec['release_root']
+    (dataset / 'release.json').unlink()
+    (dataset / 'scenarios').mkdir()
+    (dataset / 'scenarios/scenario.json').write_text('{"id":"scenario"}')
+    spec['binding']['data_release_id'] = None
+    bundle = tmp_path / 'unbound-bundle'
+    build_bundle(bundle, **spec)
+    task = env.store.register_bundle(bundle)
+    env.store.save(task, 'model-b', annotation(), method='model_proposal', expected_revision=None)
+    out = tmp_path / 'mixed-export'
+    manifest = build_annotation_release(env.store_path, out)
+    identities = [case['binding']['data_release_id'] for case in manifest['cases']]
+    assert identities.count(None) == 1
+    assert sum(isinstance(value, str) and len(value) == 64 for value in identities) == 1
+    assert verify_annotation_release(out) == manifest
+    assert independent_verify(out)['problems'] == []
+
+
+@pytest.mark.parametrize('schema, identity, expected', [
+    ('mtagentlens.evidence-bundle/v1', None, 'historical bundle lacks a valid release identity'),
+    ('mtagentlens.evidence-bundle/v2', 'a' * 64, 'unbound bundle claims a release identity'),
+])
+def test_external_consumer_rejects_mislabelled_evidence_identity(tmp_path, schema, identity, expected):
+    from scripts.evaluation.annotation_release_consumer import verify_cases
+    env = make_store(tmp_path, count=1)
+    manifest, out = build_release(tmp_path, env)
+    path = out / 'cases/case-0001/bundle/bundle.json'
+    bundle = json.loads(path.read_text())
+    bundle['schema'] = schema
+    bundle['binding']['data_release_id'] = identity
+    path.write_text(json.dumps(bundle))
+    assert any(expected in problem for problem in verify_cases(out, manifest))

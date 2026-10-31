@@ -16,6 +16,7 @@ from pathlib import Path
 from compare.tools.dataset_release import validate_release
 
 SCHEMA = "mtagentlens.evidence-bundle/v1"
+UNBOUND_SCHEMA = "mtagentlens.evidence-bundle/v2"
 _MANIFEST_KEYS = {"schema", "binding", "sources", "actors", "events", "evidence_bundle_hash"}
 _BINDING_KEYS = {"data_release_id", "scenario_id", "run_id", "source_run_uuid", "codebook_version"}
 _BUILD_SOURCE_KEYS = {"path", "kind", "producer"}
@@ -43,11 +44,17 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _validate_binding(binding: object) -> None:
+def _validate_binding(binding: object, *, unbound: bool = False) -> None:
     _require(isinstance(binding, dict) and set(binding) == _BINDING_KEYS,
              "binding must have exactly the required keys")
-    _require(all(_text(binding[key]) for key in _BINDING_KEYS), "binding values must be non-empty strings")
-    _require(_HEX64.fullmatch(binding["data_release_id"]) is not None, "data_release_id must be a lowercase SHA-256")
+    _require(all(_text(binding[key]) for key in _BINDING_KEYS - {"data_release_id"}),
+             "binding values must be non-empty strings")
+    if unbound:
+        _require(binding["data_release_id"] is None, "unbound bundle must not claim a release identity")
+    else:
+        _require(isinstance(binding["data_release_id"], str) and
+                 _HEX64.fullmatch(binding["data_release_id"]) is not None,
+                 "data_release_id must be a lowercase SHA-256")
     try:
         parsed = uuid.UUID(binding["source_run_uuid"])
     except (ValueError, AttributeError):
@@ -130,11 +137,27 @@ def build_bundle(output: Path, *, release_root: Path, binding: dict, sources: di
     output = Path(output)
     if output.exists():
         raise ValueError("Evidence bundle destination already exists; bundles are immutable")
-    release = validate_release(Path(release_root))
-    _validate_binding(binding)
-    _require(binding["data_release_id"] == release.get("release_id"), "binding does not match the validated release")
-    case_bindings = release.get("case_bindings")
-    _require(isinstance(case_bindings, dict) and binding["scenario_id"] in case_bindings, "binding scenario is absent")
+    release_root = Path(release_root)
+    _require(not release_root.is_symlink() and release_root.is_dir(), "dataset root must be a non-symlink directory")
+    manifest_path = release_root / "release.json"
+    unbound = not (manifest_path.exists() or manifest_path.is_symlink())
+    _validate_binding(binding, unbound=unbound)
+    if unbound:
+        sid = binding["scenario_id"]
+        _require(sid not in (".", "..") and "/" not in sid and "\\" not in sid and "\x00" not in sid,
+                 "invalid scenario identity")
+        scenarios = release_root / "scenarios"
+        path = scenarios / f"{sid}.json"
+        _require(not scenarios.is_symlink() and not path.is_symlink() and path.is_file(),
+                 "unbound dataset scenario is absent or a symlink")
+        scenario = _loads_strict(path.read_text(encoding="utf-8"))
+        _require(isinstance(scenario, dict) and scenario.get("id") == sid,
+                 "unbound dataset scenario identity mismatch")
+    else:
+        release = validate_release(release_root)
+        _require(binding["data_release_id"] == release.get("release_id"), "binding does not match the validated release")
+        case_bindings = release.get("case_bindings")
+        _require(isinstance(case_bindings, dict) and binding["scenario_id"] in case_bindings, "binding scenario is absent")
     sources = _validate_build_sources(sources)
     _validate_actors(actors)
     _validate_events(events, set(sources))
@@ -162,7 +185,7 @@ def build_bundle(output: Path, *, release_root: Path, binding: dict, sources: di
                 "producer": source["producer"],
             }
         manifest = {
-            "schema": SCHEMA,
+            "schema": UNBOUND_SCHEMA if unbound else SCHEMA,
             "binding": dict(binding),
             "sources": frozen,
             "actors": list(actors),
@@ -243,8 +266,8 @@ def load_bundle(root: Path) -> dict:
     _require(not payload.is_symlink() and payload.is_file(), "bundle.json is missing")
     manifest = _loads_strict(payload.read_text(encoding="utf-8"))
     _require(isinstance(manifest, dict) and set(manifest) == _MANIFEST_KEYS, "manifest keys are not exact")
-    _require(manifest["schema"] == SCHEMA, "unsupported evidence bundle schema")
-    _validate_binding(manifest["binding"])
+    _require(manifest["schema"] in (SCHEMA, UNBOUND_SCHEMA), "unsupported evidence bundle schema")
+    _validate_binding(manifest["binding"], unbound=manifest["schema"] == UNBOUND_SCHEMA)
     _validate_actors(manifest["actors"])
     source_paths = _validate_bundle_sources(manifest["sources"], root)
     _validate_events(manifest["events"], set(manifest["sources"]))

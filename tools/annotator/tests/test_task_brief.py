@@ -57,6 +57,44 @@ def test_missing_brief_is_optional_but_invalid_is_not(tmp_path):
         extract_task_brief(release, "scenario")
 
 
+def test_unbound_directory_extracts_blinded_brief(tmp_path):
+    release = release_with_brief(tmp_path)
+    (release / "release.json").unlink()
+    _, lines = extract_task_brief(release, "scenario", identifiers=("scenario",))
+    assert "Read the docs" in lines[0]["text"]
+    assert "blinded-" in lines[0]["text"]
+
+
+@pytest.mark.parametrize("scenario_id", ["../scenario", "/scenario", "a/b", "a\\b", ".", "..", ""])
+def test_unbound_brief_rejects_unsafe_scenario_id(tmp_path, scenario_id):
+    release = release_with_brief(tmp_path)
+    (release / "release.json").unlink()
+    with pytest.raises(ValueError):
+        extract_task_brief(release, scenario_id)
+
+
+def test_unbound_brief_rejects_symlink_and_id_mismatch(tmp_path):
+    release = release_with_brief(tmp_path)
+    (release / "release.json").unlink()
+    scenario = release / "scenarios" / "scenario.json"
+    scenario.write_text(json.dumps({"id": "other", "agents": [{"task": "read"}]}))
+    with pytest.raises(ValueError, match="identity"):
+        extract_task_brief(release, "scenario")
+    external = tmp_path / "external.json"
+    external.write_text(scenario.read_text())
+    scenario.unlink()
+    scenario.symlink_to(external)
+    with pytest.raises(ValueError, match="symlink"):
+        extract_task_brief(release, "scenario")
+
+
+def test_existing_release_manifest_is_still_verified(tmp_path):
+    release = release_with_brief(tmp_path)
+    (release / "scenarios" / "scenario.json").write_text("{}")
+    with pytest.raises(ValueError, match="checksum"):
+        extract_task_brief(release, "scenario")
+
+
 def test_import_freezes_the_blinded_brief_when_the_release_has_it(tmp_path, inputs):  # noqa: F811
     spec, ledger, rows = inputs
     release = Path(spec["release_root"])

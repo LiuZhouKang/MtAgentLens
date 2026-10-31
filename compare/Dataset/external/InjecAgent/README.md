@@ -14,3 +14,6 @@ Total: 2,108 test cases
 
 Attack Types: direct_prompt_injection, indirect_prompt_injection,
   tool_response_injection, parameter_injection, combined_injection
+
+Reproduction scripts: `compare/scripts/external/`. The frozen outputs are in
+`compare/results/external/InjecAgent/`.

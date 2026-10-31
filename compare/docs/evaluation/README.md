@@ -21,4 +21,4 @@
 
 冻结 GT 曾引用 `docs/evaluation/fresh-2026-10-19/action-trace-audit.json`，该来源原字节保存在[审计证据](../../../docs/dataset/evidence/action-trace-audit-2026-10-19.json)。GT 中的旧路径记录原审阅现场，保持不变。
 
-[场景设计原文](../../../docs/evaluation/scenarios/README.md)继续保留，因为冻结 GT 和裁决证据引用其内容；当前标签以 FuxiBench 发布包为准。
+[场景设计原文](scenarios/README.md)继续保留，因为冻结 GT 和裁决证据引用其内容；当前标签以 FuxiBench 发布包为准。

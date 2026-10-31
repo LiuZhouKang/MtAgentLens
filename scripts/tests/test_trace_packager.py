@@ -493,11 +493,45 @@ def test_gt_binding_ignores_auxiliary_review_and_causal_sidecars():
     assert _ground_truth_relative(files, 'case-one') == 'ground_truth/benign/case-one.json'
 
 
-def test_canonical_release_binding_uses_the_real_ground_truth_layout():
+def test_historical_release_binding_uses_the_real_ground_truth_layout(tmp_path):
     from scripts.evaluation.trace_packager import _bind_release
-    binding = _bind_release(Path(__file__).resolve().parents[2] / 'datasets/FuxiBench', 'benign-multi-handoff')
+    from compare.tools.dataset_release import _inventory
+
+    source = Path(__file__).resolve().parents[2] / 'datasets/FuxiBench'
+    scenario = 'benign-multi-handoff'
+    release = tmp_path / 'historical-release'
+    (release / 'scenarios').mkdir(parents=True)
+    (release / 'ground_truth/benign').mkdir(parents=True)
+    (release / 'scenarios' / f'{scenario}.json').write_bytes(
+        (source / 'scenarios' / f'{scenario}.json').read_bytes()
+    )
+    (release / 'ground_truth/benign' / f'{scenario}.json').write_bytes(
+        (source / 'ground_truth/benign' / f'{scenario}.json').read_bytes()
+    )
+    files = _inventory(release)
+    manifest = {
+        'schema': 'mtagentlens.dataset-release/1',
+        'files': files,
+        'case_bindings': {scenario: {
+            'scenario_sha256': files[f'scenarios/{scenario}.json'],
+            'ground_truth_sha256': files[f'ground_truth/benign/{scenario}.json'],
+        }},
+    }
+    manifest['release_id'] = hashlib.sha256(
+        json.dumps(manifest, sort_keys=True).encode()
+    ).hexdigest()
+    (release / 'release.json').write_text(json.dumps(manifest))
+    binding = _bind_release(release, scenario)
     assert binding['scenario_id'] == 'benign-multi-handoff'
-    assert len(binding['ground_truth_sha256']) == 64
+    assert binding['release_id'] == manifest['release_id']
+    assert binding['ground_truth_sha256'] == files[f'ground_truth/benign/{scenario}.json']
+
+
+def test_current_dataset_is_explicitly_unbound():
+    release = Path(__file__).resolve().parents[2] / 'datasets/FuxiBench'
+    binding = tp._bind_release(release, 'benign-multi-handoff')
+    assert binding['release_id'] is None
+    assert binding['source_status'] == 'unbound'
 
 
 PUBLIC_SCENARIO = "case-original"
@@ -921,3 +955,66 @@ def test_validate_public_cli_reports_integrity_only(tmp_path, capsys):
     assert report["integrity_verified"] is True
     assert report["source_verified"] is False
     assert report["admission"] is False
+
+
+def test_unbound_package_keeps_independent_run_proof(tmp_path, monkeypatch):
+    db, release, replay, record, row = _setup(tmp_path, monkeypatch)
+    (release / 'release.json').unlink()
+    row['run_binding']['release_id'] = None
+    record.write_text(json.dumps(row))
+    calls = []
+    monkeypatch.setattr(run_artifacts, 'validate_run_binding',
+                        lambda current, root: calls.append((current, root)))
+    out = tmp_path / 'unbound-package'
+    manifest = tp.package(db, replay, out, SCENARIO, release, record)
+    assert manifest['schema'] == 'mtagentlens.trace-package/v2'
+    assert manifest['binding']['release_id'] is None
+    assert manifest['binding']['source_status'] == 'unbound'
+    assert len(calls) == 1
+    assert tp.validate(out, replay, release, record) == manifest
+    assert len(calls) == 2
+    (release / 'scenarios' / f'{SCENARIO}.json').write_text(
+        json.dumps({'id': SCENARIO, 'mode': 'changed'}))
+    with pytest.raises(ValueError, match='binding changed'):
+        tp.validate(out, replay, release, record)
+
+
+def test_unbound_package_rejects_claimed_historical_identity(tmp_path, monkeypatch):
+    db, release, replay, record, row = _setup(tmp_path, monkeypatch)
+    (release / 'release.json').unlink()
+    with pytest.raises(ValueError, match='release_id'):
+        tp.package(db, replay, tmp_path / 'package', SCENARIO, release, record)
+
+
+def test_unbound_directory_requires_matching_ground_truth(tmp_path):
+    release = _make_release(tmp_path)
+    (release / 'release.json').unlink()
+    (release / 'ground_truth' / f'{SCENARIO}.json').write_text(
+        json.dumps({'scenario_id': 'foreign', 'label': 'benign'}))
+    with pytest.raises(ValueError, match='ground truth'):
+        tp._bind_release(release, SCENARIO)
+
+
+def test_unbound_cohort_audit_does_not_require_a_release_manifest(tmp_path, monkeypatch):
+    db, release, replay, record, row = _setup(tmp_path, monkeypatch)
+    (release / 'release.json').unlink()
+    row['run_binding']['release_id'] = None
+    record.write_text(json.dumps(row))
+    packages = tmp_path / 'packages'
+    tp.package(db, replay, packages / SCENARIO, SCENARIO, release, record)
+    report = tp.audit_cohort(packages, replay, release)
+    assert report['release']['release_id'] is None
+    assert report['release']['source_status'] == 'unbound'
+    assert report['summary']['cohort_complete'] is True
+
+
+def test_unbound_packaging_cannot_skip_independent_source_rejection(tmp_path, monkeypatch):
+    db, release, replay, record, row = _setup(tmp_path, monkeypatch)
+    (release / 'release.json').unlink()
+    row['run_binding']['release_id'] = None
+    record.write_text(json.dumps(row))
+    def reject(*args):
+        raise ValueError('source run changed')
+    monkeypatch.setattr(run_artifacts, 'validate_run_binding', reject)
+    with pytest.raises(ValueError, match='not independently verified'):
+        tp.package(db, replay, tmp_path / 'package', SCENARIO, release, record)

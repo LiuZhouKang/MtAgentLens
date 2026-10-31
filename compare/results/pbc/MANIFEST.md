@@ -15,7 +15,7 @@
 | Metrics | `metrics/pbc-metrics.json` |
 | Figure | `figures/f2_pbc_strip.{png,pdf,svg}` |
 | Table | `tables/STRATIFIED-METRICS.md` |
-| Original note | `../../docs/evaluation/e2-pbc-activity-baseline.md` |
+| Current evidence | `../../docs/evaluation/CURRENT-EVIDENCE.md` |
 
 ## Caveats
 

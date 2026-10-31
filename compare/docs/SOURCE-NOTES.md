@@ -8,6 +8,6 @@
 - 运行数据库、本地现场和模型依赖不保证随包提供；有些复现入口需要完整仓库和相应数据。文档中的源码与原件链接可能指向包外仓库路径。
 - App 基线的 `records/`、`traces/` 可能含运行时凭据，按打包规则排除。发布前仍需核查其他 raw 内容。
 
-`compare/datasets/` 提供选定的数据契约、数据卡和标注说明副本，不替代完整数据集的 release、metadata、checksums 与证据文件。
+`compare/datasets/` 提供选定的数据契约、数据卡和标注、来源说明副本，不替代完整数据集的 metadata 和证据文件。
 
 交付入口见 [compare README](../README.md)，文件范围见 [MANIFEST](../MANIFEST.md)。

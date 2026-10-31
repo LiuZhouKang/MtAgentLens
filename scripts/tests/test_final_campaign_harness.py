@@ -697,3 +697,58 @@ def test_e0_admission_subcommand_parses_explicit_paths(tmp_path, monkeypatch):
     assert seen['run_root'] == tmp_path / 'runs'
     assert seen['replay'] == replay
     assert seen['kwargs'] == {'timeout': 7, 'annotation_exports': tmp_path / 'exports'}
+
+
+def test_unbound_dataset_plan_records_no_release_identity(tmp_path, monkeypatch):
+    release = _campaign_fixture(tmp_path)
+    from mtagentlens_benchmark.loader import scenario_loader
+    monkeypatch.setattr(h, 'FROZEN_SCENARIO_COUNT', 4)
+    configs = [SimpleNamespace(id=path.stem, pre_run_script=None)
+               for path in sorted((release / 'scenarios').glob('*.json'))]
+    monkeypatch.setattr(scenario_loader, 'load_all_scenarios', lambda *a, **k: configs)
+    plan = h.campaign_plan(release, tmp_path / 'out', cohort='campaign')
+    assert not plan['problems']
+    assert plan['release_id'] is None
+    assert plan['target_count'] == 3
+
+
+def test_existing_invalid_release_manifest_remains_an_error(tmp_path):
+    release = _campaign_fixture(tmp_path)
+    (release / 'release.json').write_text('{}')
+    with pytest.raises(ValueError):
+        h._validated_release(release)
+
+
+@pytest.mark.parametrize(('release_id', 'case_ids', 'status', 'source_status'), [
+    (None, [None, None], 0, 'unbound'),
+    (None, [None, 'old'], 1, 'unbound'),
+    ('current', ['current', 'current'], 0, 'release-bound'),
+    ('current', ['current', 'old'], 1, 'release-bound'),
+])
+def test_runtime_annotation_source_binding(tmp_path, monkeypatch, capsys,
+                                           release_id, case_ids, status, source_status):
+    monkeypatch.setattr(h, 'runtime_commands', lambda *args: [['true']] * 3)
+    monkeypatch.setattr(h.subprocess, 'run', lambda *args, **kwargs: SimpleNamespace(returncode=0))
+    monkeypatch.setattr(h, '_read_json', lambda path: {
+        'cases': [{'binding': {'data_release_id': rid}} for rid in case_ids],
+        'records': [{'status': 'included'} for _ in case_ids],
+    })
+    monkeypatch.setattr(h, '_validated_release', lambda path: {'release_id': release_id})
+    monkeypatch.setattr(h, '_write_plan', lambda *args: None)
+    args = SimpleNamespace(execute=False, out=tmp_path, run_root=tmp_path, release=tmp_path)
+    assert h.cmd_runtime_annotations(args) == status
+    plan = json.loads(capsys.readouterr().out)
+    assert plan['source_status'] == source_status
+    assert bool(plan['problems']) == bool(status)
+
+
+def test_runtime_annotation_missing_binding_is_not_unbound(tmp_path, monkeypatch):
+    monkeypatch.setattr(h, 'runtime_commands', lambda *args: [['true']] * 3)
+    monkeypatch.setattr(h.subprocess, 'run', lambda *args, **kwargs: SimpleNamespace(returncode=0))
+    monkeypatch.setattr(h, '_read_json', lambda path: {
+        'cases': [{'binding': {}}], 'records': [{'status': 'included'}],
+    })
+    monkeypatch.setattr(h, '_validated_release', lambda path: {'release_id': None})
+    monkeypatch.setattr(h, '_write_plan', lambda *args: None)
+    args = SimpleNamespace(execute=False, out=tmp_path, run_root=tmp_path, release=tmp_path)
+    assert h.cmd_runtime_annotations(args) == 1

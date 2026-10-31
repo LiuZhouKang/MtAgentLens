@@ -14,7 +14,7 @@ from scripts.evaluation import run_artifacts
 
 
 @pytest.fixture
-def artifacts(tmp_path, monkeypatch):
+def artifacts(tmp_path, monkeypatch, request):
     from env.tests.test_release_input_chain import source_release, configure_client
     from mtagentlens_benchmark.engine.input_reference import ReleaseInputAudit
     from mtagentlens_benchmark.engine.runner import _save_summary
@@ -27,6 +27,9 @@ def artifacts(tmp_path, monkeypatch):
     manifest['release_id'] = hashlib.sha256(json.dumps({key:value for key,value in manifest.items()
                                                       if key!='release_id'},sort_keys=True).encode()).hexdigest()
     (release/'release.json').write_text(json.dumps(manifest))
+    if getattr(request, "param", None) == "unbound":
+        (release / "release.json").unlink()
+        manifest = None
     executor = configure_client(tmp_path, monkeypatch)
     monkeypatch.setattr(executor, 'time', SimpleNamespace(time=time.time, sleep=lambda _: None))
     collector_id = str(uuid.uuid4())
@@ -194,6 +197,32 @@ def test_real_pilot_entry_records_the_binding_for_the_attempt(tmp_path,monkeypat
     from compare.tools.dataset_release import validate_release
     from scripts.evaluation.final_verdict_metrics import validate_run_artifacts
     validate_run_artifacts([row],validate_release(release),release_root=release)
+
+
+@pytest.mark.parametrize("artifacts", ["unbound"], indirect=True)
+def test_pilot_marks_unversioned_directory_as_unbound(tmp_path, monkeypatch, artifacts):
+    pilot, _, _, release = configure_pilot(tmp_path, monkeypatch, artifacts)
+    assert pilot.main() == 0
+    row = json.loads((tmp_path/'out/results.jsonl').read_text())
+    assert row['release_id'] is None
+    assert row['evidence_scope'] == 'unbound-directory'
+    assert row['run_binding']['release_id'] is None
+    run_artifacts.validate_run_binding(row, release)
+
+    # The synthetic collector has no health checkpoint. Supply only that
+    # independent health result; retain the real run/DB/source verification.
+    canonical_reader = run_artifacts.read_canonical_verdict
+    monkeypatch.setattr(run_artifacts, "read_canonical_verdict", lambda path: {
+        **canonical_reader(path), "capture_quality_status": "healthy"})
+    from compare.scripts.run.app_baseline import validate_real_run
+    from scripts.evaluation.final_campaign_harness import completed_case
+    validate_real_run(row, release)
+    with pytest.raises(ValueError, match="release identity"):
+        validate_real_run({**row, "release_id": "fabricated-history"}, release)
+    assert completed_case(tmp_path / "out", release, "scenario", row["collector_sha256"])
+    row["run_binding"]["collector_run_id"] = "different-run"
+    (tmp_path / "out/results.jsonl").write_text(json.dumps(row) + "\n")
+    assert not completed_case(tmp_path / "out", release, "scenario", row["collector_sha256"])
 
 
 def test_pilot_freezes_the_effective_isolated_identity_configuration(tmp_path, monkeypatch, artifacts):

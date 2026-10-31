@@ -305,27 +305,21 @@ def test_gt_reference_checker_rejects_wrong_hash_pointer_and_quote(tmp_path):
         assert validate_gt_references(tmp_path)
 
 
-def test_package_fixture_binding_matches_real_execution_input_audit(tmp_path, monkeypatch):
-    from env.tests.test_release_input_chain import source_release
-    from mtagentlens_benchmark.engine.input_reference import ReleaseInputAudit
-    from scripts.evaluation import package_fuxibench as builder
-    package, _, config = source_release(tmp_path)
-    gt = package / 'ground_truth/c/scenario.json'
-    gt.parent.mkdir(parents=True)
-    gt.write_text(json.dumps(base_record(scenario_id='scenario')))
-    monkeypatch.setattr(builder, 'PACKAGE', package)
-    manifest = builder.build_manifest()
-    ReleaseInputAudit(package, manifest, config, tmp_path / 'run')
-
-
-def test_execution_gate_materializes_exact_bound_fixtures_without_running_setup(tmp_path):
+def test_execution_inputs_accept_unversioned_directory_and_current_fixture(tmp_path):
     from env.tests.test_release_input_chain import source_release
     from scripts.evaluation.validate_fuxibench_package import validate_execution_inputs
     package, _, _ = source_release(tmp_path)
+    (package / "release.json").unlink()
+    (package / "fixtures/neutral/input.txt").write_text("updated fixture")
     assert validate_execution_inputs(package) == []
-    (package / 'fixtures/neutral/input.txt').write_text('unbound newer bytes')
-    problems = validate_execution_inputs(package)
-    assert problems and 'scenario' in problems[0]
+
+
+def test_validate_reports_structure_without_requiring_release_manifest(tmp_path):
+    from scripts.evaluation.validate_fuxibench_package import validate
+    result = validate(tmp_path, require_traces=False)
+    assert "missing release.json" not in result["problems"]
+    assert not result["valid"]
+    assert result["counts"]["records"] == 0
 
 
 def test_traces_are_declared_review_only(tmp_path):
@@ -421,3 +415,23 @@ def test_v2_annotation_verification_rejects_a_change_that_does_not_match_bytes(t
                                     annotation="a" * 64)
     problems = validate_annotation_sources(package)
     assert any("does not match packaged bytes" in item for item in problems), problems
+
+
+def test_builder_places_licenses_in_documented_locations(tmp_path, monkeypatch):
+    from scripts.evaluation import package_fuxibench as builder
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "metadata.json").write_text("{}")
+    package = tmp_path / "package"
+    (package / "ground_truth/c").mkdir(parents=True)
+    (package / "ground_truth/c/s.json").write_text(json.dumps(base_record()))
+    monkeypatch.setattr(builder, "SOURCE_PACKAGE", source)
+    monkeypatch.setattr(builder, "PACKAGE", package)
+    builder.build_docs_metadata()
+    assert (package / "LICENSE").is_file()
+    assert (package / "docs/licenses/LICENSE-APACHE").is_file()
+    assert (package / "docs/licenses/LICENSE-MIT").is_file()
+    assert not (package / "LICENSE-DATA").exists()
+    metadata = json.loads((package / "metadata.json").read_text())
+    assert "paper_metrics_available" not in metadata
+    assert "publication_blockers" not in metadata

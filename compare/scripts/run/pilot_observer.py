@@ -258,6 +258,26 @@ def release_command(release: Path, output: Path, scenario_id: str, mode: str, ob
     return command
 
 
+def input_manifest(release: Path, scenario_ids: list[str]) -> dict | None:
+    """Use strict historical validation when a release manifest is present."""
+    from compare.tools.dataset_release import validate_release
+
+    manifest_path = release / "release.json"
+    manifest = validate_release(release) if manifest_path.exists() or manifest_path.is_symlink() else None
+    for scenario_id in scenario_ids:
+        if (not scenario_id or scenario_id in (".", "..") or "/" in scenario_id
+                or "\\" in scenario_id or "\x00" in scenario_id):
+            raise ValueError("Invalid scenario id")
+        if manifest is not None:
+            known = scenario_id in manifest["case_bindings"]
+        else:
+            path = release / "scenarios" / (scenario_id + ".json")
+            known = path.is_file() and not path.is_symlink()
+        if not known:
+            raise ValueError(f"Unknown scenario: {scenario_id}")
+    return manifest
+
+
 def execute_release_scenario(args) -> int:
     """Child process: resolve all inputs from the verified immutable bundle."""
     from dataclasses import replace
@@ -265,14 +285,13 @@ def execute_release_scenario(args) -> int:
     from mtagentlens_benchmark.loader.scenario_loader import load_scenario
     from mtagentlens_benchmark.engine.runner import run_scenarios
     from mtagentlens_benchmark.engine.collector_manager import CollectorManager
-    from compare.tools.dataset_release import validate_release
     from mtagentlens_benchmark.engine.input_reference import ReleaseInputAudit
 
     if not args.collector_binary or binary_sha256(args.collector_binary) != args.collector_sha256:
         raise ValueError("Frozen collector binary is missing or its SHA256 changed")
     release = args.release.resolve()
-    manifest = validate_release(release)
-    if len(args.only) != 1 or args.only[0] not in manifest["case_bindings"]:
+    manifest = input_manifest(release, args.only)
+    if len(args.only) != 1:
         raise ValueError("Release child requires exactly one known scenario")
     workspace = replace(BenchmarkWorkspace.discover(), root=ROOT / "env", project_root=ROOT,
         scenarios_dir=release / "scenarios", fixtures_dir=release / "fixtures", runs_dir=args.out.resolve() / "runs")
@@ -344,10 +363,10 @@ def main() -> int:
     parser.add_argument("--execute-release-child", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    from compare.tools.dataset_release import validate_release
-    release = validate_release(args.release.resolve())
-    if any(sid not in release["case_bindings"] for sid in args.only):
-        parser.error("Unknown scenario in the selected input release")
+    try:
+        release = input_manifest(args.release.resolve(), args.only)
+    except (OSError, ValueError) as exc:
+        parser.error(str(exc))
     if args.execute_release_child:
         return execute_release_scenario(args)
 
@@ -462,8 +481,8 @@ def main() -> int:
                 scenario_id=scenario_id,
                 mode=mode,
                 observer=args.observer,
-                release_id=release["release_id"],
-                case_binding=release["case_bindings"][scenario_id],
+                release_id=release["release_id"] if release else None,
+                case_binding=release["case_bindings"][scenario_id] if release else {},
                 collector_sha256=binary_hash,
                 configuration_sha256=configuration_hash,
                 runtime_inputs=str(runtime_root),
@@ -532,8 +551,9 @@ def main() -> int:
                 "collector_binary": str(collector),
                 "configuration_sha256": configuration_hash,
                 "runtime_inputs": str(runtime_root),
-                "release_id": release["release_id"],
-                **release["case_bindings"][scenario_id],
+                "release_id": release["release_id"] if release else None,
+                **(release["case_bindings"][scenario_id] if release else {}),
+                "evidence_scope": "release-bound" if release else "unbound-directory",
                 "isolation": {"agent_binary": agent.binary, "agent_comm": agent.comm},
                 "stderr_tail": stderr_tail,
                 "observer_calls": observer_calls(run_dir),

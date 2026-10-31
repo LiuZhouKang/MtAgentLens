@@ -4,7 +4,20 @@
 
 - 8 current experiment directories: detection, ablation, sensitivity, identity, overhead, attribution, pbc, external.
 - `docs/`: experiment protocol, evidence index, review response, paper revision notes, dataset cards.
+- `datasets/`: selected data contracts, dataset card, annotation/provenance documents.
+- `scripts/`, `tools/`, `rjudge/`, `tests/`: repository code and contracts; kept in Git, not in the handoff tarball.
 - No secrets, no `env/config`, no `local/` working tree, no unpromoted run databases.
+
+## Handoff tarball
+
+`package.sh` includes only:
+
+- `README.md`, `MANIFEST.md`, `package.sh`
+- `results/`
+- `docs/`
+- `datasets/`
+
+Everything else stays in the repository.
 
 ## Raw data inventory
 
@@ -19,6 +32,28 @@
 | pbc | `results/pbc/data/` | 4 files / 404 KB |
 | external | `results/external/data/` | 5 files / ~130 KB |
 
+## Repository code
+
+| Path | Role |
+|---|---|
+| `scripts/run/` | pilot observer, app baseline, app judge, scenario runners |
+| `scripts/external/` | InjecAgent external-baseline reproduction |
+| `scripts/build/`, `scripts/audit/`, `scripts/dataset/` | result builders, audits, dataset contracts |
+| `scripts/eval/`, `scripts/ablation/`, `scripts/perf/`, `scripts/vis/` | contract-maintained or historical entrypoints |
+| `tools/` | offline tool-comparison framework and adapters |
+| `rjudge/` | pinned R-Judge protocol, judge, cache and trace export |
+| `tests/` | compare/ contract and regression tests |
+
+## Workspace dependencies excluded from the tarball
+
+The following are kept in the working tree but excluded from the handoff tarball:
+
+- `.venv-llm-guard/`, `.venv-prompt-guard/`, `.venv-nemo-guardrails/`
+- `models/` (local baseline weights)
+- `Dataset/external/InjecAgent/` (tracked InjecAgent inputs for external-baseline reproduction)
+
+Frozen InjecAgent outputs remain in `results/external/InjecAgent/`.
+
 ## Integrity
 
 ```bash
@@ -32,6 +67,7 @@ find results -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 
 - `local/final-v1/`：完整运行现场/历史中间结果；包内只保留必要 raw 副本。
 - `compare/docs/` 中部分历史文档仍保留 `local/...` 文字路径；这是历史命令，不是包内依赖。
+- `.venv-*`、`models/`、`Dataset/`、Python 缓存、App 基线 records/traces、数据库与日志不进入 tarball。
 
 ## Entry
 

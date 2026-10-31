@@ -395,29 +395,32 @@ def build_traces(*, skip: bool = False) -> None:
         "feed the current analysis kernel.\n\n"
         "Host paths were replaced with neutral dataset-relative placeholders; fixture credentials are\n"
         "decoys, not real secrets. `metadata.json` declares `traces_replayable: false` and\n"
-        "`traces_collected: 87`, and `validate_fuxibench_package.py` checks both against the files.\n"
-        "Run `sha256sum -c ../checksums.sha256` before use.\n", encoding="utf-8")
+        "`traces_collected` records the number of databases in the current dataset.\n", encoding="utf-8")
 
 
 def build_docs_metadata() -> None:
-    for name in ("README.md", "DATASET-CARD.md", "AI-ANNOTATION-PROTOCOL.md", "AI-SILVER-RELEASE.md",
-                 "PROVENANCE.md", "ANNOTATION-CODEBOOK.md", "ADJUDICATION-PROTOCOL.md",
-                 "BASELINE-ENGINES.md", "QUALITY_STANDARD.md", "SCENARIOS.md",
-                 "AI-SILVER-REVIEWER-MAP.md"):
+    for name in ("README.md", "DATASET-CARD.md"):
         src = SOURCE_PACKAGE / name
-        if src.exists() and src.resolve() != (PACKAGE / name).resolve():
+        if src.is_file():
             shutil.copy2(src, PACKAGE / name)
-    for path in PACKAGE.glob("*.md"):
+    docs = SOURCE_PACKAGE / "docs"
+    if docs.is_dir():
+        shutil.copytree(docs, PACKAGE / "docs", dirs_exist_ok=True)
+    for path in list(PACKAGE.glob("*.md")) + list((PACKAGE / "docs").rglob("*.md")):
         clean_text_file(path)
     # Data licenses
-    (PACKAGE / "LICENSE-DATA").write_text(
+    (PACKAGE / "LICENSE").write_text(
         "FuxiBench dataset (scenarios, fixtures, ground truth, evidence, sanitized traces) is\n"
         "licensed under Creative Commons Attribution 4.0 International (CC-BY-4.0):\n"
         "https://creativecommons.org/licenses/by/4.0/\n\n"
         "Code in the MtAgentLens repository remains Apache-2.0 OR MIT. Fixture credentials and\n"
-        "tokens are decoys for security experiments, not real secrets.\n", encoding="utf-8")
-    shutil.copy2(ROOT / "LICENSE-APACHE", PACKAGE / "LICENSE-APACHE")
-    shutil.copy2(ROOT / "LICENSE-MIT", PACKAGE / "LICENSE-MIT")
+        "tokens are decoys for security experiments, not real secrets.\n\n"
+        "Full license texts for repository code: docs/licenses/LICENSE-APACHE and\n"
+        "docs/licenses/LICENSE-MIT.\n", encoding="utf-8")
+    licenses = PACKAGE / "docs/licenses"
+    licenses.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ROOT / "LICENSE-APACHE", licenses / "LICENSE-APACHE")
+    shutil.copy2(ROOT / "LICENSE-MIT", licenses / "LICENSE-MIT")
     (PACKAGE / "CITATION.cff").write_text(
         "cff-version: 1.2.0\n"
         "title: FuxiBench 2.0 (MtAgentLens)\n"
@@ -464,9 +467,9 @@ def build_docs_metadata() -> None:
         "detection_included_attack_types": {t: sum(1 for r in included if r["attack_type"] == t) for t in ("A", "B")},
         "human_annotation": False,
         "human_review": False,
-        "paper_metrics_available": False,
     })
-    metadata.pop("annotation", None)
+    for key in ("annotation", "paper_metrics_available", "publication_blockers", "working_tree_status"):
+        metadata.pop(key, None)
     (PACKAGE / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
@@ -500,51 +503,6 @@ def sanitize_package_in_place() -> dict:
             counts["text"] += 1
     return counts
 
-def build_manifest() -> dict:
-    # First the human-readable checksum file (does not include itself or release.json).
-    base_files = []
-    for path in sorted(PACKAGE.rglob("*")):
-        if path.is_file() and path.name not in {"release.json", "checksums.sha256"}:
-            base_files.append({"path": path.relative_to(PACKAGE).as_posix(), "sha256": sha256(path), "bytes": path.stat().st_size})
-    lines = [f"{r['sha256']}  {r['path']}" for r in base_files]
-    (PACKAGE / "checksums.sha256").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    # Now the release inventory includes every file except release.json (including checksums).
-    files = {}
-    for path in sorted(PACKAGE.rglob("*")):
-        if path.is_file() and path.name != "release.json":
-            files[path.relative_to(PACKAGE).as_posix()] = sha256(path)
-    case_bindings = {}
-    for gt_path in sorted((PACKAGE / "ground_truth").glob("*/*.json")):
-        if gt_path.parent.name.startswith("_"):
-            continue
-        gt = json.loads(gt_path.read_text())
-        sid = gt["scenario_id"]
-        scenario_path = PACKAGE / "scenarios" / f"{sid}.json"
-        scenario = json.loads(scenario_path.read_text()) if scenario_path.exists() else {}
-        fixture_dir = PACKAGE / "fixtures" / (scenario.get("fixture_dir") or sid)
-        from compare.tools.dataset_release import fixture_tree_digest
-        case_bindings[sid] = {
-            "scenario_sha256": sha256(scenario_path) if scenario_path.exists() else None,
-            "ground_truth_sha256": sha256(gt_path),
-            "fixture_sha256": fixture_tree_digest(fixture_dir),
-        }
-    manifest = {
-        "schema": "mtagentlens.dataset-release/1",
-        "dataset": "FuxiBench",
-        "version": "2.0.0",
-        "taxonomy_version": "fuxibench-2type/1",
-        "license": "CC-BY-4.0",
-        "files": files,
-        "case_bindings": case_bindings,
-        "package_file_count": len(files),
-    }
-    manifest["release_id"] = hashlib.sha256(
-        json.dumps({k: v for k, v in manifest.items() if k != "release_id"}, sort_keys=True).encode()
-    ).hexdigest()
-    (PACKAGE / "release.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return manifest
-
-
 def main() -> int:
     global PACKAGE, RELEASE, TRACES, GT_STAGE, SOURCE_PACKAGE, LIVE_GT
     parser = argparse.ArgumentParser(description=__doc__)
@@ -560,7 +518,6 @@ def main() -> int:
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--skip-traces", action="store_true")
     parser.add_argument("--sanitize-only", action="store_true")
-    parser.add_argument("--manifest-only", action="store_true")
     args = parser.parse_args()
     PACKAGE = args.package.resolve()
     RELEASE = args.source_release.resolve()
@@ -568,16 +525,11 @@ def main() -> int:
     TRACES = args.source_traces.resolve()
     LIVE_GT = args.source_legacy_gt.resolve()
     GT_STAGE = SOURCE_PACKAGE / "ground_truth"
-    if PACKAGE.exists() and not args.force and not args.sanitize_only and not args.manifest_only:
+    if PACKAGE.exists() and not args.force and not args.sanitize_only:
         raise SystemExit(f"{PACKAGE} exists; pass --force after reviewing")
-    if args.manifest_only:
-        manifest = build_manifest()
-        print(json.dumps({"files": manifest["package_file_count"], "release_id": manifest["release_id"]}, indent=2))
-        return 0
     if args.sanitize_only:
         counts = sanitize_package_in_place()
-        manifest = build_manifest()
-        print(json.dumps({"sanitized": counts, "files": manifest["package_file_count"], "release_id": manifest["release_id"]}, indent=2))
+        print(json.dumps({"sanitized": counts}, indent=2))
         return 0
     # Preflight all required inputs before creating or replacing the output.
     for name in ("scenarios", "fixtures", "bench", "prompt_inputs"):
@@ -623,7 +575,6 @@ def main() -> int:
                 provenance.main()
             finally:
                 provenance.PKG = previous_root
-            manifest = build_manifest()
             from scripts.evaluation.validate_fuxibench_package import validate
             validation = validate(PACKAGE, require_traces=not args.skip_traces)
             if not validation["valid"]:
@@ -640,7 +591,7 @@ def main() -> int:
         finally:
             PACKAGE = destination
             GT_STAGE = SOURCE_PACKAGE / "ground_truth"
-    print(json.dumps({"package": str(PACKAGE), "files": manifest["package_file_count"], "release_id": manifest["release_id"]}, indent=2))
+    print(json.dumps({"package": str(PACKAGE)}, indent=2))
     return 0
 
 

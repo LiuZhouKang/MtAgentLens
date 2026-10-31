@@ -196,13 +196,9 @@ env/.venv/bin/python -m pytest -q compare/tests/test_rjudge_*.py
 
 ---
 
-## 7. 给 Lead 的接入建议（最终 RC 之后）
+## 7. 数据与运行准备
 
-**前置条件**（缺一不可，否则不要出数）：
-
-1. `datasets/FuxiBench/release.json` 存在（FuxiBench 2.0 自包含冻结包）；当前缺失会让冻结评估链抛 `Unbound dataset`；
-2. 重采已完成并把 `.claude_benchmark` 转录归档（旧 Type C 0 覆盖；2.0 的 B 类型/多智能体真实对照尚未跑）；
-3. run 与 GT 的配对清单冻结（按 `trace_id → scenario_id`，**只存在于评估层**）。
+FuxiBench 可以直接作为普通目录加载，无需顶层 release 清单。运行和评价前应准备实际任务及应用转录，并按 trace 与 scenario 的对应关系检查配对；当前已交付基线的输入、方法和结果见 [基线报告](../results/external/baselines/README.md)。历史实验的身份和运行条件以其原始记录为准。
 
 **建议步骤**：
 

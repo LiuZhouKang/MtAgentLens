@@ -426,7 +426,7 @@ note "18/18  self-contained FuxiBench package (portability + clean-room)"
 if "$PYTHON" scripts/evaluation/validate_fuxibench_package.py --clean-room \
        > /tmp/verify_package.log 2>&1; then
   tail -3 /tmp/verify_package.log
-  ok "package hashes, counts, portable paths, traces and clean-room load"
+  ok "dataset counts, portable paths, traces and clean-room load"
 else
   tail -25 /tmp/verify_package.log 2>/dev/null || true
   bad "FuxiBench package validation failed"

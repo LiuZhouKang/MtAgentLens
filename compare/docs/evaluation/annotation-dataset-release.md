@@ -89,7 +89,8 @@ case ID 从 `case-0001` 起，按 `task_id` 字典序连续编号；`task_id == 
 `case.json` / `cases[]` 字段固定为：`case_id`、`task_id`、`binding`、`split`、
 `evidence_bundle_hash`、`evidence_counts`、`actors_count`、`events_count`。
 `binding` 原样保留 `data_release_id`、`scenario_id`、`run_id`、`source_run_uuid`、
-`codebook_version`。
+`codebook_version`。v1 证据保留历史发布身份；v2 普通目录证据明确记录
+`data_release_id=null`，可参与标注和导出，不要求当前数据集具有发布清单。
 
 `annotations.jsonl` 每行字段固定为：`case_id`、`task_id`、`annotator`、`method`、
 `revision_id`、`parent_revision_id`、`saved_at`、`codebook_version`、`annotation`、

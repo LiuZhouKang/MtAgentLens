@@ -94,8 +94,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DATASET = ROOT / "datasets/FuxiBench"
 MANIFEST_PATH = DATASET / "prompt_inputs/manifest.json"
-CODEBOOK_PATH = DATASET / "ANNOTATION-CODEBOOK.md"
-PROTOCOL_PATH = DATASET / "AI-ANNOTATION-PROTOCOL.md"
+CODEBOOK_PATH = DATASET / "docs" / "codebook.md"
+PROTOCOL_PATH = DATASET / "docs" / "annotation.md"
 # The frozen v4 snapshot is the only legitimate comparison source. It must never
 # default to DATASET/"ground_truth": that path holds the *current* corpus, so the
 # audit would compare the GT with itself and would self-validate as soon as a v5

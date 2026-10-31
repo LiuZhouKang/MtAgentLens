@@ -1,6 +1,6 @@
 # 审稿问题与证据索引
 
-本页将原始审稿问题映射到当前证据，不另行维护结果数字表。原文见[审稿意见](../../../docs/paper/originals/审稿意见.txt)，逐条写作依据见[回复证据](../paper/REVIEW-RESPONSE-EVIDENCE-2026-10-26.md)。
+本页将原始审稿问题映射到当前证据，不另行维护结果数字表。审稿原文保留在完整仓库的 `docs/paper/originals/审稿意见.txt`，逐条写作依据见[回复证据](../paper/REVIEW-RESPONSE-EVIDENCE-2026-10-26.md)。
 
 | 原始问题 | 可引用证据 | 核对重点 |
 |---|---|---|

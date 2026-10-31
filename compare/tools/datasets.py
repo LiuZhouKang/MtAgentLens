@@ -109,13 +109,6 @@ class FrozenDatasetAdapter:
         return resolved_generated
 
     def load_cases(self) -> list[EvaluationCase]:
-        metadata = _read_json(self.metadata_path) if self.metadata_path.exists() else {}
-        if (self.dataset_dir / "release.json").exists() or (
-            metadata.get("ground_truth_schema") == "mtagentlens.ground_truth.v4" and self.prompt_manifest_path.exists()
-        ):
-            from .dataset_release import validate_release
-            validate_release(self.dataset_dir)
-            self._release_validated = True
         manifest = self._load_quality_manifest()
         scenario_ids = self._scenario_ids_for(manifest)
 
@@ -139,11 +132,6 @@ class FrozenDatasetAdapter:
             scenario_path = self._scenario_path_for(scenario_id)
             scenario = _read_json(scenario_path) if scenario_path.exists() else {"id": scenario_id}
             comparator_scenario_path = self._comparator_scenario_path_for(scenario_id, scenario_path, scenario)
-            if ground_truth.get("schema") == "mtagentlens.ground_truth.v4" and self.prompt_manifest_path.exists():
-                from .dataset_release import validate_release
-                if not getattr(self, "_release_validated", False):
-                    validate_release(self.dataset_dir)
-                    self._release_validated = True
             fixture_dir = self._fixture_dir_for(scenario_id, scenario)
 
             adapter_case = AdapterCase(

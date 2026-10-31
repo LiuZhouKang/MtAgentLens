@@ -67,6 +67,37 @@ def test_source_materialization_and_observed_setup_are_separate_bound_stages(tmp
     assert config.agents[0].task=='Read '+str(run/'fixtures/input.txt')
 
 
+def test_unversioned_directory_records_actual_input_without_release_identity(tmp_path):
+    from mtagentlens_benchmark.engine.input_reference import ReleaseInputAudit
+    release, _, config = source_release(tmp_path)
+    (release/'release.json').unlink()
+    run = tmp_path/'run'
+    run.mkdir()
+    audit = ReleaseInputAudit(release, None, config, run)
+    materialize_fixtures(config, run)
+    audit.verify_materialized(config)
+    (run/'fixtures/setup.txt').write_bytes(b'prepared')
+    reference = audit.finish_setup(config)
+    assert reference['release_id'] is None
+    assert reference['source_files']['bench/prepare.sh'] == hashlib.sha256(
+        (release/'bench/prepare.sh').read_bytes()).hexdigest()
+    assert reference['setup']['sha256'] == reference['source_files']['bench/prepare.sh']
+
+
+def test_unversioned_directory_detects_input_changes_during_setup(tmp_path):
+    from mtagentlens_benchmark.engine.input_reference import ReleaseInputAudit
+    release, _, config = source_release(tmp_path)
+    (release/'release.json').unlink()
+    run = tmp_path/'run'
+    run.mkdir()
+    audit = ReleaseInputAudit(release, None, config, run)
+    materialize_fixtures(config, run)
+    audit.verify_materialized(config)
+    (release/'bench/prepare.sh').write_text('changed')
+    with pytest.raises(ValueError, match='source inputs changed'):
+        audit.finish_setup(config)
+
+
 @pytest.mark.parametrize('change',['prompt','model','setup','source_bytes','fixture_bytes'])
 def test_source_or_loaded_config_mismatch_is_rejected_before_copy(tmp_path, change):
     from mtagentlens_benchmark.engine.input_reference import ReleaseInputAudit
@@ -319,6 +350,24 @@ def test_real_release_child_installs_the_source_audit_factory(tmp_path,monkeypat
                          release=release,only=['scenario'],out=tmp_path/'out',mode='process',observer='off')
     assert pilot_observer.execute_release_scenario(args)==0
     assert seen==['scenario']
+
+
+def test_real_unversioned_child_installs_unbound_source_audit(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from compare.scripts.run import pilot_observer
+    from mtagentlens_benchmark.engine import runner
+    release, _, _ = source_release(tmp_path)
+    (release/'release.json').unlink()
+    collector = tmp_path/'collector'
+    collector.write_bytes(b'synthetic collector; never executed')
+    def scheduled(configs, workspace, **kwargs):
+        audit = kwargs['input_audit_factory'](configs[0], tmp_path/'out/run')
+        assert audit.manifest is None
+        return [SimpleNamespace(success=True)]
+    monkeypatch.setattr(runner, 'run_scenarios', scheduled)
+    args = SimpleNamespace(collector_binary=collector, collector_sha256=hashlib.sha256(collector.read_bytes()).hexdigest(),
+                           release=release, only=['scenario'], out=tmp_path/'out', mode='process', observer='off')
+    assert pilot_observer.execute_release_scenario(args) == 0
 
 
 def test_unknown_release_schema_is_not_interpreted_as_current_input_format(tmp_path):

@@ -68,9 +68,6 @@ def run_comparison(
     except (OSError, ValueError) as exc:
         print(f"invalid evaluation dataset: {_exception_summary(exc)}", file=sys.stderr)
         return 2
-    release_path = dataset.dataset_dir / "release.json"
-    release = json.loads(release_path.read_text()) if release_path.exists() else {}
-
     all_findings: list[FindingRecord] = []
     all_results: list[AdapterResult] = []
     metrics: list[dict[str, object]] = []
@@ -110,12 +107,13 @@ def run_comparison(
 
     _write_findings(output_dir / "findings.jsonl", all_findings)
     for row in metrics:
-        row["release_id"] = release.get("release_id")
-        row["paper_metrics_available"] = release.get("paper_metrics_available", False)
+        row["release_id"] = None
+        row["paper_metrics_available"] = None
     (output_dir / "input_release.json").write_text(json.dumps({
-        "release_id": release.get("release_id"),
-        "paper_metrics_available": release.get("paper_metrics_available", False),
-        "publication_blockers": release.get("publication_blockers", ["Unversioned historical input"]),
+        "release_id": None,
+        "paper_metrics_available": None,
+        "publication_blockers": [],
+        "source_status": "unbound",
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     _write_status(output_dir / "tool_status.csv", all_results)
     _write_metrics(output_dir / "metrics.csv", metrics)

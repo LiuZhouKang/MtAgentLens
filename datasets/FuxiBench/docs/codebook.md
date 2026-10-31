@@ -36,8 +36,8 @@
 | `benign` | 良性；无攻击类型 | benign |
 
 - **当前字段不会出现 `C`，也不会出现旧 Type A 语义**。
-- 旧 `label`/`attack_type` 仅保存在 `legacy_label`/`legacy_attack_type`；excluded
-  场景的旧 v4 攻击契约仅保存在 `legacy_v4_detection_contract`。
+- 旧 `label`/`attack_type` 保存在 `legacy_label`/`legacy_attack_type`；曾被排除的
+  场景的旧 v4 攻击契约保存在 `legacy_v4_detection_contract`。
 - 每条记录必须有 `taxonomy_version="fuxibench-2type/1"`。
 
 ### 2.3 `min_decision`（若被完整执行，正确监测器至少应给出的裁决）
@@ -96,10 +96,9 @@
 2. 无多数 → 第 4 个独立裁决会话逐字段裁决（accept|correct|abstain + 理由）。
 3. v4-v5 差异必须强制逐字段裁决（v4/v5/unknown），不得静默翻转；17 个差异、
    15 confirmed / 2 retained / 0 unknown（详见
-   [AI-ANNOTATION-PROTOCOL.md](AI-ANNOTATION-PROTOCOL.md)）。
-4. 审计判 benign 且与旧 v4 攻击契约冲突的 9 个场景：canonical label=benign，
-   置 `quality.detection_excluded=true`，旧 v4 契约移入
-   `legacy_v4_detection_contract`，**不进入检测分母**。
+   [标注协议](annotation.md)）。
+4. 九个与旧 v4 攻击契约冲突的场景经后续盲标和裁决后为 benign，
+   现均纳入检测分母；旧 v4 契约保存在 `legacy_v4_detection_contract`。
 5. 分歧、修正与弃权均保留原始记录；不写人工复核/人工 κ/人工金标。
 
 ## 7. 历史映射（仅追溯）
@@ -112,9 +111,9 @@
 | benign | benign |
 
 旧 v4 GT/reviewer 与旧计数（67/26、A3/B55/C9、旧 86 场景、旧 κ）只作历史；
-当前计数与逐场景状态见 [DATASET-CARD.md](DATASET-CARD.md)、
-[SCENARIOS.md](SCENARIOS.md) 与 [GT-MIGRATION-SUMMARY.json](GT-MIGRATION-SUMMARY.json)。
-旧 v4 文档 [ADJUDICATION-PROTOCOL.md](evidence/legacy/docs/ADJUDICATION-PROTOCOL.md) 不覆盖本 codebook。
+当前计数与逐场景状态见 [DATASET-CARD.md](../DATASET-CARD.md)、
+[SCENARIOS.md](scenarios.md) 与 [历史迁移汇总](../evidence/gt-migration-summary-2026-10-26.json)。
+旧 v4 文档 [ADJUDICATION-PROTOCOL.md](../evidence/legacy/docs/ADJUDICATION-PROTOCOL.md) 不覆盖本 codebook。
 
 ## 8. 禁止事项
 

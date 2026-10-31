@@ -17,4 +17,4 @@
 ## Handoff
 
 - [`MANIFEST.md`](MANIFEST.md)
-- Narrative/evidence: [`docs/evaluation/e2-pbc-activity-baseline.md`](../../docs/evaluation/e2-pbc-activity-baseline.md)
+- Current evidence: [`docs/evaluation/CURRENT-EVIDENCE.md`](../../docs/evaluation/CURRENT-EVIDENCE.md)

@@ -35,6 +35,7 @@ from compare.tools.detection_scope import DEFAULT_DATASET_DIR
 from scripts.evaluation import run_artifacts
 
 PACKAGE_SCHEMA = "mtagentlens.trace-package/v1"
+UNBOUND_PACKAGE_SCHEMA = "mtagentlens.trace-package/v2"
 PUBLIC_PACKAGE_SCHEMA = "mtagentlens.trace-public-package/v1"
 PUBLIC_DERIVATION_SCHEMA = "mtagentlens.trace-public-derivation/v1"
 DERIVATION_MAPPING_SCHEMA = "mtagentlens.trace-public-mapping/v1"
@@ -139,10 +140,36 @@ def _ground_truth_relative(files: dict[str, str], scenario_id: str) -> str:
     return matches[0]
 
 
-def _bind_release(release: Path, scenario_id: str) -> dict[str, str]:
+def _bind_release(release: Path, scenario_id: str) -> dict[str, str | None]:
     if not scenario_id or scenario_id in (".", "..") or "/" in scenario_id or "\\" in scenario_id:
         raise ValueError("scenario id must be a release-relative name")
     release = Path(release)
+    manifest_path = release / "release.json"
+    if not manifest_path.exists() and not manifest_path.is_symlink():
+        if release.is_symlink() or not release.is_dir():
+            raise ValueError("dataset must be a non-symlink directory")
+        root = release.resolve()
+        scenario_path = _regular_file(release / "scenarios" / f"{scenario_id}.json", "dataset scenario")
+        if (release / "scenarios").is_symlink() or not scenario_path.resolve().is_relative_to(root):
+            raise ValueError("scenario path escapes dataset")
+        truth_root = release / "ground_truth"
+        if truth_root.is_symlink() or not truth_root.is_dir():
+            raise ValueError("ground truth directory is missing or a symlink")
+        candidates = {path.relative_to(release).as_posix(): ""
+                      for path in truth_root.rglob(f"{scenario_id}.json")}
+        truth_relative = _ground_truth_relative(candidates, scenario_id)
+        truth_path = _regular_file(release / truth_relative, "dataset ground truth")
+        if not truth_path.resolve().is_relative_to(root):
+            raise ValueError("ground truth path escapes dataset")
+        scenario = json.loads(scenario_path.read_text(encoding="utf-8"))
+        truth = json.loads(truth_path.read_text(encoding="utf-8"))
+        if not isinstance(scenario, dict) or scenario.get("id") != scenario_id:
+            raise ValueError("dataset scenario identity does not match requested scenario")
+        if not isinstance(truth, dict) or truth.get("scenario_id") != scenario_id:
+            raise ValueError("dataset ground truth identity does not match requested scenario")
+        return {"release_id": None, "source_status": "unbound", "scenario_id": scenario_id,
+                "scenario_sha256": _sha256_file(scenario_path),
+                "ground_truth_sha256": _sha256_file(truth_path)}
     try:
         manifest = validate_release(release)
     except (OSError, ValueError) as exc:
@@ -197,7 +224,7 @@ def _run_record_digest(source: object) -> str:
 
 
 def _require_run_proof(run_record: object, release: Path, scenario_id: str,
-                       release_id: str, expected_run_id: str, expected_db_sha: str,
+                       release_id: str | None, expected_run_id: str, expected_db_sha: str,
                        source_db: Path | None) -> tuple[dict, str]:
     """Recompute the existing run binding and tie it to the recording bytes.
 
@@ -236,7 +263,7 @@ def _require_run_proof(run_record: object, release: Path, scenario_id: str,
         raise ValueError("run binding collector_run_id does not match the single database run")
     if row.get("scenario_id") != scenario_id or run_binding.get("scenario_id") != scenario_id:
         raise ValueError("run record scenario does not match the requested scenario")
-    if run_binding.get("release_id") != release_id:
+    if "release_id" not in run_binding or run_binding["release_id"] != release_id:
         raise ValueError("run record binding release_id does not match the current release")
     if run_binding.get("database_sha256") != expected_db_sha:
         raise ValueError("run binding database_sha256 does not match the packaged database")
@@ -321,7 +348,7 @@ def _manifest(binding: dict[str, str], build_sha: str, database_sha: str,
         len(run.get("failures") or []) for run in report.get("runs") or []
     )
     return {
-        "schema": PACKAGE_SCHEMA,
+        "schema": UNBOUND_PACKAGE_SCHEMA if binding.get("source_status") == "unbound" else PACKAGE_SCHEMA,
         "database_contains_captured_content": True,
         "distribution": "private-restricted",
         "binding": {
@@ -413,8 +440,16 @@ def _load_package(root: Path) -> tuple[dict, dict[str, str]]:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise ValueError(f"package manifest is not valid JSON: {exc}") from exc
-    if not isinstance(manifest, dict) or manifest.get("schema") != PACKAGE_SCHEMA:
+    if not isinstance(manifest, dict) or manifest.get("schema") not in (PACKAGE_SCHEMA, UNBOUND_PACKAGE_SCHEMA):
         raise ValueError("package manifest has an unexpected schema")
+    binding = manifest.get("binding")
+    if not isinstance(binding, dict):
+        raise ValueError("package manifest has no binding")
+    if manifest["schema"] == UNBOUND_PACKAGE_SCHEMA:
+        if binding.get("source_status") != "unbound" or "release_id" not in binding or binding["release_id"] is not None:
+            raise ValueError("unbound package must not claim a historical release identity")
+    elif not isinstance(binding.get("release_id"), str) or not binding["release_id"]:
+        raise ValueError("historical package requires a release identity")
     if manifest.get("database_contains_captured_content") is not True:
         raise ValueError("package manifest does not declare private captured content")
     if manifest.get("distribution") != "private-restricted":
@@ -993,6 +1028,7 @@ def _public_manifest(source_manifest: dict, source_manifest_sha: str,
     binding = source_manifest.get("binding") if isinstance(source_manifest.get("binding"), dict) else {}
     return {
         "schema": PUBLIC_PACKAGE_SCHEMA,
+        **({"source_status": "unbound"} if binding.get("source_status") == "unbound" else {}),
         "distribution": "public-derived-review-only",
         "analysis_input_changed": True,
         "traces_replayable": False,
@@ -1135,6 +1171,14 @@ def _load_public_package(root: Path) -> tuple[dict, dict[str, str]]:
         raise ValueError(f"public package manifest is not valid JSON: {exc}") from exc
     if not isinstance(manifest, dict) or manifest.get("schema") != PUBLIC_PACKAGE_SCHEMA:
         raise ValueError("public package manifest has an unexpected schema")
+    binding = manifest.get("binding")
+    if not isinstance(binding, dict):
+        raise ValueError("public package has no source binding")
+    if binding.get("release_id") is None:
+        if manifest.get("source_status") != "unbound":
+            raise ValueError("public package must disclose its unbound source")
+    elif manifest.get("source_status") == "unbound":
+        raise ValueError("unbound public package claims a release identity")
     if manifest.get("distribution") != "public-derived-review-only":
         raise ValueError("public package is not a derived review-only distribution")
     for key, expected in (("analysis_input_changed", True), ("traces_replayable", False),
@@ -1312,10 +1356,22 @@ def audit_cohort(packages_root: Path, replay_binary: Path, release: Path, *,
         raise ValueError("cohort root must be an existing regular directory")
     replay_binary = _regular_file(Path(replay_binary), "replay binary")
     build_sha = _sha256_file(replay_binary)
-    try:
-        release_manifest = validate_release(Path(release))
-    except (OSError, ValueError) as exc:
-        raise ValueError(f"dataset release is not canonical: {exc}") from exc
+    release_root = Path(release)
+    manifest_path = release_root / "release.json"
+    if manifest_path.exists() or manifest_path.is_symlink():
+        try:
+            release_manifest = validate_release(release_root)
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"dataset release is not canonical: {exc}") from exc
+    else:
+        scenarios = release_root / "scenarios"
+        if scenarios.is_symlink() or not scenarios.is_dir():
+            raise ValueError("dataset scenarios directory is missing or a symlink")
+        release_manifest = {
+            "release_id": None, "source_status": "unbound",
+            "case_bindings": {path.stem: _bind_release(release_root, path.stem)
+                              for path in sorted(scenarios.glob("*.json"))},
+        }
     bindings = release_manifest.get("case_bindings")
     if not isinstance(bindings, dict) or not bindings:
         raise ValueError("release manifest has no case bindings")
@@ -1404,8 +1460,11 @@ def audit_cohort(packages_root: Path, replay_binary: Path, release: Path, *,
         "strict_replay_inputs": [DATABASE_NAME],
         "pinned_replay_build_sha256": build_sha,
         "external_revalidation_inputs": (
-            ["independent run record", "release manifest"]
-            if run_records is not None else ["release manifest"]),
+            ["independent run record", "dataset scenario and ground truth"]
+            if run_records is not None else ["dataset scenario and ground truth"])
+            if release_manifest.get("source_status") == "unbound" else (
+                ["independent run record", "release manifest"]
+                if run_records is not None else ["release manifest"]),
         "package_member_names_are_flat": True,
         "valid_packages_replayed": len(valid),
         "portable_strict_replay": bool(valid) and not invalid,
@@ -1423,6 +1482,7 @@ def audit_cohort(packages_root: Path, replay_binary: Path, release: Path, *,
         "release": {
             "path": str(release),
             "release_id": release_manifest.get("release_id"),
+            "source_status": release_manifest.get("source_status", "release-bound"),
             "scenario_count": len(bindings),
         },
         "replay_binary": {"path": str(replay_binary), "sha256": build_sha},

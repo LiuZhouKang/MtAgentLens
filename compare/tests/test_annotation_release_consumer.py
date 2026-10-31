@@ -21,9 +21,7 @@ def write_release(root: Path) -> Path:
     (root / "schema/annotation.schema.json").write_text(json.dumps(schema), encoding="utf-8")
     bundle = {
         "schema": "mtagentlens.evidence-bundle/v1",
-        "data_release_id": "a" * 64,
-        "scenario_id": "s",
-        "run_id": "r",
+        "binding": {"data_release_id": "a" * 64, "scenario_id": "s", "run_id": "r"},
         "sources": {"0000": {"path": "sources/0000", "sha256": sha256(b"evidence")}},
     }
     frozen = json.dumps(bundle, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
@@ -31,7 +29,7 @@ def write_release(root: Path) -> Path:
     (root / "cases/case-0001/bundle/sources/0000").write_bytes(b"evidence")
     (root / "cases/case-0001/bundle/bundle.json").write_text(
         json.dumps({**bundle, "evidence_bundle_hash": bundle_hash}), encoding="utf-8")
-    (root / "cases/case-0001/case.json").write_text(json.dumps({"case_id": "case-0001", "task_id": bundle_hash, "split": "dev"}), encoding="utf-8")
+    (root / "cases/case-0001/case.json").write_text(json.dumps({"case_id": "case-0001", "task_id": bundle_hash, "split": "dev", "binding": bundle["binding"]}), encoding="utf-8")
     row = {
         "case_id": "case-0001", "task_id": bundle_hash, "annotator": "agent-x",
         "method": "model_proposal", "revision_id": "rev-1", "parent_revision_id": None,
@@ -54,7 +52,7 @@ def write_release(root: Path) -> Path:
     release = {
         "schema": "mtagentlens.annotation-dataset/1",
         "codebook_version": "pilot/1",
-        "cases": [{"case_id": "case-0001", "task_id": bundle_hash, "split": "dev"}],
+        "cases": [{"case_id": "case-0001", "task_id": bundle_hash, "split": "dev", "binding": bundle["binding"]}],
         "splits": {"case-0001": "dev"},
         "files": files,
         "counts": {
@@ -286,3 +284,31 @@ def test_resealed_forged_event_anchor_is_rejected(tmp_path: Path):
     (root / 'annotations.jsonl').write_text(json.dumps(row) + '\n')
     reseal(root)
     assert any('anchor' in p for p in verify_release(root)['problems'])
+
+
+def test_unbound_bundle_requires_explicit_identity_field(tmp_path):
+    from scripts.evaluation.annotation_release_consumer import verify_cases
+
+    root = write_release(tmp_path)
+    path = root / 'cases/case-0001/bundle/bundle.json'
+    original = json.loads(path.read_text())
+    release = json.loads((root / 'release.json').read_text())
+    for binding in (None, {}, {"data_release_id": None}):
+        bundle = dict(original, schema='mtagentlens.evidence-bundle/v2')
+        if binding is None:
+            bundle.pop('binding', None)
+        else:
+            bundle['binding'] = binding
+        body = {k: v for k, v in bundle.items() if k != 'evidence_bundle_hash'}
+        digest = sha256(json.dumps(body, sort_keys=True, ensure_ascii=False,
+                                  separators=(',', ':')).encode())
+        bundle['evidence_bundle_hash'] = digest
+        path.write_text(json.dumps(bundle))
+        case = dict(release['cases'][0], task_id=digest)
+        if binding is None:
+            case.pop('binding', None)
+        else:
+            case['binding'] = binding
+        release['cases'] = [case]
+        (root / 'cases/case-0001/case.json').write_text(json.dumps(case))
+        assert any('binding' in problem for problem in verify_cases(root, release))

@@ -4,3 +4,6 @@ https://creativecommons.org/licenses/by/4.0/
 
 Code in the MtAgentLens repository remains Apache-2.0 OR MIT. Fixture credentials and
 tokens are decoys for security experiments, not real secrets.
+
+Full license texts for repository code: docs/licenses/LICENSE-APACHE and
+docs/licenses/LICENSE-MIT.

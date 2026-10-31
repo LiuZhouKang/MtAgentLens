@@ -4,7 +4,7 @@
 
 ## 固定输入
 
-- 使用 `datasets/FuxiBench/release.json` 与 `checksums.sha256` 确定输入身份，保留实际场景清单。
+- 记录实际使用的 FuxiBench 场景、标签和配置；普通加载不要求 release 清单。历史实验依据其原始输入记录追溯。
 - 记录 collector/helper 二进制、源码状态、配置、内核、运行环境和模型/provider。
 - 分别固定场景设计标签、运行级参考和评估规则；参考来源见[数据卡](../../datasets/FuxiBench/DATASET-CARD.md)。
 - 不以修改 payload、地址、任务或 GT 的方式改善检测结果。需要修订输入时发布新身份，并独立说明适用范围。

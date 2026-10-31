@@ -691,11 +691,11 @@ def test_send_keys_argv_and_pane_cwd_match_the_launch_audit(tmp_path, monkeypatc
     assert {path.read_text() for path in cwd_files} == {str(run.resolve())}
 
 
-def test_canonical_multi_input_with_real_tmux_and_mock_agent(tmp_path, monkeypatch):
-    """Canonical inputs and real panes; mock collector is not eBPF evidence."""
+def test_current_multi_input_with_real_tmux_and_mock_agent(tmp_path, monkeypatch):
+    """An ordinary dataset runs without a release identity using real panes."""
     require_real_tmux()
     release = Path(__file__).resolve().parents[2] / "datasets/FuxiBench"
-    manifest = json.loads((release / "release.json").read_text())
+    assert not (release / "release.json").exists()
     config = load_scenario(
         release / "scenarios/benign-multi-handoff.json", release / "fixtures"
     )
@@ -716,7 +716,7 @@ def test_canonical_multi_input_with_real_tmux_and_mock_agent(tmp_path, monkeypat
         config, run, SimpleNamespace(root=tmp_path), execution_mode="tmux-live",
         collector=SyntheticCollector(),
         input_audit_factory=lambda conf, directory: ReleaseInputAudit(
-            release, manifest, conf, directory
+            release, None, conf, directory
         ),
     )
     assert result.success, result.error
@@ -726,7 +726,11 @@ def test_canonical_multi_input_with_real_tmux_and_mock_agent(tmp_path, monkeypat
     assert len({row["details"]["tmux"]["pane_pid"] for row in launches}) == 3
     assert len({row["details"]["tmux"]["pane_id"] for row in launches}) == 3
     started = next(row for row in rows if row["event_type"] == "run_started")
-    assert started["details"]["input_reference"]["release_id"] == manifest["release_id"]
+    reference = started["details"]["input_reference"]
+    assert reference["release_id"] is None
+    assert reference["source_files"]["scenarios/benign-multi-handoff.json"] == hashlib.sha256(
+        (release / "scenarios/benign-multi-handoff.json").read_bytes()
+    ).hexdigest()
     for row in launches:
         assert row["details"]["tmux"]["role_file"]
     assert (run / "marker.log").read_text().splitlines() == [config.run_marker] * 3

@@ -25,8 +25,18 @@ def extract_task_brief(release_root: Path, scenario_id: str, *,
                        identifiers=()) -> tuple[Path, list[dict]] | None:
     """Return a one-line-per-agent brief source, or None when absent."""
     release_root = Path(release_root)
-    validate_release(release_root)
-    scenario_path = release_root / "scenarios" / f"{scenario_id}.json"
+    if (not isinstance(scenario_id, str) or not scenario_id or scenario_id in {".", ".."}
+            or any(char in scenario_id for char in ("/", "\\", "\x00"))):
+        raise ValueError("invalid scenario id")
+    manifest = release_root / "release.json"
+    if manifest.exists() or manifest.is_symlink():
+        validate_release(release_root)
+    scenario_dir = release_root / "scenarios"
+    scenario_path = scenario_dir / f"{scenario_id}.json"
+    if scenario_dir.is_symlink() or scenario_path.is_symlink():
+        raise ValueError("scenario path must not contain symlinks")
+    if not scenario_path.resolve().is_relative_to(scenario_dir.resolve()):
+        raise ValueError("scenario path escapes scenarios directory")
     if not scenario_path.is_file():
         return None
     try:
@@ -35,6 +45,8 @@ def extract_task_brief(release_root: Path, scenario_id: str, *,
         raise ValueError("invalid scenario brief JSON") from exc
     if not isinstance(scenario, dict):
         raise ValueError("scenario brief must be a JSON object")
+    if scenario.get("id") != scenario_id:
+        raise ValueError("scenario identity does not match filename")
     agents = scenario.get("agents")
     if not isinstance(agents, list) or not agents:
         raise ValueError("scenario brief has no agents")

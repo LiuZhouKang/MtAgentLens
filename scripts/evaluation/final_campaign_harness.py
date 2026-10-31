@@ -55,8 +55,19 @@ def _release_gt(release: Path) -> dict[str, dict]:
 
 
 def _validated_release(release: Path) -> dict:
-    from compare.tools.dataset_release import validate_release
-    return validate_release(release)
+    """Read ordinary inputs or validate an explicitly supplied historical release."""
+    release = Path(release)
+    manifest = release / 'release.json'
+    if manifest.exists() or manifest.is_symlink():
+        from compare.tools.dataset_release import validate_release
+        return validate_release(release)
+    if not (release / 'scenarios').is_dir() or not (release / 'ground_truth').is_dir():
+        raise ValueError('dataset must contain scenarios and ground_truth directories')
+    records = _release_gt(release)
+    if not records:
+        raise ValueError('dataset ground_truth is empty')
+    return {'release_id': None, 'source_status': 'unbound',
+            'case_labels': {sid: row.get('label') for sid, row in records.items()}}
 
 
 COHORTS = ('multi-agent', 'campaign')
@@ -551,10 +562,17 @@ def cmd_runtime_annotations(args) -> int:
     problems = []
     if not inventory['cases'] or any(row.get('status') != 'included' for row in inventory['records']):
         problems.append('empty, duplicate or invalid runner evidence; inspect inventory')
-    if any(case['binding']['data_release_id'] != manifest['release_id'] for case in inventory['cases']):
-        problems.append('runtime ledgers belong to a different release')
+    release_id = manifest.get('release_id')
+    source_status = 'unbound' if release_id is None else 'release-bound'
+    if release_id is not None and (not isinstance(release_id, str) or not release_id):
+        problems.append('invalid release identity')
+    if any(not isinstance(case.get('binding'), dict)
+           or 'data_release_id' not in case['binding']
+           or case['binding']['data_release_id'] != release_id
+           for case in inventory['cases']):
+        problems.append('runtime ledgers do not match the selected input source')
     plan = {'run_root': str(args.run_root.resolve()), 'candidates': len(inventory['cases']),
-            'commands': commands, 'problems': problems}
+            'source_status': source_status, 'commands': commands, 'problems': problems}
     _write_plan(out, 'runtime-annotations', plan)
     print(json.dumps(plan, ensure_ascii=False, indent=2))
     if problems or not args.execute:

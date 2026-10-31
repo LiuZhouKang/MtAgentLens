@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
-"""Every relative link under docs/ must resolve.
+"""Every relative link under docs/ and compare/docs/ must resolve.
 
 Documentation is part of the deliverable: a reviewer following a link must land on
 a file that exists. This test is the cheap enforcement of that promise; it does
@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DOCS = ROOT / "docs"
+DOC_ROOTS = (ROOT / "docs", ROOT / "compare" / "docs")
 LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 
 
@@ -29,7 +29,7 @@ def _links(markdown: str):
 
 def test_every_relative_docs_link_resolves():
     failures = []
-    files = sorted(DOCS.rglob("*.md"))
+    files = sorted(path for docs in DOC_ROOTS for path in docs.rglob("*.md"))
     assert files, "no markdown files found"
     for path in files:
         for target in _links(path.read_text(encoding="utf-8")):

@@ -189,3 +189,26 @@ def test_new_bundle_keeps_private_native_inputs_owner_only(tmp_path):
     assert (output / 'bundle.json').stat().st_mode & 0o077 == 0
     for source in result['sources'].values():
         assert (output / source['path']).stat().st_mode & 0o077 == 0
+
+
+def test_unbound_dataset_bundle_is_explicit_and_roundtrips(tmp_path):
+    spec = fixture_inputs(tmp_path)
+    release = spec['release_root']
+    (release / 'release.json').unlink()
+    (release / 'scenarios').mkdir()
+    (release / 'scenarios/scenario.json').write_text('{"id":"scenario"}')
+    spec['binding']['data_release_id'] = None
+    manifest = build_bundle(tmp_path / 'unbound', **spec)
+    assert manifest['schema'] == 'mtagentlens.evidence-bundle/v2'
+    assert manifest['binding']['data_release_id'] is None
+    assert load_bundle(tmp_path / 'unbound') == manifest
+
+
+def test_unbound_dataset_cannot_claim_a_release_identity(tmp_path):
+    spec = fixture_inputs(tmp_path)
+    release = spec['release_root']
+    (release / 'release.json').unlink()
+    (release / 'scenarios').mkdir()
+    (release / 'scenarios/scenario.json').write_text('{"id":"scenario"}')
+    with pytest.raises(ValueError, match='(?i)(unbound|identity|release)'):
+        build_bundle(tmp_path / 'unbound', **spec)

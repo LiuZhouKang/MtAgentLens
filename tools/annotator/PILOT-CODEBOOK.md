@@ -2,7 +2,7 @@
 
 状态：**pilot 轮次定稿**。版本：`pilot/1`。生效：2026-10-24。
 适用范围：**单个冻结运行证据包**的独立标注、第四方裁决与一致性统计。
-本文不替代数据集场景层 codebook（见 `compare/Dataset/FuxiBench/ANNOTATION-CODEBOOK.md`）。
+本文不替代数据集场景层 codebook（见 `datasets/FuxiBench/docs/codebook.md`）。
 
 > 定稿权限说明：本版由项目 Lead 在项目负责人授权下完成 `pilot/1-draft` → `pilot/1`
 > 的升级（含 §2 五项未决事项裁决）。定稿**不改变**任何人员要求：正式人工标签仍必须由

@@ -434,6 +434,69 @@ def _verify_input_reference(rows, release_root, release, *, allow_historical_rel
                      "prepared fixture differs from first launch inputs")
 
 
+def _unbound_source_manifest(rows: list, release_root: Path) -> dict:
+    """Compare a run's recorded source inputs with the current ordinary dataset.
+
+    This creates no release identity: the data only describes the source files
+    captured by the run, so it cannot authenticate a historical dataset release.
+    """
+    from mtagentlens_benchmark.engine.input_reference import (
+        _file_shas, _read_regular, _reject_symlink_path, _snapshot_tree, _within,
+    )
+
+    reference = rows[0]["details"].get("input_reference")
+    _require(isinstance(reference, dict) and reference.get("release_id") is None,
+             "unbound run requires an unbound input reference")
+    _require(not release_root.is_symlink() and release_root.is_dir(), "invalid dataset directory")
+    root = release_root.resolve()
+    sid = rows[0]["scenario_id"]
+    _require(_text(sid) and sid not in (".", "..") and "/" not in sid and
+             "\\" not in sid and "\x00" not in sid, "invalid source scenario identity")
+    scenario_path = root / "scenarios" / (sid + ".json")
+    _reject_symlink_path(scenario_path, root)
+    raw_bytes = _read_regular(scenario_path, "scenario JSON")
+    raw = _loads_strict(raw_bytes.decode("utf-8"))
+    _require(isinstance(raw, dict) and raw.get("id") == sid, "source scenario identity mismatch")
+    fixture = raw.get("fixture_dir") or sid
+    _require(isinstance(fixture, str) and fixture and not PurePosixPath(fixture).is_absolute()
+             and ".." not in PurePosixPath(fixture).parts, "invalid source fixture directory")
+    fixture_root = root / "fixtures"
+    fixture_dir = fixture_root / fixture
+    _within(fixture_dir, fixture_root, "scenario fixture directory")
+    _reject_symlink_path(fixture_dir, root)
+    fixture_files = _file_shas(_snapshot_tree(fixture_dir, "scenario fixture directory"))
+    # Older runner versions recorded every bench file. Keep those recorded
+    # declarations but verify only the setup script this scenario actually used.
+    # An unrelated bench edit must not invalidate an otherwise readable run.
+    recorded = reference.get("source_files")
+    _require(isinstance(recorded, dict), "invalid recorded source inventory")
+    bench_files = {}
+    for name, digest in recorded.items():
+        if isinstance(name, str) and name.startswith("bench/"):
+            relative = PurePosixPath(name)
+            _require(relative.as_posix() == name and ".." not in relative.parts and
+                     isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{64}", digest) is not None,
+                     "invalid recorded bench source")
+            bench_files[name] = digest
+    setup = reference.get("setup")
+    if setup is not None:
+        _require(isinstance(setup, dict) and _text(setup.get("path")), "invalid setup source")
+        setup_path = setup["path"]
+        _require(setup_path in bench_files, "setup source is absent from runner record")
+        target = root / setup_path
+        _reject_symlink_path(target, root)
+        actual = hashlib.sha256(_read_regular(target, "setup script")).hexdigest()
+        _require(actual == bench_files[setup_path], "setup source changed while verifying")
+    source_path = f"scenarios/{sid}.json"
+    scenario_sha = hashlib.sha256(raw_bytes).hexdigest()
+    files = {source_path: scenario_sha}
+    fixture_prefix = (PurePosixPath("fixtures") / fixture).as_posix()
+    files.update({f"{fixture_prefix}/{name}": digest for name, digest in fixture_files.items()})
+    files.update(bench_files)
+    return {"release_id": None, "files": files, "case_bindings": {
+        sid: {"scenario_sha256": scenario_sha, "fixture_sha256": _tree_digest(fixture_files)}}}
+
+
 def read_runner_evidence(ledger: Path, *, release_root: Path,
                          allow_historical_release: bool = False) -> dict:
     """Verify native records and any execution-source reference without writing."""
@@ -481,8 +544,13 @@ def read_runner_evidence(ledger: Path, *, release_root: Path,
         offset += len(line)
     _require(rows[-1]["event_type"] == "run_finished", "ledger has no frozen scope end")
     release_root = Path(release_root)
-    release = validate_release(release_root)
-    _require(isinstance(release, dict) and "release_id" in release, "release identity is missing")
+    manifest_path = release_root / "release.json"
+    if manifest_path.exists() or manifest_path.is_symlink():
+        release = validate_release(release_root)
+        _require(isinstance(release, dict) and _text(release.get("release_id")),
+                 "release identity is missing")
+    else:
+        release = _unbound_source_manifest(rows, release_root)
     _verify_input_reference(rows, release_root, release,
                             allow_historical_release=allow_historical_release)
     first = rows[0]

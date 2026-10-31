@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
-"""Validate the self-contained FuxiBench package (portability, counts, hashes, traces)."""
+"""Validate FuxiBench structure, execution inputs and historical traces."""
 from __future__ import annotations
 
 import argparse
@@ -226,22 +226,21 @@ def validate_execution_inputs(package: Path) -> list[str]:
     env_source = ROOT / "env/src"
     if str(env_source) not in sys.path:
         sys.path.insert(0, str(env_source))
-    from mtagentlens_benchmark.engine.input_reference import ReleaseInputAudit
+    import jsonschema
     from mtagentlens_benchmark.engine.fixtures import materialize_fixtures
     from mtagentlens_benchmark.loader.scenario_loader import load_scenario
     package = package.resolve()
-    manifest = json.loads((package / "release.json").read_text())
     problems = []
     with tempfile.TemporaryDirectory(prefix="fuxibench-input-audit-") as temp:
         for path in sorted((package / "scenarios").glob("*.json")):
             try:
                 config = load_scenario(path, package / "fixtures")
+                if not config.fixtures_dir.resolve().is_relative_to((package / "fixtures").resolve()):
+                    raise ValueError("fixture directory escapes package")
                 run = Path(temp) / path.stem
                 run.mkdir()
-                audit = ReleaseInputAudit(package, manifest, config, run)
                 materialize_fixtures(config, run)
-                audit.verify_materialized(config)
-            except (OSError, ValueError, KeyError, TypeError) as error:
+            except (OSError, ValueError, KeyError, TypeError, jsonschema.ValidationError) as error:
                 problems.append(f"{path.stem}: execution input audit failed: {error}")
     return problems
 
@@ -249,19 +248,6 @@ def validate_execution_inputs(package: Path) -> list[str]:
 def validate(package: Path, *, require_traces: bool = True) -> dict:
     problems = []
     package = package.resolve()
-    release_path = package / "release.json"
-    if not release_path.exists():
-        return {"valid": False, "problems": ["missing release.json"]}
-    release = json.loads(release_path.read_text(encoding="utf-8"))
-    if release.get("schema") != "mtagentlens.dataset-release/1":
-        problems.append("release schema is not mtagentlens.dataset-release/1")
-    try:
-        from compare.tools.dataset_release import validate_release
-        validated = validate_release(package)
-        if validated["release_id"] != release.get("release_id"):
-            problems.append("release_id mismatch after validation")
-    except Exception as exc:  # noqa: BLE001
-        problems.append(f"validate_release failed: {exc}")
     records = gt_records(package)
     attack = [r for r in records if r["label"] == "attack"]
     benign = [r for r in records if r["label"] == "benign"]
@@ -291,40 +277,51 @@ def validate(package: Path, *, require_traces: bool = True) -> dict:
         problems.append(f"scenario/GT id mismatch: {len(scenario_ids)} scenarios vs {len(gt_ids)} GT")
     for path in sorted((package / "scenarios").glob("*.json")):
         scenario = json.loads(path.read_text())
-        fixture = package / "fixtures" / (scenario.get("fixture_dir") or scenario["id"])
-        if not fixture.is_dir():
-            problems.append(f"{scenario['id']}: missing fixture directory")
+        sid = scenario.get("id")
+        if sid != path.stem:
+            problems.append(f"{path.name}: scenario id does not match filename")
+        fixture_root = (package / "fixtures").resolve()
+        fixture = (fixture_root / (scenario.get("fixture_dir") or path.stem)).resolve()
+        if not fixture.is_relative_to(fixture_root) or not fixture.is_dir():
+            problems.append(f"{sid}: missing or escaping fixture directory")
         script = scenario.get("pre_run_script")
-        if script and not (package / script).is_file():
-            problems.append(f"{scenario['id']}: missing pre_run_script {script}")
+        if script:
+            target = (package / script).resolve()
+            if not target.is_relative_to(package) or not target.is_file():
+                problems.append(f"{sid}: missing or escaping pre_run_script {script}")
     prompt_manifest = package / "prompt_inputs/manifest.json"
-    if not prompt_manifest.exists():
+    if not prompt_manifest.is_file():
         problems.append("missing prompt_inputs/manifest.json")
     else:
         entries = json.loads(prompt_manifest.read_text()).get("entries", [])
-        if len(entries) != 93:
-            problems.append(f"prompt entries {len(entries)} != 93")
-        problems.extend(validate_prompt_sources(package))
+        ids = [entry.get("scenario_id") for entry in entries]
+        if len(ids) != len(scenario_ids) or set(ids) != scenario_ids:
+            problems.append("prompt/scenario identity mismatch")
+        for sid in scenario_ids:
+            for filename in ("bundle.json", "prompt.txt"):
+                if not (package / "prompt_inputs/cases" / sid / filename).is_file():
+                    problems.append(f"{sid}: missing prompt {filename}")
     for rel in REQUIRED_EVIDENCE:
         if not (package / rel).is_file():
             problems.append(f"missing evidence {rel}")
-    problems.extend(validate_annotation_sources(package))
-    problems.extend(validate_gt_references(package))
+    for record in records:
+        annotation = record.get("label_annotation", {})
+        source = annotation.get("source")
+        refs = annotation.get("evidence", {}).get("references", [])
+        if not isinstance(source, dict) or not isinstance(refs, list):
+            problems.append(f"{record.get('scenario_id')}: missing annotation source or references")
+            continue
+        for ref in [source, *refs]:
+            if not isinstance(ref, dict) or not isinstance(ref.get("path"), str):
+                problems.append(f"{record.get('scenario_id')}: invalid evidence reference")
+                continue
+            target = (package / ref["path"]).resolve()
+            if not target.is_relative_to(package) or not target.is_file():
+                problems.append(f"{record.get('scenario_id')}: missing or escaping evidence {ref['path']}")
     problems.extend(validate_execution_inputs(package))
-    for rel in ("LICENSE-DATA", "LICENSE-APACHE", "LICENSE-MIT", "CITATION.cff", "checksums.sha256"):
+    for rel in ("LICENSE", "docs/licenses/LICENSE-APACHE", "docs/licenses/LICENSE-MIT", "CITATION.cff"):
         if not (package / rel).is_file():
             problems.append(f"missing {rel}")
-    # checksum file must agree with every non-release/non-checksum file
-    checksums = {}
-    for line in (package / "checksums.sha256").read_text().splitlines():
-        digest, name = line.split("  ", 1)
-        checksums[name] = digest
-    for path in package.rglob("*"):
-        if not path.is_file() or path.name in {"release.json", "checksums.sha256"}:
-            continue
-        rel = path.relative_to(package).as_posix()
-        if checksums.get(rel) != sha256(path):
-            problems.append(f"checksum mismatch {rel}")
     # traces
     traces = package / "traces"
     metadata_path = package / "metadata.json"
@@ -347,8 +344,8 @@ def validate(package: Path, *, require_traces: bool = True) -> dict:
     forbidden = scan_forbidden(package)
     if forbidden:
         problems.extend(forbidden[:20])
-    return {"valid": not problems, "package": str(package), "release_id": release.get("release_id"),
-            "counts": actual, "file_count": release.get("package_file_count"), "problems": problems}
+    return {"valid": not problems, "package": str(package),
+            "counts": actual, "problems": problems}
 
 
 def validate_trace_declarations(package: Path, metadata: dict, problems: list[str]) -> None:

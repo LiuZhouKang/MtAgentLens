@@ -17,6 +17,7 @@
 | Tables | `baselines/tables/table4_external_baselines.{tex,md}` |
 | Figure | `baselines/figures/fig4_baseline_comparison.{png,pdf,svg}` |
 | Reproduce | `baselines/reproduce/compute_metrics.py`, `baselines/reproduce/render_assets.py` |
+| InjecAgent reproduce | `../../scripts/external/` (repository only) |
 
 ## Raw data inventory
 

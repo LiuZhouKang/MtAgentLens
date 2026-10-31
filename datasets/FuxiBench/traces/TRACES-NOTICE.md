@@ -7,5 +7,4 @@ feed the current analysis kernel.
 
 Host paths were replaced with neutral dataset-relative placeholders; fixture credentials are
 decoys, not real secrets. `metadata.json` declares `traces_replayable: false` and
-`traces_collected: 87`, and `validate_fuxibench_package.py` checks both against the files.
-Run `sha256sum -c ../checksums.sha256` before use.
+`traces_collected: 95`, and `validate_fuxibench_package.py` checks both against the files.

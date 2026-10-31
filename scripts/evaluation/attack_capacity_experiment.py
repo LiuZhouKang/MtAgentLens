@@ -113,7 +113,13 @@ def build_plan(release: Path, triggers: dict, only: list[str]) -> dict:
     from compare.tools.dataset_release import validate_release
 
     release = Path(release)
-    manifest = validate_release(release)
+    if (release / "release.json").exists():
+        manifest = validate_release(release)
+    else:
+        from compare.tools.detection_scope import included_ground_truth
+        manifest = {"schema": None, "release_id": None,
+                    "case_labels": {sid: record.get("label") for sid, record in
+                                    included_ground_truth(release / "ground_truth").items()}}
     cohort = canonical_cohort(release)
     requested = validate_requests(manifest, cohort, triggers, only)
     return {

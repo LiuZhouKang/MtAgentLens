@@ -39,7 +39,7 @@
 1. 旧 A 场景不再单列：按独立审计结果判 benign 或按实际载荷通道归入新 A/B。
 2. 旧 B → 新 A；旧 C → 新 B；已判 benign 的场景归 benign。
 3. 旧 label/type 写入 `legacy_label`/`legacy_attack_type`；旧 v4 攻击契约写入
-   `legacy_v4_detection_contract`（仅 excluded 场景）。
+   `legacy_v4_detection_contract`（对应历史迁移场景）。
 4. 每条记录必须有 `taxonomy_version="fuxibench-2type/1"`；当前字段不得出现 `C`
    或旧 Type A 语义。
 
@@ -66,25 +66,13 @@ v4 检测元数据与 v5 共识只要在 label 或 attack_type 上不同，就�
 - 裁决会话 19 个（17 个翻转裁决 + 2 个无多数裁决）；另为 2 个重试票场景补了
   2 个额外 fresh 标注者（`atlas-recon-discovery`、`shadow-agent`，各 4 票）。
 - `atlas-recon-discovery` 裁决 2:2（2 benign vs 2 attack），裁决者判 benign；
-  该稳定性 caveat 随包披露，且该场景进入 detection_excluded。
+  该稳定性 caveat 随包披露；后续盲标和裁决结果将该场景纳入当前检测集。
 - 完整记录：`evidence/v5/flip-decisions.json`、`evidence/v5/FLIP-REPORT.md`、
   `evidence/v5/v4-v5-diff.json`。
 
-### 5.1 合并/排除政策（2.0）
+### 5.1 历史迁移与当前检测集
 
-| 情况 | 处理 | 检测分母 |
-|---|---|---|
-| `attack_type=v5` | 应用 v5 类型（新 A/B 语义） | 正常（若未排除） |
-| `attack_type=v4` | 保留 v4 类型并记录 disagreement（`handoff-injection`、`recon-user-enumeration`） | 正常 |
-| `label=v5` 或 `unknown` 且 v5 判 benign/弃权 | canonical label 记为审计结论（benign），置 `quality.detection_excluded=true`；旧 v4 攻击契约移入 `legacy_v4_detection_contract` | **排除** |
-| `label=v4` | 保留 v4 label，记录 disagreement | 正常 |
-
-本轮 9 个场景进入 detection_excluded（全部因独立审计判 benign，多数有 2:2 或
-3:0 的翻转证据）：`atlas-recon-discovery`、`c2-dns-dead-drop`、
-`exfil-archive-upload`、`handoff-unicode`、`network-anomaly`、
-`prompt-injection-direct`、`recon-passive-sniff`、`resource-direct`、
-`resource-disk-fill`。excluded 场景**不删除**，其旧 v4 label/type 只作 provenance，
-不得重新进入检出率/FPR/TPR 分母。
+2026-10-26 的合并曾将九个审计为良性的场景暂时排除，并保留旧 v4 攻击契约。2026-10-27，经三路盲标与独立裁决，它们作为困难良性纳入当前检测集。当前 `quality.detection_excluded` 为 false，检测范围为 93 场景（58 attack、35 benign）；旧判断保留在证据记录中供追溯。
 
 ## 6. 状态、分母与指标
 
@@ -103,13 +91,12 @@ v4 检测元数据与 v5 共识只要在 label 或 attack_type 上不同，就�
 - 场景证据：`evidence/v5/`（gt-v5、flip、blind_sources、legacy-audit、
   rejected-sessions、v4-v5-diff）；合并证据：`evidence/merge/`；历史 v4：
   `evidence/legacy/v4/`；PBC：`evidence/pbc/`；验证：`evidence/validation/`。
-- 包身份/文件哈希见 `release.json` 与 `checksums.sha256`；发布说明见
-  [AI-SILVER-RELEASE.md](AI-SILVER-RELEASE.md)。
+- 数据来源与迁移记录见 [来源说明](provenance.md)。历史实验的身份和记录按其原始产物追溯。
 - 可披露：输入视图、配置模型 `deepseek-flash` / provider `deepseek-official`
   （不声明 API 快照）、3 个 fresh 会话、无多数与强制翻转裁决、279 会话、
   字段覆盖与残留不确定性。
 - 必须同时披露：无人工锚点、同模型相关误差、`design_spec` 未单因素消融、
-  `atlas` 2:2 caveat、9 个 detection_excluded、运行层 447×3 推迟、旧 Type C
+  `atlas` 2:2 caveat、九个场景的历史重裁决、运行层参考的实际覆盖、旧 Type C
   有效 run=0、旧 v4 计数仅历史。
 - 方法边界参考 [ACL 2025 Alternative Annotator Test](https://aclanthology.org/2025.acl-long.782/)
   与 [No Free Labels](https://arxiv.org/abs/2503.05061)：没有人工对照时，不声称
@@ -121,5 +108,5 @@ v4 检测元数据与 v5 共识只要在 label 或 attack_type 上不同，就�
   （`ai-silver/1`）与旧 release ID 只作历史映射，不是当前 label 或论文指标。
 - 旧 v4 一致性 κ（label 0.9823 / type 0.8754）只描述旧 reviewer agents，不是人类
   κ，也已不是当前 GT 数字。
-- 旧 v4 过程文档 [ADJUDICATION-PROTOCOL.md](../../../datasets/FuxiBench/evidence/legacy/docs/ADJUDICATION-PROTOCOL.md) 等保留为
+- 旧 v4 过程文档 [ADJUDICATION-PROTOCOL.md](../evidence/legacy/docs/ADJUDICATION-PROTOCOL.md) 等保留为
   provenance，不覆盖本协议。

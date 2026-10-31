@@ -151,7 +151,7 @@ class ReleaseInputAudit:
         self.materialized_fixture_dir = self.run_dir / "fixtures"
 
         self.manifest = manifest
-        self._manifest_files = self._validate_manifest(manifest)
+        self._manifest_files = self._validate_manifest(manifest) if manifest is not None else None
 
         scenario_id = getattr(config, "id", None)
         if (
@@ -202,8 +202,9 @@ class ReleaseInputAudit:
         self.source_files, scenario_sha, fixture_shas, fixture_snapshot = (
             self._collect_sources()
         )
-        self._validate_manifest_scope(self.source_files)
-        self._validate_bindings(scenario_sha, fixture_shas)
+        if self.manifest is not None:
+            self._validate_manifest_scope(self.source_files)
+            self._validate_bindings(scenario_sha, fixture_shas)
 
         self._expected_materialized = {
             relative: _materialized_sha(
@@ -368,8 +369,9 @@ class ReleaseInputAudit:
             raise ValueError("verify_materialized must succeed before finish_setup")
 
         fresh, scenario_sha, fixture_shas, _ = self._collect_sources()
-        self._validate_manifest_scope(fresh)
-        self._validate_bindings(scenario_sha, fixture_shas)
+        if self.manifest is not None:
+            self._validate_manifest_scope(fresh)
+            self._validate_bindings(scenario_sha, fixture_shas)
         if fresh != self.source_files:
             raise ValueError("release source inputs changed after materialisation")
         self._require_config(config, self._expected_rewritten)
@@ -384,12 +386,12 @@ class ReleaseInputAudit:
         if self._setup_relative is not None:
             setup = {
                 "path": self._setup_relative,
-                "sha256": self._manifest_files[self._setup_relative],
+                "sha256": self.source_files[self._setup_relative],
                 "exit_code": 0,
             }
         return {
             "schema": SCHEMA,
-            "release_id": self.manifest["release_id"],
+            "release_id": self.manifest["release_id"] if self.manifest is not None else None,
             "release_root": str(self.release_root),
             "scenario_id": self.scenario_id,
             "source_files": dict(self.source_files),

@@ -389,17 +389,16 @@ def _check_prompt_baselines(dataset_dir: Path, prompt_lockfile: Path) -> AuditCh
     all_prompt_tools_use_prompt_text = all(
         "prompt_text" in modes for modes in prompt_modes_by_tool.values()
     )
-    release_error = None
+    dataset_error = None
     expected_cases = 0
     try:
-        from compare.tools.dataset_release import validate_release
-        release = validate_release(dataset_dir)
-        expected_cases = len(release["case_bindings"])
+        from compare.tools.datasets import FrozenDatasetAdapter
+        expected_cases = len(FrozenDatasetAdapter(dataset_dir).load_cases())
     except (OSError, ValueError) as exc:
-        release_error = str(exc)
+        dataset_error = str(exc)
     status = (
         "pass"
-        if load_error is None and release_error is None and expected_cases > 0
+        if load_error is None and dataset_error is None and expected_cases > 0
         and required_tools_ready
         and all_prompt_tools_use_prompt_text
         and manifest_evidence["manifest_valid"]
@@ -422,7 +421,7 @@ def _check_prompt_baselines(dataset_dir: Path, prompt_lockfile: Path) -> AuditCh
         evidence={
             "prompt_lockfile": _display_path(prompt_lockfile),
             "prompt_lockfile_error": load_error,
-            "release_error": release_error,
+            "dataset_error": dataset_error,
             "expected_cases": expected_cases,
             "prompt_tools_present": prompt_tools_present,
             "prompt_modes_by_tool": prompt_modes_by_tool,

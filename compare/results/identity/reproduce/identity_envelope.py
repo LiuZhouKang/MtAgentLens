@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json,glob,os,collections,random,math
-ROOT='/home/lzk/MtAgentLens'
+from pathlib import Path
+ROOT=Path(__file__).resolve().parents[4]
 REF=json.load(open(f'{ROOT}/compare/results/identity/reference/identity-reference.json'))
 CONDS={'C0':'pid-instance-only','C1':'pid-instance-plus-ppid','C2':'pid-instance-plus-tls','C3':'pid-instance-plus-conversation','C4':'full'}
 PRED={}
@@ -45,7 +46,7 @@ def wilson(k,n,z=1.96):
     return [max(0,c-h),min(1,c+h)]
 rnd=random.Random(7)
 out={'schema':'mtagentlens.experiment-metrics/1','experiment':'identity',
-     'release_id':json.load(open(f'{ROOT}/datasets/FuxiBench/release.json'))['release_id'],'estimable':True,'data':{}}
+     'release_id':json.load(open(f'{ROOT}/compare/results/identity/plan.json'))['release_id'],'estimable':True,'data':{}}
 condrows={}; f1_ci={}
 for c in CONDS:
     ev=micro(c,'eval'); al=micro(c,'all'); pc=per_case(c,'all')

@@ -211,15 +211,14 @@ def test_release_builder_taxonomy_is_two_type(tmp_path):
     assert current["case_bindings"]
 
 
-def test_package_release_manifest_is_current():
-    from compare.tools.dataset_release import validate_release
-    release = validate_release(PACKAGE)
-    assert release["schema"] == "mtagentlens.dataset-release/1"
-    assert release["version"] == "2.0.0"
-    assert len(release.get("case_labels") or {}) == 93
+def test_package_loads_all_scenarios_without_release_manifest():
+    assert not (PACKAGE / "release.json").exists()
+    assert not (PACKAGE / "checksums.sha256").exists()
     metadata = json.loads((PACKAGE / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["ground_truth_schema"] == "mtagentlens.ground_truth.v4"
+    assert metadata["detection_included_counts"] == {"attack": 58, "benign": 35}
     assert scope_counts(PACKAGE / "ground_truth")["scored"] == 93
+    assert len(FrozenDatasetAdapter(PACKAGE).load_cases()) == 93
 
 
 def test_every_metric_walker_uses_the_shared_detection_scope():

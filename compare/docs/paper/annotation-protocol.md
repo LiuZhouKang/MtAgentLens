@@ -7,9 +7,11 @@
 
 ## 1. 标注单元与证据
 
-标注单元是一次**冻结的运行证据包**，而不是原始数据库或场景目录。每个证据包由
-`mtagentlens.evidence-bundle/v1` 描述，绑定到不可变 release（release_id、场景/
-运行/源 UUID）并记录每个来源的 SHA-256 与每个事件的字节范围、记录哈希：
+标注单元是一次**冻结的运行证据包**，而不是原始数据库或场景目录。每个证据包
+记录场景、运行及源 UUID，并保留每个来源与事件的字节引用。历史
+`mtagentlens.evidence-bundle/v1` 绑定经核验的发布身份；普通目录使用
+`mtagentlens.evidence-bundle/v2`，明确记录 `data_release_id=null`，无需数据集清单。
+两者都核查本次运行的输入与来源，v2 不声称已验证历史发布身份：
 
 1. **runner ledger**：顶层启动/进程生命周期事件（v4 含启动前后时钟见证）；
 2. **脱敏任务简报**：agent 收到的任务文本（仅 `agent_index`、`mode`、`task`；

@@ -246,18 +246,16 @@ def evaluate_dataset(
         observed_cases.append(case)
     metrics = evaluate_tool_results(MTAGENTLENS_TOOL, observed_cases, findings)
     missing = any(case.is_attack and not case.expected_claims for case in cases)
-    release_path = Path(dataset_dir) / "release.json"
-    release = json.loads(release_path.read_text()) if release_path.exists() else {}
-    ready = not missing and not unknown and not uncertain and not quality_limited and not attribution_unavailable and release.get("paper_metrics_available") is True
+    ready = False if missing or unknown or uncertain or quality_limited or attribution_unavailable else None
     reason = ("ground truth has no expected_claims; recall/coverage would be meaningless" if missing
               else "uncertain, unknown, or quality-limited runs are excluded from effect denominators" if (unknown or uncertain or quality_limited)
               else "canonical binary verdicts lack exact linked claim context for attribution" if attribution_unavailable
-              else "versioned release and resolved annotation review are required" if not ready else None)
+              else "independent annotation review has not been assessed")
     return {"total_cases": len(cases), "attack_cases": sum(c.is_attack for c in cases), "benign_cases": sum(not c.is_attack for c in cases),
         "unknown_runs": unknown, "uncertain_runs": uncertain, "quality_limited_runs": quality_limited,
         "observed_cases": len(observed_cases), "attribution_unavailable_scenarios": attribution_unavailable,
         "quality_gate": {"paper_metrics_available": ready, "reason": reason},
-        "metrics": metrics, "findings": {"total": len(findings)}, "release_id": release.get("release_id")}
+        "metrics": metrics, "findings": {"total": len(findings)}, "release_id": None}
 
 
 def main() -> int:

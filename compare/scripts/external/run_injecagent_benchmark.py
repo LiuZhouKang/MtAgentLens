@@ -10,7 +10,7 @@ Agent Sentinel:
   AuditWithoutTrace 模式 — LLM 文本安全分析
 
 用法:
-  PYTHONPATH=env:env/src:. python3 compare/scripts/run/run_injecagent_benchmark.py
+  PYTHONPATH=env:env/src:. python3 compare/scripts/external/run_injecagent_benchmark.py
 """
 
 import json, re, time, os, urllib.request, urllib.error, math, sys

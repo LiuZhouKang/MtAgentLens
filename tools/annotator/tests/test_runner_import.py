@@ -405,3 +405,43 @@ def test_invalid_runner_clock_witness_is_rejected_before_bundle_creation(tmp_pat
     write_rows(ledger, rows)
     with pytest.raises(ValueError): build(tmp_path, inputs)
     assert not (tmp_path / "bundle").exists()
+
+
+def test_unbound_dataset_runner_import_retains_source_checks_and_store(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from env.tests.test_release_input_chain import source_release, configure_client
+    from mtagentlens_benchmark.engine.input_reference import ReleaseInputAudit
+    from tools.annotator.records import RecordStore
+
+    release, _, config = source_release(tmp_path)
+    (release / 'release.json').unlink()
+    unrelated = release / 'bench/unrelated.sh'
+    unrelated.write_text('unrelated before run')
+    executor = configure_client(tmp_path, monkeypatch)
+    run = tmp_path / 'run'
+    result = executor.execute_scenario(config, run, SimpleNamespace(root=tmp_path),
+        input_audit_factory=lambda conf, directory: ReleaseInputAudit(release, None, conf, directory))
+    assert result.success, result.error
+    ledger = run / 'runner-events.jsonl'
+    unrelated.write_text('unrelated after run')
+    imported = import_runner_bundle(tmp_path / 'bundle', release_root=release,
+                                    ledger=ledger, codebook_version='pilot/1')
+    assert imported['schema'] == 'mtagentlens.evidence-bundle/v2'
+    assert imported['binding']['data_release_id'] is None
+    store = RecordStore(tmp_path / 'records.sqlite')
+    store.register_bundle(tmp_path / 'bundle')
+    assert store.export()['tasks'][0]['binding']['data_release_id'] is None
+    # A changed source is still rejected; unbound is not proof of an old release.
+    (release / 'fixtures/neutral/input.txt').write_text('changed source')
+    with pytest.raises(ValueError, match='(?i)(source|input|fixture)'):
+        import_runner_bundle(tmp_path / 'changed', release_root=release,
+                             ledger=ledger, codebook_version='pilot/1')
+
+
+def test_unbound_run_without_recorded_source_is_not_treated_as_bound(tmp_path, inputs):
+    spec, ledger, _ = inputs
+    (spec['release_root'] / 'release.json').unlink()
+    with pytest.raises(ValueError, match='unbound.*input reference'):
+        import_runner_bundle(tmp_path / 'bundle-unbound', release_root=spec['release_root'],
+                             ledger=ledger, codebook_version='pilot/1')
+    assert not (tmp_path / 'bundle-unbound').exists()

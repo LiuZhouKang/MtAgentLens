@@ -13,4 +13,8 @@ Aggregated comparison table for 93 scenarios / external baselines (24 KB).
 
 These are the frozen external-baseline outputs used by `baselines/metrics/comparison.json`.
 
+Reproduction scripts and required inputs are documented in
+[`../../../scripts/external/README.md`](../../../scripts/external/README.md);
+the InjecAgent inputs remain local under `compare/Dataset/external/InjecAgent/`.
+
 `_archived/` was moved to `local/final-v1/archive/compare-legacy-2026-10-30/external-injecagent-archived/`.

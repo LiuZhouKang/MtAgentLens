@@ -771,6 +771,18 @@ def test_unknown_dataset_raises_clear_error():
         load_dataset("missing-dataset", Path("compare/Dataset"))
 
 
+def test_v4_dataset_loads_without_release_manifest(synthetic_dataset):
+    metadata = json.loads((synthetic_dataset / "metadata.json").read_text())
+    metadata["ground_truth_schema"] = "mtagentlens.ground_truth.v4"
+    (synthetic_dataset / "metadata.json").write_text(json.dumps(metadata))
+    prompt = synthetic_dataset / "prompt_inputs"
+    prompt.mkdir()
+    (prompt / "manifest.json").write_text(json.dumps({"entries": []}))
+    assert len(FrozenDatasetAdapter(synthetic_dataset).load_cases()) == 2
+    (synthetic_dataset / "release.json").write_text('{"release_id": "stale"}')
+    assert len(FrozenDatasetAdapter(synthetic_dataset).load_cases()) == 2
+
+
 @pytest.mark.parametrize('schema', ['mtagentlens.causal-design-proposal/1', 'invented.v99'])
 def test_nonruntime_schema_cannot_be_selected_as_a_negative_case(synthetic_dataset, schema):
     source = synthetic_dataset / 'ground_truth/benign-one.json'

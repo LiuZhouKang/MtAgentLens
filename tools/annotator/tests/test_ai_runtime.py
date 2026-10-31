@@ -456,3 +456,27 @@ def test_bound_cached_review_is_reused_only_until_packet_changes(tmp_path, monke
     runtime.dump(packet, data)
     with pytest.raises(ValueError, match='packet binding'):
         runtime.run_batch(tmp_path, [case], 'dsh-a', reviewers=3)
+
+
+def test_prepare_unbound_native_ledger_without_release_file(tmp_path, monkeypatch):
+    """A synthetic client reaches the ordinary-directory annotation path."""
+    from pathlib import Path
+    from types import SimpleNamespace
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[3] / 'env/src'))
+    from env.tests.test_release_input_chain import source_release, configure_client
+    from mtagentlens_benchmark.engine.input_reference import ReleaseInputAudit
+    from tools.annotator.ai_runtime import prepare
+    from tools.annotator.evidence import load_bundle
+    release, _, config = source_release(tmp_path, with_setup=False)
+    (release / 'release.json').unlink()
+    executor = configure_client(tmp_path, monkeypatch)
+    run = tmp_path / 'run'
+    result = executor.execute_scenario(config, run, SimpleNamespace(root=tmp_path),
+        input_audit_factory=lambda conf, directory: ReleaseInputAudit(release, None, conf, directory))
+    assert result.success, result.error
+    runtime = tmp_path / 'runtime'
+    inventory = prepare(runtime, run_root=run)
+    assert inventory['counts'] == {'included': 1}
+    case = inventory['cases'][0]
+    assert case['binding']['data_release_id'] is None
+    assert load_bundle(runtime / 'bundles' / case['case_id'])['schema'] == 'mtagentlens.evidence-bundle/v2'

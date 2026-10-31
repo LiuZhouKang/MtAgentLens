@@ -6,7 +6,7 @@
 
 FuxiBench 当前包含 93 个场景，设计标签为 58 attack、35 benign。场景标签描述输入中的攻击设计，运行记录说明本次实际执行；两者分别保存。攻击未执行、执行结果未知和采集失败按各实验预定规则报告，不能事后改作良性。
 
-[数据卡](../../datasets/FuxiBench/DATASET-CARD.md)记录场景构成，[来源说明](../../datasets/FuxiBench/PROVENANCE.md)记录标签与参考的生产方式。AI 标注、设计级参考和运行级独立参考有不同用途；人工复核只有实际完成并留存声明后才计入。运行级标注契约见[标注 release](annotation-dataset-release.md)与[codebook](../../tools/annotator/PILOT-CODEBOOK.md)。
+[数据卡](../../datasets/FuxiBench/DATASET-CARD.md)记录场景构成，[来源说明](../../datasets/FuxiBench/docs/provenance.md)记录标签与参考的生产方式。AI 标注、设计级参考和运行级独立参考有不同用途；人工复核只有实际完成并留存声明后才计入。运行级标注契约见[标注 release](annotation-dataset-release.md)与[codebook](../../tools/annotator/PILOT-CODEBOOK.md)。
 
 ## 实验分工
 
@@ -24,7 +24,7 @@ FuxiBench 当前包含 93 个场景，设计标签为 58 attack、35 benign。�
 
 ## 运行与冻结
 
-1. 固定数据集 release、场景、配置、模型/provider 与运行预算，保留配置的哈希身份。
+1. 记录实际使用的数据集、场景、配置、模型/provider 与运行预算；已有历史实验按其原始记录追溯。
 2. 按[测量隔离](measurement-isolation.md)隔离 Agent 配置和采集目标，记录主机、内核与二进制身份。
 3. 保留 attempt、退出状态、来源 final stats、持久化丢失和结束状态；失败重试按预先规定记录。
 4. 由 accepted/promoted 记录生成评估输入；保留无效和未执行记录及原因。

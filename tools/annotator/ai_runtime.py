@@ -1018,7 +1018,7 @@ def finalize(root=ROOT, reviewers=2):
                              'rate': pair_agree/pair_total if pair_total else None,
                              'unanimous_cases': unanimous, 'cases': len(pairs),
                              'interpretation': 'same-model repeatability, not human inter-rater reliability'}
-    release_counts = Counter(r['binding']['data_release_id'] for r in records)
+    release_counts = Counter(r['binding']['data_release_id'] or 'unbound' for r in records)
     manifest_path = root / 'sanitizer-manifest.json'
     result = {'schema': ('mtagentlens.ai-runtime-silver/v1' if reviewers == 2
                          else 'mtagentlens.ai-runtime-consensus/v1'),

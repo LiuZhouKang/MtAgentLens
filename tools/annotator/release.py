@@ -16,6 +16,7 @@ still requires ``reviewers.json`` to exist and to carry the matching
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -285,6 +286,24 @@ _EVIDENCE_BUNDLE_SCHEMA = {
         "text": {"type": "string", "pattern": "\\S"},
     },
 }
+
+# V1-only exports keep the original published schema. V2 explicitly represents
+# an ordinary dataset without a verified release identity, never a fake ID.
+_UNBOUND_EVIDENCE_SCHEMA = copy.deepcopy(_EVIDENCE_BUNDLE_SCHEMA)
+_UNBOUND_EVIDENCE_SCHEMA["$id"] = "https://mtagentlens.local/schema/evidence-bundle-v1-v2.schema.json"
+_UNBOUND_EVIDENCE_SCHEMA["title"] = "mtagentlens.evidence-bundle/v1-or-v2"
+_UNBOUND_EVIDENCE_SCHEMA["properties"]["schema"] = {"enum": [
+    "mtagentlens.evidence-bundle/v1", "mtagentlens.evidence-bundle/v2"]}
+_UNBOUND_EVIDENCE_SCHEMA["properties"]["binding"]["properties"]["data_release_id"] = {
+    "anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+_UNBOUND_EVIDENCE_SCHEMA["allOf"] = [
+    {"if": {"properties": {"schema": {"const": "mtagentlens.evidence-bundle/v1"}}},
+     "then": {"properties": {"binding": {"properties": {
+         "data_release_id": {"$ref": "#/$defs/sha256"}}}}}},
+    {"if": {"properties": {"schema": {"const": "mtagentlens.evidence-bundle/v2"}}},
+     "then": {"properties": {"binding": {"properties": {
+         "data_release_id": {"type": "null"}}}}}},
+]
 
 _SCHEMAS = {
     "annotation": _ANNOTATION_SCHEMA,
@@ -852,7 +871,7 @@ def _readme(release: dict) -> str:
         "",
         "## 5. provenance 链",
         "",
-        "1. `binding` 由上游数据集 release 产生：`data_release_id`、`scenario_id`、"
+        "1. `binding` 标识来源：历史数据集 release 使用 `data_release_id`；普通目录为 null。包含 `scenario_id`、"
         "`run_id`、`source_run_uuid`、`codebook_version`。",
         "2. 证据包 `bundle.json` 记录每个原始 source 的 sha256 与每条 evidence "
         "record 的 `record_sha256`；`evidence_bundle_hash` 是除该字段外整个 manifest "
@@ -1003,6 +1022,9 @@ def build_annotation_release(store_path: Path, out: Path, *,
         case["split"] = splits[case["case_id"]]
     rows = _annotation_rows(cases, tasks)
     bundles = {task["task_id"]: task["evidence_manifest"] for task in tasks}
+    bundle_schema = (_UNBOUND_EVIDENCE_SCHEMA if any(
+        bundle["schema"] == "mtagentlens.evidence-bundle/v2" for bundle in bundles.values()
+    ) else _EVIDENCE_BUNDLE_SCHEMA)
     _check_annotation_rows(rows, cases, bundles)
 
     task_ids = {task["task_id"] for task in tasks}
@@ -1034,7 +1056,7 @@ def build_annotation_release(store_path: Path, out: Path, *,
                      "copied evidence bundle binding changed")
             _require(copied["evidence_bundle_hash"] == case["evidence_bundle_hash"],
                      "copied evidence bundle does not reproduce its hash")
-            _validate_instance(copied, _EVIDENCE_BUNDLE_SCHEMA,
+            _validate_instance(copied, bundle_schema,
                                f"evidence bundle {case['case_id']}")
             _write_json(case_dir / "case.json", case)
 
@@ -1043,7 +1065,8 @@ def build_annotation_release(store_path: Path, out: Path, *,
                             for row in rows))
         _write_json(temporary / "attestations.json", attestations)
         for name, schema in _SCHEMAS.items():
-            _write_json(temporary / "schema" / f"{name}.schema.json", schema)
+            _write_json(temporary / "schema" / f"{name}.schema.json",
+                        bundle_schema if name == "evidence-bundle" else schema)
         _write_text(temporary / "LICENSE", _LICENSE_TEXT)
         _write_text(temporary / "README.md", _readme(release))
 
@@ -1088,14 +1111,18 @@ def verify_annotation_release(root: Path) -> dict:
     _require(_release_id(release) == release["release_id"],
              "annotation dataset release id mismatch")
 
+    bundle_schema = _EVIDENCE_BUNDLE_SCHEMA
     for name, schema in _SCHEMAS.items():
         path = root / "schema" / f"{name}.schema.json"
         _require(not path.is_symlink() and path.is_file(),
                  f"schema/{name}.schema.json is missing")
         shipped = _loads_strict(path.read_text(encoding="utf-8"))
-        _require(shipped == schema,
-                 f"schema/{name}.schema.json does not match the verifier schema")
-        _validator(schema)
+        if name == "evidence-bundle" and shipped == _UNBOUND_EVIDENCE_SCHEMA:
+            bundle_schema = _UNBOUND_EVIDENCE_SCHEMA
+        else:
+            _require(shipped == schema,
+                     f"schema/{name}.schema.json does not match the verifier schema")
+        _validator(shipped)
 
     cases = release["cases"]
     _require(isinstance(cases, list) and bool(cases),
@@ -1121,7 +1148,7 @@ def verify_annotation_release(root: Path) -> dict:
         payload = _loads_strict(payload_path.read_text(encoding="utf-8"))
         _require(payload == case, f"{case['case_id']}/case.json disagrees with release.json")
         bundle = load_bundle(case_dir / "bundle")
-        _validate_instance(bundle, _EVIDENCE_BUNDLE_SCHEMA,
+        _validate_instance(bundle, bundle_schema,
                            f"evidence bundle {case['case_id']}")
         _require(bundle["binding"] == case["binding"],
                  f"{case['case_id']} binding disagrees with its evidence bundle")

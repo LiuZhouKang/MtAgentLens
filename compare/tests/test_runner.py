@@ -1,11 +1,39 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 
 from compare.tools.base import AdapterResult, BoundaryType, FindingRecord, RunStatus, ToolMetadata
 from compare.tools.datasets import load_dataset
 from compare.tools.runner import run_comparison
+
+
+def test_runner_describes_unbound_dataset_without_claiming_historical_identity(tmp_path, synthetic_dataset):
+    dataset = tmp_path / "datasets" / "FuxiBench"
+    dataset.parent.mkdir()
+    synthetic_dataset.rename(dataset)
+    output = tmp_path / "results"
+    assert run_comparison(dataset_name="FuxiBench", tools=["fixture-scanner"],
+                          dataset_root=dataset.parent, lockfile=Path("compare/tool-lock.json"),
+                          output_dir=output, experimental=False) == 0
+    source = json.loads((output / "input_release.json").read_text())
+    assert source["release_id"] is None
+    assert source["paper_metrics_available"] is None
+    assert source["publication_blockers"] == []
+    assert source["source_status"] == "unbound"
+
+
+def test_runner_does_not_claim_unverified_release_identity(tmp_path, synthetic_dataset):
+    dataset = tmp_path / "datasets" / "FuxiBench"
+    dataset.parent.mkdir()
+    synthetic_dataset.rename(dataset)
+    (dataset / "release.json").write_text(json.dumps({"release_id": "stale"}))
+    output = tmp_path / "results"
+    assert run_comparison(dataset_name="FuxiBench", tools=["fixture-scanner"],
+                          dataset_root=dataset.parent, lockfile=Path("compare/tool-lock.json"),
+                          output_dir=output, experimental=False) == 0
+    assert json.loads((output / "input_release.json").read_text())["release_id"] is None
 
 
 def _current_frozen_case_ids(current_release_dataset) -> list[str]:

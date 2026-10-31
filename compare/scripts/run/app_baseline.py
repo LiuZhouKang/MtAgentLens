@@ -211,6 +211,8 @@ def validate_real_run(row: dict[str, Any], release: Path) -> None:
     if row.get("state") != "completed":
         raise ValueError("the selected run is not completed")
     validate_run_binding(row, release)
+    if "release_id" in row and row["release_id"] != row["run_binding"].get("release_id"):
+        raise ValueError("the selected run has a mismatched release identity")
     canonical = read_canonical_verdict(Path(row["db_path"]))
     if canonical["capture_quality_status"] != "healthy":
         raise ValueError("the selected run does not have healthy capture")

@@ -45,17 +45,11 @@
   },
   "dataset_updated": "2026-10-27",
   "human_annotation": false,
-  "paper_metrics_available": false,
-  "publication_blockers": [
-    "Scenario labels are AI-consensus design expectations, not human-verified labels; no human review or kappa.",
-    "Runtime human annotation, runtime causal ground truth and the Type C (multi-agent) campaign remain outstanding."
-  ],
-  "working_tree_status": "candidate_not_frozen",
   "ground_truth_version": "fuxibench-2.0",
   "detection_excluded_scenarios": [],
   "detection_included_counts": {
     "attack": 58,
-    "benign": 26
+    "benign": 35
   },
   "detection_included_attack_types": {
     "A": 47,

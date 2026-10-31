@@ -1,11 +1,11 @@
 # 论文工作区
 
-本目录保留论文原件、修订工作稿和主张依据。当前实验状态见[实验入口](../evaluation/CURRENT-EVIDENCE.md)；论文中的每个主张先对照[主张矩阵](claim-evidence-matrix.md)，逐条审稿依据见[回复证据](REVIEW-RESPONSE-EVIDENCE-2026-10-26.md)。
+本目录保留论文修订工作稿和主张依据；原始 DOC/PDF、审稿 TXT/XLSX 和图像保留在完整仓库的 `docs/paper/originals/`。当前实验状态见[实验入口](../evaluation/CURRENT-EVIDENCE.md)；论文中的每个主张先对照[主张矩阵](claim-evidence-matrix.md)，逐条审稿依据见[回复证据](REVIEW-RESPONSE-EVIDENCE-2026-10-26.md)。
 
 ## 原件与工作稿
 
-- [原始材料](../../../docs/paper/originals/README.md)：原始DOC/PDF、审稿TXT/XLSX和相关图像，保留原文。
-- [审稿意见原文](../../../docs/paper/originals/审稿意见.txt)与[作者规划对照](../../../docs/paper/originals/审稿意见.md)：原始意见与规划分开理解。
+- `docs/paper/originals/README.md`：原始DOC/PDF、审稿TXT/XLSX和相关图像，保留原文。
+- `docs/paper/originals/审稿意见.txt` 与 `docs/paper/originals/审稿意见.md`：原始意见与规划分开理解。
 - [正文替换工作稿](revision-package.md)：包含待编辑段落，使用时与最终结果核对。
 - [修订要点](修改说明-草稿.md)：组织本轮方法、实验与图表修改，不表示已经合入最终 Word。
 
@@ -24,4 +24,4 @@
 
 正式结果在 [compare/results](../../results/README.md) 中维护；图表、MANIFEST、机器指标和原始数据按实验查找，避免在工作稿中维护另一套数字。
 
-比赛与演示材料分别见[比赛](../../../docs/materials/competition)和[演示](../../../docs/materials/demo)，SAFI原研究稿见[SAFI](../../../docs/materials/safi)。它们保留各自历史语境，不充当当前测量记录。
+比赛与演示材料分别保留在完整仓库的 `docs/materials/competition/`、`docs/materials/demo/`，SAFI 原研究稿在 `docs/materials/safi/`。它们保留各自历史语境，不充当当前测量记录。

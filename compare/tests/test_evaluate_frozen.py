@@ -42,7 +42,8 @@ def test_evaluate_dataset_uses_nested_manifest_paths_and_expected_claims(tmp_pat
     result = evaluate_frozen.evaluate_dataset(dataset)
 
     assert result["total_cases"] == 1
-    assert result["quality_gate"]["paper_metrics_available"] is False  # Unbound legacy fixtures cannot supply paper metrics.
+    assert result["quality_gate"]["paper_metrics_available"] is None
+    assert result["release_id"] is None
     assert result["metrics"]["total_expected_claims"] == 1
     assert result["metrics"]["matched_claims"] == 0
     assert result["metrics"]["claim_coverage"] == 0.0

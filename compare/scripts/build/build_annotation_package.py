@@ -58,10 +58,6 @@ def build_annotation_package(*, output_dir: Path, salt: str = DEFAULT_SALT, data
     prompts = dataset / "prompt_inputs" if dataset_dir else PROMPT_INPUTS
     if output_dir.is_relative_to(dataset.resolve()):
         raise ValueError("Annotation output must be outside the input dataset")
-    metadata = _load_json(dataset / "metadata.json") if (dataset / "metadata.json").is_file() else {}
-    if (dataset / "release.json").exists() or metadata.get("ground_truth_schema") == "mtagentlens.ground_truth.v4":
-        from compare.tools.dataset_release import validate_release
-        validate_release(dataset)
     manifest = _load_json(prompts / "manifest.json")
     if manifest.get("schema") != "mtagentlens.prompt_inputs.v1":
         raise ValueError("Unsupported prompt input manifest")

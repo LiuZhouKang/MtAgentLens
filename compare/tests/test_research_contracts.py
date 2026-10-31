@@ -50,7 +50,7 @@ def test_current_package_loads_the_detection_scope():
 
 
 def test_release_freezes_inputs_and_detects_gt_tampering(tmp_path):
-    from compare.tools.dataset_release import build_release
+    from compare.tools.dataset_release import build_release, validate_release
     scenarios = tmp_path / "source"
     (scenarios / "fixtures/demo").mkdir(parents=True)
     (scenarios / "fixtures/demo/task.py").write_text("print('hello')\n")
@@ -67,7 +67,7 @@ def test_release_freezes_inputs_and_detects_gt_tampering(tmp_path):
     assert "Run python" in case.adapter_case.input_artifacts["prompt_text"].read_text()
     (release / "ground_truth/benign/case.json").write_text("{}")
     with pytest.raises(ValueError, match="(?i)(hash|checksum|modified)"):
-        FrozenDatasetAdapter(release).load_cases()
+        validate_release(release)
 
 
 def test_conformance_join_uses_unique_run_and_requires_true():

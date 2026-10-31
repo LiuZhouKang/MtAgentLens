@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
-out="${1:-../compare-handoff-2026-10-30.tar.gz}"
+out="${1:-../compare-handoff-2026-10-31.tar.gz}"
 out="$(realpath -m -- "$out")"
 case "$out" in
   "$PWD"|"$PWD"/*)

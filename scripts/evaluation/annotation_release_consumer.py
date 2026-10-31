@@ -15,6 +15,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
+import uuid
 import sys
 from collections import Counter
 from pathlib import Path
@@ -102,6 +104,30 @@ def verify_cases(root: Path, release: dict) -> list[str]:
         except json.JSONDecodeError as error:
             problems.append(f"{case_id}: bundle.json invalid: {error}")
             continue
+        schema = manifest.get("schema")
+        binding = manifest.get("binding")
+        if not isinstance(binding, dict) or "data_release_id" not in binding:
+            problems.append(f"{case_id}: bundle binding must explicitly declare data_release_id")
+        identity = binding.get("data_release_id") if isinstance(binding, dict) else None
+        if schema == "mtagentlens.evidence-bundle/v1":
+            if not isinstance(identity, str) or re.fullmatch(r"[0-9a-f]{64}", identity) is None:
+                problems.append(f"{case_id}: historical bundle lacks a valid release identity")
+        elif schema == "mtagentlens.evidence-bundle/v2":
+            required = {"data_release_id", "scenario_id", "run_id", "source_run_uuid", "codebook_version"}
+            if (not isinstance(binding, dict) or set(binding) != required or
+                    any(not isinstance(binding.get(key), str) or not binding[key].strip()
+                        for key in required - {"data_release_id"})):
+                problems.append(f"{case_id}: unbound bundle binding lacks its run identities")
+            else:
+                try:
+                    if str(uuid.UUID(binding["source_run_uuid"])) != binding["source_run_uuid"]:
+                        raise ValueError("noncanonical UUID")
+                except ValueError:
+                    problems.append(f"{case_id}: unbound bundle binding has an invalid source UUID")
+            if identity is not None:
+                problems.append(f"{case_id}: unbound bundle claims a release identity")
+        else:
+            problems.append(f"{case_id}: unsupported evidence bundle schema")
         frozen = {key: value for key, value in manifest.items()
                   if key != "evidence_bundle_hash"}
         encoded = json.dumps(frozen, sort_keys=True, ensure_ascii=False,
@@ -111,7 +137,7 @@ def verify_cases(root: Path, release: dict) -> list[str]:
             problems.append(f"{case_id}: bundle hash does not match its content")
         if manifest.get("evidence_bundle_hash") != case.get("task_id"):
             problems.append(f"{case_id}: bundle hash is not bound to the case task id")
-        if "binding" in manifest and manifest["binding"] != case.get("binding"):
+        if binding != case.get("binding"):
             problems.append(f"{case_id}: bundle binding differs from case")
         events = manifest.get("events", [])
         counts = Counter(event["source_id"] for event in events)

@@ -99,9 +99,9 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |  | decrypt plain |   | bind / connect|  | syscall trace |       |
   |  +---------------+   +-------------+   +----------------+       |
   |                                                                 |
-  |  process also emits file mutations (unlinkat / truncate)         |
+  |  process also emits file mutations (unlinkat / truncate)        |
   |                                                                 |
-  |  userspace: system  — CPU / memory sampled from /proc            |
+  |  userspace: system  — CPU / memory sampled from /proc           |
   |                                                                 |
   +---------------------------------+-------------------------------+
                                     | JSON event stream (stdout)
@@ -118,7 +118,7 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |  +-----------------------------+-----------------------------+  |
   |                                | EventStream                    |
   |  +-----------------------------+-----------------------------+  |
-  |  | Analyzer Pipeline (add_analyzer() chain)    |  |
+  |  | Analyzer Pipeline (add_analyzer() chain)                  |  |
   |  |                                                           |  |
   |  |  +-----------+  +-----------+  +------------------------+ |  |
   |  |  | SSE reass |  | HTTP parse|  | TimestampNormalizer    | |  |
@@ -131,9 +131,9 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |  |  |                                                   |    |  |
   |  |  |  Phase 1 (streaming, per-event)                   |    |  |
   |  |  |  +---------------------------------------------+  |    |  |
-  |  |  |  | ClassificationEngine                   |  |    |  |
-  |  |  |  |   -> 19 rules (5 safe + 14 unsafe), 6-dim score |  |    |  |
-  |  |  |  |   -> Process Boundary Crossing (PBC) detect |  |    |  |
+  |  |  |  | ClassificationEngine                        |  |    |  |
+  |  |  |  | > 19 rules (5 safe + 14 unsafe), 6-dim score|  |    |  |
+  |  |  |  | -> Process Boundary Crossing (PBC) detect   |  |    |  |
   |  |  |  +---------------------+-----------------------+  |    |  |
   |  |  |                        v                          |    |  |
   |  |  |  +---------------------------------------------+  |    |  |
@@ -182,8 +182,8 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
   |               · graph time evolution                            |
   |                                                                 |
   |  /api/live/events  live SSE: alerts + raw events + heartbeat    |
-  |  /api/runs/{id}/{alerts,evidence,graph,events,snapshots,db}      |
-  |  /api/runs/active  live run (`live`) or state=running, else null |
+  |  /api/runs/{id}/{alerts,evidence,graph,events,snapshots,db}     |
+  |  /api/runs/active  live run (`live`) or state=running, else null|
   |  /api/events  legacy log-backed stream (deprecated)             |
   +-----------------------------------------------------------------+
 ```
@@ -404,11 +404,12 @@ MtAgentLens/
 │   ├── scripts/verifiers/         场景验证器
 │   └── runs/                      运行工件 (gitignored)
 │
+├── datasets/FuxiBench/            93 场景基准（58 攻击 + 35 良性）+ 完整场景目录
 ├── compare/                       实验与论文产出
-│   ├── Dataset/FuxiBench/         93 场景基准（58 攻击 + 35 良性）+ 完整场景目录
 │   ├── results/                   检测 · 身份 · 归因 · 消融 · 敏感性 · 开销
 │   ├── results/external/          外部基线对比
-│   └── scripts/                   build · audit · run · vis · perf
+│   ├── scripts/                   build · audit · run · external · vis · perf
+│   └── tools/                     离线工具对比框架
 │
 ├── scripts/                       唯一门禁 · 发布 · E2E · 基线工具
 ├── docs/                          文档索引 (docs/README.md)
@@ -435,9 +436,9 @@ MtAgentLens/
 
 ## FuxiBench
 
-当前数据范围为 **93 个场景（58 攻击、35 良性）**；当前两类型分类为 A 47 / B 11。场景、fixture、prompt 与 GT 通过不可变 release 绑定；历史 86 场景的 prompt 和实验输出不能与当前 GT 混合评估。
+当前数据范围为 **93 个场景（58 攻击、35 良性）**；当前两类型分类为 A 47 / B 11。场景、fixture、prompt 与 GT 按场景对应；历史 86 场景的 prompt 和实验输出按原有记录解释。
 
-场景标签来自 AI 盲标与裁决，尚无人工标注、人工 κ 或人工金标。设计级标签不能当作运行根因真值；归因实验 T6 的 suite 状态仍为 `not_estimable`。数据契约、标注来源和限制见 [数据卡](datasets/FuxiBench/DATASET-CARD.md)与 [GT 来源说明](datasets/FuxiBench/PROVENANCE.md)，冻结实验范围见 [当前证据入口](docs/evaluation/CURRENT-EVIDENCE.md)。
+场景标签来自 AI 盲标与裁决，尚无人工标注、人工 κ 或人工金标。设计级标签不能当作运行根因真值；归因实验 T6 的 suite 状态仍为 `not_estimable`。数据契约、标注来源和限制见 [数据卡](datasets/FuxiBench/DATASET-CARD.md)与 [GT 来源说明](datasets/FuxiBench/docs/provenance.md)，冻结实验范围见 [当前证据入口](docs/evaluation/CURRENT-EVIDENCE.md)。
 
 ```bash
 python3 scripts/evaluation/validate_gt.py --dataset datasets/FuxiBench

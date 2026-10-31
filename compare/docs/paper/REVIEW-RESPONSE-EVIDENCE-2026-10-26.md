@@ -1,6 +1,6 @@
 # 审稿回复依据
 
-本页为逐点回复提供当前可核查材料，文件名保留原路径以维持引用。作者可据此整合正文与回复。审稿原文见[原件](../../../docs/paper/originals/审稿意见.txt)，结果状态见[实验入口](../evaluation/CURRENT-EVIDENCE.md)。
+本页为逐点回复提供当前可核查材料，文件名保留原路径以维持引用。作者可据此整合正文与回复。审稿原文保留在完整仓库的 `docs/paper/originals/审稿意见.txt`，结果状态见[实验入口](../evaluation/CURRENT-EVIDENCE.md)。
 
 ## R1.1：评分流程与最终标签
 

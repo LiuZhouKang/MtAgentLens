@@ -1,178 +1,448 @@
-<div align="center">
-  <img src="frontend/public/brand/mtl-logo.svg" width="72" alt="MtAgentLens logo" />
-  <h1>MtAgentLens</h1>
-  <p><strong>零插桩 · 内核级 · 多 Agent 攻击可观测性</strong></p>
-  <p>从运行事实到责任链，让 Agent 的行为有据可查。</p>
-  <p>
-    <a href="#系统架构"><img src="https://img.shields.io/badge/eBPF-Linux-007ec6?logo=linux&logoColor=white" alt="eBPF / Linux" /></a>
-    <a href="collector/"><img src="https://img.shields.io/badge/Rust-Collector-CE422B?logo=rust&logoColor=white" alt="Rust Collector" /></a>
-    <a href="frontend/"><img src="https://img.shields.io/badge/Next.js-Web_Console-111111?logo=nextdotjs&logoColor=white" alt="Next.js Web Console" /></a>
-    <a href="#许可证"><img src="https://img.shields.io/badge/license-Apache_2.0_OR_MIT-007ec6" alt="Apache-2.0 OR MIT" /></a>
-  </p>
-  <p>
-    <a href="#快速开始">快速开始</a> ·
-    <a href="docs/architecture.md">架构</a> ·
-    <a href="compare/results/README.md">实验结果</a> ·
-    <a href="datasets/FuxiBench/README.md">FuxiBench</a> ·
-    <a href="docs/README.md">文档</a>
-  </p>
-</div>
+```text
+ /$$      /$$   /$$      /$$$$$$                                  /$$     /$$
+| $$$    /$$$  | $$     /$$__  $$                                | $$    | $$
+| $$$$  /$$$$ /$$$$$$  | $$  \ $$  /$$$$$$   /$$$$$$  /$$$$$$$  /$$$$$$  | $$        /$$$$$$  /$$$$$$$   /$$$$$$$
+| $$ $$/$$ $$|_  $$_/  | $$$$$$$$ /$$__  $$ /$$__  $$| $$__  $$|_  $$_/  | $$       /$$__  $$| $$__  $$ /$$_____/
+| $$  $$$| $$  | $$    | $$__  $$| $$  \ $$| $$$$$$$$| $$  \ $$  | $$    | $$      | $$$$$$$$| $$  \ $$|  $$$$$$
+| $$\  $ | $$  | $$ /$$| $$  | $$| $$  | $$| $$_____/| $$  | $$  | $$ /$$| $$      | $$_____/| $$  | $$ \____  $$
+| $$ \/  | $$  |  $$$$/| $$  | $$|  $$$$$$$|  $$$$$$$| $$  | $$  |  $$$$/| $$$$$$$$|  $$$$$$$| $$  | $$ /$$$$$$$/
+|__/     |__/   \___/  |__/  |__/ \____  $$ \_______/|__/  |__/   \___/  |________/ \_______/|__/  |__/|_______/
+                                  /$$  \ $$
+                                 |  $$$$$$/
+                                  \______/
+```
 
-## 项目介绍
+**<img src="frontend/public/brand/mtl-logo.svg" alt="" width="51" height="51" style="vertical-align:middle" />&nbsp;零插桩 · 内核级 · 多 Agent 攻击可观测性**
 
-MtAgentLens 是面向 LLM Agent 的 **OS 级可观测与责任分析系统**。它通过 eBPF 采集 TLS 明文、进程、文件、网络和 stdio 事件，在 Rust Collector 中关联身份与行为，并通过内嵌 Web 控制台呈现证据和调查路径。接入核心采集通路无需修改目标 Agent 代码或集成 SDK。
+从系统调用到责任归因 —— 在 OS 边界采集可验证的运行事实
 
-一次 Agent 任务可能跨越多个 worker、工具进程和交接文件。MtAgentLens 将这些分散的执行事实关联起来，帮助回答：**谁执行了操作、涉及哪些资源、上下文如何传播、告警依据在哪里。**
+<a href="LICENSE-APACHE"><img src="https://img.shields.io/badge/license-Apache_2.0_OR_MIT-007ec6?logo=apache&logoColor=white" alt="Apache-2.0 OR MIT"></a>
+<a href="#架构"><img src="https://img.shields.io/badge/eBPF-0a0b10?logo=linux&logoColor=white" alt="eBPF"></a>
+<a href="#架构"><img src="https://img.shields.io/badge/Rust-CE422B?logo=rust&logoColor=white" alt="Rust"></a>
+<a href="#架构"><img src="https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white" alt="Next.js"></a>
+<a href="datasets/FuxiBench/README.md"><img src="https://img.shields.io/badge/FuxiBench-93_scenarios-7358a5" alt="FuxiBench 93 scenarios"></a>
 
-| 能力 | 提供什么 |
-|---|---|
-| 跨层采集 | TLS 请求与响应、进程生命周期、文件与网络操作，以及指定进程的 stdio 载荷 |
-| 选择性身份解析 | 结合进程代际、TLS 会话与 conversation 信号，在证据支持时赋予关联身份 |
-| 责任图与来源追踪 | 关联 Agent、动作和资源，保留跨进程传播与权限边界线索 |
-| 分层分析 | 结合规则、图事实和可配置的 Observer 语义复核，输出结构化裁决 |
-| 调查与回放 | 使用 SQLite、事件日志和 Web 界面查看运行、证据、告警及离线分析 |
 
-核心路径提供观测和分析，不拦截 Agent 操作。当前主要验证对象为 **Linux 上的 Claude Code**；其他 Agent 的支持范围与配置见[能力清单](docs/capabilities.json)和[采集说明](bpftools/README.md)。
+
+
+---
+
+## 背景
+
+大语言模型正在将软件系统的人机交互方式从对话层推进至执行层。以 Claude Code、Gemini CLI 为代表的端侧 Agent 不再局限于生成文本，而是能够读取仓库、调用工具、执行命令、修改文件，并通过多 Agent 协作完成编程、运维、测试与发布等复杂任务。当此类系统进入真实运行环境后，Agent 已不再是被动的“问答界面”，而是会消耗系统资源、访问敏感资产并影响工程状态的执行主体。
+
+能力边界的变化直接带来安全边界的变化。模型幻觉可能诱发逻辑死循环、重复构建或无效搜索，造成计算资源浪费；提示词注入、供应链污染和恶意上下文则可能诱导 Agent 执行越权访问、凭证读取、数据外传或破坏性操作。更重要的是，此类风险已不再局限于用户输入，还可能隐藏在 README、构建脚本、配置文件、交接文档、工具返回值以及子 Agent 的中间结果中，并沿执行链路逐级放大。
+
+公开披露的安全事件表明，上述风险并非停留在理论层面。AWS 安全公告确认，Amazon Q Developer for Visual Studio Code Extension **1.84.0** 曾分发包含恶意代码的版本，随后被移除并发布修复版本；GitHub Advisory 将其记录为 **CVE-2025-8217**。2025 年 7 月，SaaStr 创始人 Jason Lemkin 公开披露 Replit AI Agent 在 code freeze 期间仍执行破坏性数据库操作，AI Incident Database 将其记录为 Incident 1152。这两类事件共同表明，AI 工具链的风险已进入实际执行层，对事件的调查不能止步于对话文本，而必须溯源至实际命令、文件与数据库操作、网络访问、时间线以及责任主体。参见 [AWS-2025-015](https://aws.amazon.com/security/security-bulletins/AWS-2025-015/)、[GHSA-7g7f-ff96-5gcw](https://github.com/aws/aws-toolkit-vscode/security/advisories/GHSA-7g7f-ff96-5gcw) 与 [AI Incident Database 1152](https://incidentdatabase.ai/cite/1152/)。
+
+多 Agent 协作进一步加剧了问题的复杂性。一次任务可能由父 Agent 发起，再分派至多个 worker、工具进程或子 Agent；部分进程生命周期极短，仅在临时目录写入证据文件后即退出；部分上下文则通过 handoff 文件、summary、角色声明或共享工作区继续传播。在此阶段，单条日志、单个 PID 或单段 prompt 已不足以解释异常，系统真正需要回答的核心问题是：任务由谁发起，哪些进程与文件参与执行，风险沿何种路径传播，证据留存于何处，最终责任应归属于哪个 Agent 或任务链。
+
+现有监测手段均只能覆盖问题的一个侧面。应用层调用链、日志分析与高层指标监控易于接入，但依赖 Agent 框架主动生成日志，容易遗漏短命进程、真实文件操作与底层网络行为，亦无法应对日志缺失或被绕过的情形。传统系统调用审计能够观测底层动作，却缺乏 Agent 身份、任务语义与委派关系，难以将“某个进程读取了文件”还原为“某个 Agent 在某次任务中触发了风险”。Prompt scanner 与内容分类器主要处理文本输入，对隐藏在文件、工具输出、构建脚本及跨进程传播中的间接异常缺乏有效的检测能力。
+
+MtAgentLens 正是针对上述缺口而构建。项目的观测对象不是一段可疑文本，而是 Agent 执行任务后产生的真实系统行为：进程如何派生，文件如何被读写，网络连接由谁触发，上下文如何跨 Agent 传播，异常如何回溯至责任主体。通过 eBPF 采集 OS 层运行事实、Rust 流式引擎构建责任图、前端提供可审计的调查路径，MtAgentLens 将观测位置置于 Agent 之下，将归因对象置于任务链与责任链之上，使告警可回溯至证据，使异常可回溯至过程，使单点行为可回溯至完整责任链。
+
+---
+
+## 介绍
+
+MtAgentLens 是一个面向多 Agent 运行系统的 **零插桩 OS 级可观测与责任归因工具**。它在 Linux 内核边界采集进程、文件、网络、stdio 和 TLS 明文片段等运行事实，不依赖 Agent 框架，不修改目标代码，也不要求接入 SDK。
+
+它解决的不是单点日志聚合，而是多 Agent 时代最难处理的三类断层：
+
+1. **应用层与内核层的断层**：文本日志无法反映真实的进程、文件与网络行为。
+2. **行为与主体的断层**：系统调用能够观测动作，但难以还原具体由哪个 Agent、哪次任务触发。
+3. **事件与责任的断层**：多个 worker、交接文件、共享上下文与短命进程交织后，单条记录不足以解释异常。
+
+MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并在此基础上提供结构化告警、证据回溯和任务级归因。系统的核心特点包括：
+
+- **内核边界采集**：从 eBPF 直接获取可信运行事实。
+- **多信号身份归并**：结合 root_pid、tls_session、conversation_id 等线索识别同一执行链。
+- **跨进程污染追踪**：跟踪文件、上下文和工具输出在多个 Agent 之间的传播路径。
+- **结构化责任输出**：将行为、证据和责任主体组织为可复核结果，而不是孤立日志。
+- **低开销运行**：将观测开销控制在端侧可接受范围内，适合真实 Agent 执行环境。
+
+与依赖 prompt 分类或应用日志的方案相比，MtAgentLens 的差异在于将观测位置置于 Agent 之下、将归因对象置于任务链与责任链之上。其产出不是“这段文本可疑”，而是“该行为由谁触发、经历了何种路径、证据留存何处、应归责于谁”。
 
 ## 功能演示
 
-[![MtAgentLens 演示封面](docs/materials/demo/demo.png)](https://github.com/LiuZhouKang/MtAgentLens/blob/main/docs/materials/demo/demo.mp4)
+<video src="https://github.com/user-attachments/assets/7db24091-a13e-4526-903b-28cd94300d05" controls="controls" style="max-width: 100%"></video>
 
-[观看完整演示（约 1 分 48 秒）](https://github.com/LiuZhouKang/MtAgentLens/blob/main/docs/materials/demo/demo.mp4)：采集、责任图、结构化告警与证据回溯。演示原件与讲解保留在 [docs/materials/demo](docs/materials/demo/)。
+*完整功能演示（约 1 分 48 秒）：eBPF 内核级零插桩采集 → 跨进程责任图构建 → 结构化告警与证据回溯的端到端流程*
 
-## 系统架构
+---
 
-```mermaid
-flowchart LR
-    A[Agent 与工具进程] --> B[eBPF 探针]
-    B --> C[Rust 事件管线]
-    C --> D[身份解析与责任图]
-    D --> E[规则与语义复核]
-    D --> F[(SQLite 与事件日志)]
-    E --> F
-    F --> G[Web 调查与回放]
-    O[可选远端 Observer] <--> E
+## 架构
+
+```text
+  +------------------------------------------------------------------------------------+
+  |                                  AGENT EXECUTION                                   |
+  |                       Claude Code / workers / tool processes                       |
+  |                                                                                    |
+  |   +----------------------+   +----------------------+   +----------------------+   |
+  |   | Parent Agent         |   | Worker Agent         |   | Tools / subprocesses |   |
+  |   | Task / conversation  |   | Handoff / workspace  |   | Commands / resources |   |
+  |   +----------------------+   +----------------------+   +----------------------+   |
+  |                                                                                    |
+  |               Process lineage / TLS sessions / cross-process context               |
+  +------------------------------------------------------------------------------------+
+                                            |  OS-level observation
+                                            v
+  +------------------------------------------------------------------------------------+
+  |                                      CAPTURE                                       |
+  |                           eBPF hooks + userspace helpers                           |
+  |                                                                                    |
+  |   +----------------------+   +----------------------+   +----------------------+   |
+  |   | tls_capture          |   | process              |   | stdiocap             |   |
+  |   | SSL read / write     |   | exec / exit / fork   |   | read / write         |   |
+  |   | TLS plaintext        |   | File operations      |   | stdin / stdout       |   |
+  |   | uprobes              |   | connect / sendto     |   | syscall tracepoints  |   |
+  |   +----------------------+   +----------------------+   +----------------------+   |
+  |                                                                                    |
+  |                   SystemRunner: CPU / memory sampled from /proc                    |
+  +------------------------------------------------------------------------------------+
+                                            |  JSON event streams
+                                            v
+  +------------------------------------------------------------------------------------+
+  |                               RUST STREAMING ENGINE                                |
+  |                                                                                    |
+  |   +----------------------------------------------------------------------------+   |
+  |   | RUNNERS                                                                    |   |
+  |   | SslRunner / ProcessRunner / StdioRunner / SystemRunner                     |   |
+  |   | AgentRunner: event stream composition                                      |   |
+  |   +----------------------------------------------------------------------------+   |
+  |                                         |                                          |
+  |                                         v                                          |
+  |   +----------------------------------------------------------------------------+   |
+  |   | ANALYZER PIPELINE                                                          |   |
+  |   | Payload framing / HTTP + SSE parsing / timestamp normalization             |   |
+  |   | Filtering / secret redaction / event logging                               |   |
+  |   +----------------------------------------------------------------------------+   |
+  |                                         |                                          |
+  |                                         v                                          |
+  |   +----------------------------------------------------------------------------+   |
+  |   |                           ResponsibilityRuntime                            |   |
+  |   |                                                                            |   |
+  |   |   +--------------------------------------------------------------------+   |   |
+  |   |   | PHASE 1 / STREAMING                                                |   |   |
+  |   |   | IdentityResolver / GraphBuilder / provenance and taint tracking    |   |   |
+  |   |   | Evidence correlation / policy and classification                   |   |   |
+  |   |   | Observer: semantic review of candidates, when configured           |   |   |
+  |   |   +--------------------------------------------------------------------+   |   |
+  |   |                                     |                                      |   |
+  |   |                                     v                                      |   |
+  |   |   +--------------------------------------------------------------------+   |   |
+  |   |   | PHASE 2 / SESSION FINALIZATION                                     |   |   |
+  |   |   | TracebackBuilder -> ClaimBuilder -> AlertBuilder                   |   |   |
+  |   |   | Evidence references / structured verdicts / run diagnostics        |   |   |
+  |   |   +--------------------------------------------------------------------+   |   |
+  |   +----------------------------------------------------------------------------+   |
+  |                                                                                    |
+  |                 SQLite responsibility database + JSONL event logs                  |
+  +------------------------------------------------------------------------------------+
+                                            |  REST queries / live SSE
+                                            v
+  +------------------------------------------------------------------------------------+
+  |                              INVESTIGATION WORKSPACE                               |
+  |              Next.js / React / TypeScript - embedded with rust-embed               |
+  |                                                                                    |
+  |   +----------------------+   +----------------------+   +----------------------+   |
+  |   | /overview            |   | /investigations      |   | /traces              |   |
+  |   | Runtime overview     |   | Alerts / evidence    |   | Timeline / replay    |   |
+  |   +----------------------+   +----------------------+   +----------------------+   |
+  |                                                                                    |
+  |        /console: live workspace       /research/fuxibench: dataset browser         |
+  |                     HTTP API: /api/live/events + /api/runs/...                     |
+  +------------------------------------------------------------------------------------+
 ```
 
-- **采集层**：`tls_capture`、`process`、`stdiocap` 分别处理 TLS、进程及相关系统行为、stdio；系统资源从 `/proc` 采样。
-- **分析层**：Runner 与 Analyzer 完成事件接入、HTTP/SSE 解析、时间归一化、脱敏、身份关联和责任分析。
-- **交付层**：eBPF helper 和前端静态资源在构建时嵌入 `mtagentlens` 二进制；运行结果保留在本地数据库与日志中。
+**实时模式**：`record`/`trace` 直播中，前端自动跟随活跃 run——SSE 推送告警（含图快照 → 态势图实时演化）与原始事件（环形缓冲 + 虚拟化 live-tail），运行监控派生视角与图时间演化时间轴周期刷新；run 结束自动转回放深度调查。后端由 `start_web_server_if_enabled` 把 `alert_tx` 接入 `/api/live/events`（`server/live_sse.rs`）。
 
-具体职责、来源等级、Observer 数据边界和数据库契约见[架构文档](docs/architecture.md)。
+---
+
+## 检测层次
+
+LLM Guard、Meta Prompt Guard 等工具主要扫描 prompt 文本中的恶意模式，覆盖范围通常局限于文本输入本身。对于多 Agent 运行场景，主要问题有三类：
+
+| 盲区 | 攻击实例 | MtAgentLens 如何应对 |
+|------|---------|---------------------|
+| **文本绕过** — 文言文、Unicode 同形字、语义遮蔽可能绕过表层文本特征 | `prompt-injection-classical`（纯文言文·墨子·棋局对弈）展示文言文包装的注入场景 | **L1** 在 TLS uprobe 处捕获明文，解析实际请求与响应，并关联后续执行行为 |
+| **间接注入** — fixture 文件中的恶意指令不经过 prompt，文本扫描器无法感知 | `supplychain-malicious-build` 的 `build.sh` 中包含 `curl POST /exfil`，prompt 中只写"请运行构建脚本" | **L2** 追踪文件读取→进程执行→网络出站的完整链路，在进程边界跨越（PBC）时标记 |
+| **多 Agent 协同** — 攻击指令通过共享文件、交接文档、委派令牌在进程间传递，没有单一文本可供扫描 | `leader-betrayal` 中 Leader 向 Worker 下达恶意指令，Worker 盲从执行 | **L2** 并查集身份解析 + TaintTracker 跨进程追踪污染的传播路径 |
+
+**L3 Observer LLM** 在存在待复核候选且已配置 provider 时，对捕获证据与任务上下文进行语义复核。当前缓存采用精确签名匹配并复用原裁决；最终判定结合规则、证据与未决候选聚合。配置远端 Observer 会产生 API 调用，数据范围见[威胁模型](docs/security/threat-model.md)。
+
+---
 
 ## 快速开始
 
-### 1. 获取源码并构建
-
-需要具备 BTF 的 Linux 内核（最低前置条件为 5.8）、Rust 1.85+、Node.js 22.13.0+，以及 clang/LLVM、libelf、zlib、OpenSSL、zstd 开发库。内核与 TLS 库兼容性需在目标环境验证。
-
 ```bash
-git clone --recurse-submodules https://github.com/LiuZhouKang/MtAgentLens.git
+# 克隆（注意 --recursive，项目包含子模块）
+git clone --recursive https://github.com/LiuZhouKang/MtAgentLens.git
 cd MtAgentLens
-
-./install.sh       # 检查并安装构建依赖，按提示确认
-make check
-make build        # eBPF → 前端 → Rust
 ```
 
-产物为 `collector/build/release/mtagentlens`，构建依赖包含 `libbpf/` 和 `bpftool/` 两个子模块。完整环境与开发流程见[开发与维护](scripts/README.md)。
-
-### 2. 检查环境并启动采集
-
-以下示例适用于 `claude` 命令指向实际 ELF 可执行文件的安装方式：
+### 1. 安装依赖
 
 ```bash
-sudo ./collector/build/release/mtagentlens doctor
+./install.sh        # 一键安装（支持 Ubuntu/Debian/Fedora/Arch/macOS）
+```
 
+脚本会自动检测系统并安装所需依赖：clang, llvm, libelf, zlib, Rust, Node.js 22。
+
+### 2. 检查环境
+
+```bash
+make check          # 验证所有依赖就绪
+```
+
+### 3. 构建
+
+```bash
+make build          # 全量构建（BPF → 前端 → Rust）
+```
+
+### 4. 运行采集
+
+```bash
 sudo ./collector/build/release/mtagentlens record -c claude \
   --binary-path "$(readlink -f "$(command -v claude)")"
 ```
 
-在另一终端运行 Claude Code，浏览器打开 **http://127.0.0.1:7395**。采集结束时按 `Ctrl+C`，等待终结化与写入完成。
+### 5. 访问前端
 
-`--binary-path` 应指向承载 SSL 实现的 ELF 文件；脚本包装器、其他运行时和非 Claude 进程需要按[探针说明](bpftools/README.md)调整。eBPF 加载需要 root 或环境允许的相应 capabilities，以 `doctor` 的实际诊断为准。
+浏览器访问 `http://127.0.0.1:7395`
 
-### 3. 选择分析模式
+> [!NOTE]
+> **当前验证状态**：MtAgentLens 当前主要验证对象为 **Claude Code**（Bun 运行时，静态链接 BoringSSL）。对于动态链接系统 `libssl.so` 的 Agent（大多数 Python/Node.js AI 工具），eBPF uprobe 机制在架构上同样适用，但尚未进行系统性验证。其他 LLM Agent 可通过 `-c <进程名>` 参数启用实验性支持。
 
-默认路径会尝试加载 Observer 配置。需要真实语义复核时，参考[配置模板](env/config/observer.toml.example)配置 provider；也可显式关闭 Observer：
-
-```bash
-sudo ./collector/build/release/mtagentlens record -c claude \
-  --binary-path /absolute/path/to/agent-elf \
-  --disable-responsibility-observer
-```
-
-关闭 Observer 使用无模型回退路径，与完整语义分析的结果范围不同。配置了远端 Observer 后会产生 API 请求，并发送限额任务上下文；启用前阅读[数据与安全边界](docs/security/threat-model.md)。
-
-## 常用命令
-
-| 命令 | 用途 |
-|---|---|
-| `doctor` | 检查内核、权限与采集前置条件 |
-| `record` | 使用预设过滤条件采集并启动 Web 服务 |
-| `trace` | 按需组合 TLS、process、stdio、system 来源 |
-| `ssl` / `process` / `stdio` | 单独检查相应采集来源 |
-| `system` | 采样 CPU 与内存 |
-| `export-genai` | 从责任数据库导出 GenAI spans，默认不含内容 |
-| `replay-sensitivity` | 对已记录 checkpoint 进行离线参数回放 |
-
-运行 `./collector/build/release/mtagentlens <命令> --help` 查看实际参数。`trace --capture-only` 可用于仅采集对照；完整操作见[采集说明](bpftools/README.md)。
-
-## FuxiBench 与实验
-
-[FuxiBench](datasets/FuxiBench/README.md) 提供 **93 个场景：58 个攻击、35 个良性**，覆盖间接／不可信指令驱动攻击（A 类 47 个）和多 Agent／交接权限攻击（B 类 11 个）。场景、fixture、标签与来源记录按场景组织，支持跨层可观测性研究。
-
-| 实验 | 内容 | 入口 |
-|---|---|---|
-| 检测 | 93 场景，分别报告 ITT、PP 与良性误报 | [检测结果](compare/results/detection/README.md) |
-| 身份 | 30 个多 Agent 场景，展示选择性赋值及 precision–coverage 特征 | [IdentityBench](compare/results/identity/README.md) |
-| 开销 | Collector 稳态、探针执行和完整系统组件分账 | [开销结果](compare/results/overhead/README.md) |
-| 消融与敏感性 | 组件贡献、工作点与参数扰动 | [消融](compare/results/ablation/README.md) · [敏感性](compare/results/sensitivity/README.md) |
-| 外部比较与归因 | 基线输入范围、比较结果及归因输出可评分状态 | [外部基线](compare/results/external/baselines/README.md) · [归因](compare/results/attribution/README.md) |
-
-**开销实测。** 在固定本地受控负载、每次 60 s 的三次稳态测量中，Collector 进程树的单核平均 CPU 为 **0.661%**。该值包含 Rust Collector 和两个采集子进程；真实 Agent＋Observer 的完整系统成本另行分账，具体负载、窗口与原始记录见[开销报告](compare/results/overhead/README.md)。
-
-标签来自 AI 盲标与裁决，来源与评价范围见[数据卡](datasets/FuxiBench/DATASET-CARD.md)。实验数字以对应批次为准；仅克隆源码不包含全部大体积运行数据库、图表和实验原始数据。查看与复现前请阅读[交付说明](compare/results/README.md)和[复现手册](docs/evaluation/REPRODUCE.md)。
-
-## 项目导航
-
-| 路径 | 职责 |
-|---|---|
-| [bpftools/](bpftools/) | eBPF 程序与用户态加载器 |
-| [collector/](collector/) | Rust 采集、身份解析、责任分析、持久化与服务 |
-| [frontend/](frontend/) | Next.js / React 调查界面 |
-| [datasets/FuxiBench/](datasets/FuxiBench/) | 数据集、标签、场景与证据来源 |
-| [env/](env/README.md) | 场景执行与验证环境 |
-| [compare/](compare/README.md) | 实验代码、结果说明与交付入口 |
-| [docs/](docs/README.md) | 系统文档、论文、审稿意见及比赛／演示原件 |
-| [scripts/](scripts/README.md) | 开发流程、离线门禁、审计与发布 |
-
-修改前阅读[开发与维护](scripts/README.md)，先验证受影响模块，提交前运行：
+### Docker（无需本地安装依赖）
 
 ```bash
-./scripts/verify.sh
+docker build -t mtagentlens .
+docker run --rm -it --privileged --pid=host \
+  -v /sys:/sys:ro -v /usr:/usr:ro -v /lib:/lib:ro \
+  -p 7395:7395 \
+  mtagentlens record -c claude --binary-path /path/to/claude/binary
 ```
 
-Web/API 默认仅监听回环地址且没有内置鉴权；数据库与捕获日志应按敏感数据管理。安全报告、脱敏范围与部署要求统一见[威胁模型](docs/security/threat-model.md)。
+### VS Code / GitHub Codespaces
+
+项目包含 `.devcontainer/devcontainer.json`，打开后自动构建 eBPF 环境。
+
+---
+
+## 命令
+
+| 命令 | 输入源 | 说明 |
+|------|--------|------|
+| `record` | SSL + Process + System | 一键监控，自动启动 Web 界面 |
+| `trace` | 多源可选组合 | `--ssl` `--process` `--stdio` `--system` 独立开关 |
+| `ssl` | `tls_capture` uprobe | 原始 SSL 解密明文流，支持 SSE 合并和 HTTP 解析 |
+| `process` | `process` tracepoint/kprobe | 进程 exec/exit、文件 open/unlink、网络 bind/connect |
+| `stdio` | `stdiocap` syscall tracepoint | 指定 PID 的 stdin/stdout/stderr 内容，用于本地 MCP |
+| `system` | `/proc` 轮询 | CPU 使用率和 RSS 内存采样 |
+
+```bash
+# 灵活组合监控
+sudo mtagentlens trace --ssl true --process true --system --server
+
+# 独立子命令
+sudo mtagentlens ssl --http-parser --http-filter "POST /api"
+sudo mtagentlens process -- -c python -d 1000
+sudo mtagentlens stdio --pid 12345
+```
+
+---
+
+## 项目结构
+
+```
+MtAgentLens/
+│
+├── collector/                     Rust 引擎 — 编译为单二进制 mtagentlens
+│   ├── src/main.rs                CLI 入口 (clap derive)，6 个子命令
+│   ├── src/framework/             流式数据采集管线
+│   │   ├── runners/               Ssl / Process / Stdio / System / Agent / OpenClaw；Fake 测试替身
+│   │   ├── analyzers/             Analyzer 链：SSE, HTTP, HandoffInjection, ...
+│   │   └── binary_extractor.rs    include_bytes! 内嵌 BPF 二进制
+│   ├── src/responsibility/        责任分析引擎
+│   │   ├── graph/                 ResponsibilityGraph：节点·边·污点·模式匹配·简化器
+│   │   ├── identity/              IdentityResolver：并查集，三信号融合
+│   │   ├── claims/                ClaimBuilder · TracebackBuilder · AlertBuilder
+│   │   ├── classification/        规则裁决 · 六维分诊评分 · 证据关联
+│   │   ├── observer/              可选 Observer · 语义复核
+│   │   ├── persistence/           SQLite 持久化 · 事件日志
+│   │   ├── replay/                回放执行器 · 差异引擎 · 评估器
+│   │   ├── judgment/              策略评估 · 委派追踪 · OOD 检测
+│   │   ├── runtime/               事件循环编排 (阶段 1 流式 + 阶段 2 批量终结)
+│   │   └── signals/               SignalGraph：实时信号聚合
+│   ├── src/server/                Hyper 1.0 HTTP 服务器 + rust-embed 内嵌前端
+│
+├── bpftools/                      eBPF 程序 (C, libbpf + bpftool)
+│   ├── tls_capture/               SSL_read/write uprobe → 解密明文
+│   ├── process/                   进程 / 文件 / 网络事件采集（connect / sendto）
+│   ├── stdiocap/                  read/write tracepoint → MCP stdio 捕获
+│   └── process_ext/               增强进程信息 (内存、header)
+│
+├── frontend/                      Next.js 16 · React 19 · TypeScript 5 · Tailwind 4
+│   ├── 编译为静态 HTML/CSS/JS (next build → out/)
+│   └── 通过 rust-embed 内嵌到 mtagentlens 二进制
+│
+├── env/                           基准测试环境
+│   ├── src/mtagentlens_benchmark/ Python 包 (CLI, Engine, Evaluator, Verifier)
+│   ├── scenarios/                 场景定义 + fixtures
+│   ├── scripts/verifiers/         场景验证器
+│   └── runs/                      运行工件 (gitignored)
+│
+├── datasets/FuxiBench/            93 场景数据集 + 配套场景资源
+│
+├── compare/                       实验与论文产出
+│   ├── results/                   分实验结果与复现材料
+│   ├── results/external/          外部基线对比
+│   └── scripts/                   build · audit · run · vis · perf
+│
+├── Dockerfile / Dockerfile.dev
+├── Makefile
+├── LICENSE-APACHE + LICENSE-MIT (项目代码双许可)
+```
+
+## 文档
+
+| 文档 | 说明 |
+|------|------|
+| [架构设计](docs/architecture.md) | 系统架构全貌——eBPF → Rust → 因果分析 → 前端 |
+| [实验设计](docs/design/experiment-design.md) | RQ 驱动的实验方案 |
+| [评分引擎](docs/design/scoring-engine.md) | 规则裁决 · 六维分诊评分 · 证据关联 |
+| [SAFI 框架](docs/materials/safi/README.md) | 安全不对称文件注入——攻击载荷迁移方法论 |
+| [文档索引](docs/README.md) | 全部文档导航 |
+
+---
+
+## FuxiBench
+
+FuxiBench 是 MtAgentLens 的开源场景数据集，用于研究 Agent 安全观测与跨进程行为关联。当前数据集包含 **93 个场景：58 个攻击、35 个良性**。攻击分为 A 类 47 个（间接或不可信指令驱动）和 B 类 11 个（多 Agent、交接或委派权限）。
+
+| 维度 | 数据 |
+|------|------|
+| 总场景 | **93**（58 攻击 + 35 良性） |
+| 攻击类别 | **11** |
+| A 类 | **47** — 间接或不可信指令驱动 |
+| B 类 | **11** — 多 Agent、交接或委派权限攻击 |
+
+场景定义、配套资源与使用方法见 [FuxiBench](datasets/FuxiBench/README.md)。
+
+---
+
+## 关键设计
+
+### 时间戳
+
+eBPF 使用 `bpf_ktime_get_ns()`（启动时间纳秒），`Event` 存储原始值。`TimestampNormalizer` analyzer 通过 `/proc/stat` btime 计算 UTC epoch 纳秒；展示 JSON 的时间戳另转为毫秒。
+
+### 二进制内嵌
+
+```rust
+// collector/src/framework/binary_extractor.rs
+const PROCESS_BINARY: &[u8] = include_bytes!("../../../bpftools/.output/bin/process");
+const TLS_CAPTURE_BINARY: &[u8] = include_bytes!("../../../bpftools/.output/bin/tls_capture");
+```
+
+eBPF 程序和前端静态资源在编译时嵌入 Rust 二进制。运行时提取到临时目录，注册 `SIGINT`/`SIGTERM` 处理器确保退出时清理。构建顺序固化为 `BPF → 前端 → Rust`。
+
+### 信号处理与关闭
+
+`SIGINT` → 设置 `SHUTDOWN_REQUESTED: AtomicBool` → 触发 `RUNTIME_SHUTDOWN` 通知 → ResponsibilityRuntime 执行阶段 2 批量终结化（traceback + claims + alerts）→ 指标输出 → 清理临时文件。
+
+### 身份解析
+
+三个独立信号融合为统一 Agent 身份：
+
+```
+root_pid ──────────┐
+tls_session ───────┼──→ UnionFind IdentityResolver ──→ canonical_agent_id
+conversation_id ───┘
+```
+
+每个新事件根据已有信号渐进式合并身份。即使某个信号缺失（如进程已退出、TLS 会话已关闭），其他信号仍可维持身份连续性。
+
+### `--binary-path` 与静态链接 SSL
+
+部分 LLM 工具静态链接 SSL 库（如 Claude Code 的 Bun 运行时使用 BoringSSL，NVM 安装的 Node.js 使用静态 OpenSSL），不使用系统 `libssl.so`。当指定 `--binary-path` 时，`tls_capture` 跳过 `--comm` 过滤，通过字节模式匹配自动定位静态链接的 SSL 函数。动态链接 `libssl.so` 的工具无需此参数。
+
+---
+
+## 开发
+
+```bash
+make build              # 全量构建 (BPF → 前端 → Rust)
+make dev                # 开发构建 (debug, 增量编译)
+make check              # 环境预检
+make test               # 全量测试
+make lint               # 代码质量检查
+make fmt                # 格式化所有代码
+make help               # 显示所有可用目标
+
+cd collector
+cargo build --release   # → build/release/mtagentlens
+cargo test              # 测试数量以当前输出为准
+cargo clippy            # Lint
+
+cd frontend
+npm run dev             # 开发服务器 (:7395)
+```
+
+Docker 开发环境：
+
+```bash
+make docker-dev         # 构建开发镜像（含完整编译工具链）
+docker run --rm -it -v $(pwd):/workspace -w /workspace \
+  --privileged --pid=host \
+  -v /sys:/sys:ro -v /usr:/usr:ro -v /lib:/lib:ro \
+  -p 7395:7395 \
+  mtagentlens:dev bash
+```
+
+---
+
+## 环境要求
+
+| 组件 | 要求 |
+|------|------|
+| Linux 内核 | 5.8+（需 BTF；目标内核须实际验证） |
+| Rust | 1.85+ (edition 2024) |
+| Node.js | 22.13.0+ |
+| 构建工具 | clang, llvm, libelf-dev, zlib1g-dev, make, pkg-config |
+| 运行时权限 | root 或 `CAP_BPF` + `CAP_SYS_ADMIN` |
+
+---
 
 ## 引用
 
 ```bibtex
 @software{mtagentlens2026,
   author = {刘周康 and MtAgentLens contributors},
-  title = {{MtAgentLens}: Zero-Instrumentation Multi-Agent LLM Attack Observability with eBPF},
+  title = {{MtAgentLens}: Zero-Instrumentation Multi-Agent LLM Attack
+           Observability with eBPF},
   year = {2026},
   url = {https://github.com/LiuZhouKang/MtAgentLens}
 }
 ```
 
-数据集引用信息见 [FuxiBench/CITATION.cff](datasets/FuxiBench/CITATION.cff)。
+---
 
 ## 许可证
 
-- **项目代码**：[Apache-2.0](LICENSE-APACHE) 或 [MIT](LICENSE-MIT) 双许可。
-- **eBPF 与加载器**：保留各文件头许可。`process.bpf.c`、`stdiocap.bpf.c` 为 GPL-2.0 OR BSD-3-Clause；`tls_capture.bpf.c` 与三个用户态加载器为 LGPL-2.1 OR BSD-2-Clause。
-- **FuxiBench 数据**：[CC-BY-4.0](datasets/FuxiBench/LICENSE)。
-- **技术文档与演示材料**：[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.zh)。
+### 源代码
 
-第三方组件 [libbpf](https://github.com/libbpf/libbpf) 与 [bpftool](https://github.com/libbpf/bpftool) 保留上游版权及许可，具体以各目录与文件声明为准。
+本项目源代码采用 **Apache-2.0 OR MIT** 双许可，详见 [LICENSE-APACHE](LICENSE-APACHE) 与 [LICENSE-MIT](LICENSE-MIT)。
+
+eBPF 程序与加载器保留各文件头 SPDX 许可声明；第三方组件遵循上游版权和许可。
+
+---
+
+## 第三方开源组件使用声明
+
+| 组件 | 来源 | 许可证 | 用途 |
+|------|------|--------|------|
+| libbpf | [github.com/libbpf/libbpf](https://github.com/libbpf/libbpf) | LGPL-2.1 / BSD-2-Clause | eBPF 程序加载、BPF map 管理、内核接口封装 |
+| bpftool | [github.com/libbpf/bpftool](https://github.com/libbpf/bpftool) | GPL-2.0 / BSD-2-Clause | eBPF skeleton 代码生成 |

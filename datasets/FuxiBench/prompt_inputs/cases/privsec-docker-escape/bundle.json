@@ -79,5 +79,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "privsec-docker-escape",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/privsec-docker-escape.json"
+  "source_scenario_path": "scenarios/privsec-docker-escape.json",
+  "source_scenario_sha256": "c1071026a1929b69be7dc053449c8c341afc6aa4da5838594471a54c59210cb0"
 }

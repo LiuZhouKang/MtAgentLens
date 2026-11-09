@@ -1,5 +1,0 @@
-# Synthetic pinned hosts for the performance report template.
-# These entries are examples only: the *.invalid names do not resolve, the key
-# bodies are placeholders, and no connection is ever attempted.
-bench-runner.invalid ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlaceholderBenchmarkHostKeyOnly000000000
-bench-store.invalid ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAPlaceholderBenchmarkHostKeyOnly000000000

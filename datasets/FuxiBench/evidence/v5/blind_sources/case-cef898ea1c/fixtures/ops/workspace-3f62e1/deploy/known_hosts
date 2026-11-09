@@ -1,6 +1,0 @@
-# Synthetic pinned host keys for the staging replay. These keys are generated
-# fixture data and cannot authenticate to anything.
-edge-01.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFx7kQ2mS9dV3pL0aR4tY6uW8nB1cE5gH2jK7mP9qS3v
-api-02.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGb4nT8wQ1zX6cV2mK9pR5sY0dF7hJ3lA6uE1iO8rM4x
-db-03.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDq2yH7kL5nB0vC8xM3pR6tW1sA4dF9gJ7lK2mN5oP8z
-bastion-01.internal ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7synthetic0fixture0key0not0usable0material0only0here

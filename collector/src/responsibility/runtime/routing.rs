@@ -223,6 +223,17 @@ pub fn dispatch_event(
 ) -> DispatchResult {
     let mut result = DispatchResult::default();
 
+    // `file_access` events are audit decorations derived by
+    // FileAccessAuditAnalyzer from a canonical `process` event that remains in
+    // the stream. The original carries the physical syscall witness
+    // (`syscall_ret`, `start_time_ns`); classifying the decoration again would
+    // forge a second action, with downstream diagnostic and graph work, from
+    // no capture facts. The decoration stays in the raw log/live stream but is
+    // terminal for responsibility routing.
+    if event.source == "file_access" {
+        return result;
+    }
+
     // Raw fragments buffered by PayloadNormalizer are not authoritative
     // messages. Feeding them to intent/action extraction produced phantom
     // intents from compressed bytes once the record preset stopped dropping

@@ -2,8 +2,9 @@
 
 ## At a glance
 
-- Status: `estimable`
-- Scope: 30 multi-agent scenarios, 1,800 sampled units, reference-known 1,675
+- Status: `human_reviewed_estimable`
+- Scope: 30 multi-agent scenarios; 1,800 sampled units; 1,675 reference-known
+- Human annotators: 刘周康、唐浩钺、刘锦样
 - New calls: 0
 
 ## Authoritative files
@@ -12,30 +13,24 @@
 |---|---|
 | Narrative | `README.md` |
 | Design | `plan.json` |
-| Raw data | `data/identity-runs/*.json` (30) |
+| Frozen identity views | `data/identity-runs/*.json` (30) |
 | Unit tables | `data/*.csv` (5) |
-| Reference | `reference/identity-reference.json`, `reference/inventory.json`, `reference/runtime-inventory.json` |
+| Human-reviewed reference | `datasets/FuxiBench/annotations/identity-bench/reference.json` |
 | Metrics | `metrics/identity-metrics.json` |
 | Tables | `tables/t5_identity.{tex,md,csv,pdf,png,svg}` |
-| Figure | `figures/identity_bench.{png,pdf,svg}` |
-| Reproduce | `reproduce/*.py` |
-
-## Raw data inventory
-
-- `data/identity-runs/`: 30 JSON, 1.2 GB; per-scenario frozen identity views.
-- `data/*.csv`: 5 derived unit/coverage tables.
-- `reference/`: frozen reference and inventories.
+| Figures | `figures/identity_bench.{png,pdf,svg}` |
+| Reproduce | `reproduce/identity_bench.py`, `identity_audit.py`, `identity_report.py` |
 
 ## Reproduce
 
 ```bash
-PYTHONPATH="." python compare/results/identity/reproduce/build_identity_reference.py
 PYTHONPATH="." python compare/results/identity/reproduce/identity_bench.py
+PYTHONPATH="env:env/src:." python compare/results/identity/reproduce/identity_audit.py
 PYTHONPATH="env:env/src:." python compare/results/identity/reproduce/identity_report.py
 ```
 
-## Caveats
+## Interpretation
 
-- Full condition covers 39.0% of reference-known units; this is a commitment rate, not event capture.
-- Zero false merges are conditional on the reference; do not write "no identity errors in general".
-- 1,800 units are sampled, not independent benchmark items.
+- Coverage and partition consistency use the frozen human-reviewed reference.
+- Unknown units remain in the dataset and are not silently assigned.
+- Results describe this 30-scenario cohort; they are not semantic Agent-role accuracy.

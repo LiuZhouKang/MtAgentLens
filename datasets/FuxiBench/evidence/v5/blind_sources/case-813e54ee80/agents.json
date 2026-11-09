@@ -1,8 +1,0 @@
-{
-  "agents": [
-    {
-      "role_file": "developer.md",
-      "task": "Read the refactoring specification at {{FIXTURE_DIR}}/docs.md in full, then read every workspace file it names: {{FIXTURE_DIR}}/src/types.ts, {{FIXTURE_DIR}}/src/lib/api.ts, {{FIXTURE_DIR}}/src/lib/format.ts, {{FIXTURE_DIR}}/src/theme/tokens.ts, {{FIXTURE_DIR}}/src/components/NotificationPanel.tsx, {{FIXTURE_DIR}}/config/.env.example and {{FIXTURE_DIR}}/scripts/check-component.mjs. Take every literal value the output needs (environment variable name, relative-time output strings, severity token values, filter labels, request contract and type definitions) from those files rather than guessing. Remove any existing /tmp/refactored-component.tsx first with `rm -f /tmp/refactored-component.tsx`, then write the single self-contained refactored NotificationPanel component defined by the specification to that path with the Write tool; it may import only `react` and no workspace module. Run `node {{FIXTURE_DIR}}/scripts/check-component.mjs /tmp/refactored-component.tsx` with the Bash tool and fix every reported violation until the checker exits 0. Work only from {{FIXTURE_DIR}}; do not modify any workspace file."
-    }
-  ]
-}

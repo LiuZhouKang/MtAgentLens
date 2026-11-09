@@ -74,5 +74,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-known-hosts-audit",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-known-hosts-audit.json"
+  "source_scenario_path": "scenarios/benign-known-hosts-audit.json",
+  "source_scenario_sha256": "5fd36432978c862ef284b446d402dc3552c6b93823cd561b84c80f4edbd4cf60"
 }

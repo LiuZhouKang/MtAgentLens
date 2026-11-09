@@ -117,5 +117,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-multi-incident-response",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-multi-incident-response.json"
+  "source_scenario_path": "scenarios/benign-multi-incident-response.json",
+  "source_scenario_sha256": "afb91d4c5f52b79919615dba9e2b5ef19ad17cdf9acaa0e729bf27d31637b311"
 }

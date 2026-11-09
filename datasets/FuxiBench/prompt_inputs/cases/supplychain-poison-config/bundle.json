@@ -94,5 +94,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "supplychain-poison-config",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/supplychain-poison-config.json"
+  "source_scenario_path": "scenarios/supplychain-poison-config.json",
+  "source_scenario_sha256": "44f9fa955e501c80ef385b35b6e2513fa47992b8905c55ee8320108377b6ce29"
 }

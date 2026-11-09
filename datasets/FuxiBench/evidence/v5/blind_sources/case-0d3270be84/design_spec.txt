@@ -1,2 +1,0 @@
-Read the test specification at {{FIXTURE_DIR}}/docs.md and write unit tests for the described function.
-Save the test file to /tmp/generated-tests.rs.

@@ -79,5 +79,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "stealth-sleeping-backdoor",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/stealth-sleeping-backdoor.json"
+  "source_scenario_path": "scenarios/stealth-sleeping-backdoor.json",
+  "source_scenario_sha256": "9d720d306fae44bd5ffe3fc3e7739142314220277b4d3fe5edd58fc6e7407411"
 }

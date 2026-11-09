@@ -5,6 +5,7 @@ multi-user authentication service or proof of human participation.
 """
 
 import json
+import re
 import secrets
 import sqlite3
 import threading
@@ -16,9 +17,16 @@ from tools.annotator.blinding import binding_identifiers, blind_identifiers
 from tools.annotator.evidence_summary import summarize_event
 from tools.annotator.evidence import _loads_strict
 from tools.annotator.records import RecordStore
+from tools.annotator.trace_visualization import build_visualization
 
 _PAGE = Path(__file__).parent / "static" / "workbench.html"
+_VENDOR = Path(__file__).parent / "static" / "vendor"
 _PREVIEW_BYTES = 262144
+_VENDOR_FILES = {
+    "dagre.min.js": "application/javascript; charset=utf-8",
+    "cytoscape.min.js": "application/javascript; charset=utf-8",
+    "echarts.min.js": "application/javascript; charset=utf-8",
+}
 
 
 class RequestError(Exception):
@@ -54,6 +62,7 @@ class Workbench:
         self.aliases, self.task_ids = {}, {}
         self.lock = threading.Lock()
         self.summary_cache: dict[str, tuple[str, dict[str, dict]]] = {}
+        self.visualization_cache: dict[str, tuple[str, dict]] = {}
 
     def queue(self, *, review=False):
         """Task queue rows.
@@ -98,13 +107,30 @@ class Workbench:
         if cached is not None and cached[0] == cache_key:
             return cached[1]
         summaries: dict[str, dict] = {}
+        records = []
         for evidence in self.store.read_evidence_many(task_id, limit=None):
             event = evidence["event"]
             summaries[event["event_id"]] = summarize_event(
                 evidence["bytes"], source_id=event["source_id"],
                 derivation=event.get("derivation", ""))
+            records.append((event, evidence["bytes"]))
         self.summary_cache[task_id] = (cache_key, summaries)
+        self.visualization_cache[task_id] = (
+            cache_key,
+            build_visualization(records,
+                                identifiers=binding_identifiers(bundle["binding"])))
         return summaries
+
+    def visualization(self, task_id: str, bundle: dict) -> dict:
+        """Bounded graph/timeline metadata from the same verified raw bytes."""
+        cache_key = bundle["evidence_bundle_hash"]
+        cached = self.visualization_cache.get(task_id)
+        if cached is None or cached[0] != cache_key:
+            # Force a rebuild even if a summary-only cache entry exists.
+            self.summary_cache.pop(task_id, None)
+            self.event_summaries(task_id, bundle)
+            cached = self.visualization_cache[task_id]
+        return cached[1]
 
     def view(self, alias, *, review=False):
         raters = (self.rater, *self.reviewers) if self.mode == "adjudicate" else (self.rater,)
@@ -140,6 +166,7 @@ class Workbench:
                             "label": summaries.get(event["event_id"], {}).get("label", "记录"),
                             "summary": summaries.get(event["event_id"], {}).get("summary", "")}
                            for event in bundle["events"]],
+                "visualization": self.visualization(task_id, bundle),
                 "own": _record_view(own), "history": [_record_view(record) for record in history],
                 "comparisons": comparisons, "differences": differences,
                 "reviewed_revisions": heads,
@@ -206,7 +233,8 @@ class Workbench:
 
 def create_server(store_path: Path, *, rater: str, method: str, mode: str = "annotate",
                   reviewers=(), token: str | None = None, port: int = 7411,
-                  codebook_version: str | None = None):
+                  codebook_version: str | None = None,
+                  frame_ancestor: str | None = None):
     if (not isinstance(rater, str) or not rater.strip() or len(rater) > 128 or
             method not in ("human", "controlled_execution", "model_proposal") or
             mode not in ("annotate", "adjudicate", "review", "studio")):
@@ -222,6 +250,9 @@ def create_server(store_path: Path, *, rater: str, method: str, mode: str = "ann
     if codebook_version is not None and (
             not isinstance(codebook_version, str) or not codebook_version.strip()):
         raise ValueError("codebook_version must be a non-empty string or None")
+    if frame_ancestor is not None and not re.fullmatch(
+            r"http://(?:127\.0\.0\.1|localhost):[0-9]{1,5}", frame_ancestor):
+        raise ValueError("frame_ancestor must be a local HTTP origin")
     if not Path(store_path).is_file():
         raise ValueError("record store does not exist; register a bundle first")
     app = Workbench(RecordStore(store_path), rater, method, mode, reviewers,
@@ -281,9 +312,24 @@ def create_server(store_path: Path, *, rater: str, method: str, mode: str = "ann
             if self.command == "GET" and path == "/":
                 nonce = secrets.token_urlsafe(18)
                 page = _PAGE.read_text(encoding="utf-8").replace("WORKBENCH_NONCE", nonce).encode()
-                csp = (f"default-src 'none'; script-src 'nonce-{nonce}'; style-src 'nonce-{nonce}'; "
-                       "connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
+                ancestors = frame_ancestor or "'none'"
+                # Cytoscape injects its renderer stylesheet as a <style>
+                # element without a capability nonce. Styles are local and
+                # script execution stays locked to the nonce + same origin.
+                csp = (f"default-src 'none'; script-src 'nonce-{nonce}' 'self'; "
+                       f"style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; "
+                       f"frame-ancestors {ancestors}; form-action 'none'")
                 return self.reply(200, page, "text/html; charset=utf-8", headers={"Content-Security-Policy": csp})
+            if self.command == "GET" and path.startswith("/vendor/"):
+                name = path[len("/vendor/"):]
+                content_type = _VENDOR_FILES.get(name)
+                if content_type is None:
+                    raise RequestError(404, "not_found", "未找到本地依赖。")
+                vendor = _VENDOR / name
+                if not vendor.is_file():
+                    raise RequestError(404, "not_found", "本地前端依赖不存在。")
+                return self.reply(200, vendor.read_bytes(), content_type,
+                                  headers={"Cross-Origin-Resource-Policy": "same-origin"})
             if self.command == "GET" and path == "/api/session":
                 return self.reply(200, {"rater": rater, "method": method, "mode": mode,
                                         "reviewers": list(reviewers),

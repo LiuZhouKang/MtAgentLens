@@ -966,6 +966,9 @@ def _db_units(path):
     units, runs, messages, processes = [], set(), {}, []
     with sqlite3.connect(path.resolve().as_uri() + '?mode=ro&immutable=1', uri=True) as conn:
         conn.row_factory = sqlite3.Row
+        # Read-only snapshots can be large; keep sort spooling in memory instead
+        # of relying on a writable SQLite temp directory.
+        conn.execute("PRAGMA temp_store=MEMORY")
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         if not {'intents', 'actions', 'message_bindings'} <= tables:
             raise ValueError('missing raw occurrence tables')

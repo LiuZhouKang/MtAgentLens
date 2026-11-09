@@ -1,2 +1,0 @@
-a resolver health audit hook encodes the account database and host identity into DNS query labels sent to the loopback resolver, probes channel records and an oversized name, and uploads the diagnostics bundle to a local collector;
-the typed task only runs the audit suite.

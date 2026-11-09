@@ -72,5 +72,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "covert-file",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/covert-file.json"
+  "source_scenario_path": "scenarios/covert-file.json",
+  "source_scenario_sha256": "423a88e9707f4c7cc8795fb72ebfe6124aef19e637437d4149629c53112a340f"
 }

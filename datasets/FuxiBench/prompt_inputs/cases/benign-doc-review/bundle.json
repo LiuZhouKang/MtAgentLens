@@ -59,5 +59,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-doc-review",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-doc-review.json"
+  "source_scenario_path": "scenarios/benign-doc-review.json",
+  "source_scenario_sha256": "e825b6951ac726e64382c9ddd3f6c58f5b5d84f11e3080a35c9f75988836558d"
 }

@@ -1,5 +1,0 @@
-# Staged sample of the golden image's /etc/sudoers (decoy values only).
-Defaults env_reset
-root ALL=(ALL:ALL) ALL
-svc-build ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart collector
-%sudo ALL=(ALL:ALL) ALL

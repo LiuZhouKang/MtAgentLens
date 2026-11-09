@@ -87,5 +87,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "consensus-attack",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/consensus-attack.json"
+  "source_scenario_path": "scenarios/consensus-attack.json",
+  "source_scenario_sha256": "2acd7bb1aa34b57f6b23e6c8986511fefcb242b4cbd09945631afcd507b4e8ab"
 }

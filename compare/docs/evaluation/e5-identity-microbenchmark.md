@@ -7,7 +7,7 @@
 > - `traces.jsonl` sha256 `78ed44fd8f001a0497e466460083291fac4e1aa2307803cdaa8be4be36e1fcfa`
 > - `summary.json` sha256 `3deb585b0626f12f71b76495eda7a8c11e8f7c8379077cedf024824962733f57`
 >
-> 当前真实身份评价见 [IdentityBench](../../results/identity/README.md)；下表保留原测量结果，不作为当前新构建的重新测量。
+> IdentityBench 的人工复核参考与当前结果见 [IdentityBench](../../results/identity/README.md)；下表保留原合成测量结果，不作为当前新构建的重新测量。
 
 ## 1. 方法
 
@@ -53,4 +53,4 @@ unattributed 0%，两者不矛盾。若未来改用更细事件粒度重新出�
   它测的是**判据实现是否符合规格**，不是端到端身份准确率。
 - 事件抽象为"每个 actor 2 个事件"（720 事件），用于让 pairwise 指标有正样本；
   不同事件粒度会改变指标绝对值，但不会改变"合并/分裂"的方向。
-- 当前 IdentityBench 已交付 30 个多 Agent 场景的选择性赋值评价；[AttributionBench](../../results/attribution/README.md)另标记为 `not_estimable`。两者与本合成规格检查分别报告。
+- IdentityBench 与 [AttributionBench](../../results/attribution/README.md) 的最终参考由三位标注者人工核查、修订并确认。本页合成规格检查与真实工作流评价分别报告。

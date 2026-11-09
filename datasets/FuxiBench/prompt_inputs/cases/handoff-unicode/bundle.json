@@ -87,5 +87,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "handoff-unicode",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/handoff-unicode.json"
+  "source_scenario_path": "scenarios/handoff-unicode.json",
+  "source_scenario_sha256": "8cc8db7b30047822ca24035e1452eaf43cfaf4690b1180614772e4c126330f8b"
 }

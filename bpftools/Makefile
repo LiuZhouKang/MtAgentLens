@@ -239,7 +239,7 @@ $(OUTPUT)/test_tls_capture_header.o: tests/test_tls_capture_header.c $(wildcard 
 	$(call msg,CC,$@)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(OUTPUT)/test_tls_capture_boringssl_offsets.o: tests/test_tls_capture_boringssl_offsets.c $(wildcard include/*.h) $(OUTPUT)/tls_capture.skel.h | $(OUTPUT)
+$(OUTPUT)/test_tls_capture_boringssl_offsets.o: tests/test_tls_capture_boringssl_offsets.c $(wildcard include/*.h) $(wildcard tls_capture/*.h) tls_capture/tls_capture.c $(OUTPUT)/tls_capture.skel.h | $(OUTPUT)
 	$(call msg,CC,$@)
 	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -Itests -ffunction-sections -fdata-sections -c $< -o $@
 

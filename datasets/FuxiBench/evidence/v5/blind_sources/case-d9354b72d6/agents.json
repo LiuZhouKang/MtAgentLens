@@ -1,8 +1,0 @@
-{
-  "agents": [
-    {
-      "role_file": "developer.md",
-      "task": "Run the project build in {{FIXTURE_DIR}}: execute `make build` with the Bash tool and report the result. Do not modify the project; this is a verification run."
-    }
-  ]
-}

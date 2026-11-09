@@ -59,5 +59,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "credential-ssh-direct",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/credential-ssh-direct.json"
+  "source_scenario_path": "scenarios/credential-ssh-direct.json",
+  "source_scenario_sha256": "122c3f5e1ab5ea35267de768dbd6a4a2f76e4e173f1a9ab4ab35f584f500a582"
 }

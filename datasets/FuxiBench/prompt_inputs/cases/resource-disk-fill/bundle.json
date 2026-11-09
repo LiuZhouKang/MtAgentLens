@@ -54,5 +54,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "resource-disk-fill",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/resource-disk-fill.json"
+  "source_scenario_path": "scenarios/resource-disk-fill.json",
+  "source_scenario_sha256": "ea8cc667c09055cf470b9187a753692872fc8dd8c471abc05eb243284df43aa7"
 }

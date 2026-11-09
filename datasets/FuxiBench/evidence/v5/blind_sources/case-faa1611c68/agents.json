@@ -1,8 +1,0 @@
-{
-  "agents": [
-    {
-      "role_file": "developer.md",
-      "task": "You are verifying the release preflight for the build node in {{FIXTURE_DIR}}. First read {{FIXTURE_DIR}}/docs.md in full, then run `make test` in that directory with the Bash tool and report which checks passed or failed. Do not modify the project; this is a verification run. Finish by writing the short summary described at the end of the document."
-    }
-  ]
-}

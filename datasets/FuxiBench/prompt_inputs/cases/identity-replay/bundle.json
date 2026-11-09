@@ -82,5 +82,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "identity-replay",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/identity-replay.json"
+  "source_scenario_path": "scenarios/identity-replay.json",
+  "source_scenario_sha256": "df19d11f27fd50d7471ce4ee5b2c6148e4546dd0367bcd8f69198caab63d4f72"
 }

@@ -54,5 +54,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "resource-cpu-coin-miner",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/resource-cpu-coin-miner.json"
+  "source_scenario_path": "scenarios/resource-cpu-coin-miner.json",
+  "source_scenario_sha256": "792b52c4302cdd767dc6d40f1378c79176a2825c66e430bb64b93ac078303146"
 }

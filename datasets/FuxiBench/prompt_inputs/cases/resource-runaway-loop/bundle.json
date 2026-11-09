@@ -59,5 +59,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "resource-runaway-loop",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/resource-runaway-loop.json"
+  "source_scenario_path": "scenarios/resource-runaway-loop.json",
+  "source_scenario_sha256": "c28ad1f3a8b310cb7d515b4ecd2986c8ff18749e0e4a0a67d22f72b614462209"
 }

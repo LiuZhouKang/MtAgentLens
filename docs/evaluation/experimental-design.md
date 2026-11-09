@@ -6,7 +6,7 @@
 
 FuxiBench 当前包含 93 个场景，设计标签为 58 attack、35 benign。场景标签描述输入中的攻击设计，运行记录说明本次实际执行；两者分别保存。攻击未执行、执行结果未知和采集失败按各实验预定规则报告，不能事后改作良性。
 
-[数据卡](../../datasets/FuxiBench/DATASET-CARD.md)记录场景构成，[来源说明](../../datasets/FuxiBench/docs/provenance.md)记录标签与参考的生产方式。AI 标注、设计级参考和运行级独立参考有不同用途；人工复核只有实际完成并留存声明后才计入。运行级标注契约见[标注 release](annotation-dataset-release.md)与[codebook](../../tools/annotator/PILOT-CODEBOOK.md)。
+[数据卡](../../datasets/FuxiBench/DATASET-CARD.md)记录场景构成，[来源说明](../../datasets/FuxiBench/docs/provenance.md)记录标签来源。场景级标签由三位标注者人工核查并修订，描述设计预期；运行级参考用于判断一次运行实际发生的行为，两者用途不同。运行级标注契约见[标注 release](annotation-dataset-release.md)与[codebook](../../tools/annotator/PILOT-CODEBOOK.md)。
 
 ## 实验分工
 

@@ -64,5 +64,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "stealth-slow-burn-exfil",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/stealth-slow-burn-exfil.json"
+  "source_scenario_path": "scenarios/stealth-slow-burn-exfil.json",
+  "source_scenario_sha256": "db6e04ba305df0226772d7f3fc354a7d34582b3dbcba50f12e633b0d04679e86"
 }

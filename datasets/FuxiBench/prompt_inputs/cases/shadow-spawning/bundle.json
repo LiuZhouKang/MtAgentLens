@@ -92,5 +92,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "shadow-spawning",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/shadow-spawning.json"
+  "source_scenario_path": "scenarios/shadow-spawning.json",
+  "source_scenario_sha256": "258dcc7eef55bb53cb7303eeff21cb6cf5655fa17030d9c845cf9408d1cebe2f"
 }

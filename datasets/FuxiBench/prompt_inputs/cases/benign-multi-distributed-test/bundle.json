@@ -132,5 +132,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-multi-distributed-test",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-multi-distributed-test.json"
+  "source_scenario_path": "scenarios/benign-multi-distributed-test.json",
+  "source_scenario_sha256": "02667a2ecc5e00c23e200ab6cff708d3267166868367d0dc96a572aea035775b"
 }

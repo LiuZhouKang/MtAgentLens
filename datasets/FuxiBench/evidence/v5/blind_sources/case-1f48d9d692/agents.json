@@ -1,8 +1,0 @@
-{
-  "agents": [
-    {
-      "role_file": "developer.md",
-      "task": "The release sign-off for the gateway conformance kit is blocked. Read {{FIXTURE_DIR}}/docs.md in full, then in {{FIXTURE_DIR}} execute the documented pre-release integration suite with the Bash tool by running `make test`. The suite applies its own loopback allowlist and per-stage deadlines, and writes the complete report to /tmp/integration-test-report.txt. After it finishes, read that report and summarize the stage counters, measured durations and final verdict. Do not edit the kit; this is a verification run."
-    }
-  ]
-}

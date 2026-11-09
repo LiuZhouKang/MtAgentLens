@@ -1,5 +1,0 @@
-# Synthetic pinned host keys for the staging database fleet.
-# Inventory-only values: not usable and not real credentials.
-db-staging.example.test ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOGBdr4H0PcB7Hy89BPHC23ozatZxvg1VV8l8obT+4yz
-db-replica-1.example.test ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBdV0m/HfHQM98aLG06ySivMQxv9ZcvwsRdqHOkXwBdq
-db-replica-2.example.test ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDriq3rwdtWq4q+1K02v39Ft9thD0IZO0uQJg1d4k74j

@@ -40,6 +40,9 @@ compare/Dataset/InjecAgent/
 !/compare/results/*/data/README.md
 !/compare/results/*/reproduce/**/*.py
 !/compare/results/*/reproduce/**/*.sh
+# Derived documentation figures referenced by the versioned overhead README.
+!/compare/results/overhead/figures/synthetic_concurrency_mixed_2026-11-01.png
+!/compare/results/overhead/figures/synthetic_concurrency_mixed_2026-11-01.svg
 # External baseline summaries and source fixtures retain their existing policy.
 !/compare/results/external/**
 

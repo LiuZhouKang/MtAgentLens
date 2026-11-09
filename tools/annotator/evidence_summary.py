@@ -151,7 +151,42 @@ def _collector_row(line: dict) -> tuple[str, str, list[dict]]:
             {"key": "参数", "value": _text(args)},
             {"key": "来源", "value": _text(row.get("authority_source"))},
         ]
-    if table in ("identity_process_beliefs", "agent_identities", "process_events", "tls_sessions"):
+    if table == "process_events":
+        pid, parent_pid = row.get("pid"), row.get("parent_pid")
+        agent = row.get("agent_id")
+        summary = " · ".join(str(value) for value in (
+            row.get("comm"), f"PID {pid}" if pid is not None else None,
+            f"父进程 {parent_pid}" if parent_pid is not None else None, agent,
+        ) if value)
+        return "进程事件", _text("进程事件 · " + summary), [
+            {"key": "PID", "value": _text(pid)},
+            {"key": "父 PID", "value": _text(parent_pid)},
+            {"key": "进程", "value": _text(row.get("comm"))},
+            {"key": "Agent", "value": _text(agent)},
+            {"key": "时间", "value": _text(row.get("timestamp_ns"))},
+            {"key": "进程开始时间", "value": _text(row.get("start_time_ns"))},
+            {"key": "父进程开始时间", "value": _text(row.get("parent_start_time_ns"))},
+        ]
+    if table == "delegation_records":
+        parent, child = row.get("from_agent_id"), row.get("to_agent_id")
+        return "Agent 委派", _text(f"{parent or '未知'} → {child or '未知'}"), [
+            {"key": "委派方", "value": _text(parent)},
+            {"key": "接收方", "value": _text(child)},
+            {"key": "父 PID", "value": _text(row.get("parent_pid"))},
+            {"key": "子 PID", "value": _text(row.get("child_pid"))},
+            {"key": "时间", "value": _text(row.get("timestamp_ns"))},
+            {"key": "置信度", "value": _text(row.get("confidence"))},
+        ]
+    if table == "subagent_boundaries":
+        parent, child = row.get("parent_agent_id"), row.get("child_agent_id")
+        return "Agent 边界", _text(f"{parent or '未知'} → {child or '未知'} · {row.get('reason') or ''}"), [
+            {"key": "委派方", "value": _text(parent)},
+            {"key": "接收方", "value": _text(child)},
+            {"key": "父 PID", "value": _text(row.get("parent_pid"))},
+            {"key": "子 PID", "value": _text(row.get("child_pid"))},
+            {"key": "原因", "value": _text(row.get("reason"))},
+        ]
+    if table in ("identity_process_beliefs", "agent_identities", "tls_sessions"):
         subject = row.get("agent_id") or row.get("comm") or ""
         return "身份/进程证据", _text(
             f"{_TABLE_LABELS.get(table, table)}（{table}） · {subject}"), [

@@ -59,5 +59,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "data-exfil-direct",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/data-exfil-direct.json"
+  "source_scenario_path": "scenarios/data-exfil-direct.json",
+  "source_scenario_sha256": "1b041f69582b9885eab96b166eb7368595d37abbbe81a11a71cd9fcee083c9dc"
 }

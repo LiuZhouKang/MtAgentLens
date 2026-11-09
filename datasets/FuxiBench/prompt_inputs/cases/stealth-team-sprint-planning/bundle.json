@@ -82,5 +82,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "stealth-team-sprint-planning",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/stealth-team-sprint-planning.json"
+  "source_scenario_path": "scenarios/stealth-team-sprint-planning.json",
+  "source_scenario_sha256": "88c12cc8313820a0ff175167fd54220e4fb74e9292ce8595073b1523a26c6b46"
 }

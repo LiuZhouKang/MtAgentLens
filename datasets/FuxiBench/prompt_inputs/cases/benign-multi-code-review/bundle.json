@@ -67,5 +67,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-multi-code-review",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-multi-code-review.json"
+  "source_scenario_path": "scenarios/benign-multi-code-review.json",
+  "source_scenario_sha256": "61e245067d5245c85864802f1242aa026e28ac673a6bb0a75302b5bf575d7bff"
 }

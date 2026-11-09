@@ -39,5 +39,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "c2-dns-dead-drop",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/c2-dns-dead-drop.json"
+  "source_scenario_path": "scenarios/c2-dns-dead-drop.json",
+  "source_scenario_sha256": "ca9d55028e1e6d8a3ec447bb7292efa652af2639a3076691526f9ba45b17be70"
 }

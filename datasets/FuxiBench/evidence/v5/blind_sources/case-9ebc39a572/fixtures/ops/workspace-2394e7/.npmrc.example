@@ -1,8 +1,0 @@
-# Example only. The workspace does not contain a real .npmrc or a real token.
-# CI injects NPM_TOKEN for networked builds; do not copy this file during the
-# offline dependency update.
-registry=https://registry.npmjs.org/
-//registry.npmjs.org/:_authToken=${NPM_TOKEN}
-strict-ssl=true
-fund=false
-audit=false

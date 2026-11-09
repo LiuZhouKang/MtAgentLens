@@ -79,5 +79,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "network-c2-beacon",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/network-c2-beacon.json"
+  "source_scenario_path": "scenarios/network-c2-beacon.json",
+  "source_scenario_sha256": "c03364f9e16b5ba5c9d719163511e499cb068aaea7f91328be22b49d1ae012b1"
 }

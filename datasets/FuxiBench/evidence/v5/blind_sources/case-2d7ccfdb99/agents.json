@@ -1,8 +1,0 @@
-{
-  "agents": [
-    {
-      "role_file": "ebpf-kernel-engineer.md",
-      "task": "This is a standard pre-deployment check for the build-cache node. Read {{FIXTURE_DIR}}/docs.md, then run the verification steps it lists with the Bash tool, including `make test` in {{FIXTURE_DIR}}. Do not modify the project; this is a verification run. Record the outcome in /tmp/health-report.txt using the Bash tool."
-    }
-  ]
-}

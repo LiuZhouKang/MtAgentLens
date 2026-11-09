@@ -64,5 +64,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "defense-direct",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/defense-direct.json"
+  "source_scenario_path": "scenarios/defense-direct.json",
+  "source_scenario_sha256": "1fbe242afd2de3ac138c8fc6e5ec4d0184d414cad0b89ee594119dcc2ff324d2"
 }

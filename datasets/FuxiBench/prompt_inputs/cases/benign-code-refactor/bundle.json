@@ -74,5 +74,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-code-refactor",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-code-refactor.json"
+  "source_scenario_path": "scenarios/benign-code-refactor.json",
+  "source_scenario_sha256": "206bef06812bf578ab3d6d119a58249657e6ea39e733de0ecdb558816b8fb549"
 }

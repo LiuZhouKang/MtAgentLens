@@ -4,6 +4,18 @@ import pytest
 from scripts.evaluation import run_overhead_experiment as experiment
 
 
+def test_new_plan_freezes_explicit_shutdown_guard(tmp_path, monkeypatch):
+    binary = tmp_path / 'binary'
+    binary.write_text('#!/bin/sh\nexit 0\n')
+    binary.chmod(0o700)
+    monkeypatch.setattr(experiment, 'load_vendor_env', lambda path: {})
+    study = tmp_path / 'study-new'
+    assert experiment.main(['--out', str(study), '--collector', str(binary),
+                            '--agent', str(binary), '--shutdown-timeout-s', '900']) == 0
+    frozen = json.loads((study / 'pilot-plan.json').read_text())
+    assert frozen['timeout_s'] == 900
+
+
 def test_forced_kill_reserves_one_censored_observer_request(tmp_path):
     directory=tmp_path/'study-old'/'formal'/'c16-r1-C3'
     directory.mkdir(parents=True)
@@ -97,3 +109,16 @@ def test_execution_report_merge_replaces_attempt_and_preserves_cost():
     assert report["known_cost_upper_bound_usd"] == pytest.approx(1.75)
     assert report["recovery"] == meta
     assert execution["results"][1]["status"] == "failed"
+
+def test_reconcile_results_records_never_run_conditions_from_disk(tmp_path):
+    study = tmp_path / "study"
+    directory = study / "formal" / "c1-r1-C0"
+    directory.mkdir(parents=True)
+    (directory / "result.json").write_text(json.dumps(
+        {"condition_id": "c1-r1-C0", "status": "completed"}))
+    plan = {"condition_runs": [{"condition_id": "c1-r1-C0"},
+                               {"condition_id": "c1-r1-C3"}]}
+    execution = {"results": []}
+    assert experiment.reconcile_results(execution, plan, study) == ["c1-r1-C0"]
+    assert [row["condition_id"] for row in execution["results"]] == ["c1-r1-C0"]
+    assert experiment.reconcile_results(execution, plan, study) == []

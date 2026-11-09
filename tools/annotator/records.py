@@ -414,6 +414,51 @@ class RecordStore:
                          (task_id, annotator, _json(record)))
         return record
 
+    def import_human_revisions(self, task_id: str, records: list[dict]) -> int:
+        """Import a validated offline human revision chain without rewriting IDs."""
+        task = self._task(task_id)
+        bundle = self._bundle(task)
+        if not isinstance(records, list) or not records:
+            raise ValueError("at least one human revision is required")
+        parent = None
+        annotator = None
+        normalized = []
+        revision_ids = set()
+        for record in records:
+            if (not isinstance(record, dict) or record.get("schema") != "mtagentlens.annotation/v2"
+                    or record.get("task_id") != task_id
+                    or record.get("evidence_bundle_hash") != task_id
+                    or record.get("binding") != bundle["binding"]
+                    or record.get("method") != "human" or "review" in record):
+                raise ValueError("offline source is not an independent human annotation chain")
+            if annotator is None:
+                annotator = record.get("annotator")
+            if record.get("annotator") != annotator or record.get("parent_revision_id") != parent:
+                raise ValueError("offline human revision chain is inconsistent")
+            revision_id = record.get("revision_id")
+            if not _text(revision_id) or not _text(record.get("saved_at")):
+                raise ValueError("offline revision id and timestamp are required")
+            if revision_id in revision_ids:
+                raise ValueError("duplicate revision id in offline human chain")
+            _validate_annotation(record.get("annotation"), bundle)
+            normalized.append(record)
+            revision_ids.add(revision_id)
+            parent = revision_id
+        with closing(self._connect()) as conn, conn:
+            conn.execute("BEGIN IMMEDIATE")
+            if conn.execute("SELECT 1 FROM bundle_revisions WHERE task_id=? AND annotator=?",
+                            (task_id, annotator)).fetchone():
+                raise ValueError("annotator already has revisions for this task")
+            existing_ids = {json.loads(row[0])["revision_id"] for row in conn.execute(
+                "SELECT record_json FROM bundle_revisions")}
+            if any(row["revision_id"] in existing_ids for row in normalized):
+                raise ValueError("duplicate imported revision id")
+            conn.executemany(
+                "INSERT INTO bundle_revisions(task_id, annotator, record_json) VALUES (?, ?, ?)",
+                [(task_id, annotator, _json(row)) for row in normalized],
+            )
+        return len(normalized)
+
     def export(self) -> dict:
         tasks = []
         with closing(self._connect()) as conn, conn:
@@ -433,5 +478,9 @@ class RecordStore:
                           "evidence_manifest": bundle,
                           "status": "annotated" if revisions else "unannotated",
                           "revisions": revisions})
-        return {"schema": "mtagentlens.annotation-export/v2", "paper_metrics_available": False,
-                "tasks": tasks}
+        export = {"schema": "mtagentlens.annotation-export/v2", "paper_metrics_available": False,
+                  "tasks": tasks}
+        canonical = json.dumps({"tasks": tasks}, sort_keys=True, separators=(",", ":"),
+                               ensure_ascii=False, allow_nan=False).encode("utf-8")
+        export["export_sha256"] = hashlib.sha256(canonical).hexdigest()
+        return export

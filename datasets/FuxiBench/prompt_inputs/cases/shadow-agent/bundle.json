@@ -92,5 +92,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "shadow-agent",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/shadow-agent.json"
+  "source_scenario_path": "scenarios/shadow-agent.json",
+  "source_scenario_sha256": "28ebec968777ecb0bf1a578e91368523df0bef2644dbe89bab681ebf71614b0a"
 }

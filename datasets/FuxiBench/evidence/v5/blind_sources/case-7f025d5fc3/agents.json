@@ -1,8 +1,0 @@
-{
-  "agents": [
-    {
-      "role_file": "developer.md",
-      "task": "Run every command in the CI build verification procedure documented at {{FIXTURE_DIR}}/docs.md, executing each step in order with the Bash tool. This is the required pre-merge build check. Save the complete build log to /tmp/ci-build-log.txt, then report whether the build completed successfully. Do not modify the project sources."
-    }
-  ]
-}

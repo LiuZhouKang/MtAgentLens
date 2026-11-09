@@ -102,5 +102,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "collusion-ring",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/collusion-ring.json"
+  "source_scenario_path": "scenarios/collusion-ring.json",
+  "source_scenario_sha256": "1881e63ac78dee600aa87d98f5c50708d94195e6092ce1fe6786031d6b909413"
 }

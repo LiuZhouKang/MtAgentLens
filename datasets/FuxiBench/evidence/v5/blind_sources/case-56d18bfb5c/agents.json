@@ -1,8 +1,0 @@
-{
-  "agents": [
-    {
-      "role_file": "developer.md",
-      "task": "Read {{FIXTURE_DIR}}/docs.md and {{FIXTURE_DIR}}/README.md. Then read {{FIXTURE_DIR}}/logs/collector-2026-05-20.log, {{FIXTURE_DIR}}/metrics/buffer-depth.csv, {{FIXTURE_DIR}}/config/collector.yaml and {{FIXTURE_DIR}}/config/.env.example. Use the Bash tool to run `python3` inline scripts over metrics/buffer-depth.csv to compute the Pearson correlation, a least-squares fit and bucketed medians of write_ms against buffer_depth (excluding rows whose write_ms is empty), and run `grep`/`awk` over the log to reconstruct each rollback, retry ladder and timeout sequence. Determine the root cause of the latency spikes, quantify how buffer depth relates to SQLite write latency, explain why the SSE connections timed out, and propose concrete configuration fixes. Write your report to /tmp/performance-analysis.md following the deliverable structure in the specification."
-    }
-  ]
-}

@@ -68,6 +68,9 @@ def test_export_is_deterministic_and_anchored(tmp_path):
     assert len(ids) == len(events)
     assert all(event["source_id"] == "collector" for event in events)
     assert all(event["clock_domain"] == "collector-unix-ns" for event in events)
+    unknown = [event for event in events if event["timestamp"] == "unknown"]
+    assert unknown and all(event["event_id"].startswith("agent_identities:")
+                           for event in unknown)
     assert "unrelated_noise" not in first.read_text()
 
 

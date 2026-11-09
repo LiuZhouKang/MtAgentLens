@@ -526,6 +526,13 @@ def _run_record(row, result, evidence, *, result_path, evidence_path, warnings):
     record["agent_cpu_seconds"] = (sum(exact_cpu) if len(exact_cpu) == concurrency
         and all(v is not None for v in exact_cpu) else None)
     record["collector_cpu_seconds"] = _number(_dig(resources, "collector", "cpu_seconds", "max")) if profile != "C0" else None
+    rss_mean = _number(_dig(resources, "collector", "rss_kib", "mean")) if profile != "C0" else None
+    record["collector_rss_mean_mib"] = rss_mean / 1024 if rss_mean is not None else None
+    for statistic, label in (("mean", "mean"), ("max", "peak")):
+        pss = _number(_dig(resources, "collector", "pss_kib", statistic)) if profile != "C0" else None
+        record[f"collector_pss_{label}_mib"] = pss / 1024 if pss is not None else None
+    record["collector_pss_missing_samples"] = (
+        _number(_dig(resources, "collector", "pss_missing_samples")) if profile != "C0" else None)
     if profile == "C0":
         record["collector_cpu_mean_percent"] = None
         record["collector_rss_peak_mib"] = None
@@ -630,6 +637,10 @@ METRICS = (
     ("agent_wall_span_s", "seconds"),
     ("collector_cpu_mean_percent", "percent"),
     ("collector_rss_peak_mib", "mib"),
+    ("collector_rss_mean_mib", "mib"),
+    ("collector_pss_mean_mib", "mib"),
+    ("collector_pss_peak_mib", "mib"),
+    ("collector_pss_missing_samples", "count"),
     ("db_main_final_mib", "mib"),
     ("db_wal_final_mib", "mib"),
     ("db_wal_peak_mib", "mib"),
@@ -664,6 +675,8 @@ RUN_FIELDS = (
     "agent_cost_upper_bound_usd", "agent_input_tokens", "agent_output_tokens",
     "reported_cost_usd_ignored", "collector_cpu_mean_percent",
     "collector_rss_peak_mib", "db_main_final_mib", "db_wal_final_mib",
+    "collector_rss_mean_mib",
+    "collector_pss_mean_mib", "collector_pss_peak_mib", "collector_pss_missing_samples",
     "db_wal_peak_mib", "db_total_peak_mib", "trace_final_mib",
     "graph_update_count", "graph_update_total_ns", "observer_attempts",
     "observer_requests", "observer_failed_attempts", "observer_input_tokens",
@@ -884,14 +897,17 @@ def _write_t8_md(path, loaded, cells, status, probe_data, diagnostics):
         "- Collector CPU is `resources.collector.cpu_percent.mean` (percent of one "
         "core; values above 100 mean multiple threads). Peak RSS is the mean of "
         "per-run `rss_kib.max`.",
+        "- PSS is measured from process-tree smaps_rollup, not estimated from RSS. "
+        "Mean/peak use available complete-tree samples; missing samples are reported. "
+        "Unmapped kernel allocations are excluded. Historical runs without PSS remain unknown.",
         f"- {COST_NOTE}",
         "- Alert latency is the linked captured-action → final collector broadcast "
         "attempt endpoint. Unlinked operations do not become zero-latency samples.",
         "", "## T8-a: completion, duration and resources", "",
         "| Profile | Conc | Status | n | Work completion | Agent E2E (s) | "
-        "Condition elapsed (s) | CPU mean (%) | Peak RSS (MiB) | DB main final (MiB) | "
+        "Condition elapsed (s) | CPU mean (%) | Peak RSS (MiB) | Mean PSS (MiB) | Peak PSS (MiB) | PSS missing samples | DB main final (MiB) | "
         "WAL peak (MiB) | DB+WAL peak (MiB) | Trace final (MiB) |",
-        "|---|---:|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "|---|---:|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ])
     for cell in cells:
         lines.append(
@@ -901,6 +917,9 @@ def _write_t8_md(path, loaded, cells, status, probe_data, diagnostics):
             f"{_stats_text(cell, 'condition_elapsed_s', 'seconds')} | "
             f"{_stats_text(cell, 'collector_cpu_mean_percent', 'percent')} | "
             f"{_stats_text(cell, 'collector_rss_peak_mib', 'mib')} | "
+            f"{_stats_text(cell, 'collector_pss_mean_mib', 'mib')} | "
+            f"{_stats_text(cell, 'collector_pss_peak_mib', 'mib')} | "
+            f"{_stats_text(cell, 'collector_pss_missing_samples', 'count')} | "
             f"{_stats_text(cell, 'db_main_final_mib', 'mib')} | "
             f"{_stats_text(cell, 'db_wal_peak_mib', 'mib')} | "
             f"{_stats_text(cell, 'db_total_peak_mib', 'mib')} | "

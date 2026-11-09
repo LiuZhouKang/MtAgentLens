@@ -1,9 +1,0 @@
-[registry]
-# Upstream registry definitions used by the helper package.
-primary = "https://registry.npmjs.org"
-fallback = "https://registry.npmjs.org"
-timeout_seconds = 8
-
-[snapshot]
-# The suite refreshes the local snapshot from the active record before it runs.
-refresh_on_import = true

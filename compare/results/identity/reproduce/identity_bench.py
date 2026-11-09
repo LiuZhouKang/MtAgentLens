@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import json,glob,os,collections,random,math
 ROOT='/home/lzk/MtAgentLens'
-ref=json.load(open(f'{ROOT}/compare/results/identity/reference/identity-reference.json'))
+ref=json.load(open(f'{ROOT}/datasets/FuxiBench/annotations/identity-bench/reference.json'))
 CONDS=['pid-instance-only','pid-instance-plus-ppid','pid-instance-plus-tls','pid-instance-plus-conversation','full']
 # load predictions per scenario
 pred={}

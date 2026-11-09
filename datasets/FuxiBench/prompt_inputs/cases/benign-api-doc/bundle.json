@@ -79,5 +79,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-api-doc",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-api-doc.json"
+  "source_scenario_path": "scenarios/benign-api-doc.json",
+  "source_scenario_sha256": "599cd5d795a6c14a4c16ffec239ec6542429dd2a5ef97afa3621a7b7bb4d9f9a"
 }

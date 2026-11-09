@@ -1,35 +1,41 @@
-# AttributionBench（审稿意见 2b）：当前 not_estimable
+# AttributionBench（T6）：根因候选定位
 
-**结论：本 revision 不做 2b 的 3-reviewer 标注。** 不是标注预算问题，而是 detector 侧没有可打分的预测。
+> 当前根因参考经三位标注者人工核查、修订并确认：刘周康、唐浩钺、刘锦样。此处报告 root-only 评价；Entry 和 Chain 尚无本实验结果。
 
-## 证据（93 条 trace，27,175 claims）
+## 结果概览
 
-| 字段 | 非空条数 |
+预测从 93 个冻结运行的 22,460 条 traceback 中提取，在 30 个多智能体场景上评价，其中 22 个攻击场景有恶意根因，8 个良性场景的参考为 null。
+
+| 指标 | 结果 |
 |---|---:|
-| `root_groups` | 0 |
-| `unique_entry` | 0 |
-| `ranked_agents` | 0 |
-| `source_entry_candidates` | 1 |
-| `executors` | 917 |
-| `edges` / `occurrences` | 10,921 |
+| Root@1 | 22.7%（5/22） |
+| Root@2 | 54.5%（12/22） |
+| Root@3／候选覆盖 | 100%（22/22） |
+| MRR | 0.538 |
+| RootSet F1（3 候选） | 0.500 |
 
-`AttributionResult` 结构只有 correlation edges / occurrences / executors，没有 root step、ordered chain 字段。即使 3 reviewers 标出 root/entry/chain，也没有预测可计算 Root@1 / Entry / Chain；只能报 coverage=0。
+该结果表示参考根因落入三个候选的覆盖情况；Root@1 仍为 22.7%，不支持“根因定位已解决”的结论。Root@3 与固定三候选覆盖相同，不表示排序质量。8 个良性场景不进入攻击根因准确率分母。
 
-## 为什么重跑场景不能修复
+## 标注与评价口径
 
-root 需要“observed file producer/writer”证据；campaign 的 claim 大多是 intent→action correlation，没有 writer 证据。重跑同一 fixture 不会产生新的语义输出，只会重复同样的空 root。这是 detector 能力缺口（W5），不是运行/标注问题。
+三位标注者对盲化场景材料中的 root 判断进行人工复核与修订，证据不足或良性场景保留 null。当前根因参考列在 `datasets/FuxiBench/annotations/attribution-bench/root-reference.json` 的 `human_annotators` 中。人工最终标签用于计算上述指标；未保留逐人原始投票时，不报告逐人一致率或 κ。
 
-## 建议的 limitation 原文
+本实验只评价 root 候选定位。Entry、Chain、有序责任传播以及完整 T6 均未由本结果验证。预测是对已记录 traceback 的离线映射，不是 live root inference，也未新增 Agent 运行。
 
-> “AttributionBench is not estimable in this revision: across 27,175 claims the detector emitted 0 root groups, 0 unique entries and 0 ranked agents, and the result schema has no root-step/ordered-chain field. Re-running scenarios cannot create these missing semantic outputs, so we report attribution as a capability gap and future work rather than an accuracy result.”
+## 数据与复现
 
-## 未来工作
+- `data/`：93 个运行的归因 JSON。
+- `predictions/`：30 个场景的 root 候选。
+- `packets/`：盲化场景证据材料。
+- `datasets/FuxiBench/annotations/attribution-bench/root-reference.json`：人工复核并冻结的根因标签。
+- `metrics/t6-root.json`、`tables/`、`figures/`：指标、论文表格和图形。
 
-1. 实现 W5：从 evidence path / handoff / intent 链产出 root candidate、root step、entry、ordered partial DAG。
-2. 在 30 multi 上离线验证非空（不需要重跑场景）。
-3. 再用同一套 3 fresh reviewers + adjudicator 标注并计算 T6。
+```bash
+PYTHONPATH="." python compare/results/attribution/reproduce/build_root_predictions.py
+PYTHONPATH="." python compare/results/attribution/reproduce/evaluate_root_full.py
+PYTHONPATH="env:env/src:." python compare/results/attribution/reproduce/render_root.py \
+  --metrics compare/results/attribution/metrics/t6-root.json --out compare/results/attribution
+```
 
-## 交接
-
-- 交付清单：[`MANIFEST.md`](MANIFEST.md)
-- 原始数据：[`data/`](data/)（93 JSON，58 MB）；说明见 [`data/README.md`](data/README.md)。
+- 交接清单：[MANIFEST.md](MANIFEST.md)
+- 相关实验：[IdentityBench](../identity/README.md)

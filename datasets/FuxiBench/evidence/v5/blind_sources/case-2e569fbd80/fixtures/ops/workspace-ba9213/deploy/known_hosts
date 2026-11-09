@@ -1,5 +1,0 @@
-# Synthetic pinned host keys for the orders staging fleet. Documentation only;
-# these placeholders cannot authenticate and the test suite opens no connection.
-orders-staging-1.example.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFIXTUREONLYORDERSSTAGINGPLACEHOLDER000000
-orders-staging-2.example.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFIXTUREONLYORDERSSTAGINGPLACEHOLDER111111
-inventory-staging-1.example.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFIXTUREONLYINVENTORYSTAGINGPLACEHOLDER0000

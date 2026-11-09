@@ -1,10 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
-"""Assemble the self-contained FuxiBench 2.0 package.
-
-Inputs are the frozen v5 release and the migrated two-type GT produced by
-build_fuxibench_dataset.py. The output is a single dataset tree with scenarios,
-fixtures, bench support, prompt inputs, GT, bundled evidence and sanitized traces.
-"""
+"""Assemble the current human-reviewed FuxiBench package from frozen inputs."""
 from __future__ import annotations
 
 import argparse
@@ -20,26 +15,25 @@ ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "local/workpackages/2026-10-26-final-dataset"
 RELEASE = WORK / "release/FuxiBench-v5"
 TRACES = ROOT / "datasets/FuxiBench/traces"
-LIVE_GT = ROOT / "datasets/FuxiBench/evidence/legacy/v4/ground_truth"
 PACKAGE = ROOT / "datasets/FuxiBench"
 GT_STAGE = PACKAGE / "ground_truth"
 SOURCE_PACKAGE = PACKAGE
 
 sys.path.insert(0, str(ROOT))
-from scripts.evaluation.build_fuxibench_dataset import OLD_TO_NEW, portable, sha256  # noqa: E402
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 SANITIZE_PATTERNS = [
     ("/home/lzk/MtAgentLens/", ""),
     ("/home/lzk/MtAgentLens", ""),
     ("/home/lzk", "<home>"),
-    ("local/workpackages/2026-10-26-final-dataset/", "evidence/v5/"),
-    ("local/validate-tonight/", "evidence/validation/legacy-run3/"),
-    ("local/f6/", "evidence/legacy/f6/"),
-    ("local/f6", "evidence/legacy/f6"),
-    ("local/workpackages/", "evidence/legacy/"),
     ("datasets/FuxiBench/", ""),
-    ("compare/Dataset/", "evidence/legacy/datasets/"),
-    ("compare/", "evidence/legacy/repo/"),
     ("env/scenarios/fixtures/", "fixtures/"),
     ("env/scenarios/", "scenarios/"),
     ("env/scenarios", "scenarios"),
@@ -50,109 +44,6 @@ def clean_text(text: str) -> str:
     for old, new in SANITIZE_PATTERNS:
         text = text.replace(old, new)
     return text
-
-
-def restore_annotation_inputs(package: Path, annotation_map: Path, source_root: Path, *, dry_run: bool = False) -> dict:
-    """Restore only files whose original bytes match the accepted annotation source map.
-
-    All source hashes are checked before writing. External destinations in the
-    original fixture remain unchanged; reversing an IP replacement is ambiguous.
-    """
-    data = json.loads(annotation_map.read_text(encoding="utf-8"))
-    gt_ids = {json.loads(path.read_text())["scenario_id"]
-              for path in (package / "ground_truth").glob("*/*.json")
-              if not path.parent.name.startswith("_")}
-    case_ids = [case.get("scenario_id") for case in data["cases"]]
-    if gt_ids and (set(case_ids) != gt_ids or len(case_ids) != len(gt_ids)):
-        raise ValueError("annotation map does not cover each package scenario exactly once")
-    planned = {}
-    verified = []
-    for case in data["cases"]:
-        if gt_ids:
-            from scripts.evaluation.gt_rebuild import scrub_text
-            sid = case["scenario_id"]
-            agents_source = next(source for source in case["sources"] if source["kind"] == "agents")
-            blind = source_root / agents_source["blind_path"]
-            if not blind.resolve().is_relative_to(source_root.resolve()) or sha256(blind) != agents_source["blind_sha256"]:
-                raise ValueError(f"annotation task source hash mismatch: {sid}")
-            source_scenario = source_root / case["source_scenario_path"]
-            if not source_scenario.resolve().is_relative_to(source_root.resolve()):
-                raise ValueError(f"annotation scenario path escapes source: {sid}")
-            original_agents = json.loads(source_scenario.read_text())["agents"]
-            scrubbed = [{"role_file": agent.get("role_file"),
-                         "task": scrub_text(agent.get("task", ""), sid, case["anon_case_id"])[0]}
-                        for agent in original_agents]
-            if scrubbed != json.loads(blind.read_text())["agents"]:
-                raise ValueError(f"annotation tasks differ from accepted blind input: {sid}")
-            target = package / "scenarios" / f"{sid}.json"
-            scenario = json.loads(target.read_text())
-            if len(scenario["agents"]) != len(original_agents):
-                raise ValueError(f"annotation agent count mismatch: {sid}")
-            for agent, original in zip(scenario["agents"], original_agents):
-                agent["role_file"] = original.get("role_file")
-                agent["task"] = clean_text(original.get("task", ""))
-            content = (json.dumps(scenario, ensure_ascii=False, indent=2) + "\n").encode()
-            planned[target] = content
-            verified.append({"path": target.relative_to(package).as_posix(),
-                             "annotation_sha256": agents_source["blind_sha256"],
-                             "packaged_sha256": hashlib.sha256(content).hexdigest(),
-                             "kind": "scenario_tasks"})
-        for source in case["sources"]:
-            if source.get("kind") not in {"fixture", "role"}:
-                continue
-            origin = source["origin"]
-            rel = Path(origin["path"])
-            if rel.is_absolute() or ".." in rel.parts or rel.parts[:2] != ("env", "scenarios"):
-                raise ValueError(f"invalid annotation source path: {rel}")
-            original = source_root / rel
-            if not original.resolve().is_relative_to(source_root.resolve()):
-                raise ValueError(f"annotation source escapes source root: {rel}")
-            if not original.is_file() or sha256(original) != origin["sha256"]:
-                raise ValueError(f"annotation source hash mismatch: {rel}")
-            content = original.read_bytes()
-            if original.suffix == ".db":
-                with tempfile.TemporaryDirectory(prefix="fuxibench-fixture-db-") as temp:
-                    copied = Path(temp) / "fixture.db"
-                    copied.write_bytes(content)
-                    sanitize_sqlite(copied)
-                    vacuumed = Path(temp) / "portable.db"
-                    connection = sqlite3.connect(str(copied))
-                    try:
-                        connection.execute("VACUUM INTO ?", (str(vacuumed),))
-                    finally:
-                        connection.close()
-                    content = vacuumed.read_bytes()
-            try:
-                content = clean_text(content.decode("utf-8")).encode("utf-8")
-            except UnicodeDecodeError:
-                pass
-            target = package / Path(*rel.parts[2:])
-            if not target.resolve().is_relative_to(package.resolve()):
-                raise ValueError(f"annotation target escapes package: {target}")
-            if target in planned and planned[target] != content:
-                raise ValueError(f"conflicting annotation sources: {target}")
-            planned[target] = content
-            verified.append({"path": target.relative_to(package).as_posix(),
-                             "annotation_sha256": origin["sha256"],
-                             "packaged_sha256": hashlib.sha256(content).hexdigest(),
-                             "kind": source["kind"]})
-    restored = []
-    for target, content in sorted(planned.items()):
-        if not target.exists() or target.read_bytes() != content:
-            if not dry_run:
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(content)
-            restored.append(target.relative_to(package).as_posix())
-    report = {"schema": "mtagentlens.annotation-source-verification/1",
-              "annotation_map_sha256": sha256(annotation_map),
-              "scenario_ids": sorted(gt_ids), "verified_files": len(planned),
-              "restored": restored, "files": verified,
-              "note": "Original source hashes verified before path-only normalization; IPs unchanged."}
-    if not dry_run:
-        report_path = package / "evidence/annotation-source-verification.json"
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
-    return report
 
 
 def clean_value(value):
@@ -276,9 +167,8 @@ def build_prompts() -> None:
 
 
 def build_gt(gt: dict[str, dict]) -> None:
-    # GT_STAGE is produced by build_fuxibench_dataset.py gt; verify each record is migrated.
-    if not (GT_STAGE / "manifest.json").exists() and not any(GT_STAGE.glob("*/*.json")):
-        raise SystemExit("missing migrated GT; run build_fuxibench_dataset.py gt first")
+    if not any(GT_STAGE.glob("*/*.json")):
+        raise SystemExit("missing current human-reviewed GT records")
     for path in GT_STAGE.rglob("*.json"):
         clean_json_file(path)
 
@@ -286,52 +176,12 @@ def build_gt(gt: dict[str, dict]) -> None:
 def build_evidence() -> None:
     ev = PACKAGE / "evidence"
     bundled = SOURCE_PACKAGE / "evidence"
-    if bundled.is_dir():
-        require_disjoint_source(bundled, ev)
-        if ev.exists():
-            shutil.rmtree(ev)
-        copy_clean_tree(bundled, ev)
-        return
-    require_disjoint_source(LIVE_GT, ev)
+    if not bundled.is_dir():
+        raise SystemExit("missing current evidence directory in source package")
+    require_disjoint_source(bundled, ev)
     if ev.exists():
         shutil.rmtree(ev)
-    v5 = ev / "v5"
-    v5.mkdir(parents=True)
-    for name in ("gt-v5.json", "flip-decisions.json", "FLIP-REPORT.md", "v4-v5-diff.json",
-                 "rejected-sessions.json", "summary.json", "legacy-audit.json"):
-        src = WORK / "gt/runs/full-93" / name
-        if src.exists():
-            shutil.copy2(src, v5 / name)
-    merge = ev / "merge"
-    merge.mkdir()
-    for name in ("MERGE-REPORT.json", "MERGE-REPORT.md"):
-        src = WORK / "integration/full-93" / name
-        if src.exists():
-            shutil.copy2(src, merge / name)
-            if src.suffix == ".json":
-                clean_json_file(merge / name)
-    # portable evidence paths in the bundled v5 records
-    for path in v5.glob("*.json"):
-        clean_json_file(path)
-    # legacy v4 GT, byte-preserved, for provenance/hash checks
-    legacy = ev / "legacy/v4/ground_truth"
-    if legacy.exists():
-        shutil.rmtree(legacy)
-    shutil.copytree(LIVE_GT, legacy)
-    for path in legacy.rglob("*.json"):
-        clean_json_file(path)
-    # blind sources referenced by label_annotation.evidence
-    blind_src = WORK / "gt/runs/full-93/blind_sources"
-    if blind_src.exists():
-        copy_clean_tree(blind_src, v5 / "blind_sources")
-    # validation evidence
-    val_src = WORK / "validation"
-    if val_src.exists():
-        copy_clean_tree(val_src, ev / "validation")
-    # PBC
-    pbc_src = WORK / "pbc"
-    if pbc_src.exists():
-        copy_clean_tree(pbc_src, ev / "pbc")
+    copy_clean_tree(bundled, ev)
 
 
 def sanitize_sqlite(path: Path) -> None:
@@ -423,12 +273,12 @@ def build_docs_metadata() -> None:
     shutil.copy2(ROOT / "LICENSE-MIT", licenses / "LICENSE-MIT")
     (PACKAGE / "CITATION.cff").write_text(
         "cff-version: 1.2.0\n"
-        "title: FuxiBench 2.0 (MtAgentLens)\n"
-        "message: Independent AI-annotated LLM-agent security benchmark; no human labels.\n"
+        "title: FuxiBench 2.0.1 (MtAgentLens)\n"
+        "message: Please cite FuxiBench as a human-reviewed LLM-agent security benchmark.\n"
         "type: dataset\n"
         "license: CC-BY-4.0\n"
-        "version: 2.0.0\n"
-        "date-released: 2026-10-26\n", encoding="utf-8")
+        "version: 2.0.1\n"
+        "date-released: 2026-11-06\n", encoding="utf-8")
     metadata = clean_value(json.loads((SOURCE_PACKAGE / "metadata.json").read_text()))
     records = []
     for path in sorted((PACKAGE / "ground_truth").glob("*/*.json")):
@@ -440,7 +290,7 @@ def build_docs_metadata() -> None:
     excluded = [r for r in records if (r.get("quality") or {}).get("detection_excluded")]
     metadata.update({
         "dataset_name": "FuxiBench",
-        "dataset_version": "2.0.0",
+        "dataset_version": "2.0.1",
         "taxonomy_version": "fuxibench-2type/1",
         "taxonomy": {"A": "indirect/poisoned instruction (old B)", "B": "multi-agent/handoff (old C)",
                      "benign": "no audited attack"},
@@ -453,9 +303,9 @@ def build_docs_metadata() -> None:
         "traces_collected": len(list((PACKAGE / "traces").rglob("*.db")))
         if (PACKAGE / "traces").exists() else 0,
         "file_layout": "self-contained package; see README.md",
-        "version": "2.0.0",
+        "version": "2.0.1",
         "ground_truth_version": "fuxibench-2.0",
-        "quality": "ai_consensus_3_two_type_flip_adjudicated_human_unverified",
+        "quality": "three_annotator_human_reviewed_and_revised",
         "scenarios_total": len(records),
         "scenario_ids": sorted(r["scenario_id"] for r in records),
         "scenarios_attack": len(attack),
@@ -465,8 +315,9 @@ def build_docs_metadata() -> None:
         "detection_included_counts": {"attack": sum(1 for r in included if r["label"] == "attack"),
                                       "benign": sum(1 for r in included if r["label"] == "benign")},
         "detection_included_attack_types": {t: sum(1 for r in included if r["attack_type"] == t) for t in ("A", "B")},
-        "human_annotation": False,
-        "human_review": False,
+        "human_annotation": True,
+        "human_annotators": ["刘周康", "唐浩钺", "刘锦样"],
+        "human_review": True,
     })
     for key in ("annotation", "paper_metrics_available", "publication_blockers", "working_tree_status"):
         metadata.pop(key, None)
@@ -504,17 +355,13 @@ def sanitize_package_in_place() -> dict:
     return counts
 
 def main() -> int:
-    global PACKAGE, RELEASE, TRACES, GT_STAGE, SOURCE_PACKAGE, LIVE_GT
+    global PACKAGE, RELEASE, TRACES, GT_STAGE, SOURCE_PACKAGE
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--package", type=Path, default=PACKAGE)
     parser.add_argument("--source-release", type=Path, default=RELEASE)
     parser.add_argument("--source-package", type=Path, default=SOURCE_PACKAGE,
                         help="Existing two-type GT, documentation and bundled evidence")
     parser.add_argument("--source-traces", type=Path, default=TRACES)
-    parser.add_argument("--source-legacy-gt", type=Path, default=LIVE_GT)
-    parser.add_argument("--annotation-map", type=Path,
-                        help="Accepted case-map: verify original fixture/role hashes before restoration")
-    parser.add_argument("--source-root", type=Path, default=ROOT)
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--skip-traces", action="store_true")
     parser.add_argument("--sanitize-only", action="store_true")
@@ -523,7 +370,6 @@ def main() -> int:
     RELEASE = args.source_release.resolve()
     SOURCE_PACKAGE = args.source_package.resolve()
     TRACES = args.source_traces.resolve()
-    LIVE_GT = args.source_legacy_gt.resolve()
     GT_STAGE = SOURCE_PACKAGE / "ground_truth"
     if PACKAGE.exists() and not args.force and not args.sanitize_only:
         raise SystemExit(f"{PACKAGE} exists; pass --force after reviewing")
@@ -537,8 +383,8 @@ def main() -> int:
             raise SystemExit(f"missing source release directory: {RELEASE / name}")
     if not GT_STAGE.is_dir() or not (SOURCE_PACKAGE / "metadata.json").is_file():
         raise SystemExit("missing source-package ground_truth or metadata.json")
-    if not (SOURCE_PACKAGE / "evidence").is_dir() and not LIVE_GT.is_dir():
-        raise SystemExit("missing bundled evidence or source-legacy-gt")
+    if not (SOURCE_PACKAGE / "evidence").is_dir():
+        raise SystemExit("missing current evidence directory in source package")
     if not args.skip_traces and not TRACES.is_dir():
         raise SystemExit(f"missing source traces: {TRACES}")
     destination = PACKAGE
@@ -563,18 +409,9 @@ def main() -> int:
             build_scenarios(gt_records)
             build_fixtures_bench()
             build_evidence()
-            if args.annotation_map:
-                restore_annotation_inputs(PACKAGE, args.annotation_map, args.source_root)
             build_prompts()
             build_traces(skip=args.skip_traces)
             build_docs_metadata()
-            from scripts.evaluation import repair_package_provenance as provenance
-            previous_root = provenance.PKG
-            try:
-                provenance.PKG = PACKAGE
-                provenance.main()
-            finally:
-                provenance.PKG = previous_root
             from scripts.evaluation.validate_fuxibench_package import validate
             validation = validate(PACKAGE, require_traces=not args.skip_traces)
             if not validation["valid"]:

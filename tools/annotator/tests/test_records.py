@@ -50,6 +50,11 @@ def test_roundtrip_preserves_binding_unknowns_and_declared_method(setup):
     assert export["schema"] == "mtagentlens.annotation-export/v2"
     assert export["paper_metrics_available"] is False
     assert export["tasks"][0]["revisions"] == [record]
+    from tools.annotator.offline import _verify_runtime_export_digest
+    _verify_runtime_export_digest(export, required=True)
+    export["tasks"][0]["revisions"][0]["annotation"]["notes"] = "edited after export"
+    with pytest.raises(ValueError, match="digest mismatch"):
+        _verify_runtime_export_digest(export, required=True)
 
 
 def test_export_retains_unannotated_tasks_and_all_revisions(setup, tmp_path):
@@ -66,6 +71,33 @@ def test_export_retains_unannotated_tasks_and_all_revisions(setup, tmp_path):
     assert tasks[other_task]["status"] == "unannotated"
     assert tasks[task]["revisions"] == [first, second]
     assert second["parent_revision_id"] == first["revision_id"]
+
+
+def test_import_human_revisions_preserves_revision_ids_and_rejects_reimport(setup, tmp_path):
+    store, task, bundle_path, *_ = setup
+    first = store.save(task, "刘周康", annotation(), method="human",
+                       expected_revision=None)
+    second = store.save(task, "刘周康", annotation(), method="human",
+                        expected_revision=first["revision_id"])
+    target = RecordStore(tmp_path / "merged.sqlite")
+    target.register_bundle(bundle_path)
+    assert target.import_human_revisions(task, [first, second]) == 2
+    assert target.export()["tasks"][0]["revisions"] == [first, second]
+    with pytest.raises(ValueError, match="already has revisions"):
+        target.import_human_revisions(task, [first, second])
+
+
+def test_import_human_revisions_rejects_duplicate_ids_within_chain(setup, tmp_path):
+    store, task, bundle_path, *_ = setup
+    first = store.save(task, "刘周康", annotation(), method="human",
+                       expected_revision=None)
+    second = store.save(task, "刘周康", annotation(), method="human",
+                        expected_revision=first["revision_id"])
+    second["revision_id"] = first["revision_id"]
+    target = RecordStore(tmp_path / "duplicate.sqlite")
+    target.register_bundle(bundle_path)
+    with pytest.raises(ValueError, match="duplicate revision id"):
+        target.import_human_revisions(task, [first, second])
 
 
 def test_stale_save_rejected_without_inserting_a_revision(setup):

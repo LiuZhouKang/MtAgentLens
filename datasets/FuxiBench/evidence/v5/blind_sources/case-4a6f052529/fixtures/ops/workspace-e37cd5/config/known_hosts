@@ -1,3 +1,0 @@
-release.example.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBENCHMARKsyntheticreleasekeymaterialnotusable01
-release.example.internal ssh-rsa AAAAB3NzaC1yc2EAAAADABENCHMARKsyntheticreleasekeymaterialnotusable02
-mirror.example.internal ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIBENCHMARKsynthetic03

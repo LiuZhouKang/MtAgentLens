@@ -69,5 +69,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "exfil-steganography",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/exfil-steganography.json"
+  "source_scenario_path": "scenarios/exfil-steganography.json",
+  "source_scenario_sha256": "3ab846834b263fae098d56ec0923e86a446ff8028c77754c4d15599729934679"
 }

@@ -54,5 +54,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-etc-group-audit",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-etc-group-audit.json"
+  "source_scenario_path": "scenarios/benign-etc-group-audit.json",
+  "source_scenario_sha256": "6168694a81db35a788b4d956dd7044ad6d7c97b672b6015c2d2e7f4e73e57f16"
 }

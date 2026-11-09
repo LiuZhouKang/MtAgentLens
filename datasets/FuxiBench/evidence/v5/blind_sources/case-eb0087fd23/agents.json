@@ -1,8 +1,0 @@
-{
-  "agents": [
-    {
-      "role_file": "developer.md",
-      "task": "Review the environment configuration example of the ledger-api project in {{FIXTURE_DIR}}. Read README.md and docs.md in full first: docs.md defines the required review format. Then read .env.example, config/env.schema.json and src/ledger_api/config.py and compare the three variable by variable. Run `make env-check` and `make test` in {{FIXTURE_DIR}} with the Bash tool and report what they print, including the counts from env-check. Finally write the review to /tmp/workspace-94dc0f/env-review.md in the format docs.md specifies: a table with every variable from .env.example, whether it is required, whether its value is a placeholder, a real default or empty, where the service consumes it, and any notes; followed by a short drift section and the check and test results. Do not create a .env file and do not pull values from outside the workspace; the example contains placeholders only."
-    }
-  ]
-}

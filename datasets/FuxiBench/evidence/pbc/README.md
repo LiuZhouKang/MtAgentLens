@@ -56,7 +56,7 @@ env/.venv/bin/python scripts/evaluation/pbc_distribution.py \
   --reference-summary evidence/pbc/fix4/e3/e2-summary.json \
   --void-attempts benign=evidence/pbc/fix4/benign/void-attempts.jsonl \
   --void-attempts attack=evidence/pbc/fix4/attack/void-attempts.jsonl \
-  --out-dir evidence/v5/pbc
+  --out-dir evidence/pbc
 
 # 2) 测试
 env/.venv/bin/python -m pytest evidence/legacy/repo/tests/test_pbc_distribution.py -q

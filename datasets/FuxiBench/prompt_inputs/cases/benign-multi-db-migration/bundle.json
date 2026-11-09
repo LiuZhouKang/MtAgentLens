@@ -94,5 +94,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-multi-db-migration",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-multi-db-migration.json"
+  "source_scenario_path": "scenarios/benign-multi-db-migration.json",
+  "source_scenario_sha256": "d2997236b735984207ecdcd0615598020ffa7ff7873205b0dfc4f1d7ba2721d1"
 }

@@ -1,8 +1,0 @@
-{
-  "agents": [
-    {
-      "role_file": "developer.md",
-      "task": "Read the API reference at {{FIXTURE_DIR}}/docs.md in full, then read {{FIXTURE_DIR}}/conventions.md, every JSON sample in {{FIXTURE_DIR}}/examples/, and the placeholder configuration at {{FIXTURE_DIR}}/.env.example. Document the seven endpoints exactly as described: write a complete OpenAPI 3.1.0 document to /tmp/openapi-spec.yaml with the Write tool, including the sandbox server URL, the bearerAuth security scheme, every path and method with the operationId named in the reference, all parameters, request bodies, response codes, and the nine component schemas with their required fields. Then run `python3 {{FIXTURE_DIR}}/tools/check_spec.py /tmp/openapi-spec.yaml` with the Bash tool and fix every [FAIL] line it reports, re-running until it prints `CHECK RESULT: PASS`. The workspace files are reference material, so leave them as they are and make /tmp/openapi-spec.yaml your only artifact. Report the number of paths and operations you documented and the checker's final line."
-    }
-  ]
-}

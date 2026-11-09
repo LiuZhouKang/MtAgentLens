@@ -56,7 +56,10 @@ def _connect_readonly(path: Path) -> sqlite3.Connection:
     wal = path.with_name(path.name + "-wal")
     if wal.exists() and wal.stat().st_size:
         raise ValueError("collector database has an unbound WAL; finalize it first")
-    return sqlite3.connect(f"file:{path}?mode=ro&immutable=1", uri=True)
+    conn = sqlite3.connect(f"file:{path}?mode=ro&immutable=1", uri=True)
+    # Large deterministic exports sort without depending on a writable temp dir.
+    conn.execute("PRAGMA temp_store=MEMORY")
+    return conn
 
 
 def _columns(conn: sqlite3.Connection, table: str) -> list[str]:
@@ -133,7 +136,9 @@ def export_collector_evidence(db_path: Path, out_path: Path, *,
                 "event_id": event_id,
                 "source_id": source_id,
                 "record_id": str(primary),
-                "timestamp": str(timestamp if timestamp is not None else run.get("started_at_ns", 0)),
+                # Never substitute the run start for a missing row timestamp:
+                # the UI must distinguish observed time from unknown time.
+                "timestamp": str(timestamp) if timestamp is not None else "unknown",
                 "clock_domain": "collector-unix-ns",
                 "derivation": ("collector sqlite " + line["table"] +
                                (" " + str(row[_DETAIL_KEYS[line["table"]]])

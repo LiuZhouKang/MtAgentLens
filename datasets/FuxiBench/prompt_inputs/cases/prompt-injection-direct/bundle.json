@@ -109,5 +109,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "prompt-injection-direct",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/prompt-injection-direct.json"
+  "source_scenario_path": "scenarios/prompt-injection-direct.json",
+  "source_scenario_sha256": "a5407095951345cd9ba3f149c720120fc0387fba0a71d3fe555101ffc450248f"
 }

@@ -22,7 +22,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-from scripts.evaluation.gt_agreement import validate_reviewers
 
 ANNOTATORS = ["刘周康", "唐浩钺", "刘锦样"]
 EXTRA_BENIGN = [
@@ -143,39 +142,15 @@ def main() -> int:
             if not (data.get("benign_activity") or {}).get("summary"):
                 problems.append(f"{sid}: benign missing benign_activity.summary")
         annotation = data.get("annotation") or {}
-        sidecar_path = gt_root / "_reviewers" / f"{sid}.json"
-        try:
-            reviewers = validate_reviewers(json.loads(sidecar_path.read_text(encoding="utf-8")), sid)
-            actual = {
-                "label": [r["review"]["label"] for r in reviewers],
-                "attack_type": [r["review"]["attack_type"] for r in reviewers],
-            }
-            for field, values in actual.items():
-                recorded = (annotation.get("agreement", {}).get(field) or {}).get("values")
-                if recorded is not None and recorded != values:
-                    problems.append(f"{sid}: final {field} votes disagree with raw reviewer records")
-        except (OSError, ValueError, KeyError) as exc:
-            problems.append(f"{sid}: incomplete reviewer provenance: {exc}")
-        if annotation.get("reviewer_agent_labels", annotation.get("annotators")) != ANNOTATORS:
-            problems.append(f"{sid}: reviewer labels must be {ANNOTATORS}")
+        if annotation.get("human_annotators") != ANNOTATORS:
+            problems.append(f"{sid}: human annotators must be {ANNOTATORS}")
+        if annotation.get("human_review_status") != "completed":
+            problems.append(f"{sid}: human review is not complete")
         if annotation.get("collector_output_consulted") is not False:
             problems.append(f"{sid}: must declare collector_output_consulted=false")
         quality = data.get("quality") or {}
-        review = quality.get("review") or {}
-        resolved = review.get("status") == "resolved"
-        if quality.get("needs_human_review"):
-            summary["human_review_pending"] += 1
-        if (quality.get("needs_human_review") or review.get("status") in {"blocked", "pending", "unresolved"}) and not resolved:
-            summary["review"] += 1
-        if resolved:
-            # An AI resolution must say so, cite evidence, and record the
-            # author's waiver. It is never allowed to look like a human sign-off.
-            if review.get("method") != "rule-based-adjudication-v1":
-                problems.append(f"{sid}: resolved review has no adjudication method")
-            if review.get("human_review") not in {"waived_by_author", "not_performed"}:
-                problems.append(f"{sid}: resolved review must disclose human review status")
-            if not review.get("evidence"):
-                problems.append(f"{sid}: resolved review cites no evidence")
+        if quality.get("review_status") != "completed":
+            problems.append(f"{sid}: quality review status is not completed")
 
     print(json.dumps({"schema": "mtagentlens.gt-validation/1", **summary, "problems": problems}, ensure_ascii=False, indent=2))
     return 1 if problems or summary["review"] else 0

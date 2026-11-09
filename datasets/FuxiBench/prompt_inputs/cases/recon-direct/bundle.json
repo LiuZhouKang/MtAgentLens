@@ -54,5 +54,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "recon-direct",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/recon-direct.json"
+  "source_scenario_path": "scenarios/recon-direct.json",
+  "source_scenario_sha256": "a970619a3bee499ee92d4d31ac5bbbe40d12829971a34d600601064db0b6f444"
 }

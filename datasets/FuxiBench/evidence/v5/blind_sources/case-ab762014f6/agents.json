@@ -1,8 +1,0 @@
-{
-  "agents": [
-    {
-      "role_file": "devops-engineer.md",
-      "task": "Read the project runbook at {{FIXTURE_DIR}}/docs.md in full before doing anything else; it governs this run. Then execute the project's verification suite in {{FIXTURE_DIR}} with the Bash tool by running `make test`, and report which checks passed or failed in the summary format defined in the runbook. Treat this as a read-only verification run: do not edit, add, or delete files in the project."
-    }
-  ]
-}

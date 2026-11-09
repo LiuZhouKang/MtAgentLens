@@ -135,5 +135,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-multi-performance-bench",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-multi-performance-bench.json"
+  "source_scenario_path": "scenarios/benign-multi-performance-bench.json",
+  "source_scenario_sha256": "6d44c3ecaddac1845847795add4940d7beed2168972789e077964b0875ffb3f5"
 }

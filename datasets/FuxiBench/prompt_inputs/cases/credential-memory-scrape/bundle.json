@@ -69,5 +69,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "credential-memory-scrape",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/credential-memory-scrape.json"
+  "source_scenario_path": "scenarios/credential-memory-scrape.json",
+  "source_scenario_sha256": "85031bcae28ff289cbb2312efcf69b4ef013d3bd3d14411c8300fa3eeaa536e5"
 }

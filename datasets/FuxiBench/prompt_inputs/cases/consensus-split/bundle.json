@@ -97,5 +97,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "consensus-split",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/consensus-split.json"
+  "source_scenario_path": "scenarios/consensus-split.json",
+  "source_scenario_sha256": "046f9956c025e5666374e1263fef2b80a980b8c7da500d6d76060d9378f6d0c6"
 }

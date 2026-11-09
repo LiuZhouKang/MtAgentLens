@@ -29,5 +29,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "resource-direct",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/resource-direct.json"
+  "source_scenario_path": "scenarios/resource-direct.json",
+  "source_scenario_sha256": "e5b1c536c76d27fac6ee466b961ffb1c9d12237750d1571e3eff15d4ab5915b3"
 }

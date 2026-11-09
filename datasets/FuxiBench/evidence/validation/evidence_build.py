@@ -6,7 +6,7 @@ Reads only:
   ground_truth/...
 Writes only:  <this dir>/evidence.json
 
-Run: env/.venv/bin/python evidence/v5/validation/evidence_build.py
+Run: env/.venv/bin/python evidence/validation/evidence_build.py
 """
 from __future__ import annotations
 
@@ -269,7 +269,7 @@ def source_mtimes() -> dict:
 def main() -> int:
     evidence: dict = {
         "schema": "mtagentlens.validation-diagnosis-evidence/1",
-        "generated_by": "evidence/v5/validation/evidence_build.py",
+        "generated_by": "evidence/validation/evidence_build.py",
         "binary_sha256": "dda3f4b59a8c4cc91dc873bcbbd415e00bb7a945557bb172992b0e4f8afb72d5",
         "release_id": "71e10e45a3c051bfaaa992bc1c0ca0cd84d27daef41e852c86928438840f2e1a",
         "binary_mtime": None,

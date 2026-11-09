@@ -54,5 +54,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "privsec-direct",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/privsec-direct.json"
+  "source_scenario_path": "scenarios/privsec-direct.json",
+  "source_scenario_sha256": "a3b36bc885f42dde17c732e99653be83f56152b1e6a21879688996f0bb287787"
 }

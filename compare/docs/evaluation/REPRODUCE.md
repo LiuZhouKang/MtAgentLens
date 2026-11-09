@@ -29,25 +29,9 @@ PYCODE
 
 期望：93/58/35、ITT 23/58、PP 23/29、FPR 2/35、良性Uncertain 21、未执行告警6。`detected` 的定义包含marker、Unsafe和健康采集；marker只是执行代理。生产Unsafe攻击总数为29，其中6条没有marker执行证据，不额外计为TP。
 
-## 2. 核对身份覆盖和两个F1分母
+## 2. 身份与归因结果复现
 
-输入为[身份主表CSV](../../results/identity/tables/t5_identity.csv)：
-
-```bash
-env/.venv/bin/python - <<'PYCODE'
-import csv
-from pathlib import Path
-p = Path('compare/results/identity/tables/t5_identity.csv')
-with p.open() as f:
-    rows = {r['condition']: r for r in csv.DictReader(f)}
-r = rows['C4']
-print({k: r[k] for k in ('assigned_known', 'reference_known', 'coverage',
-                         'assigned_only_f1', 'all_known_pair_f1')})
-assert (int(r['assigned_known']), int(r['reference_known'])) == (654, 1675)
-PYCODE
-```
-
-Full覆盖约0.39045，已赋值子集F1=1.000，全参考F1约0.27973。125个参考未知单元不进入该计分分母。参考方法与模型复核范围见[身份报告](../../results/identity/README.md)。
+IdentityBench 与 AttributionBench 使用已由刘周康、唐浩钺、刘锦样人工核查、修订并确认的冻结参考。可重算身份覆盖、分区指标和 root-only 候选指标；Entry/Chain 未在当前结果中计分。复现入口与口径见 [IdentityBench](../../results/identity/README.md) 和 [AttributionBench](../../results/attribution/README.md)。
 
 ## 3. 重建已有派生结果
 

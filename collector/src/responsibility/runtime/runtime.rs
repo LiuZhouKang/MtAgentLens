@@ -1117,9 +1117,6 @@ impl ResponsibilityRuntime {
             }
         }
 
-        // ── 1. Signal snapshot ─────────────────────────────────────
-        let _snapshot = self.signal_graph.snapshot();
-
         // ── 2. Drain and persist evidence correlator diagnostics ──
         for diag in self.evidence_correlator.drain_diagnostics() {
             let _ = self
@@ -2184,13 +2181,11 @@ impl ResponsibilityRuntime {
             run_id: self.current_run_id.clone().unwrap_or_default(),
             contract: crate::responsibility::replay::checkpoint::REPLAY_CONTRACT.into(),
             implementation: crate::responsibility::replay::checkpoint::implementation_fingerprint(),
-            graph: _frozen.snapshot.clone(),
+            graph: _frozen.snapshot,
             identity_input: Some(identity_input),
             identity_policy: Some(identity_policy),
             identities: resolved_identities,
-            evidence: batch_evidence.evidence.clone(),
-            intents: all_intents.clone(),
-            actions: all_actions.clone(),
+            evidence: batch_evidence.evidence,
             delegations: self.graph_builder.delegation_records().to_vec(),
             score_signals: crate::responsibility::classification::scoring::ScoreSignals {
                 baseline_deviation: self.last_baseline_deviation,
@@ -2220,9 +2215,9 @@ impl ResponsibilityRuntime {
             timeline: timeline.clone(),
             capture_quality,
             observer_enabled: Some(!self.config.disable_observer),
-            graph_refinements: _frozen.refinements.clone(),
+            graph_refinements: _frozen.refinements,
             identity_refinements: authoritative_identity.refinements.clone(),
-            evidence_refinements: batch_evidence.refinements.clone(),
+            evidence_refinements: batch_evidence.refinements,
             non_link_count: batch_evidence.non_links.len(),
             captured_request_contexts: Some(self.captured_request_contexts.clone()),
             graph_inputs: Some({
@@ -2252,6 +2247,10 @@ impl ResponsibilityRuntime {
                         .collect(),
                 }
             }),
+            // Finalization owns these vectors; transfer them to the checkpoint
+            // instead of retaining a second full copy during semantic review.
+            intents: all_intents,
+            actions: all_actions,
         };
         // ── 4b. Review candidates the phase-2 graph introduced ──────
         //
@@ -2346,6 +2345,11 @@ impl ResponsibilityRuntime {
                 }
             }
         }
+        // Review owns a reconstructed graph; release it before serialization
+        // and evaluation reconstruct another full graph from the checkpoint.
+        drop(review_graph);
+        drop(review_patterns);
+        drop(pending_candidates);
         if let Some(run_id) = self.current_run_id.clone() {
             let payload_json =
                 serde_json::to_string(&checkpoint).expect("analysis checkpoint is serializable");
@@ -2513,7 +2517,7 @@ impl ResponsibilityRuntime {
         // claim construction used the full in-memory evidence vector above.
         let selected = crate::responsibility::evidence::retention::select_for_persistence(
             &self.review_evidence,
-            &all_actions,
+            &checkpoint.actions,
             &claims,
         );
         for ev in selected {
@@ -2547,8 +2551,8 @@ impl ResponsibilityRuntime {
             session_id: uuid::Uuid::new_v4().to_string(),
             run_duration_ms: elapsed_millis(self.run_started_ns, current_time_ns()),
             total_events: self.event_count as u64,
-            total_intents: all_intents.len() as u64,
-            total_actions: all_actions.len() as u64,
+            total_intents: checkpoint.intents.len() as u64,
+            total_actions: checkpoint.actions.len() as u64,
             pbc_edge_count: graph
                 .edges_of_type(&NewEdgeType::PolicyBoundaryCrossing)
                 .len() as u64,
@@ -2927,6 +2931,131 @@ mod tests {
             json!({"event": "EXEC", "filename": "/usr/bin/ioq"}),
         );
         assert!(!ignored_file_comm_matches(&prefixes, &exec));
+    }
+
+    /// Run a real canonical process event through the real
+    /// `FileAccessAuditAnalyzer`, then route every event it emits through the
+    /// runtime. This is the production shape: the analyzer passes the original
+    /// `process` event through and appends a derived `file_access` audit event.
+    async fn route_through_real_file_access_audit(
+        runtime: &mut ResponsibilityRuntime,
+        event: Event,
+    ) -> Vec<Event> {
+        use futures::StreamExt;
+        let mut analyzer =
+            crate::framework::analyzers::file_access_audit::FileAccessAuditAnalyzer::new(
+                crate::framework::analyzers::file_access_audit_contract::FileAccessAuditConfig::default(),
+                vec![std::path::PathBuf::from("/home")],
+            );
+        let output: Vec<Event> = analyzer
+            .process(Box::pin(futures::stream::iter(vec![event])))
+            .await
+            .expect("file access audit analyzer runs")
+            .collect()
+            .await;
+        for observed in &output {
+            runtime.route_event(observed);
+        }
+        output
+    }
+
+    #[tokio::test]
+    async fn one_captured_file_open_yields_one_action_not_the_audit_decoration() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut runtime = runtime_with_db(&dir.path().join("dedup.db"));
+        let captured = Event::new_with_timestamp(
+            1_000,
+            "process".into(),
+            4242,
+            "claude".into(),
+            json!({
+                "event": "FILE_OPEN",
+                "pid": 4242,
+                "start_time_ns": 7,
+                "filepath": "/home/user/project/main.rs",
+                "flags": 0,
+                "syscall_ret": 3,
+                "outcome": "succeeded",
+            }),
+        );
+
+        let output = route_through_real_file_access_audit(&mut runtime, captured).await;
+        assert_eq!(
+            output.len(),
+            2,
+            "analyzer must emit the original process event plus one audit decoration"
+        );
+        assert!(
+            output.iter().any(|event| event.source == "file_access"),
+            "the audit decoration must remain in the stream for logging"
+        );
+        assert_eq!(runtime.source_counts.get("process"), Some(&1));
+        assert_eq!(runtime.source_counts.get("file_access"), Some(&1));
+        assert!(
+            runtime.graph_buffer.intents.is_empty(),
+            "audit decoration must not forge an intent"
+        );
+        assert_eq!(
+            runtime.graph_buffer.actions.len(),
+            1,
+            "one physical open must not become two actions: {:?}",
+            runtime.graph_buffer.actions
+        );
+        let action = &runtime.graph_buffer.actions[0];
+        assert_eq!(
+            action.process_id,
+            crate::responsibility::types::ProcessId::new(4242, 7),
+            "action must keep the original process instance"
+        );
+        assert_eq!(
+            action.outcome,
+            crate::responsibility::types::ActionOutcome::Succeeded
+        );
+        assert_eq!(action.syscall_ret, Some(3));
+    }
+
+    #[tokio::test]
+    async fn two_distinct_captured_file_opens_still_yield_two_actions() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut runtime = runtime_with_db(&dir.path().join("distinct.db"));
+        for (timestamp, filepath) in [
+            (1_000, "/home/user/project/main.rs"),
+            (1_001, "/home/user/project/lib.rs"),
+        ] {
+            let captured = Event::new_with_timestamp(
+                timestamp,
+                "process".into(),
+                4242,
+                "claude".into(),
+                json!({
+                    "event": "FILE_OPEN",
+                    "pid": 4242,
+                    "start_time_ns": 7,
+                    "filepath": filepath,
+                    "flags": 0,
+                    "syscall_ret": 3,
+                    "outcome": "succeeded",
+                }),
+            );
+            route_through_real_file_access_audit(&mut runtime, captured).await;
+        }
+
+        assert_eq!(
+            runtime.graph_buffer.actions.len(),
+            2,
+            "two distinct physical opens must remain two actions: {:?}",
+            runtime.graph_buffer.actions
+        );
+        for action in &runtime.graph_buffer.actions {
+            assert_eq!(
+                action.process_id,
+                crate::responsibility::types::ProcessId::new(4242, 7)
+            );
+            assert_eq!(
+                action.outcome,
+                crate::responsibility::types::ActionOutcome::Succeeded
+            );
+        }
     }
 
     fn runtime_with_db(db_path: &std::path::Path) -> ResponsibilityRuntime {

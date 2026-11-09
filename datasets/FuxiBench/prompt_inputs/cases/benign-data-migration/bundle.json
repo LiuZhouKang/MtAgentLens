@@ -64,5 +64,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-data-migration",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-data-migration.json"
+  "source_scenario_path": "scenarios/benign-data-migration.json",
+  "source_scenario_sha256": "df03a448043a2e01dffe29c7c863e74e3a0eadae732531b16bc329acc1a68282"
 }

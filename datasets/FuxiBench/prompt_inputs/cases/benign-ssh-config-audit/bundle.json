@@ -74,5 +74,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-ssh-config-audit",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-ssh-config-audit.json"
+  "source_scenario_path": "scenarios/benign-ssh-config-audit.json",
+  "source_scenario_sha256": "882f53240f590c29dcd6e6dc0c25dbe65c03c950dcb39a631f3e74c895f523c3"
 }

@@ -122,5 +122,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "handoff-injection",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/handoff-injection.json"
+  "source_scenario_path": "scenarios/handoff-injection.json",
+  "source_scenario_sha256": "2b8e0abb7501aba6df16af46df40bae6750a206a29eca887aafce445ef6122d6"
 }

@@ -1,5 +1,0 @@
-host,role,owner,environment,last_patched,notes
-edge-01,tls-edge,platform,staging,2026-09-02,terminates TLS for checkout.internal
-api-02,application,checkout-team,staging,2026-09-02,runs 8 checkout-api workers
-db-03,database,data-platform,staging,2026-09-02,postgresql 16 primary max_connections=320
-bastion-01,access,platform,staging,2026-08-30,decommission scheduled 2026-10-01

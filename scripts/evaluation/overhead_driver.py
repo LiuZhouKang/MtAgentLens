@@ -626,9 +626,23 @@ def descendant_pids(roots) -> set[int]:
     return found
 
 
+def _proc_pss_kib(pid: int) -> int | None:
+    try:
+        for line in Path(f"/proc/{pid}/smaps_rollup").read_text().splitlines():
+            key, _, value = line.partition(":")
+            if key == "Pss":
+                amount, unit = value.split()
+                return int(amount) if unit == "kB" and amount.isdigit() else None
+    except (OSError, ValueError):
+        pass
+    return None
+
+
 def _tree_snapshot(roots) -> dict:
     pids = descendant_pids(roots)
     rss_kib = 0
+    pss_kib = 0
+    pss_processes = 0
     cpu_seconds = 0.0
     alive = 0
     cpu_by_process = {}
@@ -640,6 +654,10 @@ def _tree_snapshot(roots) -> dict:
         rss = status.get("VmRSS", "").split()
         if rss and rss[0].isdigit():
             rss_kib += int(rss[0])
+        pss = _proc_pss_kib(pid)
+        if pss is not None:
+            pss_kib += pss
+            pss_processes += 1
         cpu = _proc_cpu_seconds(pid)
         if cpu is not None:
             cpu_seconds += cpu
@@ -649,7 +667,10 @@ def _tree_snapshot(roots) -> dict:
                 cpu_by_process[f'{pid}:{birth}'] = cpu
             except (OSError,IndexError):
                 pass
-    return {"processes": alive, "rss_kib": rss_kib, "cpu_seconds": cpu_seconds,
+    # A partial sum would understate memory when a process exits or denies access.
+    return {"processes": alive, "rss_kib": rss_kib,
+            "pss_kib": pss_kib if pss_processes == alive else None,
+            "pss_processes": pss_processes, "cpu_seconds": cpu_seconds,
             "cpu_by_process": cpu_by_process}
 
 
@@ -722,7 +743,8 @@ class ResourceSampler(threading.Thread):
     def _sample(self) -> dict:
         now = time.monotonic()
         collector = _tree_snapshot([self.collector_pid]) if self.collector_pid else {
-            "processes": 0, "rss_kib": 0, "cpu_seconds": 0.0}
+            "processes": 0, "rss_kib": 0, "pss_kib": 0,
+            "pss_processes": 0, "cpu_seconds": 0.0}
         workloads = _tree_snapshot(self.workload_pids)
         # A process disappearing must not subtract all of its prior CPU time.
         # PID plus start ticks separates reused numeric PIDs. Very short-lived
@@ -775,9 +797,13 @@ class ResourceSampler(threading.Thread):
         series = [{
             "elapsed_s": row["elapsed_s"],
             "collector_rss_kib": row["collector"]["rss_kib"],
+            "collector_pss_kib": row["collector"].get("pss_kib"),
+            "collector_pss_processes": row["collector"].get("pss_processes"),
             "collector_cpu_percent": row["collector"]["cpu_percent"],
             "collector_processes": row["collector"]["processes"],
             "workload_rss_kib": row["workloads"]["rss_kib"],
+            "workload_pss_kib": row["workloads"].get("pss_kib"),
+            "workload_pss_processes": row["workloads"].get("pss_processes"),
             "workload_cpu_percent": row["workloads"]["cpu_percent"],
             "workload_processes": row["workloads"]["processes"],
             "collector_cpu_seconds": row["collector"]["cpu_seconds"],
@@ -819,6 +845,8 @@ class ResourceSampler(threading.Thread):
             "sample_interval_ms": int(round(self.interval_s * 1000)),
             "collector": {
                 "rss_kib": _series_stats([row["collector"]["rss_kib"] for row in self.rows], "KiB"),
+                "pss_kib": _series_stats([row["collector"].get("pss_kib") for row in self.rows], "KiB"),
+                "pss_missing_samples": sum(row["collector"].get("pss_kib") is None for row in self.rows),
                 "cpu_percent": _series_stats(collector_cpu, "percent"),
                 "cpu_seconds": _series_stats(
                     [row["collector"]["cpu_seconds"] for row in self.rows], "seconds"),
@@ -827,6 +855,8 @@ class ResourceSampler(threading.Thread):
             },
             "workloads": {
                 "rss_kib": _series_stats([row["workloads"]["rss_kib"] for row in self.rows], "KiB"),
+                "pss_kib": _series_stats([row["workloads"].get("pss_kib") for row in self.rows], "KiB"),
+                "pss_missing_samples": sum(row["workloads"].get("pss_kib") is None for row in self.rows),
                 "cpu_percent": _series_stats(workload_cpu, "percent"),
                 "cpu_seconds": _series_stats(
                     [row["workloads"]["cpu_seconds"] for row in self.rows], "seconds"),
@@ -845,6 +875,9 @@ class ResourceSampler(threading.Thread):
             "series": series,
             "series_stride": stride,
             "limitations": [
+                "PSS sums smaps_rollup Pss across observed processes; unreadable/partial tree samples remain null",
+                "PSS excludes unmapped kernel allocations; sequential process reads are not an atomic snapshot",
+                "smaps_rollup adds sampling cost; actual sample spacing includes collection time plus the requested interval",
                 "system-wide kernel memory includes unrelated activity and is not a collector-only delta",
                 "CPU percent is derived from /proc utime+stime across the observed process tree",
                 "cpu_seconds is the cumulative /proc value observed while processes are alive; exited children are not reconstructed",

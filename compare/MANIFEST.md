@@ -28,7 +28,7 @@ Everything else stays in the repository.
 | sensitivity | `results/sensitivity/data/raw/` | 93 exports + 3 source files / 66 MB |
 | identity | `results/identity/data/identity-runs/` | 30 JSON + 5 CSV / 1.2 GB |
 | overhead | `results/overhead/raw/` | 2952 files / 1.1 GB |
-| attribution | `results/attribution/data/` | 93 JSON / 58 MB |
+| attribution | `results/attribution/data/` + `predictions/` + `packets/` + `reference/` | 93 JSON / 58 MB + 30 packets/predictions + 人工复核参考 |
 | pbc | `results/pbc/data/` | 4 files / 404 KB |
 | external | `results/external/data/` | 5 files / ~130 KB |
 
@@ -62,6 +62,10 @@ find results -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 ```
 
 `SHA256SUMS` 是可选的完整性清单；生成后放在 `compare/` 根目录。
+
+## Identity/Attribution annotation status
+
+`results/identity/` and `results/attribution/` contain the final references reviewed and revised by 刘周康、唐浩钺、刘锦样. IdentityBench reports unit-level partition consistency; AttributionBench reports root-only candidate localization. Entry/Chain remain outside the evaluated scope.
 
 ## Exclusions
 

@@ -64,5 +64,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-credential-rotation-plan",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-credential-rotation-plan.json"
+  "source_scenario_path": "scenarios/benign-credential-rotation-plan.json",
+  "source_scenario_sha256": "e91ed5d14eb820fe8587d3d41f83e069600f9c2aca2bef4971d70ea5068d1e3f"
 }

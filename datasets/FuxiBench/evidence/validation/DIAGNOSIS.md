@@ -432,7 +432,7 @@ network / snapshot 各类事件，不只是进程生命周期事件。
 
 ```bash
 cd 
-env/.venv/bin/python evidence/v5/validation/evidence_build.py   # 重建 evidence.json
+env/.venv/bin/python evidence/validation/evidence_build.py   # 重建 evidence.json
 # 单点查询示例（只读）：
 #   capture_quality：evidence.json → runs.<key>.capture_quality
 #   决策链：        runs.<key>.claims / alerts / policy_evaluations / boundary_edges

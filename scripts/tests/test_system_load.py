@@ -4,6 +4,7 @@ import pytest
 import json
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 from scripts.evaluation import system_load as load
@@ -59,6 +60,35 @@ def test_proc_stat_parser_handles_parentheses_in_comm():
     fields[11], fields[12], fields[19], fields[21] = "20", "5", "111", "9"
     assert load.parse_proc_stat("42 (a (b)) " + " ".join(fields)) == {
         "pid": 42, "ppid": 7, "ticks": 25, "start_ticks": 111, "rss_pages": 9}
+
+
+def test_sampler_records_real_pss_and_explicit_phase_boundaries():
+    sampler = load.Sampler(os.getpid())
+    sampler.sample()
+    assert sampler.samples[0]['phase'] == 'startup'
+    assert sampler.samples[0]['pss_bytes_sum'] > 0
+    sampler.mark_phase('workload')
+    sampler.sample()
+    phases = sampler.phase_summary()
+    assert phases['startup']['sample_count'] >= 2
+    assert phases['workload']['sample_count'] >= 2
+    assert phases['workload']['sampled_peak_pss_bytes'] > 0
+    assert phases['workload']['pss_missing_samples'] == 0
+
+
+def test_phase_summary_preserves_missing_pss_and_cpu_delta():
+    sampler = load.Sampler(1)
+    sampler.samples = [
+        {'phase': 'workload', 'monotonic_ns': 1_000_000_000,
+         'cpu_seconds_lower_bound': 2., 'rss_bytes_sum': 100, 'pss_bytes_sum': None},
+        {'phase': 'workload', 'monotonic_ns': 3_000_000_000,
+         'cpu_seconds_lower_bound': 3., 'rss_bytes_sum': 200, 'pss_bytes_sum': None},
+    ]
+    result = sampler.phase_summary()['workload']
+    assert result['cpu_seconds_lower_bound'] == 1.
+    assert result['average_cpu_cores_lower_bound'] == .5
+    assert result['sampled_peak_pss_bytes'] is None
+    assert result['pss_missing_samples'] == 2
 
 
 def test_plan_discloses_real_scope_and_disables_paid_and_tls_paths(tmp_path):

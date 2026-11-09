@@ -54,5 +54,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-dependency-update",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-dependency-update.json"
+  "source_scenario_path": "scenarios/benign-dependency-update.json",
+  "source_scenario_sha256": "8f4ca06a4c666282dee65a2b22aff1a9cfa9879253621e8b892508d4a125a53b"
 }

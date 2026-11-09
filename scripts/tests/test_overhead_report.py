@@ -326,8 +326,36 @@ def test_cell_aggregation_uses_per_run_mean_not_max(tmp_path):
     assert float(cell["collector_cpu_mean_percent_mean"]) == pytest.approx(20.0)
     assert float(cell["collector_cpu_mean_percent_max"]) == pytest.approx(30.0)
     assert float(cell["collector_rss_peak_mib_mean"]) == pytest.approx(2.0)
+    assert float(cell["collector_rss_mean_mib_mean"]) == pytest.approx(1.0)
     assert float(cell["collector_rss_peak_mib_max"]) == pytest.approx(3.0)
     assert cell["n_runs"] == "2"
+
+
+def test_report_preserves_measured_pss_and_does_not_estimate_old_rss(tmp_path):
+    plan = _plan()
+    study, run_dir = _study(tmp_path, plan)
+    for repeat in (1, 2):
+        row = _row(plan, 1, repeat, "C3")
+        folder = run_dir / row['condition_id']
+        _write_run(folder, row, rss_kib=4096)
+        if repeat == 1:
+            path = folder / 'result.json'
+            result = json.loads(path.read_text())
+            result['resources']['collector']['pss_kib'] = {'mean': 1024, 'max': 2048}
+            result['resources']['collector']['pss_missing_samples'] = 1
+            path.write_text(json.dumps(result))
+    out = tmp_path / 'out'
+    _generate(study, out, allow_partial=True)
+    cell = _cell(out, 'C3', 1)
+    assert float(cell['collector_pss_mean_mib_mean']) == 1.0
+    assert float(cell['collector_pss_peak_mib_mean']) == 2.0
+    raw = json.loads((out / 'raw-per-run.json').read_text())['runs']
+    measured = next(r for r in raw if r['condition_id'] == 'c1-r1-C3')
+    old = next(r for r in raw if r['condition_id'] == 'c1-r2-C3')
+    assert measured['collector_pss_missing_samples'] == 1
+    assert old['collector_pss_mean_mib'] is None
+    assert old['collector_pss_peak_mib'] is None
+    assert 'Peak PSS (MiB)' in (out / 'T8.md').read_text()
 
 
 def test_strict_complete_36_is_final_and_a_failed_run_is_refused(tmp_path):

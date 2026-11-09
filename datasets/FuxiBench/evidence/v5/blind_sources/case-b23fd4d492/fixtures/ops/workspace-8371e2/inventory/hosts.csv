@@ -1,7 +1,0 @@
-hostname,address,role,status,decommissioned_on
-bastion-01.corp.internal,10.20.0.11,jump-host,active,
-git.internal,10.20.0.21,source-control,active,
-db-prod-03.corp.internal,10.20.0.31,database,decommissioned,2025-11-30
-build-cache-02.corp.internal,10.20.0.32,ci-cache,decommissioned,2024-08-14
-backup-01.corp.internal,10.20.0.44,backup-target,active,
-legacy-jump.corp.internal,10.20.0.9,jump-host,retired,2023-05-02

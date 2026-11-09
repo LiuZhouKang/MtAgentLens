@@ -458,108 +458,115 @@ impl EvidenceCorrelator {
         let mut match_counts: std::collections::HashMap<String, usize> =
             std::collections::HashMap::new();
 
-        // First pass: find all valid matches
-        let mut matches: Vec<(usize, usize, MatchLevel, f32, NormalizedArgs)> = Vec::new();
+        // Authoritative attribution is one-to-one: an action is attributed to its
+        // best matching intent, not to every intent whose process tree happens to
+        // contain it. Keeping every eligible pair made phase-2 evidence quadratic
+        // (observed: 204k rows for 66 intents / 18,520 actions, 110k of them
+        // ProcessLineage), which blew up the database and made finalisation
+        // impossible to complete for multi-agent runs. Retain only the current
+        // best candidate per action while traversing; cloning NormalizedArgs for
+        // every accepted pair cost over 1 GiB of transient RSS.
+        struct BestCandidate {
+            intent_index: usize,
+            action_index: usize,
+            level: MatchLevel,
+            confidence: f32,
+            matched_fields: NormalizedArgs,
+            rank: (u8, i64, u64),
+            sequence: u64,
+        }
+
+        let mut best_per_action: Vec<Option<BestCandidate>> =
+            (0..actions.len()).map(|_| None).collect();
+        let mut accepted = 0u64;
+
+        // First pass: find the best valid match per action in traversal order.
         for (i_idx, intent) in intents.iter().enumerate() {
             for (a_idx, action) in actions.iter().enumerate() {
+                // Process-tree eligibility cannot change the result, so check it
+                // before the more expensive argument matching.
+                if !snapshot.can_correlate(intent.process_id, action.process_id) {
+                    continue;
+                }
                 let argument = match_args_detailed(&intent.tool_args, &action.normalized_args);
                 let lineage = if argument.is_none() {
                     lineage_match(intent, action)
                 } else {
                     None
                 };
-                if let Some(arg_match) = argument {
+                let (level, confidence, matched_fields) = if let Some(arg_match) = argument {
                     let level = arg_match.level.clone();
-                    // Check process tree
-                    if snapshot.can_correlate(intent.process_id, action.process_id) {
-                        let tree_dist =
-                            compute_tree_distance(intent.process_id, action.process_id, snapshot);
-                        let _time_delta = intent.timestamp_ns.abs_diff(action.timestamp_ns);
-                        // Get competing matches count
-                        let competing = *match_counts.get(intent.intent_id.as_str()).unwrap_or(&0);
-                        // Phase 2 batch: no time window per spec §7.3.
-                        // Time delta affects confidence but doesn't hard-gate.
-                        // Pass 0 to skip time penalty in batch mode.
-                        let confidence = compute_confidence(
-                            &level,
-                            0, // batch mode: no time penalty
-                            tree_dist,
-                            &action.signal_class,
-                            competing,
-                        );
-
-                        if confidence >= min_confidence_for_level(&level) {
-                            matches.push((
-                                i_idx,
-                                a_idx,
-                                level.clone(),
-                                confidence,
-                                matched_fields_from(&arg_match),
-                            ));
-                            *match_counts
-                                .entry(intent.intent_id.as_str().to_string())
-                                .or_insert(0) += 1;
-                        }
+                    let tree_dist =
+                        compute_tree_distance(intent.process_id, action.process_id, snapshot);
+                    // Get competing matches count
+                    let competing = *match_counts.get(intent.intent_id.as_str()).unwrap_or(&0);
+                    // Phase 2 batch: no time window per spec §7.3.
+                    // Time delta affects confidence but doesn't hard-gate.
+                    // Pass 0 to skip time penalty in batch mode.
+                    let confidence = compute_confidence(
+                        &level,
+                        0, // batch mode: no time penalty
+                        tree_dist,
+                        &action.signal_class,
+                        competing,
+                    );
+                    if confidence < min_confidence_for_level(&level) {
+                        continue;
                     }
-                } else if let Some((level, _score)) = lineage
-                    && snapshot.can_correlate(intent.process_id, action.process_id)
-                {
+                    (level, confidence, matched_fields_from(&arg_match))
+                } else if let Some((level, _score)) = lineage {
                     let tree_dist =
                         compute_tree_distance(intent.process_id, action.process_id, snapshot);
                     let confidence =
                         compute_confidence(&level, 0, tree_dist, &action.signal_class, 0);
-                    if confidence >= min_confidence_for_level(&level) {
-                        matches.push((
-                            i_idx,
-                            a_idx,
-                            level.clone(),
-                            confidence,
-                            lineage_fields(intent, action),
-                        ));
-                        *match_counts
-                            .entry(intent.intent_id.as_str().to_string())
-                            .or_insert(0) += 1;
+                    if confidence < min_confidence_for_level(&level) {
+                        continue;
                     }
+                    (level, confidence, lineage_fields(intent, action))
+                } else {
+                    continue;
+                };
+
+                // Every accepted candidate raises the competing-match count for
+                // its intent, even when it loses the per-action ranking.
+                *match_counts
+                    .entry(intent.intent_id.as_str().to_string())
+                    .or_insert(0) += 1;
+
+                let time_delta = intent.timestamp_ns.abs_diff(action.timestamp_ns);
+                let rank = (
+                    level.clone() as u8,
+                    (confidence.clamp(0.0, 1.0) * 1_000_000.0) as i64,
+                    u64::MAX - time_delta,
+                );
+                let better = match &best_per_action[a_idx] {
+                    Some(existing) => rank > existing.rank,
+                    None => true,
+                };
+                if better {
+                    best_per_action[a_idx] = Some(BestCandidate {
+                        intent_index: i_idx,
+                        action_index: a_idx,
+                        level,
+                        confidence,
+                        matched_fields,
+                        rank,
+                        sequence: accepted,
+                    });
                 }
+                accepted += 1;
             }
         }
 
-        // Authoritative attribution is one-to-one: an action is attributed to its
-        // best matching intent, not to every intent whose process tree happens to
-        // contain it. Keeping every eligible pair made phase-2 evidence quadratic
-        // (observed: 204k rows for 66 intents / 18,520 actions, 110k of them
-        // ProcessLineage), which blew up the database and made finalisation
-        // impossible to complete for multi-agent runs.
-        let mut best_match: std::collections::HashMap<usize, (u8, i64, u64, usize)> =
-            std::collections::HashMap::new();
-        for (index, (i_idx, a_idx, level, confidence, _)) in matches.iter().enumerate() {
-            let intent = &intents[*i_idx];
-            let action = &actions[*a_idx];
-            let time_delta = intent.timestamp_ns.abs_diff(action.timestamp_ns);
-            let key = (
-                level.clone() as u8,
-                (confidence.clamp(0.0, 1.0) * 1_000_000.0) as i64,
-                u64::MAX - time_delta,
-            );
-            let better = match best_match.get(a_idx) {
-                Some(existing) => key > (existing.0, existing.1, existing.2),
-                None => true,
-            };
-            if better {
-                best_match.insert(*a_idx, (key.0, key.1, key.2, index));
-            }
-        }
+        // Second pass: produce evidence in the original accepted-candidate order
+        // (intent-major), which is what filtering the full matches vector did.
+        let mut winners: Vec<BestCandidate> = best_per_action.into_iter().flatten().collect();
+        winners.sort_unstable_by_key(|candidate| candidate.sequence);
 
-        // Second pass: produce evidence and track linked sets
-        let mut final_matches: Vec<CorrelationEvidence> = Vec::new();
-        for (index, (i_idx, a_idx, level, confidence, matched_fields)) in
-            matches.into_iter().enumerate()
-        {
-            if best_match.get(&a_idx).map(|entry| entry.3) != Some(index) {
-                continue;
-            }
-            let intent = &intents[i_idx];
-            let action = &actions[a_idx];
+        let mut final_matches: Vec<CorrelationEvidence> = Vec::with_capacity(winners.len());
+        for candidate in winners {
+            let intent = &intents[candidate.intent_index];
+            let action = &actions[candidate.action_index];
 
             // Dedup: skip already-linked pairs
             let pair_key = (
@@ -574,9 +581,9 @@ impl EvidenceCorrelator {
                     .unwrap_or_else(EvidenceId::new),
                 intent_id: intent.intent_id.clone(),
                 action_id: action.action_id.clone(),
-                match_level: level,
-                confidence,
-                matched_fields,
+                match_level: candidate.level,
+                confidence: candidate.confidence,
+                matched_fields: candidate.matched_fields,
                 derivation_mode: CandidateDerivationMode::Direct,
                 phase: PhaseIndicator::Authoritative {
                     timestamp_ns: std::cmp::max(intent.timestamp_ns, action.timestamp_ns),
@@ -882,7 +889,7 @@ mod tests {
     use crate::responsibility::signals::SignalGraph;
     use crate::responsibility::types::{
         ActionCandidateType, ActionId, CandidateDerivationMode, IntentAuthoritySource, IntentClass,
-        IntentParseState, MessageId, NormalizedArg, ProcessId, SignalClass,
+        IntentParseState, MessageId, NonLinkReason, NormalizedArg, ProcessId, SignalClass,
     };
 
     fn pid(id: u32, start: u64) -> ProcessId {
@@ -1525,6 +1532,201 @@ mod tests {
         let result = corr.correlate_batch(&intents, &actions, &snap);
         assert!(result.evidence.is_empty());
         assert!(!result.non_links.is_empty());
+    }
+
+    /// Phase 2 is one-to-one per action. The winner is chosen by match level,
+    /// then quantized confidence, then inverse time distance, and the first
+    /// candidate wins a full tie. Evidence is emitted in the original accepted
+    /// candidate order (intent-major), not action-major. Confidence includes the
+    /// competing-match count seen before the candidate, so that count must not
+    /// change when only the winner is retained.
+    #[test]
+    fn correlate_batch_winner_ranking_order_and_confidence_are_stable() {
+        let agent = pid(700, 1);
+        let child = pid(701, 2);
+        let (_, snap) = build_snapshot(&[(child, agent)]);
+        let corr = EvidenceCorrelator::new();
+
+        let intents = vec![
+            make_intent(
+                agent,
+                "Read",
+                vec![NormalizedArg::Path("/data/a".into())],
+                1_000,
+            ),
+            make_intent(
+                agent,
+                "Read",
+                vec![NormalizedArg::Path("/data/a".into())],
+                2_000,
+            ),
+            make_intent(
+                child,
+                "Read",
+                vec![NormalizedArg::Path("/data/a".into())],
+                3_000,
+            ),
+        ];
+        let actions = vec![
+            make_action(
+                agent,
+                ActionCandidateType::FileRead,
+                vec![NormalizedArg::Path("/data/a".into())],
+                1_000,
+            ),
+            make_action(
+                child,
+                ActionCandidateType::FileRead,
+                vec![NormalizedArg::Path("/data/a".into())],
+                2_000,
+            ),
+            make_action(
+                agent,
+                ActionCandidateType::FileRead,
+                vec![NormalizedArg::Path("/data/a".into())],
+                3_000,
+            ),
+        ];
+
+        let result = corr.correlate_batch(&intents, &actions, &snap);
+        assert_eq!(result.evidence.len(), 3);
+        assert!(result.non_links.is_empty());
+
+        // action 0: intents 0/1 tie on confidence, the nearer intent (0) wins.
+        assert_eq!(result.evidence[0].action_id, actions[0].action_id);
+        assert_eq!(result.evidence[0].intent_id, intents[0].intent_id);
+        assert!((result.evidence[0].confidence - 0.93).abs() < 1e-6);
+        assert_eq!(
+            result.evidence[0].matched_fields.canonical_path.as_deref(),
+            Some("/data/a")
+        );
+
+        // action 2 appears before action 1 because evidence keeps the
+        // accepted-candidate order: intent 1's action 2 is accepted before
+        // intent 2's action 1. action 2: equal level/confidence, intent 1 is
+        // nearer than intent 0. action 1: same-process high confidence wins.
+        assert_eq!(result.evidence[1].action_id, actions[2].action_id);
+        assert_eq!(result.evidence[1].intent_id, intents[1].intent_id);
+        assert!((result.evidence[1].confidence - 0.85).abs() < 1e-6);
+        assert_eq!(result.evidence[2].action_id, actions[1].action_id);
+        assert_eq!(result.evidence[2].intent_id, intents[2].intent_id);
+        assert!((result.evidence[2].confidence - 0.93).abs() < 1e-6);
+        assert_eq!(result.refinements.len(), 3);
+    }
+
+    /// Peak resident set (KiB) from /proc, used to bound transient candidate
+    /// retention. Only the focused fixture test reads it.
+    #[cfg(target_os = "linux")]
+    fn peak_rss_kib() -> Option<u64> {
+        let status = std::fs::read_to_string("/proc/self/status").ok()?;
+        status.lines().find_map(|line| {
+            let value = line.strip_prefix("VmHWM:")?;
+            value.split_whitespace().next()?.parse().ok()
+        })
+    }
+
+    /// Many intents and actions in distinct process trees. Retaining every
+    /// accepted pair makes this fixture clone Cartesian `NormalizedArgs` and
+    /// spike RSS; retaining one best candidate per action stays bounded.
+    #[test]
+    fn correlate_batch_bounds_retained_candidates_for_many_pairs() {
+        // VmHWM is process-wide; isolate this budget from parallel unit tests.
+        if cfg!(target_os = "linux") && std::env::var_os("MTL_CORRELATOR_MEMORY_CHILD").is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "responsibility::evidence::correlator::tests::correlate_batch_bounds_retained_candidates_for_many_pairs",
+                    "--exact",
+                    "--test-threads=1",
+                ])
+                .env("MTL_CORRELATOR_MEMORY_CHILD", "1")
+                .output()
+                .expect("run isolated memory check");
+            assert!(
+                output.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+            return;
+        }
+        const TREES: usize = 4;
+        const INTENTS_PER_TREE: usize = 16;
+        const ACTIONS_PER_TREE: usize = 5_000;
+
+        let mut intents = Vec::with_capacity(TREES * INTENTS_PER_TREE);
+        let mut actions = Vec::with_capacity(TREES * ACTIONS_PER_TREE);
+        for tree in 0..TREES {
+            // Each tree is a disconnected single process. Actions in another
+            // tree fail can_correlate, while a tree's own intents all match.
+            let agent = pid(1_000 + tree as u32 * 10, 1 + tree as u64);
+            for _ in 0..INTENTS_PER_TREE {
+                intents.push(make_intent(
+                    agent,
+                    "Read",
+                    vec![NormalizedArg::Path("/data/shared".into())],
+                    0,
+                ));
+            }
+            for _ in 0..ACTIONS_PER_TREE {
+                actions.push(make_action(
+                    agent,
+                    ActionCandidateType::FileRead,
+                    vec![NormalizedArg::Path("/data/shared".into())],
+                    0,
+                ));
+            }
+        }
+        let (_, snap) = build_snapshot(&[]);
+        let corr = EvidenceCorrelator::new();
+
+        #[cfg(target_os = "linux")]
+        let before_kib = peak_rss_kib();
+        let result = corr.correlate_batch(&intents, &actions, &snap);
+
+        // Each action is attributed to the first intent of its tree: every
+        // candidate in a tree has identical level, confidence and time delta,
+        // so the first accepted candidate wins. Evidence order is intent-major.
+        assert_eq!(result.evidence.len(), TREES * ACTIONS_PER_TREE);
+        for tree in 0..TREES {
+            let expected = &intents[tree * INTENTS_PER_TREE].intent_id;
+            let first = &result.evidence[tree * ACTIONS_PER_TREE];
+            let last = &result.evidence[(tree + 1) * ACTIONS_PER_TREE - 1];
+            assert_eq!(&first.intent_id, expected);
+            assert_eq!(&last.intent_id, expected);
+        }
+
+        // L1 + HighSignal = 0.93; each earlier accepted match for the same
+        // intent costs 0.04, capped at 0.20.
+        for (index, expected) in [(0, 0.93), (1, 0.89), (2, 0.85), (5, 0.73)]
+            .into_iter()
+            .chain([(ACTIONS_PER_TREE - 1, 0.73)])
+        {
+            let confidence = result.evidence[index].confidence;
+            assert!(
+                (confidence - expected).abs() < 1e-5,
+                "evidence[{index}] confidence {confidence} != {expected}"
+            );
+        }
+
+        // Non-first intents stay unlinked and get one explanation each.
+        assert_eq!(result.non_links.len(), TREES * (INTENTS_PER_TREE - 1));
+        assert!(
+            result
+                .non_links
+                .iter()
+                .all(|diag| diag.reason == NonLinkReason::NoArgumentMatch)
+        );
+
+        #[cfg(target_os = "linux")]
+        if let (Some(before), Some(after)) = (before_kib, peak_rss_kib()) {
+            let growth_kib = after.saturating_sub(before);
+            assert!(
+                growth_kib <= 64 * 1024,
+                "correlate_batch grew peak RSS by {growth_kib} KiB for {} accepted pairs",
+                TREES * INTENTS_PER_TREE * ACTIONS_PER_TREE
+            );
+        }
     }
 
     #[test]

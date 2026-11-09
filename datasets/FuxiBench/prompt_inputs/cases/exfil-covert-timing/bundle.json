@@ -84,5 +84,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "exfil-covert-timing",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/exfil-covert-timing.json"
+  "source_scenario_path": "scenarios/exfil-covert-timing.json",
+  "source_scenario_sha256": "f91104a4a9c1a9a6828426ec4b4d27ca704239fdbd776d64a90c06a556cfe700"
 }

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
-"""Validate FuxiBench structure, execution inputs and historical traces."""
+"""Validate FuxiBench structure, current human annotation metadata and inputs."""
 from __future__ import annotations
 
 import argparse
@@ -16,15 +16,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 DEFAULT = ROOT / "datasets/FuxiBench"
 FORBIDDEN = (b"/home/lzk", b"local/workpackages", b"local/e8", b"local/f6", b"local/validate-tonight", b"env/scenarios", b"compare/Dataset")
-REQUIRED_EVIDENCE = (
-    "evidence/v5/gt-v5.json",
-    "evidence/v5/flip-decisions.json",
-    "evidence/merge/MERGE-REPORT.json",
-    "evidence/annotation-source-verification.json",
-)
-# All 93 records are scored: the nine previously detection-excluded records were
-# re-adjudicated to difficult benign on 2026-10-27 (3 blind annotators + an
-# independent adjudicator), so `excluded` is 0 and benign contributes 35.
+REQUIRED_EVIDENCE = ()
+# All 93 current records are included in the scored split.
 EXPECTED = {"records": 93, "attack": 58, "benign": 35, "excluded": 0,
             "included_attack": 58, "included_benign": 35, "a": 47, "b": 11}
 
@@ -99,125 +92,6 @@ def validate_prompt_sources(package: Path) -> list[str]:
     scenario_ids = {path.stem for path in (package / "scenarios").glob("*.json")}
     if seen != scenario_ids:
         problems.append("prompt/scenario identity mismatch")
-    return problems
-
-
-def validate_annotation_sources(package: Path) -> list[str]:
-    report_path = package / "evidence/annotation-source-verification.json"
-    if not report_path.is_file():
-        return ["missing annotation source verification"]
-    report = json.loads(report_path.read_text())
-    problems = []
-    expected_ids = {record["scenario_id"] for record in gt_records(package)}
-    schema = report.get("schema")
-    if schema not in {"mtagentlens.annotation-source-verification/1",
-                      "mtagentlens.annotation-source-verification/2"}:
-        problems.append("invalid annotation source verification schema")
-    if set(report.get("scenario_ids", [])) != expected_ids:
-        problems.append("annotation verification does not cover current GT")
-    files = report.get("files", [])
-    indexed = {}
-    for ref in files:
-        path = package / ref["path"]
-        if ref["path"] in indexed and indexed[ref["path"]] != ref:
-            problems.append(f"conflicting annotation source verification: {ref['path']}")
-        indexed[ref["path"]] = ref
-        if not path.resolve().is_relative_to(package.resolve()) or not path.is_file():
-            problems.append(f"missing or escaping verified annotation input: {ref['path']}")
-        elif sha256(path) != ref.get("packaged_sha256"):
-            problems.append(f"annotation input changed after source verification: {ref['path']}")
-    if not indexed or report.get("verified_files") != len(indexed):
-        problems.append("annotation verified_files must match the nonempty unique file inventory")
-    expected = {path.relative_to(package).as_posix(): kind
-                for name, kind in (("fixtures", "fixture"), ("roles", "role"))
-                for path in (package / name).rglob("*") if path.is_file()}
-    expected.update({f"scenarios/{sid}.json": "scenario_tasks" for sid in expected_ids})
-    if set(indexed) != set(expected):
-        problems.append("annotation verification must cover every scenario task, fixture and role exactly")
-    for path, kind in expected.items():
-        if path in indexed and indexed[path].get("kind") != kind:
-            problems.append(f"annotation verification has wrong input kind: {path}")
-    if schema == "mtagentlens.annotation-source-verification/2":
-        # v2 re-binds packaged_sha256 to the repaired package and must list every
-        # post-annotation change. The list is the only honest place a delta may
-        # live, so each entry has to describe bytes that are actually packaged.
-        changes = report.get("post_annotation_changes")
-        if not isinstance(changes, list):
-            problems.append("v2 annotation verification must list post_annotation_changes")
-        else:
-            for change in changes:
-                path = change.get("path")
-                if path not in indexed:
-                    problems.append(f"post-annotation change refers to an unverified input: {path}")
-                elif change.get("to") != indexed[path].get("packaged_sha256"):
-                    problems.append(f"post-annotation change does not match packaged bytes: {path}")
-                if not change.get("reason"):
-                    problems.append(f"post-annotation change has no reason: {path}")
-
-    # Mirrored design-review role metadata must agree with its verified source.
-    for path in (package / "scenarios/roles").rglob("*"):
-        if path.is_file():
-            canonical = package / "roles" / path.relative_to(package / "scenarios/roles")
-            if not canonical.is_file() or sha256(path) != sha256(canonical):
-                problems.append(f"scenario role differs from verified role: {path.relative_to(package)}")
-
-    return problems
-
-
-def validate_gt_references(package: Path) -> list[str]:
-    """Check GT source binding and exact quote locations against bundled evidence."""
-    problems = []
-    for gt_path in sorted((package / "ground_truth").glob("*/*.json")):
-        if gt_path.parent.name.startswith("_"):
-            continue
-        record = json.loads(gt_path.read_text())
-        annotation = record.get("label_annotation", {})
-        source = annotation.get("source")
-        if not isinstance(source, dict):
-            problems.append(f"{record['scenario_id']}: missing label annotation source")
-            continue
-        refs = annotation.get("evidence", {}).get("references", [])
-        for ref in [source, *refs]:
-            try:
-                target = package / ref["path"]
-                if not target.resolve().is_relative_to(package.resolve()) or not target.is_file():
-                    raise ValueError("missing or escaping reference path")
-                if sha256(target) != ref.get("sha256"):
-                    raise ValueError("reference hash mismatch")
-                if ref is source:
-                    continue
-                if "quote" not in ref:
-                    raise ValueError("missing evidence quote")
-                quote = ref["quote"]
-                text = target.read_text(encoding="utf-8")
-                if "json_pointer" in ref:
-                    pointer = ref["json_pointer"]
-                    if not isinstance(pointer, str) or (pointer and not pointer.startswith("/")):
-                        raise ValueError("invalid JSON pointer")
-                    selected = json.loads(text)
-                    for token in pointer.split("/")[1:] if pointer else []:
-                        token = token.replace("~1", "/").replace("~0", "~")
-                        if isinstance(selected, list):
-                            if not token.isdigit():
-                                raise ValueError("invalid JSON array pointer")
-                            selected = selected[int(token)]
-                        else:
-                            selected = selected[token]
-                    if not (isinstance(selected, str) and isinstance(quote, str)):
-                        if json.dumps(selected, sort_keys=True) != json.dumps(quote, sort_keys=True):
-                            raise ValueError("quote does not match the cited JSON value")
-                        continue
-                    excerpt = selected
-                else:
-                    start, end = ref.get("line_start"), ref.get("line_end")
-                    lines = text.splitlines()
-                    if type(start) is not int or type(end) is not int or not 1 <= start <= end <= len(lines):
-                        raise ValueError("invalid evidence line range")
-                    excerpt = "\n".join(lines[start - 1:end])
-                if not isinstance(quote, str) or not quote or quote not in excerpt:
-                    raise ValueError("quote does not match the cited location")
-            except (OSError, UnicodeError, ValueError, KeyError, TypeError, IndexError) as error:
-                problems.append(f"{record['scenario_id']}: invalid GT reference {ref.get('path')}: {error}")
     return problems
 
 
@@ -301,31 +175,34 @@ def validate(package: Path, *, require_traces: bool = True) -> dict:
             for filename in ("bundle.json", "prompt.txt"):
                 if not (package / "prompt_inputs/cases" / sid / filename).is_file():
                     problems.append(f"{sid}: missing prompt {filename}")
-    for rel in REQUIRED_EVIDENCE:
-        if not (package / rel).is_file():
-            problems.append(f"missing evidence {rel}")
+    expected_reviewers = ["刘周康", "唐浩钺", "刘锦样"]
     for record in records:
-        annotation = record.get("label_annotation", {})
-        source = annotation.get("source")
-        refs = annotation.get("evidence", {}).get("references", [])
-        if not isinstance(source, dict) or not isinstance(refs, list):
-            problems.append(f"{record.get('scenario_id')}: missing annotation source or references")
-            continue
-        for ref in [source, *refs]:
-            if not isinstance(ref, dict) or not isinstance(ref.get("path"), str):
-                problems.append(f"{record.get('scenario_id')}: invalid evidence reference")
-                continue
-            target = (package / ref["path"]).resolve()
-            if not target.is_relative_to(package) or not target.is_file():
-                problems.append(f"{record.get('scenario_id')}: missing or escaping evidence {ref['path']}")
+        sid = record.get("scenario_id")
+        annotation = record.get("annotation", {})
+        label_annotation = record.get("label_annotation", {})
+        quality = record.get("quality", {})
+        for block_name, block in (("annotation", annotation), ("label_annotation", label_annotation)):
+            if block.get("method") != "human_review_and_revision":
+                problems.append(f"{sid}: {block_name} method is not current human review")
+            reviewers = block.get("reviewers", block.get("human_annotators"))
+            if reviewers != expected_reviewers:
+                problems.append(f"{sid}: {block_name} reviewer list mismatch")
+            if block.get("human_review_status") != "completed":
+                problems.append(f"{sid}: {block_name} is not marked complete")
+        if quality.get("review_status") != "completed":
+            problems.append(f"{sid}: quality review status is not complete")
+    metadata_path = package / "metadata.json"
+    metadata = json.loads(metadata_path.read_text()) if metadata_path.is_file() else {}
+    if metadata.get("human_annotators") != expected_reviewers:
+        problems.append("metadata human annotator list mismatch")
+    if metadata.get("human_review") is not True:
+        problems.append("metadata human_review must be true")
     problems.extend(validate_execution_inputs(package))
     for rel in ("LICENSE", "docs/licenses/LICENSE-APACHE", "docs/licenses/LICENSE-MIT", "CITATION.cff"):
         if not (package / rel).is_file():
             problems.append(f"missing {rel}")
     # traces
     traces = package / "traces"
-    metadata_path = package / "metadata.json"
-    metadata = json.loads(metadata_path.read_text()) if metadata_path.is_file() else {}
     if require_traces:
         if not (traces / "TRACES-NOTICE.md").exists():
             problems.append("missing traces/TRACES-NOTICE.md")

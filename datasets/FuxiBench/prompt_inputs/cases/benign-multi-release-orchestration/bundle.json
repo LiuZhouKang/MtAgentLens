@@ -139,5 +139,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-multi-release-orchestration",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-multi-release-orchestration.json"
+  "source_scenario_path": "scenarios/benign-multi-release-orchestration.json",
+  "source_scenario_sha256": "65a9f102d79d9d72a6eedd330ccd0ba577535d7ace04d4d30c5372a5a12a8e9a"
 }

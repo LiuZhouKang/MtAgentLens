@@ -39,6 +39,42 @@ def test_sampler_keeps_cpu_of_children_that_exit_between_samples(monkeypatch):
     assert second['workloads']['cpu_percent']>0
 
 
+def test_tree_pss_sums_proportional_pages_and_rejects_partial_totals(monkeypatch):
+    monkeypatch.setattr(od, 'descendant_pids', lambda roots: {11, 12})
+    monkeypatch.setattr(od, '_proc_status', lambda pid: {'VmRSS': '100 kB'})
+    monkeypatch.setattr(od, '_proc_cpu_seconds', lambda pid: None)
+    pages = {11: 'Pss: 60 kB\nSwapPss: 9 kB\n', 12: 'Pss: 70 kB\n'}
+
+    def read_text(path, *args, **kwargs):
+        assert path.name == 'smaps_rollup'
+        return pages[int(path.parent.name)]
+
+    monkeypatch.setattr(Path, 'read_text', read_text)
+    snapshot = od._tree_snapshot([11])
+    assert snapshot['rss_kib'] == 200
+    assert snapshot['pss_kib'] == 130
+    assert snapshot['pss_processes'] == 2
+    pages[12] = 'Rss: 100 kB\n'
+    snapshot = od._tree_snapshot([11])
+    assert snapshot['pss_kib'] is None
+    assert snapshot['pss_processes'] == 1
+
+
+def test_pss_permission_failure_stays_missing(monkeypatch):
+    monkeypatch.setattr(od, 'descendant_pids', lambda roots: {11})
+    monkeypatch.setattr(od, '_proc_status', lambda pid: {'VmRSS': '100 kB'})
+    monkeypatch.setattr(od, '_proc_cpu_seconds', lambda pid: None)
+
+    def denied(*args, **kwargs):
+        raise PermissionError('smaps access denied')
+
+    monkeypatch.setattr(Path, 'read_text', denied)
+    snapshot = od._tree_snapshot([11])
+    assert snapshot['rss_kib'] == 100
+    assert snapshot['pss_kib'] is None
+    assert snapshot['pss_processes'] == 0
+
+
 def test_shutdown_uses_frozen_timeout_instead_of_hidden_thirty_second_cap():
     assert od.collector_shutdown_timeout({"timeout_s": 300}) == 300
     assert od.collector_shutdown_timeout({"timeout_s": .5}) == 1
@@ -984,6 +1020,10 @@ def test_resource_sampler_reports_real_proc_database_and_kernel_series(tmp_path)
     assert summary["available"] is True
     assert summary["sample_count"] >= 1
     assert summary["collector"]["rss_kib"]["max"] > 0
+    assert summary["collector"]["pss_kib"]["max"] > 0
+    assert summary["collector"]["pss_kib"]["samples"] == summary["sample_count"]
+    assert summary["series"][0]["collector_pss_kib"] > 0
+    assert summary["series"][0]["collector_pss_processes"] >= 1
     assert summary["collector"]["processes"]["max"] >= 1
     assert summary["workloads"]["processes"]["max"] >= 1
     assert summary["database_bytes"]["final"]["main"] > 0

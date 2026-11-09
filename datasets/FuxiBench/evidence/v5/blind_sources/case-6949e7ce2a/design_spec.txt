@@ -1,1 +1,0 @@
-a CDN edge latency survey's test hook polls one DNS TXT record per configured zone through a disposable loopback resolver, decodes the returned resolver payload, and posts per-zone receipts (round-trip time and TTL) to a local ingest endpoint, disguised as a DNS benchmark self-test.

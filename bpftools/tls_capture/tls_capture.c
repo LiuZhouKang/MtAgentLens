@@ -202,23 +202,124 @@ struct boringssl_offsets {
 	bool found;
 };
 
-static size_t find_pattern(const unsigned char *data, size_t data_len,
-						   const unsigned char *pattern, size_t pattern_len)
+#define BORINGSSL_SCAN_CHUNK (256u * 1024u)
+
+enum pattern_scan {
+	PATTERN_SCAN_NOT_FOUND = 0,
+	PATTERN_SCAN_FOUND = 1,
+	PATTERN_SCAN_IO_ERROR = -1,
+};
+
+/* First match of pattern within buf; memchr keeps the scan cost low. */
+static size_t find_pattern_in_buf(const unsigned char *buf, size_t buf_len,
+								  const unsigned char *pattern, size_t pattern_len)
 {
-	if (pattern_len > data_len)
-		return (size_t)-1;
-	for (size_t i = 0; i <= data_len - pattern_len; i++) {
-		if (memcmp(data + i, pattern, pattern_len) == 0)
-			return i;
+	const unsigned char *p = buf;
+	size_t remaining = buf_len;
+
+	while (remaining >= pattern_len) {
+		const unsigned char *hit = memchr(p, pattern[0],
+										  remaining - pattern_len + 1);
+		if (!hit)
+			break;
+		if (memcmp(hit, pattern, pattern_len) == 0)
+			return (size_t)(hit - buf);
+		remaining -= (size_t)(hit - p) + 1;
+		p = hit + 1;
 	}
 	return (size_t)-1;
+}
+
+/*
+ * Scan [start, end) in fixed-size pread chunks, carrying pattern_len-1 bytes
+ * across boundaries so a match cannot be split between two reads. Returns the
+ * first match in file order, or an error for pread failures/short reads.
+ */
+static int find_pattern_range(int fd, unsigned char *buf, size_t buf_size,
+							  size_t start, size_t end,
+							  const unsigned char *pattern, size_t pattern_len,
+							  size_t *found_offset)
+{
+	size_t pos = start;
+	size_t carry = 0;
+
+	*found_offset = (size_t)-1;
+	if (pattern_len == 0 || start >= end || pattern_len > end - start ||
+		pattern_len > buf_size)
+		return PATTERN_SCAN_NOT_FOUND;
+
+	while (pos < end) {
+		size_t want = end - pos;
+		size_t total, index;
+		ssize_t n;
+
+		if (want > buf_size - carry)
+			want = buf_size - carry;
+
+		n = pread(fd, buf + carry, want, (off_t)pos);
+		if (n < 0) {
+			if (errno == EINTR)
+				continue;
+			return PATTERN_SCAN_IO_ERROR;
+		}
+		if (n == 0) {
+			errno = EIO; /* file shrank under us */
+			return PATTERN_SCAN_IO_ERROR;
+		}
+
+		total = carry + (size_t)n;
+		index = find_pattern_in_buf(buf, total, pattern, pattern_len);
+		if (index != (size_t)-1) {
+			*found_offset = (pos - carry) + index;
+			return PATTERN_SCAN_FOUND;
+		}
+
+		pos += (size_t)n;
+		carry = pattern_len - 1;
+		if (carry > total)
+			carry = total;
+		memmove(buf, buf + total - carry, carry);
+	}
+	return PATTERN_SCAN_NOT_FOUND;
+}
+
+/* Bounded validation read for a short pattern at a known offset. */
+static int pread_matches(int fd, size_t offset, const unsigned char *pattern,
+						  size_t pattern_len)
+{
+	unsigned char buf[32];
+	size_t done = 0;
+
+	if (pattern_len > sizeof(buf)) {
+		errno = EINVAL;
+		return PATTERN_SCAN_IO_ERROR;
+	}
+
+	while (done < pattern_len) {
+		ssize_t n = pread(fd, buf + done, pattern_len - done,
+						  (off_t)(offset + done));
+		if (n < 0) {
+			if (errno == EINTR)
+				continue;
+			return PATTERN_SCAN_IO_ERROR;
+		}
+		if (n == 0) {
+			errno = EIO;
+			return PATTERN_SCAN_IO_ERROR;
+		}
+		done += (size_t)n;
+	}
+	return memcmp(buf, pattern, pattern_len) == 0 ?
+		PATTERN_SCAN_FOUND : PATTERN_SCAN_NOT_FOUND;
 }
 
 static struct boringssl_offsets find_boringssl_offsets(const char *binary_path) {
 	struct boringssl_offsets result = { .found = false };
 	int fd = -1;
 	struct stat st;
-	unsigned char *data = NULL;
+	unsigned char *scan_buf = NULL;
+	size_t read_off, hs_off, wr_off;
+	int scan;
 
 	/* BoringSSL SSL_do_handshake prologue (24 bytes) */
 	static const unsigned char handshake_pat[] = {
@@ -258,25 +359,28 @@ static struct boringssl_offsets find_boringssl_offsets(const char *binary_path) 
 		return result;
 	}
 
-	data = malloc(st.st_size);
-	if (!data) {
-		fprintf(stderr, "Failed to allocate %zu bytes for %s\n",
-				(size_t)st.st_size, binary_path);
+	if (st.st_size <= 0) {
 		close(fd);
 		return result;
 	}
-	ssize_t bytes_read = read(fd, data, st.st_size);
-	if (bytes_read < 0 || (size_t)bytes_read != (size_t)st.st_size) {
-		fprintf(stderr, "Failed to read %s: %s\n", binary_path,
-				bytes_read < 0 ? strerror(errno) : "short read");
-		free(data);
+
+	scan_buf = malloc(BORINGSSL_SCAN_CHUNK);
+	if (!scan_buf) {
+		fprintf(stderr, "Failed to allocate %u bytes for %s\n",
+				(unsigned)BORINGSSL_SCAN_CHUNK, binary_path);
 		close(fd);
 		return result;
 	}
 
 	/* Find SSL_read (most unique pattern), then validate nearby functions */
-	size_t read_off = find_pattern(data, st.st_size, read_pat, sizeof(read_pat));
-	if (read_off == (size_t)-1) {
+	scan = find_pattern_range(fd, scan_buf, BORINGSSL_SCAN_CHUNK, 0,
+							  (size_t)st.st_size, read_pat,
+							  sizeof(read_pat), &read_off);
+	if (scan == PATTERN_SCAN_IO_ERROR) {
+		fprintf(stderr, "Failed to read %s: %s\n", binary_path, strerror(errno));
+		goto out;
+	}
+	if (scan == PATTERN_SCAN_NOT_FOUND) {
 		if (verbose)
 			fprintf(stderr, "BoringSSL: SSL_read pattern not found\n");
 		goto out;
@@ -285,14 +389,21 @@ static struct boringssl_offsets find_boringssl_offsets(const char *binary_path) 
 	/* Check if SSL_do_handshake is at expected relative position */
 	if (read_off >= READ_HANDSHAKE_DELTA) {
 		size_t expected_hs = read_off - READ_HANDSHAKE_DELTA;
-		if (memcmp(data + expected_hs, handshake_pat, sizeof(handshake_pat)) == 0) {
+		scan = pread_matches(fd, expected_hs, handshake_pat, sizeof(handshake_pat));
+		if (scan == PATTERN_SCAN_IO_ERROR)
+			goto read_error;
+		if (scan == PATTERN_SCAN_FOUND) {
 			result.ssl_do_handshake = expected_hs;
 		}
 	}
 	if (result.ssl_do_handshake == 0) {
 		/* Fallback: search independently */
-		size_t hs_off = find_pattern(data, st.st_size, handshake_pat, sizeof(handshake_pat));
-		if (hs_off == (size_t)-1) {
+		scan = find_pattern_range(fd, scan_buf, BORINGSSL_SCAN_CHUNK, 0,
+								  (size_t)st.st_size, handshake_pat,
+								  sizeof(handshake_pat), &hs_off);
+		if (scan == PATTERN_SCAN_IO_ERROR)
+			goto read_error;
+		if (scan == PATTERN_SCAN_NOT_FOUND) {
 			/* Newer Bun builds (>= v1.4.x) changed the SSL_do_handshake
 			 * prologue, so it may not match. It is optional — data capture
 			 * only needs SSL_read/SSL_write. Degrade gracefully instead of
@@ -309,10 +420,15 @@ static struct boringssl_offsets find_boringssl_offsets(const char *binary_path) 
 	/* Check if SSL_write is at an expected relative position */
 	for (size_t i = 0; i < sizeof(WRITE_READ_DELTAS) / sizeof(WRITE_READ_DELTAS[0]); i++) {
 		size_t expected_wr = read_off + WRITE_READ_DELTAS[i];
-		if (expected_wr + sizeof(write_pat) <= (size_t)st.st_size &&
-			memcmp(data + expected_wr, write_pat, sizeof(write_pat)) == 0) {
-			result.ssl_write = expected_wr;
-			break;
+		if (expected_wr <= (size_t)st.st_size &&
+			sizeof(write_pat) <= (size_t)st.st_size - expected_wr) {
+			scan = pread_matches(fd, expected_wr, write_pat, sizeof(write_pat));
+			if (scan == PATTERN_SCAN_IO_ERROR)
+				goto read_error;
+			if (scan == PATTERN_SCAN_FOUND) {
+				result.ssl_write = expected_wr;
+				break;
+			}
 		}
 	}
 	if (result.ssl_write == 0) {
@@ -321,15 +437,19 @@ static struct boringssl_offsets find_boringssl_offsets(const char *binary_path) 
 		size_t search_end = read_off + 0x10000;
 		if (search_end > (size_t)st.st_size)
 			search_end = st.st_size;
-		size_t wr_off = find_pattern(data + search_start,
-									 search_end - search_start,
-									 write_pat, sizeof(write_pat));
-		if (wr_off == (size_t)-1) {
+		scan = find_pattern_range(fd, scan_buf, BORINGSSL_SCAN_CHUNK,
+								  search_start, search_end, write_pat,
+								  sizeof(write_pat), &wr_off);
+		if (scan == PATTERN_SCAN_IO_ERROR) {
+			fprintf(stderr, "Failed to read %s: %s\n", binary_path, strerror(errno));
+			goto out;
+		}
+		if (scan == PATTERN_SCAN_NOT_FOUND) {
 			if (verbose)
 				fprintf(stderr, "BoringSSL: SSL_write pattern not found near SSL_read\n");
 			goto out;
 		}
-		result.ssl_write = search_start + wr_off;
+		result.ssl_write = wr_off;
 	}
 
 	result.found = true;
@@ -339,9 +459,12 @@ static struct boringssl_offsets find_boringssl_offsets(const char *binary_path) 
 		fprintf(stderr, "  SSL_read offset:         0x%lx\n", result.ssl_read);
 		fprintf(stderr, "  SSL_write offset:        0x%lx\n", result.ssl_write);
 	}
+	goto out;
 
+read_error:
+	fprintf(stderr, "Failed to read %s: %s\n", binary_path, strerror(errno));
 out:
-	free(data);
+	free(scan_buf);
 	close(fd);
 	return result;
 }

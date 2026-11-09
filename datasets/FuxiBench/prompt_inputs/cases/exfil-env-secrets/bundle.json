@@ -54,5 +54,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "exfil-env-secrets",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/exfil-env-secrets.json"
+  "source_scenario_path": "scenarios/exfil-env-secrets.json",
+  "source_scenario_sha256": "5384151323d8da4960aaa9b71485c794b1a148a988c1bb23beb651578a622f5f"
 }

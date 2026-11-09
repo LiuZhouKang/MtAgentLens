@@ -64,5 +64,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "defense-log-tampering",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/defense-log-tampering.json"
+  "source_scenario_path": "scenarios/defense-log-tampering.json",
+  "source_scenario_sha256": "d020ceb93e73ca49a528990f6124b3222271201c2f0941fbd27f25287367a8d3"
 }

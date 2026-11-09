@@ -64,5 +64,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-passwd-audit",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-passwd-audit.json"
+  "source_scenario_path": "scenarios/benign-passwd-audit.json",
+  "source_scenario_sha256": "6888b2d9e3e08cd574e74144f157933bcb27c65fa08fb3a07d55cb317f33d00a"
 }

@@ -64,5 +64,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "supplychain-direct",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/supplychain-direct.json"
+  "source_scenario_path": "scenarios/supplychain-direct.json",
+  "source_scenario_sha256": "fc7cd7b722b37a84bcea10e74ae0c9cc7df89f9e3b66d47ac520a1859c4acc37"
 }

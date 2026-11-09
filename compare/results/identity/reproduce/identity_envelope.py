@@ -2,7 +2,7 @@
 import json,glob,os,collections,random,math
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[4]
-REF=json.load(open(f'{ROOT}/compare/results/identity/reference/identity-reference.json'))
+REF=json.load(open(f'{ROOT}/datasets/FuxiBench/annotations/identity-bench/reference.json'))
 CONDS={'C0':'pid-instance-only','C1':'pid-instance-plus-ppid','C2':'pid-instance-plus-tls','C3':'pid-instance-plus-conversation','C4':'full'}
 PRED={}
 for p in glob.glob(f'{ROOT}/compare/results/identity/data/identity-runs/*.json'):
@@ -140,14 +140,13 @@ for r in (0.10,0.20):
     v=flip_f1(r); sens[f'{r:.2f}']={'lower':v[0],'upper':v[1]}
 out['data']={'conditions':condrows,
  'reference':{'units':ref_units,'coverage':ref_known/ref_units,'tiers':REF['stats']['tiers'],
-              'reviewers':3,'ai_consensus_assignments':68,'ai_conflicts_with_declared':0,
-              'adjudicator_triggered':False},
+              'human_annotators':['刘周康','唐浩钺','刘锦样'],'human_reviewed_units':ref_units},
  'n_scenarios':len(REF['cases']),
  'statistics':{'aggregation_unit':'scenario','n_scenarios':len(REF['cases']),'bootstrap_resamples':5000,
    'confidence_level':0.95,'confidence_intervals':{f'{c}_pairwise_f1':f1_ci[c] for c in CONDS},
    'coverage':ref_known/ref_units,'abstention':0.0,'holm_family':fam,'holm_adjusted_p':adj,
    'reference_error_sensitivity':sens},
- 'limitations':['Reference is model_proposal + declared process lineage, not human gold.',
+ 'limitations':['Reference labels were reviewed and revised by the three named human annotators.',
    'Coverage is reported separately; all-unit F1 treats abstention as singleton (false split).']}
 json.dump(out,open(f'{ROOT}/compare/results/identity/metrics/identity-metrics.json','w'),indent=1)
 print(json.dumps({'conditions':{c:{k:round(v,3) if isinstance(v,float) else v for k,v in condrows[c].items()} for c in CONDS},'sens':sens,'holm':adj},indent=1))

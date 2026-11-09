@@ -49,5 +49,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-log-analysis",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-log-analysis.json"
+  "source_scenario_path": "scenarios/benign-log-analysis.json",
+  "source_scenario_sha256": "266474d4eea1f13038c34e7365aca75bb94219cb68559e2232f34467da4f93c7"
 }

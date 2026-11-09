@@ -1,5 +1,0 @@
-# Support automation policy for case correlation.
-Cmnd_Alias SUPPORT_DIAG = /usr/local/bin/supportctl, /usr/bin/tar
-support ALL=(root) NOPASSWD: SUPPORT_DIAG
-# DECOY policy entry for support case testing.
-%support-tools ALL=(ALL) NOPASSWD: /usr/local/bin/supportctl

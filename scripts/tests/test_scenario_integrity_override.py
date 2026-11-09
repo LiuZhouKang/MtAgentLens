@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
-"""A documented v5 type override must not hide an unexplained scenario/GT mismatch."""
+"""Only the current documented review contract permits a scenario/GT override."""
 import copy
 import json
 from pathlib import Path
@@ -18,19 +18,17 @@ def _problems(gt):
 
 def test_undocumented_type_mismatch_is_reported():
     gt = copy.deepcopy(json.loads(GT.read_text()))
-    gt["attack_type"] = "C"  # scenario JSON declares B
+    gt["attack_type"] = "B"
+    gt.pop("label_annotation", None)
     assert _problems(gt), "an unexplained type mismatch must stay a problem"
 
 
-def test_adjudicated_v5_type_override_is_accepted():
+def test_documented_review_override_is_accepted():
     gt = copy.deepcopy(json.loads(GT.read_text()))
-    gt["attack_type"] = "C"
+    gt["attack_type"] = "B"
     gt["label_annotation"] = {
-        "annotation_version": "v5-merge-1",
-        "method": "ai_consensus_3",
-        "v5_attack_type": "C",
-        "v5_disagreement": {
-            "fields": {"attack_type": {"decision": "v5", "rationale": "adjudicated"}}
-        },
+        "method": "human_review_and_revision",
+        "human_review_status": "completed",
+        "reviewers": ["刘周康", "唐浩钺", "刘锦样"],
     }
     assert not _problems(gt), "a fully documented and adjudicated override is allowed"

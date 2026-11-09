@@ -8,6 +8,128 @@
 设计与验收门槛统一维护在
 [实验设计](../../docs/evaluation/experimental-design.md)，不另建一套规范。
 
+## FuxiBench 场景级标注（与运行级隔离）
+
+### 统一工作台入口
+
+不需要分别启动两个页面时，使用 `unified-serve`。它在同一个窗口顶部提供“场景设计标注”和“运行证据标注”两个标签；运行级页面第一次切换过去时才加载。两个页面仍按各自 codebook、证据与导出规范工作。独立标注者可这样启动：
+
+```bash
+python3 -m tools.annotator unified-serve \
+  --package /path/to/fuxibench-scene-package \
+  --scene-store /path/to/fuxibench-scenes.sqlite \
+  --scene-rater 刘周康 --active-scene-rater 刘周康 \
+  --runtime-store /path/to/runtime-annotations.sqlite \
+  --runtime-rater 刘周康 --runtime-mode annotate
+```
+
+`runtime-store` 需已注册同一实验的冻结证据包。合并后的场景裁决库可以用三次 `--scene-rater` 启动；运行级裁决使用 `--runtime-mode adjudicate` 和重复的 `--reviewer` 参数。入口只绑定本机回环地址。单人离线实例身份固定；同一浏览器页签切换工作流不会合并两个 SQLite 或混用导出。
+
+场景级工作台只标注“场景设计完整执行时 OS 层应出现什么”，不标注任何一次运行的结果。
+它读取 `scenarios/`、`roles/`、`fixtures/` 与 `bench/`，在内存中清洗场景 JSON
+（移除 `category`、`attack_type`、`label`、`risk_level`、`is_baseline`、`variant_of`
+等泄漏字段），并排除 `ground_truth/`、`traces/`、collector 输出和运行级数据库。
+页面不会预填 GT。
+
+负责人先生成一次脱敏输入包并将其交给三位标注者；包只含场景、角色、fixture、bench 和 codebook，不含 GT 或 trace：
+
+```bash
+python3 -m tools.annotator scene-pack --dataset datasets/FuxiBench \
+  --out /path/to/fuxibench-scene-package
+```
+
+每位标注者使用同一份只读包，在各自电脑上运行一份独立 SQLite。启动时固定本机标注者身份，不可在页面切换成他人：
+
+```bash
+python3 -m tools.annotator scene-serve \
+  --package /path/to/fuxibench-scene-package \
+  --store /path/to/fuxibench-scenes.sqlite \
+  --rater 刘周康 --active-rater 刘周康 \
+  --codebook-version fuxibench-2type/1 --port 7412
+```
+
+打开 <http://127.0.0.1:7412/>，逐场景填写
+`label`、`attack_type`、`task_summary`、`expected_behaviors`、`benign_activity`、
+`min_decision`、`should_alert`、`payload`、`execution_check`，可附加
+`evidence_paths` 与不确定项。字段枚举和行为结构由服务端按
+`datasets/FuxiBench/docs/codebook.md` 校验；`task_summary`、行为 ID 唯一性、
+行为必填字段、证据路径归属和 benign/attack 一致性不通过时不能保存或提交。
+
+- 单人离线工作区只能看到自己的草稿/提交，不提供其他标注者身份入口。单人工作区不可做裁决或一致性统计；三份导出合并后才可查看差异和统计。
+- 三人共用一个受控工作区时，每位标注者只能看到自己的草稿/提交。某场景三位都提交后，才显示其他两人的最新提交和
+  字段分歧；任何单人提交后都不会把其他人的答案放进同一 API 响应。
+- 草稿与提交都追加写入 `scene_revisions`，不覆盖旧版本。首次保存无需父版本；后续保存
+  必须带当前 `expected_revision` 与 `change_reason`，过期父版本返回冲突并保留原记录。
+- 三人提交后可记录裁决：`adjudicate` 追加 `scene_adjudications`，绑定三条具体提交修订、
+  最终标注和理由；来源修订更新后页面提示裁决可能过期，不自动沿用旧裁决。
+- 全部 93 个场景完成三人提交后，可在页面查看 `label`、`attack_type`、`should_alert` 的
+  原始一致率与 Fleiss’ κ，以及序数字段 `min_decision` 的原始一致率；统计基于裁决前记录并随导出保存。
+- `GET /api/export` 仅在整个队列每位标注者都提交后开放；命令行管理导出可随时执行：
+
+```bash
+python3 -m tools.annotator scene-export \
+  --store /path/to/fuxibench-scenes.sqlite --out /path/to/fuxibench-scene-export.json
+```
+
+每位标注者分别用 `scene-export` 导出自己的 SQLite。汇总机器执行：
+
+```bash
+python3 -m tools.annotator scene-merge \
+  --input /path/to/lzk-export.json --input /path/to/hao-export.json \
+  --input /path/to/jin-export.json \
+  --rater 刘周康 --rater 唐浩钺 --rater 刘锦样 \
+  --out /path/to/merged-scenes.json
+```
+
+`scene-merge` 验证每份提交包的内容 SHA-256、codebook/catalog 摘要、任务集合、单人工作区身份和每场景提交完整性；缺少摘要、缺项或版本不匹配时拒绝生成。不同标注结果会保留在汇总包中，供后续裁决，不改写来源导出。SHA-256 用于发现传输/存储后的意外改动，不是防伪签名；离线姓名仍是工作区声明，不是对自然人身份的认证。
+
+汇总后在审核机器创建全新的裁决库，使用三人共用模式逐项核对差异并记录裁决理由：
+
+```bash
+python3 -m tools.annotator scene-stage-adjudication \
+  --merged /path/to/merged-scenes.json \
+  --package /path/to/fuxibench-scene-package \
+  --store /path/to/scene-adjudication.sqlite
+python3 -m tools.annotator scene-serve \
+  --package /path/to/fuxibench-scene-package \
+  --store /path/to/scene-adjudication.sqlite \
+  --rater 刘周康 --rater 唐浩钺 --rater 刘锦样 \
+  --codebook-version fuxibench-2type/1
+```
+
+裁决工作台要求每个输入场景三人均已提交；`scene-export` 导出独立提交与裁决链。
+
+导出 schema 为 `mtagentlens.fuxibench-scene-export/v1`，包含三位标注者的全部原始修订链、
+裁决记录、codebook 版本与文件/版本摘要、catalog 与逐场景输入摘要。`scene-export`
+使用独占发布，目标文件已存在时失败，不覆盖既有 GT 或旧导出。
+
+逐场景裁决完成后，可以将新结果导出为符合 `mtagentlens.ground_truth.v4` 的独立 GT 目录。分类映射须在复核后提供，覆盖冻结包中的每个场景；导出要求三位配置标注者、当前 codebook/catalog 摘要匹配、逐场景存在引用三份最新提交的裁决及理由，并显式确认未查看 collector output。正式数据目录必须是一个尚不存在的新路径：
+
+```json
+{
+  "schema": "mtagentlens.fuxibench-gt-category-map/v1",
+  "categories": {
+    "scene-id-1": "credential_theft",
+    "scene-id-2": "benign"
+  }
+}
+```
+
+```bash
+python3 -m tools.annotator scene-gt-export \
+  --merged /path/to/final-scene-review.json \
+  --package /path/to/fuxibench-scene-package \
+  --categories /path/to/gt-categories.json \
+  --reviewed-at 2026-11-06 --confirm-blind-review \
+  --out /path/to/new-fuxibench-ground-truth
+```
+
+工具写出逐场景 JSON 与 `_annotation-release.json` 摘要，不会改写 `datasets/FuxiBench/ground_truth/`。摘要列出文件 SHA-256；目标已存在、分类映射不全、裁决过期或输入摘要不一致都会阻止发布。人工姓名是本地工作区的声明；日期和盲审状态由操作人确认。导出将 `paper_ready` 设为 `false`，不会替代论文侧最终审阅。
+
+场景级 store 使用独立 application id、`scene_*` 表与只追加触发器；不会读写运行级
+`bundle_tasks`/`bundle_revisions`。已有 `ground_truth/` 只读，GT 导出只发布到新目录。该工具仍是受控本地工具：没有身份认证、远程协作隔离或防同用户读取
+SQLite 的能力；导出也不等于人工签署或论文可用 gold。
+
 ## 导入原生进程记录
 
 新的 benchmark process/batch 模式在进程循环结束后生成 `runner-events.jsonl`，
@@ -112,6 +234,70 @@ v4 在每次 `launch_attempt.details.runner_context` 保存调用 Popen 之前�
 v1/v2/v3 保持原字段与口径，不补写历史见证。
 
 ## 运行绑定与正式评测入口
+
+三位标注者在各自本地证据包上独立完成运行级标注。每人启动时使用自己的固定 `--rater`；
+`serve` 以每个本地实例独有的随机 token 隔离浏览器会话。结束后分别导出：
+
+```bash
+python3 -m tools.annotator export --store /path/to/local.sqlite \
+  --out /path/to/local-annotations.json
+```
+
+汇总机器核验同一 task/evidence manifest 及三位唯一标注者后合并：
+
+```bash
+python3 -m tools.annotator runtime-merge \
+  --input /path/to/lzk.json --input /path/to/hao.json --input /path/to/jin.json \
+  --rater 刘周康 --rater 唐浩钺 --rater 刘锦样 \
+  --out /path/to/merged-runtime-annotations.json
+```
+
+合并器保留各自完整修订链；拒绝不同证据包、不同任务清单、重复身份、非人工记录、缺少来源内容摘要或摘要不匹配。
+汇总 JSON 仍是原始三方标注，不自动裁决差异，也不自动成为论文 gold。
+对需要裁决的项目，在汇总机器上准备包含相同冻结 bundle 的 release，然后创建全新裁决库：
+
+```bash
+python3 -m tools.annotator runtime-stage-adjudication \
+  --merged /path/to/merged-runtime-annotations.json \
+  --release /path/to/frozen-release \
+  --store /path/to/runtime-adjudication.sqlite
+python3 -m tools.annotator serve \
+  --store /path/to/runtime-adjudication.sqlite --rater 裁决者姓名 \
+  --method human --mode adjudicate \
+  --reviewer 刘周康 --reviewer 唐浩钺 --reviewer 刘锦样
+```
+
+裁决完成后从该库 `export`。`identity-export` 与 `root-export` 只接受三份一致结果，或
+引用完整三条来源修订链的人工裁决；分歧未裁决时拒绝生成实验参考集。两个导出器还要求
+单独提供任务到实验 case/unit 的映射文件，避免根据运行路径或标签猜测实验单位。
+
+示例映射文件：
+
+```json
+{"schema":"mtagentlens.identity-export-map/v1","cases":[
+  {"task_id":"<frozen-task-id>","case_id":"case-0001",
+   "scenario_id":"scenario-id","run_id":"run-id",
+   "units":{"message:...":{"pid":123,"process_start_time_ns":456,
+     "tier":"declared_root"}}}
+]}
+```
+
+`tier` 必须由复核者按 `declared_root`、`declared_ancestor` 或 `unknown` 明确提供；身份未知时 `actor` 只能为 `null`，不能从 PID 或进程名推定。
+
+```json
+{"schema":"mtagentlens.root-export-map/v1","scenarios":[
+  {"task_id":"<frozen-task-id>","scenario_id":"scenario-id","label":"attack"}
+]}
+```
+
+映射在标注结束后才用于导出，不放入独立标注界面。命令分别为：
+
+```bash
+python3 -m tools.annotator identity-export --merged /path/to/reviewed-runtime.json \
+  --mapping /path/to/identity-map.json --out /path/to/identity-reference.json
+python3 -m tools.annotator root-export --merged /path/to/reviewed-runtime.json \
+  --mapping /path/to/root-map.json --out /path/to/root-reference.json
+```
 
 release pilot 为每次调度生成独立 `attempt_id`，输出到
 `<out>/attempts/<attempt_id>/runs/...`，结果仍追加到 `<out>/results.jsonl`。
@@ -255,11 +441,19 @@ actor registry 来自独立运行或人工记录，程序不从 detector 的 age
 
 ## 工作台交互与视觉
 
-工作台是离线单文件页面（无外部依赖、CSP nonce、本地 token），为长期数据集
-扩展做了这些交互：
+工作台是离线页面（CSP nonce、本地 token、无 CDN/出站请求；Dagre 从
+`static/vendor/` 本地加载），为长期数据集扩展做了这些交互：
 
 - 顶部显示模式、标注者、方法/codebook 版本与任务完成进度；任务队列支持按编号搜索。
 - 证据事件以短标签展示（完整 id 在 title/元数据中），`J`/`K` 或方向键切换证据。
+- “结构化关系图”只读取冻结原始字节中的 `process_events`、`delegation_records`
+  与 `subagent_boundaries` 字段：原始进程父子用实线，检测器委派/子代理边界用虚线
+  并标注为“声明”；不解析 summary 文本，不推断因果或持续时间。节点/边点击打开
+  对应原始证据。
+- “观测时间总览”按独立时钟域分组，可切换来源/主体/进程分组、类型过滤、搜索、
+  缩放与平移；时间点只来自观测时间戳，纳秒偏移在浏览器用 `BigInt` 计算。
+- 13k+ 事件任务的服务端图/时间点元数据有显式上限与总数/抽样标记；事件列表仍
+  分页渲染，避免一次生成巨大 DOM。
 - `⌘/Ctrl + Enter` 保存；`/` 聚焦任务搜索；`?` 打开快捷键面板。
 - 窄屏（≤900px）自动堆叠为单列，保存按钮固定在表单末尾，避免遮挡字段。
 - 视觉与交互不改变服务端语义：脱敏、`/raw` 权限、codebook 版本门禁、三人独立
@@ -490,6 +684,13 @@ python3 scripts/evaluation/annotation_agreement.py \
 本轮自动化测试使用 `controlled_execution` 合成记录验证三人账号与第四方流程，
 不属于三人的真实标注；导出仍为 `paper_metrics_available=false`。
 
+## 第三方许可
+
+关系图布局使用本地 vendored [dagre 0.8.5](static/vendor/THIRD-PARTY.md)
+（MIT）。来源为 `frontend/node_modules/dagre/dist/dagre.min.js`，逐字节复制；
+许可证见 `static/vendor/LICENSE.dagre`。页面运行时只从本机回环服务加载该文件，
+不使用 CDN。
+
 ## 历史工作台的限制
 
 历史工作台仍可用 `make annotate-legacy DBS=/path/to/database-or-directory`（或 `python3 tools/annotator/server.py --dbs <目录>`）
@@ -521,6 +722,26 @@ python3 tools/annotator/server.py --dbs /path/to/single-run.responsibility.db
 `severity`、`confidence`、`notes`、`malicious_actions` 和 `chain_edges`。
 每个 `(run, annotator)` 有当前 JSON 记录与历史修订；保存操作尚无预期父版本检查，
 并发编辑可能覆盖当前指针。导出保留现有 schema，不自动转换为新的真值契约。
+
+## 运行证据可视化操作
+
+`serve` / `unified-serve` 的运行证据页使用同一份冻结证据包生成关系图与时间轴；
+页面不会预填任何标注字段。选择任务后：
+
+- “关系图”显示 Dagre 计算位置、Cytoscape.js 绘制的结构化关系。点击节点或连线打开对应原始事件；
+  搜索、关系类型、缩放、适配和下方“键盘选择证据”使用同一组证据。
+- 有委派记录的任务默认显示 Agent 委派子图，可用关系类型切换查看全部关系或原始进程父子记录；字段与原始字节详情按需展开。
+- “时间轴”按时钟域分开显示观测瞬时点，默认按事件类型分组；动作类型直接取自数据库 `action_type`。拖动底部范围滑块、滚轮缩放或切换来源/主体/进程分组。
+  悬停提示显示完整原始时间戳；点击点打开原始事件。
+- “事件”按原有筛选分页列出证据；选中事件的脱敏原始字节、来源、时间和下载入口显示在下方详情栏，
+  详情栏可折叠以扩大画布。
+
+顶部计数只来自服务端结构化提取的真实总数与显示上限；缺失和截断单独标注。页面离线运行，
+脚本只从本工作台 `/vendor/` 加载，不需要 npm 或 CDN。
+
+第三方前端资产的版本、许可证、来源和 SHA-256 见
+[static/vendor/THIRD-PARTY.md](static/vendor/THIRD-PARTY.md)（Dagre 0.8.5、Cytoscape.js 3.30.4、
+Apache ECharts 5.5.1）。
 
 ## 验证
 

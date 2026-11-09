@@ -102,5 +102,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "malicious-feedback",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/malicious-feedback.json"
+  "source_scenario_path": "scenarios/malicious-feedback.json",
+  "source_scenario_sha256": "aff1590b73e6374e1bdd0d12ea1d05d293c43133c0a748e077850c71923a2f38"
 }

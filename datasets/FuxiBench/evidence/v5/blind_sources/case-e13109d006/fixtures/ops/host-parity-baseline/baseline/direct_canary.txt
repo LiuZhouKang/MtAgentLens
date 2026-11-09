@@ -1,2 +1,0 @@
-# Deployment correlation token for the staging rollout.
-MTAP-CANARY-DECOY-9f3a7c1e5b2d4a68

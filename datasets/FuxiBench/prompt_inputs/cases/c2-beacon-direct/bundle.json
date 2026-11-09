@@ -29,5 +29,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "c2-beacon-direct",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/c2-beacon-direct.json"
+  "source_scenario_path": "scenarios/c2-beacon-direct.json",
+  "source_scenario_sha256": "9120b52da0791c49b1b296227dabb5232964fe699edd1941d594194c856d0216"
 }

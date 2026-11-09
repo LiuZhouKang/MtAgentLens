@@ -9,11 +9,13 @@
 | `detection/` | T4 检测（93 场景） | final cohort | `data/`（metrics + promoted ledger） | [README](detection/README.md) · [MANIFEST](detection/MANIFEST.md) |
 | `ablation/` | T7 消融（ranking + operating point） | estimable | `data/exports/`（93 JSON） | [README](ablation/README.md) · [MANIFEST](ablation/MANIFEST.md) |
 | `sensitivity/` | T7-S 参数敏感性 | estimable | `data/raw/`（93 exports + 3 源文件） | [README](sensitivity/README.md) · [MANIFEST](sensitivity/MANIFEST.md) |
-| `identity/` | T5 IdentityBench | estimable | `data/`（30 JSON + 5 CSV） | [README](identity/README.md) · [MANIFEST](identity/MANIFEST.md) |
+| `identity/` | T5 IdentityBench | 人工复核完成，可估计 | `data/`（30 JSON + 5 CSV） | [README](identity/README.md) · [MANIFEST](identity/MANIFEST.md) |
 | `overhead/` | T8 开销 | estimable | `raw/`（2952 文件）+ `data/`（18 CSV/JSON） | [README](overhead/README.md) · [MANIFEST](overhead/MANIFEST.md) |
-| `attribution/` | T6 归因 | not_estimable | `data/`（93 JSON） | [README](attribution/README.md) · [MANIFEST](attribution/MANIFEST.md) |
+| `attribution/` | T6 根因候选 | 人工复核完成；root-only 可估计 | `data/`（93 JSON）+ `predictions/`/`reference/` | [README](attribution/README.md) · [MANIFEST](attribution/MANIFEST.md) |
 | `pbc/` | T7 PBC 分布/活动量基线 | estimable（supplementary） | `data/`（4 文件） | [README](pbc/README.md) · [MANIFEST](pbc/MANIFEST.md) |
 | `external/` | 外部基线 | comparator | `data/`（comparison + InjecAgent） | [baselines/README](external/baselines/README.md) · [MANIFEST](external/MANIFEST.md) |
+
+IdentityBench 与 AttributionBench 的最终参考已由刘周康、唐浩钺、刘锦样人工核查、修订并确认。IdentityBench 报告身份分区结果；AttributionBench 当前只报告 root-only 结果，Entry/Chain 未评估。
 
 ## Git 与实验交付包
 

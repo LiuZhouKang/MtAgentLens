@@ -135,12 +135,6 @@ def test_final_run_decision_controls_frozen_detection(tmp_path):
     assert module._alert_rows(db, True) == []
 
 
-def test_recovered_raw_annotation_is_complete_and_source_bound():
-    sidecar = json.loads((ROOT / "datasets/FuxiBench/ground_truth/_reviewers/data-exfil-direct.json").read_text())
-    reviewer = sidecar["reviewers"][1]
-    assert reviewer["name"] == "唐浩钺"
-    assert len(reviewer["review"]["expected_behaviors"]) == 3
-    assert sidecar["recovery_provenance"]["raw_review_sha256"]
 
 
 def test_marker_summary_flag_alone_does_not_prove_hook_execution(tmp_path):

@@ -87,5 +87,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "delegation-chain",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/delegation-chain.json"
+  "source_scenario_path": "scenarios/delegation-chain.json",
+  "source_scenario_sha256": "0429260cb19dfd202def46434a08482547e239d80e920593fce7d9cc81e24102"
 }

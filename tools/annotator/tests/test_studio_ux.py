@@ -75,7 +75,33 @@ def test_page_is_offline_only_and_never_sinks_text_into_markup(page_text):
         assert sink not in page_text, sink
     # Server substitutes a fresh CSP nonce into exactly these placeholders.
     assert page_text.count("WORKBENCH_NONCE") >= 2
-    assert "http://" not in page_text.replace("http://localhost", "")
+    assert "http://" not in page_text.replace("http://www.w3.org/2000/svg", "").replace("http://localhost", "")
+
+
+def test_trace_navigation_uses_structured_metadata_and_bigint_time(page_text):
+    assert 'time.className = "event-time"' in page_text
+    assert "formatEventTime(event.timestamp, event.clock_domain)" in page_text
+    assert 'id="agent-relationship-panel"' in page_text
+    assert 'id="relation-canvas"' in page_text
+    assert 'id="timeline-canvas"' in page_text
+    assert "task.visualization" in page_text
+    assert "dagre.graphlib.Graph" in page_text
+    assert "window.cytoscape(" in page_text
+    assert "window.echarts.init(" in page_text
+    assert 'renderMode: "richText"' in page_text
+    assert "BigInt(" in page_text
+    assert "from_agent_id" not in page_text
+    # Graph edges must never be recovered by matching summary prose.
+    assert not re.search(r"summary[^\n]{0,80}\.match\(", page_text)
+    # Canvas views need an explicit, bounded keyboard fallback instead of
+    # hundreds of focusable offscreen controls.
+    assert 'id="relation-evidence-picker"' in page_text
+    assert 'id="relation-open-evidence"' in page_text
+    assert page_text.count('data-trace-view="graph"') >= 2
+    assert page_text.count('data-trace-view="timeline"') >= 2
+    assert page_text.count('data-trace-view="events"') >= 2
+    # The replaced custom SVG renderers are gone.
+    assert "relation-svg" not in page_text and "timeline-svg" not in page_text
 
 
 def test_palette_meets_wcag_aa_contrast(page_text):

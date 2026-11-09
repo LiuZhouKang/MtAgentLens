@@ -64,5 +64,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "credential-theft-direct",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/credential-theft-direct.json"
+  "source_scenario_path": "scenarios/credential-theft-direct.json",
+  "source_scenario_sha256": "76ebe89c2a13c4e61c6273b9ddbe6702f5927d8c63dcad4061d54d9ae48b3594"
 }

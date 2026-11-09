@@ -59,5 +59,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "network-anomaly",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/network-anomaly.json"
+  "source_scenario_path": "scenarios/network-anomaly.json",
+  "source_scenario_sha256": "9e8f1d853a7c3ac19deccc0d492bd14868dab64792a035d9f40b0979b9abe8fb"
 }

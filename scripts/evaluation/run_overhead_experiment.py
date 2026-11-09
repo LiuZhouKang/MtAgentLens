@@ -111,6 +111,30 @@ def update_execution_report(execution, recovered, recovery_meta, added_cost):
     return report
 
 
+def reconcile_results(execution, plan, study):
+    """Fold never-run condition results on disk back into the cohort manifest.
+
+    A truncated run appends only the rows it executed. Recovery replaces rows it
+    re-runs but cannot invent the conditions that were still queued when the run
+    stopped. The per-condition ``result.json`` files are authoritative, so record
+    them again in frozen plan order; already-known rows are left untouched.
+    """
+    results = execution.setdefault('results', [])
+    known = {row.get('condition_id') for row in results}
+    added = []
+    for planned in plan.get('condition_runs', []):
+        condition_id = planned['condition_id']
+        if condition_id in known:
+            continue
+        path = Path(study) / 'formal' / condition_id / 'result.json'
+        if not path.is_file():
+            continue
+        results.append(json.loads(path.read_text()))
+        known.add(condition_id)
+        added.append(condition_id)
+    return added
+
+
 def recover(args):
     """Re-run only failed/missing conditions into the frozen formal cohort."""
     study = args.out.resolve()
@@ -180,6 +204,7 @@ def recover(args):
             'targets': targets, 'executed_condition_ids': [row['condition_id'] for row in recovered],
             'archived_attempts': archived, 'started_epoch_ns': started,
             'ended_epoch_ns': time.time_ns()}
+    meta['reconciled_condition_ids'] = reconcile_results(execution, frozen, study)
     updated = update_execution_report(execution, recovered, meta, added)
     execution_path.write_text(json.dumps(updated, indent=2) + '\n')
     (study / 'formal-recovery-plan.json').write_text(json.dumps(plan, indent=2) + '\n')
@@ -309,7 +334,7 @@ def run(args):
     output = args.out.resolve()/args.phase
     plan = driver.build_plan(wrapper,output,
         [sys.executable,str(ROOT/'scripts/evaluation/overhead_workload.py'),'agent',
-         '--binary',str(agent),'--operations','16'],16,timeout_s=300,
+        '--binary',str(agent),'--operations','16'],16,timeout_s=args.shutdown_timeout_s,
         agent_comm='mtl-oh-agent',env=env,sample_interval_ms=50)
     if args.phase=='formal':
         pilot=args.out.resolve()/'pilot/execution-report.json'
@@ -394,7 +419,7 @@ def main(argv=None):
     parser.add_argument('--condition-id',action='append',dest='condition_ids',
                         help='limit --recover to these failed condition ids (repeatable)')
     parser.add_argument('--shutdown-timeout-s',type=float,default=300,
-                        help='--recover harness shutdown guard; never changes the measurement')
+                        help='freeze the harness timeout in a new or recovery plan; actual elapsed time is still measured')
     parser.add_argument('--sudo-password-stdin',action='store_true')
     args=parser.parse_args(argv)
     try:

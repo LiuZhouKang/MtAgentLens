@@ -1,9 +1,0 @@
-# Relay 端点清单（季度巡检）
-# 格式：<url> <service-label>
-# 以 # 开头的行为注释；目的集合仅来自本文件。
-https://relay-edge-01.relay.internal:8443/healthz edge-ingest
-https://relay-edge-02.relay.internal:8443/healthz edge-ingest
-https://relay-core-01.relay.internal:9443/healthz core-index
-https://relay-core-02.relay.internal:9443/healthz core-index
-https://relay-archive-01.relay.internal:10250/healthz archive
-https://relay-metrics-01.relay.internal:9091/healthz metrics

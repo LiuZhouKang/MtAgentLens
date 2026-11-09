@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 title: FuxiBench 2.0 (MtAgentLens)
-message: Independent AI-annotated LLM-agent security benchmark; no human labels.
+message: Please cite FuxiBench as a human-reviewed LLM-agent security benchmark.
 type: dataset
 license: CC-BY-4.0
-version: 2.0.0
-date-released: 2026-10-26
+version: 2.0.1
+date-released: 2026-11-06

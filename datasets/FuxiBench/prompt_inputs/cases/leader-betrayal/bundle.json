@@ -72,5 +72,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "leader-betrayal",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/leader-betrayal.json"
+  "source_scenario_path": "scenarios/leader-betrayal.json",
+  "source_scenario_sha256": "e21a9479c548179602c36cc07df109e56ae7f4f404fc19ea7a1c706dc79ec364"
 }

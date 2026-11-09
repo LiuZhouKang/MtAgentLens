@@ -139,5 +139,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "supplychain-dependency-confusion",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/supplychain-dependency-confusion.json"
+  "source_scenario_path": "scenarios/supplychain-dependency-confusion.json",
+  "source_scenario_sha256": "4c907818abbbca709d4accfacc2e93996d98fd58ac7ff3613074e2139c7396f1"
 }

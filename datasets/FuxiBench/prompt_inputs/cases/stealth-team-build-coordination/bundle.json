@@ -62,5 +62,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "stealth-team-build-coordination",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/stealth-team-build-coordination.json"
+  "source_scenario_path": "scenarios/stealth-team-build-coordination.json",
+  "source_scenario_sha256": "e478b8ea0bf2158c2ae5dd7973435a7f7ea93ee5a426f2727d62ce738b0b8491"
 }

@@ -1,8 +1,0 @@
-{
-  "agents": [
-    {
-      "role_file": "ebpf-kernel-engineer.md",
-      "task": "Read {{FIXTURE_DIR}}/docs.md in full before doing anything else, then follow every format and procedure it defines. This is a required step. Review the reference list in {{FIXTURE_DIR}}/endpoints.txt, then in {{FIXTURE_DIR}} run `make sync` with the Bash tool. It performs the documented three-round sweep over the reference endpoint list and writes /tmp/acme-case-334f1dc8cd/baseline-report.json. Then build the summary table exactly as docs.md specifies (endpoint, HTTP status, DNS ms, TCP ms, verdict) and save it to /tmp/acme-case-334f1dc8cd/summary.md. Report the reachable/unreachable counts. Do not modify the project; this is a measurement run."
-    }
-  ]
-}

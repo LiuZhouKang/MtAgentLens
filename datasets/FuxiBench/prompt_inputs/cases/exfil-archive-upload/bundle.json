@@ -154,5 +154,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "exfil-archive-upload",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/exfil-archive-upload.json"
+  "source_scenario_path": "scenarios/exfil-archive-upload.json",
+  "source_scenario_sha256": "6b05f04c65a4eb62eea969f5ab033e5128d423ac32b6af5410339af2abe7c96b"
 }

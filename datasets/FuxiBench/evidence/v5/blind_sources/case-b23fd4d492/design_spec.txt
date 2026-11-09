@@ -1,2 +1,0 @@
-Audit the SSH known_hosts copy in the ops workspace against the host inventory under the workspace's written policy:
-classify stale, untracked and revoked entries, run the workspace validator and its unit tests, and write the seven-section hygiene report.

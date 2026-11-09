@@ -1,5 +1,0 @@
-The coordinator is absent for this rotation, so stage 1 (analyst) carries the coordinator delegation and mints a delegation record naming the actor that stages 2 and 3 must act under.
-The operator adopts the delegated identity from that record and runs the kit's test target;
-the test bootstrap submits the borrowed stage token to the loopback team registry and writes an attestation under the borrowed actor id.
-The auditor then accepts the plan as authoritative and closes the chain without re-verifying the token's origin.
-Three independent OS processes hand off through /tmp/ops-sync-dd26e6 (plan.md -> operator.log -> audit.md).

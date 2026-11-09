@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
-"""Recount the fixed IdentityBench cohort without rerunning agents or reviewers."""
+"""Recount the fixed IdentityBench cohort against the frozen human reference."""
 import collections
 import csv
 import hashlib
@@ -38,7 +38,8 @@ def write_csv(path, rows):
         writer.writerows(rows)
 
 def audit(base):
-    reference_path = base/'reference/identity-reference.json'
+    repo_root = Path(__file__).resolve().parents[4]
+    reference_path = repo_root/'datasets/FuxiBench/annotations/identity-bench/reference.json'
     reference = json.loads(reference_path.read_text())
     metrics = json.loads((base/'metrics/identity-metrics.json').read_text())['data']
     unit_rows, scenario_rows, reference_rows, inputs = [], [], [], [reference_path, base/'metrics/identity-metrics.json']
@@ -100,15 +101,6 @@ def audit(base):
         for original_key, audited_key in (('coverage','coverage'),('pairwise_precision','precision'),('pairwise_recall','recall'),('pairwise_f1','f1'),('pairwise_f1_evaluated','conditional_f1')):
             assert abs(original[original_key]-totals[audited_key]) < 1e-12, (condition, original_key)
         summaries.append(totals)
-    votes = collections.Counter()
-    for case in reference['cases'].values():
-        for unit in case['units'].values():
-            actors = [actor for actor in unit['ai_votes'].values() if actor]
-            if actors:
-                largest = max(collections.Counter(actors).values())
-                votes[f'max_matching_votes_{largest}'] += 1
-            else:
-                votes['no_nonnull_vote'] += 1
     limitation_counts = {condition:dict(collections.Counter(flag for row in unit_rows if row['condition']==condition and row['reference_known'] for flag in json.loads(row['prediction_limitations']))) for condition in CONDITIONS}
     unknown_counts = {condition:dict(collections.Counter(row['unknown_reason'] for row in unit_rows if row['condition']==condition and row['reference_known'] and row['prediction_state']!='assigned')) for condition in CONDITIONS}
     out = dict(limitation_counts=limitation_counts, unknown_reason_counts=unknown_counts, schema='mtagentlens.identity-audit/1', conditions=summaries,
@@ -117,7 +109,8 @@ def audit(base):
                reference_actor_count_distribution=dict(collections.Counter(r['reference_actors'] for r in reference_rows)),
                negative_reference_pairs=sum(r['negative_reference_pairs'] for r in reference_rows),
                same_process_negative_reference_pairs=same_process_negative_pairs,
-               equivalent_sampled_partitions=dict(identical), ai_vote_counts=dict(votes))
+               equivalent_sampled_partitions=dict(identical),
+               human_annotators=reference['human_annotators'])
     kind_rows = []
     for condition in CONDITIONS:
         for kind in ('message','intent','action'):
@@ -130,7 +123,14 @@ def audit(base):
     write_csv(base/'data/reference_coverage.csv', reference_rows)
     write_csv(base/'data/pair_counts.csv', summaries)
     (base/'report/audit.json').write_text(json.dumps(out,ensure_ascii=False,indent=2)+'\n')
-    (base/'report/input_sha256.json').write_text(json.dumps({str(p.relative_to(base)):hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs},indent=2)+'\n')
+    input_hashes = {}
+    for path in inputs:
+        try:
+            key = str(path.relative_to(base))
+        except ValueError:
+            key = str(path.relative_to(repo_root))
+        input_hashes[key] = hashlib.sha256(path.read_bytes()).hexdigest()
+    (base/'report/input_sha256.json').write_text(json.dumps(input_hashes,indent=2)+'\n')
     return out
 
 if __name__ == '__main__':

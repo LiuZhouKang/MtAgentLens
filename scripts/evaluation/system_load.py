@@ -22,6 +22,8 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+from scripts.evaluation.overhead_driver import _proc_pss_kib
 
 
 def sha256(path):
@@ -46,7 +48,9 @@ def make_plan(binary, out, concurrency, operations, interval_ms):
         "concurrency": concurrency, "operations_per_worker": operations, "sample_interval_ms": interval_ms,
         "operation_delay_ms": 10, "observer_enabled": False, "tls_enabled": False,
         "limits": ["controlled file opens; no LLM-agent or TLS workload", "no semantic Observer costs",
-            "no alert-latency claim", "sampled process-tree RSS excludes kernel BPF map memory",
+            "no alert-latency claim", "sampled process-tree RSS/PSS exclude unmapped kernel BPF memory",
+            "PSS reads add sampling cost; missing process reads remain null; phase summaries are sampled, not atomic",
+            "workload phase starts after process snapshot readiness; settle is a separate fixed 3-second visibility drain",
             "sampled CPU time is a lower bound for children that exit between samples",
             "producer has no generated-event denominator; report measured drop counts and controlled-operation missing fraction",
             "process-only inputs may produce an empty intent-correlation graph"]}
@@ -129,6 +133,30 @@ class Sampler:
         self.pid = pid
         self.samples = []
         self.ticks = {}
+        self.phase = 'startup'
+
+    def mark_phase(self, phase):
+        self.sample()
+        self.phase = phase
+        self.sample()
+
+    def phase_summary(self):
+        result = {}
+        for phase in dict.fromkeys(row['phase'] for row in self.samples):
+            rows = [row for row in self.samples if row['phase'] == phase]
+            elapsed = (rows[-1]['monotonic_ns'] - rows[0]['monotonic_ns']) / 1e9
+            cpu = rows[-1]['cpu_seconds_lower_bound'] - rows[0]['cpu_seconds_lower_bound']
+            pss = [row['pss_bytes_sum'] for row in rows if row['pss_bytes_sum'] is not None]
+            result[phase] = {
+                'sample_count': len(rows), 'sampled_elapsed_s': elapsed,
+                'cpu_seconds_lower_bound': cpu,
+                'average_cpu_cores_lower_bound': cpu / elapsed if elapsed > 0 else None,
+                'sampled_peak_rss_bytes': max(row['rss_bytes_sum'] for row in rows),
+                'sampled_peak_pss_bytes': max(pss) if pss else None,
+                'sampled_mean_pss_bytes': sum(pss) / len(pss) if pss else None,
+                'pss_missing_samples': len(rows) - len(pss),
+            }
+        return result
 
     def sample(self):
         rows = {}
@@ -148,7 +176,10 @@ class Sampler:
         for row in tree:
             key = (row["pid"], row["start_ticks"])
             self.ticks[key] = max(self.ticks.get(key, 0), row["ticks"])
+        pss = [_proc_pss_kib(row['pid']) for row in tree]
         self.samples.append({"monotonic_ns": time.monotonic_ns(), "processes": len(tree),
+            "phase": self.phase,
+            "pss_bytes_sum": sum(pss) * 1024 if all(value is not None for value in pss) else None,
             "rss_bytes_sum": sum(max(0, row["rss_pages"]) for row in tree) * os.sysconf("SC_PAGE_SIZE"),
             "cpu_seconds_lower_bound": sum(self.ticks.values()) / os.sysconf("SC_CLK_TCK")})
 
@@ -261,6 +292,7 @@ def execute_one(plan, concurrency):
                 if time.monotonic() > deadline:
                     raise ValueError("kernel process snapshot readiness timed out")
                 time.sleep(plan["sample_interval_ms"] / 1000)
+            sampler.mark_phase('workload')
             for proc in workers:
                 proc.stdin.write("go\n")
                 proc.stdin.close()
@@ -290,12 +322,14 @@ def execute_one(plan, concurrency):
                 raise ValueError(f"controlled workload failed: {errors}")
             if len(operations) != concurrency * plan["operations_per_worker"]:
                 raise ValueError("controlled workload ledger is incomplete")
+            sampler.mark_phase('settle')
             # Flush the final committed action rows before freezing the verdict.
             deadline = time.monotonic() + 3
             while time.monotonic() < deadline:
                 sampler.sample()
                 committed_paths(database, first_seen)
                 time.sleep(plan["sample_interval_ms"] / 1000)
+            sampler.mark_phase('shutdown')
             collector.send_signal(signal.SIGINT)
             deadline = time.monotonic() + 20
             while collector.poll() is None:
@@ -334,6 +368,7 @@ def execute_one(plan, concurrency):
         result["workers"] = worker_status
         if sampler and sampler.samples:
             result["resource_samples"] = sampler.samples
+            result["resource_phases"] = sampler.phase_summary()
             result["sampled_peak_process_tree_rss_bytes"] = max(row["rss_bytes_sum"] for row in sampler.samples)
             result["sampled_process_tree_cpu_seconds_lower_bound"] = sampler.samples[-1]["cpu_seconds_lower_bound"]
             elapsed = (sampler.samples[-1]["monotonic_ns"] - sampler.samples[0]["monotonic_ns"]) / 1_000_000_000

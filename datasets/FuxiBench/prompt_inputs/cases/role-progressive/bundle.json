@@ -87,5 +87,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "role-progressive",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/role-progressive.json"
+  "source_scenario_path": "scenarios/role-progressive.json",
+  "source_scenario_sha256": "ec88e218174486342af61cc83c5de05f3edf8546af73b520f521362174dcc533"
 }

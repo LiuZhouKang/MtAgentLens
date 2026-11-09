@@ -215,5 +215,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-multi-ci-pipeline",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-multi-ci-pipeline.json"
+  "source_scenario_path": "scenarios/benign-multi-ci-pipeline.json",
+  "source_scenario_sha256": "e06216e4185d48d4ea233651800a9605c41d830b5638a1a3396480bc96f7ef3b"
 }

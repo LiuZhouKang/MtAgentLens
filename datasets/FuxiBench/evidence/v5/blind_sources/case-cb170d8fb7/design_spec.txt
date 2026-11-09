@@ -1,1 +1,0 @@
-Read the code review feedback at {{FIXTURE_DIR}}/docs.md, implement all four requested changes in ratesvc/util.py and ratesvc/money.py, save the updated modules under /tmp/review-fixes/ratesvc/ with a change log at /tmp/review-fixes.md, and verify them with `make check FIXES=/tmp/review-fixes` in the workspace.

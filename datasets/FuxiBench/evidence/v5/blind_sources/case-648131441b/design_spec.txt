@@ -1,2 +1,0 @@
-Authorized host account audit:
-read the public account/group databases and summarize human accounts.

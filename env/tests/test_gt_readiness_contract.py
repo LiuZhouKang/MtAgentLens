@@ -1,15 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
-"""Every ground-truth record must be usable, and say so truthfully.
+"""Check executable inputs and consistency of the current review declarations.
 
-``quality.paper_ready`` is a record-level claim: the labels agree with the
-two-type taxonomy, nothing is excluded from the detection denominators, every
-``role_file`` resolves, multi-agent scenarios declare a tmux layout, the
-description speaks the current taxonomy, the scenario bytes still match the
-frozen prompt manifest, and the annotation carries an evidence note.
-
-It is **not** a human sign-off claim: ``metadata.json`` still records
-``human_annotation: false`` and the AI-consensus provenance. These checks make
-the mechanical part reproducible instead of a remembered assertion.
+These checks validate metadata structure and cross-record consistency. They do
+not independently establish that human review took place.
 """
 
 from __future__ import annotations
@@ -75,8 +68,17 @@ def readiness_problems(scenario_id: str, gt: dict, entry: dict | None) -> list[s
         if digest != entry.get("source_scenario_sha256"):
             problems.append("scenario bytes drifted from the frozen manifest")
 
-    if not quality.get("notes"):
-        problems.append("no annotation evidence note")
+    annotation = gt.get("annotation") or {}
+    if not annotation.get("reviewed_at") or not annotation.get("codebook_version"):
+        problems.append("missing structured review metadata")
+    if annotation.get("human_review_status") != "completed":
+        problems.append("review declaration is incomplete")
+    if not annotation.get("human_annotators"):
+        problems.append("missing declared reviewers")
+    if quality.get("reviewers") != annotation.get("human_annotators"):
+        problems.append("reviewer declarations disagree")
+    if annotation.get("collector_output_consulted") is not False:
+        problems.append("missing independent-input declaration")
     behaviors = gt.get("expected_behaviors") or []
     if label == "benign" and behaviors:
         problems.append("benign record carries expected_behaviors")
@@ -106,6 +108,21 @@ def test_record_declares_itself_ready(scenario_id: str):
         f"{scenario_id}: passes the readiness contract but does not say so")
 
 
-def test_human_signoff_is_still_not_claimed():
+def test_annotation_metadata_matches_record_declarations():
     metadata = json.loads((DATASET / "metadata.json").read_text(encoding="utf-8"))
-    assert metadata.get("human_annotation") is False
+    assert isinstance(metadata.get("human_annotation"), bool)
+    assert metadata.get("human_annotators")
+    for gt in CASES.values():
+        annotation = gt.get("annotation") or {}
+        assert annotation.get("human_annotation") == metadata["human_annotation"]
+        assert annotation.get("human_annotators") == metadata["human_annotators"]
+
+
+@pytest.mark.parametrize("field", ["reviewed_at", "codebook_version", "human_annotators",
+                                  "human_review_status", "collector_output_consulted"])
+def test_missing_review_declarations_are_reported(field):
+    import copy
+    sid = next(iter(CASES))
+    gt = copy.deepcopy(CASES[sid])
+    gt["annotation"].pop(field)
+    assert readiness_problems(sid, gt, ENTRIES[sid])

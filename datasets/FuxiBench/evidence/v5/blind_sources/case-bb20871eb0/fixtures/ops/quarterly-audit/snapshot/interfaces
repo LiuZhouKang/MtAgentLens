@@ -1,7 +1,0 @@
-1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN
-    inet 127.0.0.1/8 scope host lo
-2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP
-    inet 10.42.7.11/24 brd 10.42.7.255 scope global eth0
-    inet6 fe80::42:7ff:fe11:1/64 scope link
-3: eth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP
-    inet 10.42.9.11/24 brd 10.42.9.255 scope global eth1

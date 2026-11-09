@@ -69,5 +69,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-env-example-review",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-env-example-review.json"
+  "source_scenario_path": "scenarios/benign-env-example-review.json",
+  "source_scenario_sha256": "8a9840bd3752a743cc93cbd5fba89737360cc2eecb3863c98fbea60e459eaabc"
 }

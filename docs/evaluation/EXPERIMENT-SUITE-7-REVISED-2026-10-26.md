@@ -4,6 +4,8 @@
 
 §6 是完整开销批次所引用的冻结协议，协议标识 `EXPERIMENT-SUITE-7-REVISED-2026-10-26 §6` 保持不变。当前开销展示与解释由[开销报告](../../compare/results/overhead/README.md)维护。历史执行指令不构成新的运行任务。
 
+> **状态修订（2026-11-06）**：IdentityBench 与 AttributionBench 的最终参考已由刘周康、唐浩钺、刘锦样人工核查、修订并确认；当前结果按冻结人工参考报告。
+
 ---
 
 ## 0. 先冻结三件事（G0）
@@ -24,9 +26,9 @@
 - 依据：fix4 中 30/43 攻击被测模型拒绝执行；未执行攻击不是 benign，也不是 detector FN。
 
 ### 0.3 参考来源与诚信
-- 3 fresh AI + 裁决；`method=model_proposal`；**不写 human κ/gold**。
-- **更正**：原稿“3 位安全研究人员 + Fleiss κ=0.87”是错误表述；实际是 AI reviewer agents；修改稿和回复信必须显式更正，不能静默删除。
-- 根因/入口/链参考只来自 3-AI 冻结轨迹标注；`_causal` 设计级 proposal 只作 `scenario_design`，**绝不作为 runtime 参考**。
+- 身份/根因参考改为三位标注者独立、可留痕的人工标注；完成并冻结前不报告指标，**不写 human κ/gold**。
+- **口径**：稿件按最终人工复核参考报告身份与归因结果；无逐人原始投票支持的信度统计不作报告。
+- 归因参考由人工复核冻结；当前报告 root-only，Entry/Chain 不纳入评分。`_causal` 设计级 proposal 只作 `scenario_design`，**绝不作为 runtime 参考**。
 - 旧 fix4 只作 historical/回归；不与 93 主表混。
 
 ---
@@ -37,7 +39,7 @@
 
 1. **30 multi 当前会被 harness 判 failed**：tmux-live 不写 `runner-events.jsonl`（仅 process 模式有），`bind_run_artifacts` 硬性要求该文件；tmux env 漏 `RUN_TAG/RUN_TAG_FILE`。需先补 tmux v4 runner-events（session/pane/role_file）并让 binding 接受；约 2–3 人日。否则 93×1 只有 63 single 可完成。
 2. **G0 已机械完成**：93/58/35、0 excluded、93 paper_ready；`identity-confusion` notes 仍科学未决；A6 `/tmp` blind prepare 已修复；A5 env 计数 298 vs 声明 491。**不能把 G0 机械通过当实验准入**。
-3. **Identity/Attribution 预测对象不存在**：无 IdentityView/5 条件；SignalSnapshot 不可序列化；无 AttributionResult/ranked_agents/entry/ordered chain；claim.traceback_ref 恒 NULL；现有 3-AI 标注器强制 root_actor=null。必须 W2/W5 先实现，不能先跑。
+3. **Identity/Attribution 评价范围**：IdentityBench 基于 5 个身份视图报告单元级分区结果；AttributionBench 基于冻结 root 候选报告 root-only 指标。Entry/Chain 尚未进入评分范围。
 4. **AppBench 转录覆盖不足**：当前约 45/93 可解析；Type C/无转录 run 单列；不能直接承诺 93 records。A2 为 full trace（含 tool result）；每个 record judge 2 次调用，93 records=186 calls。
 5. **旧 v1 trace 不能 replay**；新 93 DB 必须在 C0 后生成；fix4 不混主表。
 
@@ -49,7 +51,7 @@
 |---|---|---|---|
 | G0 数据 | **机械完成** | 93/58/35/0、93 paper_ready；identity notes 未决；A6 已修复；A5 计数不一致 | 仅 A6 + 科学 notes 待收口 |
 | C0 93×1 | 部分：63 single 可跑；30 multi 会被 harness 判 failed | tmux 无 runner-events/input_reference，binding 拒绝；漏 RUN_TAG；无 93 编排/finalize cap | 4–6 人日 + 6–12h |
-| IdentityBench | 否 | 无 5 条件；SignalSnapshot 不可重建；无 per-unit 预测/false-merge 指标；3-AI 管线禁止身份 | 4–6 + 3–4 人日 + 3–5 天标注 |
+| IdentityBench | 是 | 5 条件、per-unit 分区预测与人工复核参考已交付 | 已完成人工核查并冻结 |
 | AttributionBench | 否 | 无 AttributionResult/entry/ranked/ordered chain；claim.traceback_ref NULL；metrics 无 producer | 5–8 + 4–6 人日 + 5–7 天标注 |
 | AppBench | 部分（代码 ~70%，数据 0%） | e8 只出 A2；未接 select_valid_runs；A2 设计/代码相反；93 records=186 calls；multi transcript 未验证 | 1 人日 + 2–4h |
 | OverheadBench | 已完成（2026-10-28） | 36/36 正式条件、15 配对区组、372 实例；driver/metrics 已适配 §6，成功 TLS 路径、真实 usage/告警关联与 C1 诊断均已实测；T8/F2 在 `compare/results/overhead/raw/full-system/report/` | 仅单主机/单内核/单一负载/3 次描述性重复；Word 合入与 claims 登记待做 |
@@ -58,7 +60,7 @@
 | AblationBench | 否（~20%） | 只有六维 LOO；无 L0/L0.5/L1–L3 开关/ gate/ Observer/图/PBC 关闭 | 5–8 人日 |
 | 新 trace | 否 | replay 指纹不匹配；sanitizer 改 workspace_prefix；无 validator/replay gate；旧 87 v1 仍宣称 replay | 4–6 人日 + 2–8GB |
 
-**历史总前置量估算（2026-10-26）为 48–74 人日**（代码+数据），加 3-AI 标注日历时间；2–3 人并行约 6–9 周，单人约 10–14 周。此估算不是当前排期，尤其不适用于已收敛的 §6；不能据此安排开销实验。设计完成不等于实验已就绪。
+**历史总前置量估算（2026-10-26）为 48–74 人日**（代码+数据），加人工标注日历时间；2–3 人并行约 6–9 周，单人约 10–14 周。此估算不是当前排期，尤其不适用于已收敛的 §6；不能据此安排开销实验。设计完成不等于实验已就绪。
 
 ## 1. 任务边界：7 项分派任务，不是 7 条意见
 
@@ -72,7 +74,7 @@
 | 6 | 7 PBC 混杂 | PBCBench | 参数稳定性、层级贡献 |
 | 7 | 8 消融粒度 | AblationBench | 参数稳定性（只引用 T5C） |
 
-**参考依赖**：IdentityBench 先产出 unit→agent reference；AttributionBench 以该 reference 为条件做 scope/root/entry/chain，并报告 cross-reference agreement（若独立重做）。不把两套 3-AI 参考冒充独立证据；成本按实际会话数报（30×3 +30×3 或共享）。
+**参考依赖**：IdentityBench 使用三位标注者复核后的 unit→agent 参考；AttributionBench 使用三位标注者复核后的 root 参考。两者分别评价身份分区和 root-only 候选定位；Entry/Chain 当前未评估。
 
 原始意见 1（判定流水线）、3b（InjecAgent 协议）、4（F1 算术）、同级方法（能力矩阵）属于文档/他组任务；本组不承诺“7 条意见全部闭环”。
 
@@ -84,7 +86,7 @@
 | 意见 3b InjecAgent 协议 | E10 文档/他组 | 不新实验；披露未 OS 执行、2,108/149 |
 | 意见 4 F1 算术 | 论文表 11 + claims | 不新实验；重算/撤回无 artifact 数字 |
 | 同级方法能力矩阵 | T1/他组 | 不跑 E11；不承诺性能比较 |
-| 人工 κ/金标更正 | 回复信 + 根因指标定义 | 必做：原文“3 位安全研究人员/κ=0.87”更正为 AI reviewers；不写 human κ/gold |
+| 人工 κ/金标更正 | 回复信 + 根因指标定义 | 完成：最终参考由三位标注者核查、修订并确认；不报告无逐人原始投票依据的 κ |
 | 编辑提交合规 | 11-03 PDF/修改说明 | 不在实验内 |
 
 **注意**：不要把“7 个实验”写成“7 条原始意见全覆盖”；回复矩阵要单列这些文档项。
@@ -125,10 +127,10 @@
 
 ### 3.3 参考（不是“准确率”）
 - Tier A `orchestrator_declared`：runner-agent-i/role/session/pane/process；只对顶层 agent，不评 message-level。
-- Tier B `ai_adjudicated`：3 fresh AI 对分层样本（所有 handoff/boundary + 每 run 60 units：20 message/20 intent/20 action）标 agent/unknown + 证据；第 4 裁决；冲突单列。
-- **2026-10-28 实现状态**：detector-blind native reference 已支持 conditional declared identity/root（仅 captured native anchor，PID/role 不作逻辑身份）并与 replay 预测导出按 source DB SHA256 绑定；但 per-run unit cohort 尚未按本节 60-unit 规则冻结，参考生产暂不启动。
-- 报告 **agreement with ai_adjudicated reference**，不写 accuracy；加参考误差敏感性（假设 10%/20% 参考错误，给上下界）。
-- 主表分层：anchor-verifiable / AI-only / conflict；不把设计角色当独立观测。
+- Tier B `human_annotated`：三位标注者对分层样本（所有 handoff/boundary + 每 run 60 units：20 message/20 intent/20 action）独立标 agent/unknown + 证据并留痕；差异按 FuxiBench 协议复核，冲突单列。
+- **2026-11-06 状态**：IdentityBench 人工复核参考已冻结；报告覆盖、分区一致性和参考限制。
+- 人工参考冻结后报告 agreement，不写 accuracy；参考误差敏感性作为预注册分析，不引用旧数值。
+- 主表分层：anchor-verifiable / human-only / conflict；不把设计角色当独立观测。
 
 ### 3.4 指标/统计
 - pairwise P/R/F1、B³、false-merge/split、unattributed、coverage；按拓扑分层。
@@ -136,7 +138,7 @@
 - 1 run：CI 条件于该 run；不写 run 方差。
 
 ### 3.5 能写/不能写
-- 可写：“与 AI 参考的一致率、B³、false-merge、coverage”；不可写：“身份准确率”“1.000”“解决共享进程”。
+- 人工标注完成后可写：“与人工参考的一致率、B³、false-merge、coverage”；完成前不写任何指标，不写“身份准确率”“1.000”“解决共享进程”。
 
 ---
 
@@ -156,8 +158,8 @@
 - **不做 8 个实验**；所有条件同一参考/同一 run。
 
 ### 4.3 参考
-- 3 AI：先 scope（相关 agent/step/attack_executed），后 localize（root agent(s)、root step、entry、ordered chain、evidence、unknown）。
-- **2026-10-28 实现状态**：当前 native reference 仍把 run 内每个 action 当作 target（真实 run 可达 5,440 action，单 packet 2.89 MB，超过 review batch 700 KB 上限），与本节“先 scope 后 localize”不一致；必须先实现 phase-1 scope 或开跑前固定的 cohort manifest 才能生产参考。
+- 三位标注者：先 scope（相关 agent/step/attack_executed），后 localize（root agent(s)、root step、entry、ordered chain、evidence、unknown）。
+- **2026-11-06 状态**：AttributionBench 人工复核参考已冻结；当前评价范围为 root-only 候选定位，Entry/Chain 不计分。
 - root 可多根/unknown；执行者≠根因。
 - **排序**：预测有冻结排序、参考有明确相关根因时可报 @1/@3/MRR，参考本身无需排序；多根以 RootSet P/R/F1 为主，MRR若采用首个相关根，须开跑前固定该口径。预测无排序时只报 RootSet/coverage，**不伪造 @3**。代码必须实现 `ranked_agents`（按证据强度/时序，非概率）并测试；未实现前在回复里明确“Top-k 未报”。
 - Entry 定义：**图距离/边序**为主（entry→harmful action 的边序），时间窗只做次口径；开跑前固定两个口径并报敏感性，避免 ±500ms 在快慢 run 上不等价。
@@ -168,7 +170,7 @@
 - 30−N_A benign：false-root/abstain。
 
 ### 4.5 能写/不能写
-- 可写：“与 3-AI 参考的 RootSet/Entry/Chain 估计 + abstain”；不可写：“根因准确率”“Type C 23 例全部”“@3 已实现”（除非预测排序与明确相关根因参考均具备）。
+- 人工标注完成后可写：“与人工参考的 RootSet/Entry/Chain 估计 + abstain”；完成前不写根因指标；不可写：“根因准确率”“Type C 23 例全部”“@3 已实现”（除非预测排序与明确相关根因参考均具备）。
 
 ---
 
@@ -368,7 +370,7 @@
 - 归因：RootSet/@1 primary；@3/MRR 仅预测排序与明确相关根因参考具备后；entry 边序为主；N_A attack 估计+CI。
 - 多重性：每个实验开跑前固定 primary（1）+ secondary family；Holm；跨实验不合并，摘要不挑显著。
 - 开跑前固定 cohort/endpoints/exclusions/stopping/analysis；G0 后不改分母。
-- 披露：AI 非人工；无独立开发集；1 run；30 multi/N_A attack 非随机；参考误差。
+- 披露：身份/归因参考由三位标注者人工复核并冻结；无独立开发集；1 run；30 multi/N_A attack 非随机；参考误差。
 - **capture quality**：C0 的 healthy/降级 run 开跑前固定；primary=all attempts，sensitivity=healthy-only；降级不得静默剔除。
 - **顺序/漂移**：记录 run order；报告前 1/3 vs 后 1/3；长 campaign 模型/API 漂移作为协变量。
 - **多重性**：每个实验只 1 个 primary；secondary family 开跑前固定；跨实验不做统一 Holm，摘要不挑显著。
@@ -378,7 +380,7 @@
 
 ## 12. 数据/代码前置（G0 + W）
 
-- G0：93 全 scored 或明确冻结口径；9 个 excluded 盲重标、label/notes 对齐；identity-confusion 修 actor/hash/回退；其他 paper_ready=false 修 prompt/fixture/GT；30 multi；3 AI/裁决。
+- G0：93 全 scored 或明确冻结口径；9 个 excluded 盲重标、label/notes 对齐；identity-confusion 修 actor/hash/回退；其他 paper_ready=false 修 prompt/fixture/GT；30 multi；三位标注者人工标注。
 - 运行：launch manifest、runner-events、agent logs、v4 DB/checkpoint、execution evidence；C0 stability sample optional。
 - 代码：IdentityView/pre-checkpoint resolver；AttributionResult/ranked_agents；score-based metrics；AppBench transcript; PBC raw activity; ablation layer configs; overhead instrumentation; trace exporter.
 - 每个实验的 prediction/reference 分离；metrics 无 reference 返回 None；claims/artifact.
@@ -387,17 +389,19 @@
 
 ## 13. 执行顺序
 
-G0 数据冻结 → E0 pilot → C0 93×1 → 新 trace → IdentityBench/AttributionBench 3-AI 参考 → AppBench → Sensitivity/PBC/Ablation → Overhead → 统计/表/claims。
+G0 数据冻结 → E0 pilot → C0 93×1 → 新 trace → IdentityBench/AttributionBench 人工标注 → AppBench → Sensitivity/PBC/Ablation → Overhead → 统计/表/claims。
 
 **G 门**：G0 分母/参考/协议；G1 pilot；G2 C0 健康；G3 参考 agreement；G4 表/claims。
 
 ## 14. 红线
 
-- 不写 accuracy（AI 参考）；不写 human κ/gold；不写 93 已计分（G0 前）；不写 23 Type C=23 attack；不写 Root@3（未实现排序）；不写 TPR 显著（4–10 Unsafe）；不写“PBC 匹配/已排除混杂”；不写“独立测试集”；不把 fix4/旧 trace 混主表；不把设计级 causal 当 runtime。
+- 身份/归因指标按冻结人工参考解释，不报告无逐人票据支持的 κ；不写 93 已计分（G0 前）；不写 23 Type C=23 attack；不写旧 Root@3/Root@1 结果；不写 TPR 显著（4–10 Unsafe）；不写“PBC 匹配/已排除混杂”；不写“独立测试集”；不把 fix4/旧 trace 混主表；不把设计级 causal 当 runtime。
 
 
 ## 2026-10-29 意见 5 补测与复核
 
 用户确认精简方案后，复用原 36 条件，新增且已完成免费的 C1 固定本地稳态测量（3×60 s，40 SSL 操作/s、10 文件操作/s、1 子进程/s）。冻结 ELF 与原批次相同；三次单核 CPU 0.667%/0.667%/0.650%，均值 0.661%；平均 PSS 111.17 MiB。就绪后计时、包含全部三个采集进程，不插入额外静默时段，主计时关闭 BPF 统计。每次 600 个受控文件操作、60 个 exec 全部可见，来源丢弃计数 0。固定非 HTTP 载荷只支持限定采集流量结论；不能替代完整真实 Agent/Observer 开销，也不证明所有 TLS 操作原始载荷完整留存。启动与旧原生 Agent 大 ELF 扫描分开。
+
+2026-11-01 补充：把同一 C1 负载扩展为 1/4/8/16/32 并发合成混合负载（TLS+file+exec；每实例 40 TLS 读写/s、10 文件/s、1 子进程/s 不变）。full-runtime（无 Observer）1 并发为 2.7% 单核 / 平均 PSS 114.4 MiB，32 并发为 0.307 核 / 124.8 MiB，受控文件与 TLS 事件零丢弃；该表只支持采集→归因运行时→SQLite 通路的稳态扩展结论，不替代真实 Agent/Observer 批次。命令、哈希与逐档数据见 [复核后的报告](../../compare/results/overhead/README.md) 的“合成并发稳态测量”一节。
 
 图表收敛为一张分账表、一张三面板图，见 [复核后的报告](../../compare/results/overhead/README.md)。该入口也纠正旧解释：32 并发 23/96 成功凭据动作有 evidence；145.17 s 是运行内 p95 的均值，条件样本 pooled p95 228.16 s、仅 3 个独立最终 alert；300 s 原失败尝试保留，未证实恢复规则预先登记。原全批次完成不等于所有科学结论已闭环。

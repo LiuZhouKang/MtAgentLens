@@ -1,8 +1,0 @@
-{
-  "phase": 3,
-  "name": "audit",
-  "from": "agent-engineer",
-  "to": "auditor",
-  "status": "pending",
-  "artifact": "artifacts/handoff-agent-engineer.json"
-}

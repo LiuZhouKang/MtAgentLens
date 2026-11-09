@@ -143,18 +143,21 @@
   .panels {
     flex: 1 1 auto; min-height: 0;
     display: grid;
-    grid-template-columns: 276px minmax(0, 1fr) minmax(400px, 450px);
-    gap: 12px;
-    padding: 12px 14px 14px;
+    grid-template-columns: 204px minmax(0, 1fr) 352px;
+    gap: 10px;
+    padding: 10px 12px 12px;
   }
   .panel {
     min-width: 0; min-height: 0; overflow: auto;
-    padding: 14px;
+    padding: 12px;
     border: 1px solid var(--line);
     border-radius: var(--radius-lg);
     background: var(--surface);
     box-shadow: var(--shadow);
   }
+  #queue-panel { padding: 11px 10px; }
+  #inspection-panel { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+  #editor-panel { overflow: auto; }
   #queue-panel { background: var(--surface); }
   .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
   h2 { margin: 0; color: var(--text-2); font-size: 11px; font-weight: 600; letter-spacing: .03em; }
@@ -209,6 +212,7 @@
   .event-index { color: var(--faint); font-family: var(--mono); font-size: 9px; }
   .event-main { min-width: 0; display: grid; gap: 1px; }
   .event-label { color: var(--accent); font-size: 9.5px; font-weight: 600; letter-spacing: .02em; }
+  .event-time { color: var(--faint); font-family: var(--mono); font-size: 9px; }
   .event-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-family: var(--mono); font-size: 10.5px; }
   .event-source { color: var(--faint); font-size: 8.5px; font-weight: 600; letter-spacing: .04em; }
   .evidence-headline { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; margin: 2px 0 6px; }
@@ -313,7 +317,17 @@
   .event-button, .task { transition: background .12s var(--ease); }
   .comparison-item, .history-record { animation: fadeIn .18s var(--ease) both; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
-  @media (max-width: 1180px) { main { grid-template-columns: 250px minmax(0, 1fr); } #editor-panel { grid-column: 1 / -1; } }
+  @media (max-width: 1240px) {
+    .panels { grid-template-columns: 190px minmax(0, 1fr) 336px; gap: 8px; padding: 8px; }
+    #queue-panel { padding: 10px 8px; }
+  }
+  @media (max-width: 1040px) {
+    .panels { grid-template-columns: 186px minmax(0, 1fr) 320px; gap: 8px; padding: 8px; }
+    .panel { padding: 10px; }
+    .summary-stat { min-width: 66px; padding: 5px 7px; }
+    .selection-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .graph-view .trace-canvas { min-height: 240px; }
+  }
   @media (max-width: 900px) {
     html, body { height: auto; min-height: 100%; }
     body { overflow: auto; }
@@ -321,9 +335,12 @@
     .subtitle { padding: 8px 12px; }
     .panels { display: flex; flex-direction: column; padding: 10px; gap: 9px; }
     .panel { overflow: visible; padding: 12px; }
-    #queue-panel { max-height: 320px; overflow: auto; }
-    #evidence-content { max-height: 40vh; }
-    .event-list { max-height: 46vh; overscroll-behavior: contain; }
+    #inspection-panel { overflow: hidden; padding: 0; min-height: 74vh; }
+    .selection-detail { max-height: none; }
+    .graph-view .trace-canvas { min-height: 360px; }
+    #queue-panel { max-height: 300px; overflow: auto; }
+    #evidence-content { max-height: 36vh; }
+    .event-list { max-height: 40vh; overscroll-behavior: contain; }
     .topbar-meta { margin-left: 0; }
     .progress-cluster { order: 5; width: 100%; border-left: 0; padding-left: 0; }
     .identity-field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
@@ -336,7 +353,71 @@
     .panel { padding: 10px; }
     fieldset { padding: 9px; }
     .kbd-hint { display: none; }
+    .task-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .selection-meta { grid-template-columns: minmax(0, 1fr); }
   }
+
+  .inspection-head { display: grid; gap: 8px; padding: 11px 12px 0; }
+  .inspection-head .panel-head { margin-bottom: 0; }
+  .task-summary { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+  .summary-stat { display: grid; gap: 0; min-width: 0; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); }
+  .summary-stat span { overflow: hidden; color: var(--faint); font-size: 9px; letter-spacing: .06em; text-overflow: ellipsis; white-space: nowrap; }
+  .summary-stat b { overflow: hidden; color: var(--text-2); font-family: var(--mono); font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .summary-stat[data-tone="accent"] b { color: var(--accent); }
+  .summary-stat[data-tone="warn"] b { color: var(--warning); }
+  .summary-stat[data-tone="danger"] b { color: var(--danger); }
+  .trace-nav { display: flex; flex-wrap: wrap; gap: 3px; width: max-content; max-width: 100%; padding: 3px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); }
+  .trace-nav button { padding: 5px 13px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--muted); font-size: 11px; }
+  .trace-nav button:hover:not([aria-pressed="true"]) { background: var(--surface-3); color: var(--text); }
+  .trace-nav button[aria-pressed="true"] { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .inspection-body { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; overflow: hidden; padding: 8px 12px 0; }
+  .trace-view { display: none; flex: 1 1 auto; flex-direction: column; min-height: 0; }
+  .trace-view[data-active="true"] { display: flex; }
+  .trace-tools { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 0 0 6px; }
+  .trace-tools input { flex: 1 1 130px; min-width: 0; padding: 6px 8px; font-size: 10.5px; }
+  .trace-tools select { flex: 0 1 165px; width: auto; min-width: 112px; padding: 6px 22px 6px 8px; font-size: 10.5px; }
+  .trace-tools .ghost-button { min-width: 30px; padding: 5px 8px; }
+  .trace-tools .trace-tools-label { flex: 0 0 auto; color: var(--faint); font-size: 9.5px; }
+  .trace-canvas { position: relative; flex: 1 1 auto; width: 100%; min-height: 260px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); overflow: hidden; }
+  .graph-view .trace-canvas { min-height: 280px; }
+  .timeline-view .trace-canvas { min-height: 240px; }
+  #relation-canvas { cursor: grab; touch-action: none; }
+  #relation-canvas:active { cursor: grabbing; }
+  #timeline-canvas { cursor: crosshair; }
+  .trace-empty { position: absolute; inset: 0; z-index: 2; margin: auto; display: grid; place-items: center; padding: 14px; text-align: center; }
+  .trace-empty[hidden] { display: none !important; }
+  .graph-tooltip { position: absolute; z-index: 6; max-width: min(330px, calc(100% - 16px)); padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 6px; background: rgba(10, 12, 16, .97); color: var(--text-2); font-family: var(--mono); font-size: 10px; line-height: 1.5; pointer-events: none; box-shadow: 0 10px 24px rgba(0,0,0,.45); overflow-wrap: anywhere; }
+  .graph-tooltip[hidden] { display: none !important; }
+  .graph-tooltip b { display: block; color: var(--text); font-size: 10.5px; font-weight: 600; }
+  .graph-tooltip span { display: block; }
+  .graph-fallback { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 0; }
+  .graph-fallback label { flex: 0 0 auto; color: var(--faint); font-size: 9.5px; }
+  .graph-fallback select { flex: 1 1 160px; min-width: 0; padding: 5px 22px 5px 8px; font-size: 10px; }
+  .graph-fallback button { flex: 0 0 auto; padding: 5px 9px; font-size: 10px; }
+  .trace-legend { margin: 5px 0 0; color: var(--faint); font-size: 9.5px; line-height: 1.5; }
+  .legend-dot { display: inline-block; width: 7px; height: 7px; margin: 0 3px 0 7px; border-radius: 2px; vertical-align: 1px; }
+  .legend-dot.process { background: #38bdf8; }
+  .legend-dot.agent { background: #818cf8; }
+  .legend-dot.unresolved { background: #f97066; }
+  .trace-status { min-height: 16px; margin: 0 0 6px; color: var(--muted); font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+  .events-view .event-list { flex: 1 1 auto; max-height: none; min-height: 160px; margin-bottom: 6px; }
+  .selection-detail { flex: 0 0 auto; max-height: 32%; overflow: auto; margin: 8px 12px 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); }
+  .selection-detail[hidden] { display: none !important; }
+  .selection-bar { position: sticky; top: -9px; z-index: 2; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: flex-start; padding: 2px 0 5px; background: var(--surface-2); }
+  .selection-main { flex: 1 1 240px; min-width: 0; display: grid; gap: 1px; }
+  .selection-label { color: var(--accent); font-size: 10px; font-weight: 600; }
+  .selection-summary { color: var(--text); font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+  .selection-meta { display: grid; flex: 1 1 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 12px; margin: 0; }
+  .selection-meta div { min-width: 0; }
+  .selection-meta dt { color: var(--faint); font-size: 9px; letter-spacing: .04em; }
+  .selection-meta dd { margin: 0; overflow: hidden; color: var(--text-2); font-family: var(--mono); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+  .selection-meta dd#selection-id { white-space: normal; overflow-wrap: anywhere; }
+  .selection-actions { display: flex; flex: 0 0 auto; gap: 5px; align-items: center; }
+  .selection-actions button { padding: 4px 8px; font-size: 10px; }
+  .evidence-detail { margin-top: 7px; border-top: 1px solid var(--line); padding-top: 6px; }
+  .evidence-detail > summary { cursor: pointer; color: var(--muted); font-size: 10px; }
+  .evidence-detail .kv { margin: 6px 0; }
+  .evidence-detail #evidence-content { min-height: 80px; max-height: 18vh; }
 </style>
 </head>
 <body>
@@ -382,27 +463,116 @@
     <div class="task-list" id="task-list" role="group" aria-label="任务队列"></div>
   </section>
 
-  <section class="panel" id="evidence-panel" aria-labelledby="evidence-title">
-    <div class="panel-head">
-      <h2 id="evidence-title">原始证据</h2>
-      <button type="button" class="secondary" id="download-raw" hidden>下载脱敏记录</button>
+  <section class="panel" id="inspection-panel" aria-labelledby="evidence-title">
+    <div class="inspection-head">
+      <div class="panel-head">
+        <h2 id="evidence-title">运行证据检查</h2>
+        <span class="hint" id="evidence-hint">选择任务后载入首个事件。证据按原始字节校验；场景/运行标识符脱敏后以纯文本显示。</span>
+      </div>
+      <div class="task-summary" id="task-summary" role="group" aria-label="任务证据计数">
+        <div class="summary-stat" data-stat="nodes"><span>节点</span><b id="stat-nodes">—</b></div>
+        <div class="summary-stat" data-stat="edges"><span>关系边</span><b id="stat-edges">—</b></div>
+        <div class="summary-stat" data-stat="points"><span>观测点</span><b id="stat-points">—</b></div>
+        <div class="summary-stat" data-stat="evidence"><span>证据</span><b id="stat-evidence">—</b></div>
+        <div class="summary-stat" data-stat="missing"><span>缺失</span><b id="stat-missing">—</b></div>
+        <div class="summary-stat" data-stat="truncated"><span>截断</span><b id="stat-truncated">—</b></div>
+      </div>
+      <nav class="trace-nav" id="trace-view-nav" aria-label="证据检查视图">
+        <button type="button" id="trace-view-graph" data-trace-view="graph" aria-pressed="true">关系图</button>
+        <button type="button" id="trace-view-timeline" data-trace-view="timeline" aria-pressed="false">时间轴</button>
+        <button type="button" id="trace-view-events" data-trace-view="events" aria-pressed="false">事件</button>
+      </nav>
     </div>
-    <p class="hint" id="evidence-hint">选择任务后载入首个事件。证据按原始字节校验；场景/运行标识符脱敏后以纯文本显示。</p>
-    <div class="evidence-tools">
-      <input id="event-search" type="search" placeholder="过滤事件 id / 类型" autocomplete="off" aria-label="过滤证据事件" />
-      <select id="event-kind" aria-label="证据类型"></select>
-      <span class="hint" id="event-count"></span>
+    <div class="inspection-body">
+      <section id="agent-relationship-panel" class="trace-view graph-view" data-trace-view="graph" data-active="true" aria-label="结构化关系图">
+        <div class="trace-tools">
+          <input id="relation-search" type="search" placeholder="搜索节点 / 边 / 事件 id" autocomplete="off" aria-label="搜索关系图" />
+          <select id="relation-kind" aria-label="关系类型">
+            <option value="">全部关系</option>
+            <option value="process_parenthood">原始进程父子</option>
+            <option value="delegation_record">检测器委派记录</option>
+            <option value="subagent_boundary">子代理边界记录</option>
+          </select>
+          <button type="button" class="ghost-button" id="relation-zoom-in" aria-label="放大关系图">＋</button>
+          <button type="button" class="ghost-button" id="relation-zoom-out" aria-label="缩小关系图">－</button>
+          <button type="button" class="ghost-button" id="relation-reset">适配</button>
+        </div>
+        <p class="trace-status" id="relation-status" role="status"></p>
+        <div class="trace-canvas" id="relation-canvas" role="application" aria-label="结构化证据关系图画布；可用下方键盘选择列表打开证据">
+          <p class="hint trace-empty" id="relation-empty" hidden></p>
+          <div class="graph-tooltip" id="graph-tooltip" hidden></div>
+        </div>
+        <div class="graph-fallback">
+          <label for="relation-evidence-picker">键盘选择证据</label>
+          <select id="relation-evidence-picker" aria-label="选择要打开的关系证据"></select>
+          <button type="button" class="secondary" id="relation-open-evidence">打开证据</button>
+          <span class="hint" id="relation-fallback-count"></span>
+        </div>
+        <p class="hint trace-legend">
+          <span class="legend-dot process"></span>进程
+          <span class="legend-dot agent"></span>Agent
+          <span class="legend-dot unresolved"></span>未解析端点 ·
+          实线：原始进程父子记录；虚线：检测器委派 / 子代理边界记录（声明，不是因果关系）。点击节点或连线打开原始证据；超出显示上限的关系仍保留在事件列表。
+        </p>
+      </section>
+
+      <section id="timeline-panel" class="trace-view timeline-view" data-trace-view="timeline" aria-label="观测时间总览">
+        <div class="trace-tools">
+          <select id="timeline-domain" aria-label="时钟域"></select>
+          <select id="timeline-dimension" aria-label="时间分组">
+            <option value="type">按事件类型</option>
+            <option value="source">按来源</option>
+            <option value="actor">按主体</option>
+            <option value="process">按进程</option>
+          </select>
+          <input id="timeline-search" type="search" placeholder="搜索事件 id / 类型 / 主体" autocomplete="off" aria-label="搜索时间点" />
+          <select id="timeline-kind" aria-label="时间点类型"><option value="">全部类型</option></select>
+          <button type="button" class="ghost-button" id="timeline-zoom-in" aria-label="放大时间轴">＋</button>
+          <button type="button" class="ghost-button" id="timeline-zoom-out" aria-label="缩小时间轴">－</button>
+          <button type="button" class="ghost-button" id="timeline-reset">重置</button>
+        </div>
+        <p class="trace-status" id="timeline-status" role="status"></p>
+        <div class="trace-canvas" id="timeline-canvas" role="img" aria-label="按观测时间戳分组的时间散点画布；每个点是一个观测时刻">
+          <p class="hint trace-empty" id="timeline-empty" hidden></p>
+        </div>
+        <p class="hint trace-legend">时间点只来自证据中的观测时间戳，不推断持续时间；不同时钟域分开显示，纳秒偏移用 BigInt 计算。拖动底部滑块或滚轮缩放时间窗口。</p>
+      </section>
+
+      <section id="events-panel" class="trace-view events-view" data-trace-view="events" aria-label="证据事件列表">
+        <div class="evidence-tools">
+          <input id="event-search" type="search" placeholder="过滤事件 id / 类型" autocomplete="off" aria-label="过滤证据事件" />
+          <select id="event-kind" aria-label="证据类型"></select>
+          <span class="hint" id="event-count"></span>
+        </div>
+        <div class="event-list" id="event-list" role="group" aria-label="证据事件"></div>
+        <button type="button" class="secondary" id="event-more" hidden>加载更多证据</button>
+        <p class="hint">选择事件后，下方详情栏显示脱敏原始字节与下载入口。</p>
+      </section>
     </div>
-    <div class="event-list" id="event-list" role="group" aria-label="证据事件"></div>
-    <button type="button" class="secondary" id="event-more" hidden>加载更多证据</button>
-    <div class="evidence-headline">
-      <span id="evidence-label"></span>
-      <span id="evidence-summary"></span>
-    </div>
-    <dl class="kv" id="event-meta"></dl>
-    <p class="hint" id="truncation" hidden></p>
-    <p class="hint raw-label">原始字节（审计用；界面语义见上方字段）</p>
-    <pre id="evidence-content" tabindex="0" aria-label="证据原文">尚未载入证据。</pre>
+
+    <section class="selection-detail" id="selection-detail" aria-label="选中证据详情" hidden>
+      <div class="selection-bar">
+        <div class="selection-main">
+          <span class="selection-label" id="evidence-label"></span>
+          <span class="selection-summary" id="evidence-summary"></span>
+        </div>
+        <div class="selection-actions">
+          <button type="button" class="secondary" id="download-raw" hidden>下载脱敏记录</button>
+        </div>
+        <dl class="selection-meta">
+          <div><dt>来源</dt><dd id="selection-source">—</dd></div>
+          <div><dt>时间</dt><dd id="selection-time">—</dd></div>
+          <div><dt>事件编号</dt><dd id="selection-id">—</dd></div>
+        </dl>
+      </div>
+      <details class="evidence-detail" id="evidence-details">
+        <summary>字段与原始字节 <span class="hint" id="selection-bytes-hint"></span></summary>
+        <dl class="kv" id="event-meta"></dl>
+        <p class="hint" id="truncation" hidden></p>
+        <p class="hint raw-label">原始字节（审计用；界面语义见上方字段）</p>
+        <pre id="evidence-content" tabindex="0" aria-label="证据原文">尚未载入证据。</pre>
+      </details>
+    </section>
   </section>
 
   <section class="panel" id="editor-panel" aria-labelledby="editor-title" tabindex="-1">
@@ -557,6 +727,9 @@
   </div>
 </dialog>
 
+<script nonce="WORKBENCH_NONCE" src="/vendor/dagre.min.js"></script>
+<script nonce="WORKBENCH_NONCE" src="/vendor/cytoscape.min.js"></script>
+<script nonce="WORKBENCH_NONCE" src="/vendor/echarts.min.js"></script>
 <script nonce="WORKBENCH_NONCE">
 (() => {
   "use strict";
@@ -577,11 +750,41 @@
   const eventKind = document.getElementById("event-kind");
   const eventCount = document.getElementById("event-count");
   const eventMore = document.getElementById("event-more");
+  const relationCanvas = document.getElementById("relation-canvas");
+  const relationEmpty = document.getElementById("relation-empty");
+  const relationStatus = document.getElementById("relation-status");
+  const relationSearch = document.getElementById("relation-search");
+  const relationKind = document.getElementById("relation-kind");
+  const relationPicker = document.getElementById("relation-evidence-picker");
+  const relationFallbackCount = document.getElementById("relation-fallback-count");
+  const graphTooltip = document.getElementById("graph-tooltip");
+  const timelineCanvas = document.getElementById("timeline-canvas");
+  const timelineEmpty = document.getElementById("timeline-empty");
+  const timelineStatus = document.getElementById("timeline-status");
+  const timelineDomain = document.getElementById("timeline-domain");
+  const timelineDimension = document.getElementById("timeline-dimension");
+  const timelineSearch = document.getElementById("timeline-search");
+  const timelineKind = document.getElementById("timeline-kind");
   const eventMeta = document.getElementById("event-meta");
   const evidenceContent = document.getElementById("evidence-content");
   const evidenceHint = document.getElementById("evidence-hint");
   const evidenceLabel = document.getElementById("evidence-label");
   const evidenceSummary = document.getElementById("evidence-summary");
+  const selectionDetail = document.getElementById("selection-detail");
+  const selectionSource = document.getElementById("selection-source");
+  const selectionTime = document.getElementById("selection-time");
+  const selectionId = document.getElementById("selection-id");
+  const selectionBytesHint = document.getElementById("selection-bytes-hint");
+  const traceViewButtons = Array.from(document.querySelectorAll("[data-trace-view]"))
+    .filter((node) => node.tagName === "BUTTON");
+  const traceViews = Array.from(document.querySelectorAll("[data-trace-view]"))
+    .filter((node) => node.tagName === "SECTION");
+  const statNodes = document.getElementById("stat-nodes");
+  const statEdges = document.getElementById("stat-edges");
+  const statPoints = document.getElementById("stat-points");
+  const statEvidence = document.getElementById("stat-evidence");
+  const statMissing = document.getElementById("stat-missing");
+  const statTruncated = document.getElementById("stat-truncated");
   const truncationEl = document.getElementById("truncation");
   const identityFields = document.getElementById("identity-fields");
   const comparison = document.getElementById("comparison");
@@ -641,6 +844,34 @@
     eventLimit: 120,
     eventKind: "",
   };
+
+  const traceState = {
+    visualization: null,
+    view: "graph",
+    selectedEventId: null,
+    relation: {
+      nodeById: new Map(),
+      edgeById: new Map(),
+      pickerItems: new Map(),
+      selected: null,
+      userView: false,
+      overviewLimited: false,
+      lastWidth: 0,
+      lastHeight: 0,
+    },
+    timeline: {
+      selected: null,
+      seriesData: [],
+      statusBase: [],
+      zoomStart: 0,
+      zoomEnd: 100,
+    },
+  };
+
+  let relationCy = null;
+  let timelineChart = null;
+  let traceResizeObserver = null;
+  let traceResizeFrame = 0;
 
   class ApiError extends Error {
     constructor(status, code, message) {
@@ -1056,11 +1287,15 @@
       const label = document.createElement("span");
       label.className = "event-label";
       label.textContent = event.label || "记录";
+      const time = document.createElement("span");
+      time.className = "event-time";
+      time.textContent = formatEventTime(event.timestamp, event.clock_domain);
+      time.title = event.clock_domain || "原始时间戳";
       const summary = document.createElement("span");
       summary.className = "event-summary";
       summary.textContent = event.summary || event.event_id;
       summary.title = event.summary || event.event_id;
-      main.append(label, summary);
+      main.append(label, time, summary);
       const source = document.createElement("span");
       source.className = "event-source";
       source.textContent = event.source_kind === "controlled_runner" ? "RUNNER" :
@@ -1075,10 +1310,1189 @@
     if (eventMore) eventMore.hidden = shown.length >= filtered.length;
   }
 
+  const RELATION_KIND_LABELS = {
+    process_parenthood: "原始进程父子",
+    delegation_record: "检测器委派记录",
+    subagent_boundary: "子代理边界记录",
+  };
+  const NODE_KIND_LABELS = { process: "进程", agent: "Agent", unresolved: "未解析端点" };
+  const TRACE_DIMENSION_LABELS = { source: "来源", actor: "主体", process: "进程", type: "类型" };
+  const TIMELINE_LANE_LIMIT = 10;
+
+  function shortLabel(value, limit) {
+    const text = String(value === undefined || value === null ? "" : value);
+    return text.length > limit ? text.slice(0, limit - 1) + "…" : text;
+  }
+
+  function bigintOrNull(value) {
+    if (value === undefined || value === null || value === "") return null;
+    try { return BigInt(String(value)); } catch { return null; }
+  }
+
+  function formatDelta(ns) {
+    if (ns === null || ns === undefined) return "时间未知";
+    const negative = ns < 0n;
+    const value = negative ? -ns : ns;
+    const units = [
+      [3600000000000n, "h"], [60000000000n, "min"], [1000000000n, "s"],
+      [1000000n, "ms"], [1000n, "µs"], [1n, "ns"],
+    ];
+    let text = value.toString() + " ns";
+    for (const [unit, label] of units) {
+      if (value < unit) continue;
+      const whole = value / unit;
+      const fraction = ((value % unit) * 1000n) / unit;
+      const suffix = fraction ? "." + fraction.toString().padStart(3, "0") : "";
+      text = whole.toString() + suffix + " " + label;
+      break;
+    }
+    return (negative ? "−" : "+") + text;
+  }
+
+  function formatTimestamp(raw, domain) {
+    const ns = bigintOrNull(raw);
+    if (ns === null) {
+      return raw === undefined || raw === null || raw === "" ? "时间未知" : String(raw);
+    }
+    const label = domain || "时钟未知";
+    if (domain === "collector-unix-ns") {
+      const milliseconds = ns / 1000000n;
+      const remainder = ns % 1000000n;
+      const date = new Date(Number(milliseconds));
+      if (!Number.isNaN(date.getTime())) {
+        const base = date.toISOString().replace("T", " ").replace("Z", " UTC");
+        return remainder ? base + " +" + remainder.toString() + " ns" : base;
+      }
+    }
+    return label + " · " + ns.toString() + " ns";
+  }
+
+  function formatEventTime(value, clockDomain) {
+    return formatTimestamp(value, clockDomain);
+  }
+
+  function relationView() {
+    const visualization = traceState.visualization;
+    return visualization && visualization.relations ? visualization.relations : null;
+  }
+
+  function relationFiltered() {
+    const data = relationView();
+    if (!data) return { nodes: [], edges: [], data: null };
+    const query = (relationSearch?.value || "").trim().toLowerCase();
+    const kind = relationKind?.value || "";
+    const nodes = Array.isArray(data.nodes) ? data.nodes : [];
+    const edges = Array.isArray(data.edges) ? data.edges : [];
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const nodeMatch = (node) => !query || [node.id, node.label, node.pid, node.start_time_ns]
+      .some((value) => String(value ?? "").toLowerCase().includes(query));
+    const matchedNodeIds = new Set(nodes.filter(nodeMatch).map((node) => node.id));
+    const edgeMatch = (edge) => {
+      if (kind && edge.kind !== kind) return false;
+      if (!query) return true;
+      if (matchedNodeIds.has(edge.source) || matchedNodeIds.has(edge.target)) return true;
+      return [edge.id, edge.source, edge.target, edge.label, edge.event_id, edge.provenance]
+        .some((value) => String(value ?? "").toLowerCase().includes(query));
+    };
+    const filteredEdges = edges.filter(edgeMatch);
+    const ids = new Set();
+    for (const edge of filteredEdges) { ids.add(edge.source); ids.add(edge.target); }
+    if (!query && !kind) nodes.forEach((node) => ids.add(node.id));
+    else if (query) matchedNodeIds.forEach((id) => ids.add(id));
+    return {
+      nodes: Array.from(ids).map((id) => nodeById.get(id)).filter(Boolean),
+      edges: filteredEdges,
+      data,
+    };
+  }
+
+  function relationLayout(nodes, edges) {
+    if (!window.dagre || !nodes.length) return null;
+    try {
+      const graph = new dagre.graphlib.Graph({ multigraph: true });
+      graph.setGraph({ rankdir: "LR", nodesep: 24, ranksep: 70, marginx: 18, marginy: 18 });
+      graph.setDefaultEdgeLabel(() => ({}));
+      const sizes = new Map();
+      for (const node of nodes) {
+        const label = shortLabel(node.label || node.id, 30);
+        const width = Math.max(104, Math.min(236, label.length * 6.6 + 26));
+        sizes.set(node.id, { width, height: 38, label });
+        graph.setNode(node.id, { width, height: 38 });
+      }
+      for (const edge of edges) {
+        if (!sizes.has(edge.source) || !sizes.has(edge.target)) continue;
+        try { graph.setEdge(edge.source, edge.target, {}, edge.id); } catch { /* duplicate edge id */ }
+      }
+      dagre.layout(graph);
+      return { graph, sizes };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function fallbackLayout(nodes) {
+    const positions = new Map();
+    const columns = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(nodes.length))));
+    nodes.forEach((node, index) => {
+      const label = shortLabel(node.label || node.id, 30);
+      const width = Math.max(104, Math.min(236, label.length * 6.6 + 26));
+      positions.set(node.id, {
+        x: 30 + (index % columns) * 220,
+        y: 30 + Math.floor(index / columns) * 70,
+        width, height: 38, label,
+      });
+    });
+    return positions;
+  }
+
+  function buildGraphElements(nodes, edges) {
+    const laid = relationLayout(nodes, edges);
+    const positions = new Map();
+    if (laid) {
+      for (const node of nodes) {
+        const item = laid.graph.node(node.id);
+        const size = laid.sizes.get(node.id);
+        if (!item || !size) continue;
+        positions.set(node.id, { x: item.x, y: item.y, ...size });
+      }
+    } else {
+      for (const [id, position] of fallbackLayout(nodes)) positions.set(id, position);
+    }
+    const labels = new Map();
+    for (const node of nodes) {
+      labels.set(node.id, node.label || node.id);
+    }
+    const elements = [];
+    for (const node of nodes) {
+      const position = positions.get(node.id);
+      if (!position) continue;
+      elements.push({
+        group: "nodes",
+        data: {
+          id: node.id,
+          kind: node.kind,
+          kindLabel: NODE_KIND_LABELS[node.kind] || node.kind,
+          labelShort: position.label,
+          labelFull: node.label || node.id,
+          eventIds: Array.isArray(node.event_ids) ? node.event_ids.slice(0, 8) : [],
+          eventCount: node.event_count || 0,
+          pid: node.pid,
+          startTime: node.start_time_ns,
+          observed: Boolean(node.observed),
+          width: position.width,
+          height: position.height,
+          textWidth: Math.max(48, position.width - 20),
+        },
+        position: { x: position.x, y: position.y },
+      });
+    }
+    for (const edge of edges) {
+      if (!positions.has(edge.source) || !positions.has(edge.target)) continue;
+      elements.push({
+        group: "edges",
+        data: {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          kind: edge.kind,
+          provenance: edge.provenance,
+          claim: Boolean(edge.claim),
+          missing: Boolean(edge.missing_endpoint),
+          labelText: edge.label || RELATION_KIND_LABELS[edge.kind] || edge.kind,
+          eventId: edge.event_id,
+          sourceLabel: labels.get(edge.source) || edge.source,
+          targetLabel: labels.get(edge.target) || edge.target,
+          timestamp: edge.timestamp_ns,
+          clockDomain: edge.clock_domain,
+          confidence: edge.confidence,
+        },
+      });
+    }
+    return elements;
+  }
+
+  function hideGraphTooltip() {
+    if (graphTooltip) graphTooltip.hidden = true;
+  }
+
+  function showGraphTooltip(element) {
+    if (!graphTooltip || !relationCanvas) return;
+    const data = element.data();
+    graphTooltip.replaceChildren();
+    addText(graphTooltip, "b", data.labelFull || data.labelText || data.id);
+    if (element.isEdge()) {
+      addText(graphTooltip, "span", "关系：" + (data.labelText || data.kind));
+      addText(graphTooltip, "span", "来源：" + (data.provenance || "未知"));
+      addText(graphTooltip, "span", "端点：" + data.sourceLabel + " → " + data.targetLabel);
+      addText(graphTooltip, "span", "事件：" + data.eventId);
+      if (data.confidence) addText(graphTooltip, "span", "置信度：" + data.confidence);
+      addText(graphTooltip, "span", data.claim ? "声明关系，不是因果推断" : "原始记录关系");
+    } else {
+      addText(graphTooltip, "span", "类别：" + (data.kindLabel || data.kind || "未知"));
+      if (data.pid !== null && data.pid !== undefined) addText(graphTooltip, "span", "PID：" + data.pid);
+      if (data.startTime) addText(graphTooltip, "span", "开始时间：" + data.startTime + " ns");
+      addText(graphTooltip, "span", "关联事件：" + (data.eventCount || 0));
+      if (Array.isArray(data.eventIds) && data.eventIds.length) {
+        addText(graphTooltip, "span", "证据：" + data.eventIds.join(", "));
+      }
+      if (!data.observed) addText(graphTooltip, "span", "未在本次证据中解析到端点记录");
+    }
+    graphTooltip.hidden = false;
+    const position = element.isEdge() ? element.renderedMidpoint() : element.renderedPosition();
+    if (!position) {
+      graphTooltip.hidden = true;
+      return;
+    }
+    const width = relationCanvas.clientWidth || 0;
+    const height = relationCanvas.clientHeight || 0;
+    const left = Math.max(8, Math.min(position.x + 14, width - graphTooltip.offsetWidth - 8));
+    const top = Math.max(8, Math.min(position.y + 14, height - graphTooltip.offsetHeight - 8));
+    graphTooltip.style.left = left + "px";
+    graphTooltip.style.top = top + "px";
+  }
+
+  function ensureRelationCy() {
+    if (relationCy || !relationCanvas || !window.cytoscape) return relationCy;
+    relationCy = window.cytoscape({
+      container: relationCanvas,
+      elements: [],
+      style: [
+        {
+          selector: "node",
+          style: {
+            "background-color": "#18222e",
+            "border-width": 1.5,
+            "border-color": "#3a4658",
+            "shape": "round-rectangle",
+            "width": "data(width)",
+            "height": "data(height)",
+            "label": "data(labelShort)",
+            "color": "#e9eef7",
+            "font-family": "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif",
+            "font-size": 11,
+            "text-valign": "center",
+            "text-halign": "center",
+            "text-max-width": "data(textWidth)",
+            "text-wrap": "ellipsis",
+            "min-zoomed-font-size": 6,
+            "overlay-opacity": 0,
+            "transition-property": "opacity, border-width, background-color",
+            "transition-duration": "120ms",
+          },
+        },
+        { selector: 'node[kind = "process"]', style: { "border-color": "#38bdf8", "background-color": "#12202b" } },
+        { selector: 'node[kind = "agent"]', style: { "border-color": "#818cf8", "background-color": "#171a2e" } },
+        { selector: 'node[kind = "unresolved"]', style: { "border-color": "#f97066", "border-style": "dashed", "background-color": "#2a1418" } },
+        { selector: "node:selected", style: { "border-width": 3, "border-color": "#fbbf24", "background-color": "#2b2633", "color": "#ffffff" } },
+        { selector: "node.hover", style: { "border-width": 2.5, "border-color": "#e2f2ff" } },
+        {
+          selector: "edge",
+          style: {
+            "width": 1.7,
+            "line-color": "#64748b",
+            "target-arrow-color": "#64748b",
+            "target-arrow-shape": "triangle",
+            "arrow-scale": 0.85,
+            "curve-style": "bezier",
+            "line-style": "solid",
+            "opacity": 0.92,
+            "overlay-opacity": 0,
+            "transition-property": "opacity, width, line-color",
+            "transition-duration": "120ms",
+          },
+        },
+        { selector: 'edge[kind = "delegation_record"]', style: { "line-style": "dashed", "line-color": "#f5a524", "target-arrow-color": "#f5a524" } },
+        { selector: 'edge[kind = "subagent_boundary"]', style: { "line-style": "dashed", "line-color": "#818cf8", "target-arrow-color": "#818cf8" } },
+        { selector: "edge[?missing]", style: { "line-style": "dashed", "line-color": "#f97066", "target-arrow-color": "#f97066" } },
+        { selector: "edge:selected", style: { "width": 3.2, "line-color": "#fbbf24", "target-arrow-color": "#fbbf24", "opacity": 1 } },
+        { selector: ".faded", style: { "opacity": 0.13 } },
+        { selector: ".muted", style: { "opacity": 0.14 } },
+      ],
+      layout: { name: "preset", fit: true, padding: 28, animate: false },
+      minZoom: 0.12,
+      maxZoom: 4,
+      wheelSensitivity: 0.22,
+      boxSelectionEnabled: false,
+      selectionType: "single",
+      autoungrabify: true,
+    });
+    relationCanvas._cy = relationCy;
+    relationCy.on("tap", "node", (event) => {
+      const element = event.target;
+      hideGraphTooltip();
+      selectGraphElement("node", element.id());
+      const ids = element.data("eventIds") || [];
+      if (ids.length) openEvidence(String(ids[0]));
+    });
+    relationCy.on("tap", "edge", (event) => {
+      const element = event.target;
+      hideGraphTooltip();
+      selectGraphElement("edge", element.id());
+      const eventId = element.data("eventId");
+      if (eventId) openEvidence(String(eventId));
+    });
+    relationCy.on("tap", (event) => {
+      if (event.target !== relationCy) return;
+      relationCy.elements().unselect();
+      relationCy.elements().removeClass("faded");
+      traceState.relation.selected = null;
+      hideGraphTooltip();
+    });
+    relationCy.on("mouseover", "node, edge", (event) => {
+      event.target.addClass("hover");
+      showGraphTooltip(event.target);
+    });
+    relationCy.on("mouseout", "node, edge", (event) => {
+      event.target.removeClass("hover");
+      hideGraphTooltip();
+    });
+    relationCy.on("pan zoom drag", (event) => {
+      if (event.originalEvent) traceState.relation.userView = true;
+      hideGraphTooltip();
+    });
+    return relationCy;
+  }
+
+  function clearGraphSelection() {
+    if (!relationCy) return;
+    relationCy.elements().unselect();
+    relationCy.elements().removeClass("faded");
+    traceState.relation.selected = null;
+  }
+
+  function selectGraphElement(type, id) {
+    if (!relationCy) return;
+    const element = relationCy.getElementById(id);
+    if (!element || element.empty()) return;
+    relationCy.elements().unselect();
+    element.select();
+    const neighborhood = element.closedNeighborhood();
+    relationCy.elements().addClass("faded");
+    neighborhood.removeClass("faded");
+    traceState.relation.selected = { type, id };
+    const eventId = type === "edge" ? element.data("eventId")
+      : (element.data("eventIds") || [])[0];
+    if (eventId) traceState.selectedEventId = String(eventId);
+  }
+
+  function applyGraphSelection() {
+    const eventId = traceState.selectedEventId;
+    if (!relationCy || relationCy.elements().empty()) return;
+    const previous = traceState.relation.selected;
+    if (previous) {
+      const type = previous.type === "edge" ? relationCy.edges() : relationCy.nodes();
+      const match = type.filter((item) => item.id() === previous.id);
+      if (match.length) {
+        selectGraphElement(previous.type, previous.id);
+        return;
+      }
+    }
+    if (!eventId) return;
+    const node = relationCy.nodes().filter((item) =>
+      (item.data("eventIds") || []).some((value) => String(value) === String(eventId)));
+    if (node.length) {
+      selectGraphElement("node", node.first().id());
+      return;
+    }
+    const edge = relationCy.edges().filter((item) =>
+      String(item.data("eventId") || "") === String(eventId));
+    if (edge.length) selectGraphElement("edge", edge.first().id());
+  }
+
+  function syncTraceSelection(eventId) {
+    traceState.selectedEventId = eventId ? String(eventId) : null;
+    if (traceState.view === "graph") {
+      applyGraphSelection();
+    } else if (traceState.view === "timeline") {
+      traceState.timeline.selected = eventId ? String(eventId) : null;
+      renderTimeline();
+    }
+  }
+
+  function renderGraphPicker(nodes, edges) {
+    if (!relationPicker) return;
+    relationPicker.replaceChildren();
+    traceState.relation.pickerItems = new Map();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "选择节点或连线证据…";
+    relationPicker.append(placeholder);
+    let count = 0;
+    const groups = [["节点", nodes, "node"], ["连线", edges, "edge"]];
+    for (const [title, items, type] of groups) {
+      const group = document.createElement("optgroup");
+      group.label = title;
+      for (const item of items) {
+        const eventId = type === "edge" ? item.event_id : (item.event_ids || [])[0];
+        if (!eventId) continue;
+        const key = type + ":" + item.id;
+        const label = type === "edge"
+          ? (item.label || RELATION_KIND_LABELS[item.kind] || item.kind) + " · " +
+            (item.source || "") + " → " + (item.target || "") + " · " + eventId
+          : (item.label || item.id) + " · " + eventId;
+        const option = document.createElement("option");
+        option.value = key;
+        option.textContent = shortLabel(label, 96);
+        option.title = label;
+        group.append(option);
+        traceState.relation.pickerItems.set(key, { type, id: item.id, eventId: String(eventId) });
+        count += 1;
+      }
+      if (group.children.length) relationPicker.append(group);
+    }
+    if (count === 0) {
+      placeholder.textContent = "没有可打开的关系证据";
+    }
+    if (relationFallbackCount) {
+      relationFallbackCount.textContent = count ? count + " 项可用" : "";
+    }
+  }
+
+  function selectionStatusPiece() {
+    if (!traceState.selectedEventId) return null;
+    return "已选 " + shortLabel(traceState.selectedEventId, 34);
+  }
+
+  function renderRelationGraph() {
+    if (!relationCanvas) return;
+    hideGraphTooltip();
+    const { nodes, edges, data } = relationFiltered();
+    const counts = data && data.counts ? data.counts : {};
+    const empty = !data || (!nodes.length && !edges.length);
+    if (relationEmpty) {
+      relationEmpty.hidden = !empty;
+      if (!data) relationEmpty.textContent = "尚未载入结构化关系。";
+      else if (data.empty) relationEmpty.textContent = "此任务没有结构化关系证据；原始事件仍可在事件视图逐条查看。";
+      else relationEmpty.textContent = "没有符合搜索 / 类型筛选的关系。";
+    }
+    const pieces = [];
+    if (data) {
+      pieces.push("显示 " + nodes.length + "/" + (counts.nodes_total || 0) + " 节点",
+        edges.length + "/" + (counts.edges_total || 0) + " 边");
+      if (counts.unresolved_edges) pieces.push(counts.unresolved_edges + " 条端点未解析");
+      if (data.cycles && data.cycles.count) pieces.push(data.cycles.count + " 个环");
+      if (data.truncated) pieces.push("服务端按上限抽样，完整计数保留");
+      const selected = selectionStatusPiece();
+      if (selected) pieces.push(selected);
+    }
+    if (relationStatus) relationStatus.textContent = pieces.join(" · ");
+    renderGraphPicker(nodes, edges);
+    if (empty) {
+      if (relationCy) relationCy.elements().remove();
+      return;
+    }
+    const cy = ensureRelationCy();
+    if (!cy) {
+      if (relationEmpty) {
+        relationEmpty.hidden = false;
+        relationEmpty.textContent = "本地关系图组件未加载，请使用下方键盘选择查看证据。";
+      }
+      return;
+    }
+    cy.elements().remove();
+    cy.add(buildGraphElements(nodes, edges));
+    cy.elements().removeClass("muted");
+    cy.layout({ name: "preset", fit: false, animate: false }).run();
+    traceState.relation.nodeById = new Map(nodes.map((node) => [node.id, node]));
+    traceState.relation.edgeById = new Map(edges.map((edge) => [edge.id, edge]));
+    traceState.relation.userView = false;
+    fitGraphOverview(false);
+    if (traceState.relation.overviewLimited && relationStatus) {
+      relationStatus.textContent += " · 节点较多，已聚焦首组关系；点“适配”查看全图";
+    }
+    applyGraphSelection();
+  }
+
+  function fitGraphOverview(forceFit) {
+    if (!relationCy || relationCy.elements().empty()) return;
+    relationCy.resize();
+    const width = relationCanvas.clientWidth || 0;
+    const height = relationCanvas.clientHeight || 0;
+    traceState.relation.lastWidth = width;
+    traceState.relation.lastHeight = height;
+    const box = relationCy.elements().boundingBox();
+    if (!box || !box.w || !box.h || !width || !height) {
+      relationCy.fit(relationCy.elements(), 30);
+      relationCy.elements().removeClass("muted");
+      traceState.relation.overviewLimited = false;
+      return;
+    }
+    const fitZoom = Math.min((width - 56) / box.w, (height - 56) / box.h, 1);
+    if (!forceFit && fitZoom < 0.38) {
+      const anchor = relationCy.nodes('[kind = "agent"]').first();
+      const focus = anchor.length ? anchor.closedNeighborhood()
+        : relationCy.nodes().first().closedNeighborhood();
+      relationCy.fit(focus, 96);
+      relationCy.elements().addClass("muted");
+      focus.removeClass("muted");
+      if (relationCy.zoom() > 1.2) {
+        relationCy.zoom({
+          level: 1.2,
+          renderedPosition: {
+            x: relationCanvas.clientWidth / 2,
+            y: relationCanvas.clientHeight / 2,
+          },
+        });
+      }
+      traceState.relation.overviewLimited = true;
+      return;
+    }
+    relationCy.fit(relationCy.elements(), 30);
+    relationCy.elements().removeClass("muted");
+    traceState.relation.overviewLimited = false;
+  }
+
+  function zoomRelation(factor) {
+    if (!relationCy) return;
+    traceState.relation.userView = true;
+    const level = Math.min(4, Math.max(0.12, relationCy.zoom() * factor));
+    relationCy.zoom({
+      level,
+      renderedPosition: { x: relationCanvas.clientWidth / 2, y: relationCanvas.clientHeight / 2 },
+    });
+  }
+
+  function fitRelation() {
+    if (!relationCy) return;
+    traceState.relation.userView = false;
+    traceState.relation.overviewLimited = false;
+    fitGraphOverview(true);
+  }
+
+  function timelineDomains() {
+    const visualization = traceState.visualization;
+    return visualization && visualization.timeline && Array.isArray(visualization.timeline.domains)
+      ? visualization.timeline.domains : [];
+  }
+
+  function currentTimelineDomain() {
+    const domains = timelineDomains();
+    const selected = timelineDomain?.value;
+    return domains.find((domain) => domain.id === selected) || domains[0] || null;
+  }
+
+  function populateTimelineKinds() {
+    if (!timelineKind) return;
+    const previous = timelineKind.value || "";
+    const domain = currentTimelineDomain();
+    timelineKind.replaceChildren();
+    const all = document.createElement("option");
+    all.value = "";
+    all.textContent = "全部类型";
+    timelineKind.append(all);
+    const labels = new Map();
+    for (const entry of (domain?.kinds || [])) {
+      labels.set(entry.kind, entry.label || entry.kind);
+    }
+    for (const [kind, label] of Array.from(labels).sort((left, right) =>
+      String(left[1]).localeCompare(String(right[1])))) {
+      const option = document.createElement("option");
+      option.value = kind;
+      option.textContent = label;
+      timelineKind.append(option);
+    }
+    timelineKind.value = labels.has(previous) ? previous : "";
+  }
+
+  function populateTimelineDomains() {
+    if (!timelineDomain) return;
+    const domains = timelineDomains();
+    const previous = timelineDomain.value;
+    timelineDomain.replaceChildren();
+    for (const domain of domains) {
+      const option = document.createElement("option");
+      option.value = domain.id;
+      option.textContent = domain.label + " (" + domain.points_total + ")";
+      timelineDomain.append(option);
+    }
+    timelineDomain.disabled = domains.length === 0;
+    timelineDomain.value = domains.some((domain) => domain.id === previous)
+      ? previous : (domains[0]?.id || "");
+    populateTimelineKinds();
+  }
+
+  function laneValue(point, dimension) {
+    if (dimension === "type") return point.type || point.label || point.kind || null;
+    if (dimension === "source") return point.source || null;
+    if (dimension === "actor") return point.actor || null;
+    if (dimension === "process") return point.process || null;
+    return null;
+  }
+
+  function timelineFiltered(domain) {
+    const query = (timelineSearch?.value || "").trim().toLowerCase();
+    const kind = timelineKind?.value || "";
+    return (domain?.points || []).filter((point) => {
+      if (kind && point.kind !== kind) return false;
+      if (!query) return true;
+      return [point.event_id, point.kind, point.label, point.type, point.source, point.actor, point.process]
+        .some((value) => String(value ?? "").toLowerCase().includes(query));
+    });
+  }
+
+  function timelineLaneList(domain, dimension, points) {
+    const lanes = new Map();
+    for (const lane of (domain.lanes?.[dimension] || [])) {
+      lanes.set(String(lane.key), {
+        key: String(lane.key), label: lane.label || String(lane.key),
+        count: lane.count,
+      });
+    }
+    for (const point of points) {
+      const key = laneValue(point, dimension);
+      if (key === null || key === undefined) continue;
+      if (!lanes.has(String(key))) {
+        lanes.set(String(key), { key: String(key), label: String(key), count: null });
+      }
+    }
+    return Array.from(lanes.values()).sort((left, right) => {
+      const countDelta = (right.count ?? -1) - (left.count ?? -1);
+      return countDelta || String(left.key).localeCompare(String(right.key));
+    });
+  }
+
+  function timelineKindColor(kind) {
+    if (kind === "process_events") return "#38bdf8";
+    if (kind === "delegation_records" || kind === "subagent_boundaries" ||
+        kind === "agent_identities" || kind === "provisional_identities") return "#818cf8";
+    if (kind === "responsibility_alerts") return "#f97066";
+    return "#99c8ff";
+  }
+
+  function fractionToNs(fraction, span) {
+    const clamped = Math.max(0, Math.min(1000000, Math.round(Number(fraction) * 1000000)));
+    return (span * BigInt(clamped)) / 1000000n;
+  }
+
+  function ensureTimelineChart() {
+    if (timelineChart || !timelineCanvas || !window.echarts) return timelineChart;
+    timelineChart = window.echarts.init(timelineCanvas, null, { renderer: "canvas" });
+    timelineCanvas._chart = timelineChart;
+    timelineChart.on("click", (params) => {
+      const data = params.data;
+      if (!data || !data.eventId) return;
+      traceState.timeline.selected = String(data.eventId);
+      traceState.selectedEventId = String(data.eventId);
+      renderTimeline();
+      openEvidence(String(data.eventId));
+    });
+    timelineChart.on("datazoom", () => {
+      const option = timelineChart.getOption();
+      const zoom = option.dataZoom && option.dataZoom[0];
+      if (!zoom) return;
+      traceState.timeline.zoomStart = Number(zoom.start ?? 0);
+      traceState.timeline.zoomEnd = Number(zoom.end ?? 100);
+      updateTimelineStatus();
+    });
+    return timelineChart;
+  }
+
+  function updateTimelineStatus() {
+    if (!timelineStatus) return;
+    const pieces = traceState.timeline.statusBase.slice();
+    const data = traceState.timeline.seriesData;
+    const start = Math.max(0, Math.min(100, traceState.timeline.zoomStart));
+    const end = Math.max(start, Math.min(100, traceState.timeline.zoomEnd));
+    if (data.length && (start > 0 || end < 100)) {
+      const visible = data.filter((item) =>
+        item.value[0] * 100 >= start && item.value[0] * 100 <= end).length;
+      pieces.push("窗口 " + visible + "/" + data.length + " 点");
+    }
+    const selected = traceState.timeline.selected || traceState.selectedEventId;
+    if (selected && data.some((item) => String(item.eventId) === String(selected))) {
+      pieces.push("已选点");
+    }
+    timelineStatus.textContent = pieces.join(" · ");
+  }
+
+  function renderTimeline() {
+    if (!timelineCanvas) return;
+    const timeline = traceState.visualization?.timeline || {};
+    const domain = currentTimelineDomain();
+    traceState.timeline.statusBase = [];
+    traceState.timeline.seriesData = [];
+    if (!domain) {
+      if (timelineChart) timelineChart.clear();
+      if (timelineEmpty) {
+        timelineEmpty.hidden = false;
+        timelineEmpty.textContent = (timeline.missing_timestamp || timeline.unsupported_domain)
+          ? "没有可绘制的观测时间戳：" + (timeline.missing_timestamp || 0) + " 条缺失，" +
+            (timeline.unsupported_domain || 0) + " 条时钟域不适用。"
+          : "此任务没有观测时间戳。";
+      }
+      if (timelineStatus) timelineStatus.textContent = "";
+      return;
+    }
+    const dimension = timelineDimension?.value || "type";
+    const points = timelineFiltered(domain);
+    const laneList = timelineLaneList(domain, dimension, points);
+    const shownLanes = laneList.slice(0, TIMELINE_LANE_LIMIT);
+    const laneIndex = new Map(shownLanes.map((lane, index) => [lane.key, index]));
+    const drawable = points.filter((point) => {
+      const key = laneValue(point, dimension);
+      return key !== null && key !== undefined && laneIndex.has(String(key));
+    });
+    const span = bigintOrNull(domain.span_ns) ?? 0n;
+    const ratioOf = (point) => {
+      const offset = bigintOrNull(point.offset_ns);
+      if (offset === null) return null;
+      if (span <= 0n) return 0.5;
+      return Number((offset * 1000000n) / span) / 1000000;
+    };
+    const selected = traceState.timeline.selected || traceState.selectedEventId;
+    const statusBase = [
+      domain.label + " · " + (domain.points_shown || 0) + "/" + (domain.points_total || 0) + " 点",
+      "显示 " + shownLanes.length + "/" + laneList.length + " 个" +
+        (TRACE_DIMENSION_LABELS[dimension] || "分组"),
+    ];
+    if (domain.truncated) statusBase.push("服务端点数上限抽样，完整计数保留");
+    if (laneList.length > shownLanes.length) {
+      statusBase.push("另有 " + (laneList.length - shownLanes.length) + " 个分组按计数省略");
+    }
+    const missing = (timeline.missing_timestamp || 0) + (timeline.unsupported_domain || 0);
+    if (missing) statusBase.push("缺失 / 不适用 " + missing);
+    traceState.timeline.statusBase = statusBase;
+    if (timelineEmpty) {
+      timelineEmpty.hidden = drawable.length > 0;
+      if (!drawable.length) timelineEmpty.textContent = "没有符合搜索 / 类型筛选的观测点。";
+    }
+    if (!drawable.length) {
+      if (timelineChart) timelineChart.clear();
+      updateTimelineStatus();
+      return;
+    }
+    const chart = ensureTimelineChart();
+    if (!chart) {
+      if (timelineEmpty) {
+        timelineEmpty.hidden = false;
+        timelineEmpty.textContent = "本地时间轴组件未加载，请使用事件视图查看证据。";
+      }
+      updateTimelineStatus();
+      return;
+    }
+    if (timelineCanvas.offsetParent === null) {
+      updateTimelineStatus();
+      return;
+    }
+    chart.resize();
+    const seriesData = [];
+    for (const point of drawable) {
+      const x = ratioOf(point);
+      if (x === null) continue;
+      const lane = laneValue(point, dimension);
+      const laneNumber = laneIndex.get(String(lane));
+      if (laneNumber === undefined) continue;
+      const isSelected = selected && String(point.event_id) === String(selected);
+      seriesData.push({
+        value: [x, laneNumber],
+        eventId: String(point.event_id),
+        kind: point.kind,
+        tNs: String(point.t_ns),
+        offsetNs: String(point.offset_ns),
+        label: point.label || point.kind,
+        source: point.source || "",
+        actor: point.actor || "",
+        process: point.process || "",
+        symbolSize: isSelected ? 14 : 9,
+        itemStyle: {
+          color: timelineKindColor(point.kind),
+          borderColor: isSelected ? "#fbbf24" : "rgba(10, 12, 16, .92)",
+          borderWidth: isSelected ? 2.4 : 1,
+        },
+      });
+    }
+    traceState.timeline.seriesData = seriesData;
+    const laneLabels = shownLanes.map((lane) =>
+      shortLabel(lane.label, 22) + " (" + (lane.count === null ? "?" : lane.count) + ")");
+    const zoomStart = Math.max(0, Math.min(100, traceState.timeline.zoomStart));
+    const zoomEnd = Math.max(zoomStart, Math.min(100, traceState.timeline.zoomEnd));
+    const startValue = fractionToNs(zoomStart / 100, span);
+    const endValue = fractionToNs(zoomEnd / 100, span);
+    chart.setOption({
+      animation: false,
+      backgroundColor: "transparent",
+      grid: { left: 154, right: 32, top: 18, bottom: 62, containLabel: false },
+      tooltip: {
+        trigger: "item",
+        renderMode: "richText",
+        confine: true,
+        backgroundColor: "#0a0c10",
+        borderColor: "#3a424f",
+        borderWidth: 1,
+        textStyle: {
+          color: "#e8eaed",
+          fontSize: 11,
+          fontFamily: "SF Mono, JetBrains Mono, Consolas, monospace",
+        },
+        formatter: (params) => {
+          const item = params.data || {};
+          return [
+            formatTimestamp(item.tNs, domain.id),
+            "事件：" + (item.eventId || ""),
+            (item.label || item.kind || "记录") + " · " + (item.source || "来源未知"),
+            "偏移：" + formatDelta(bigintOrNull(item.offsetNs)) + "（" + (item.offsetNs || "") + " ns）",
+            "类型：" + (item.kind || ""),
+          ].join("\n");
+        },
+      },
+      xAxis: {
+        type: "value",
+        min: 0,
+        max: 1,
+        axisLine: { lineStyle: { color: "#3a424f" } },
+        axisTick: { show: false },
+        axisLabel: {
+          color: "#98a2b3",
+          fontSize: 9,
+          formatter: (value) => formatDelta(fractionToNs(value, span)),
+        },
+        splitLine: { lineStyle: { color: "#262c36" } },
+      },
+      yAxis: {
+        type: "category",
+        data: laneLabels,
+        inverse: true,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: "#d0d5dd",
+          fontSize: 9.5,
+          width: 132,
+          overflow: "truncate",
+        },
+        splitLine: { show: false },
+      },
+      dataZoom: [
+        {
+          type: "inside",
+          xAxisIndex: 0,
+          filterMode: "none",
+          zoomOnMouseWheel: true,
+          moveOnMouseMove: true,
+          moveOnMouseWheel: false,
+          start: zoomStart,
+          end: zoomEnd,
+        },
+        {
+          type: "slider",
+          xAxisIndex: 0,
+          filterMode: "none",
+          start: zoomStart,
+          end: zoomEnd,
+          height: 18,
+          bottom: 8,
+          borderColor: "#262c36",
+          backgroundColor: "#15181d",
+          fillerColor: "rgba(153, 200, 255, .14)",
+          dataBackground: {
+            lineStyle: { color: "#3a424f" },
+            areaStyle: { color: "#242a34" },
+          },
+          selectedDataBackground: {
+            lineStyle: { color: "#99c8ff" },
+            areaStyle: { color: "rgba(153, 200, 255, .18)" },
+          },
+          handleStyle: { color: "#99c8ff", borderColor: "#d7e9ff" },
+          moveHandleStyle: { color: "#99c8ff" },
+          textStyle: { color: "#98a2b3", fontSize: 9 },
+        },
+      ],
+      series: [{
+        type: "scatter",
+        name: "观测点",
+        data: seriesData,
+        symbolSize: 9,
+        emphasis: {
+          scale: 1.7,
+          itemStyle: { borderColor: "#fbbf24", borderWidth: 2 },
+        },
+        selectedMode: false,
+      }],
+    }, true);
+    updateTimelineStatus();
+  }
+
+  function zoomTimeline(factor) {
+    if (!timelineChart) return;
+    const start = traceState.timeline.zoomStart;
+    const end = traceState.timeline.zoomEnd;
+    const center = (start + end) / 2;
+    const nextSpan = Math.max(1, Math.min(100, (end - start) / factor));
+    let nextStart = Math.max(0, center - nextSpan / 2);
+    let nextEnd = Math.min(100, center + nextSpan / 2);
+    if (nextEnd - nextStart < 1) {
+      nextStart = Math.max(0, center - 0.5);
+      nextEnd = Math.min(100, center + 0.5);
+    }
+    timelineChart.dispatchAction({ type: "dataZoom", start: nextStart, end: nextEnd });
+  }
+
+  function updateStat(node, value, title) {
+    if (!node) return;
+    node.textContent = value;
+    if (title) node.title = title;
+    else node.removeAttribute("title");
+  }
+
+  function renderTaskSummary() {
+    const visualization = traceState.visualization;
+    if (!visualization) {
+      for (const node of [statNodes, statEdges, statPoints, statEvidence, statMissing, statTruncated]) {
+        updateStat(node, "—", "");
+      }
+      return;
+    }
+    const relations = visualization.relations || {};
+    const counts = relations.counts || {};
+    const timeline = visualization.timeline || {};
+    const missing = (timeline.missing_timestamp || 0) + (timeline.unsupported_domain || 0);
+    const unresolved = counts.unresolved_edges || 0;
+    updateStat(statNodes, (counts.nodes_shown || 0) + "/" + (counts.nodes_total || 0),
+      "显示 / 总计；节点与边计数来自冻结原始字节");
+    updateStat(statEdges, (counts.edges_shown || 0) + "/" + (counts.edges_total || 0),
+      "显示 / 总计；类型计数 " + JSON.stringify(counts.by_kind || {}));
+    updateStat(statPoints, String(timeline.timestamped_total || 0),
+      (timeline.domains_total || 0) + " 个时钟域；服务端样本点数见时间轴状态");
+    updateStat(statEvidence, String(timeline.events_total || 0),
+      "已校验证据事件总数");
+    updateStat(statMissing, String(missing),
+      "缺失时间戳 " + (timeline.missing_timestamp || 0) +
+      " · 时钟域不适用 " + (timeline.unsupported_domain || 0) +
+      " · 未解析关系端点 " + unresolved);
+    const truncatedParts = [];
+    if (relations.truncated) truncatedParts.push("关系");
+    if (timeline.truncated) truncatedParts.push("时点");
+    updateStat(statTruncated, truncatedParts.length ? truncatedParts.join("+") : "无",
+      "关系 " + (counts.nodes_shown || 0) + "/" + (counts.nodes_total || 0) + " 节点，" +
+      (counts.edges_shown || 0) + "/" + (counts.edges_total || 0) + " 边；" +
+      (timeline.truncated ? "时点按服务端上限显示" : "时点完整显示"));
+    const missingStat = statMissing?.closest(".summary-stat");
+    if (missingStat) missingStat.dataset.tone = missing || unresolved ? "warn" : "";
+    const truncatedStat = statTruncated?.closest(".summary-stat");
+    if (truncatedStat) truncatedStat.dataset.tone = truncatedParts.length ? "warn" : "";
+  }
+
+  function activateTraceView(view) {
+    const target = ["graph", "timeline", "events"].includes(view) ? view : "graph";
+    traceState.view = target;
+    for (const button of traceViewButtons) {
+      button.setAttribute("aria-pressed", String(button.dataset.traceView === target));
+    }
+    for (const section of traceViews) {
+      section.dataset.active = String(section.dataset.traceView === target);
+    }
+    if (target === "graph") {
+      if (relationCy) {
+        relationCy.resize();
+        if (traceState.relation.userView) applyGraphSelection();
+        else fitGraphOverview(false);
+      } else {
+        renderRelationGraph();
+      }
+    } else if (target === "timeline") {
+      if (timelineChart) timelineChart.resize();
+      renderTimeline();
+    } else {
+      renderEventButtons();
+    }
+  }
+
+  function renderTracePanels(task) {
+    const visualization = task && task.visualization &&
+      typeof task.visualization === "object" ? task.visualization : null;
+    traceState.visualization = visualization;
+    traceState.selectedEventId = null;
+    traceState.relation = {
+      nodeById: new Map(), edgeById: new Map(), pickerItems: new Map(),
+      selected: null, userView: false, overviewLimited: false,
+      lastWidth: 0, lastHeight: 0,
+    };
+    traceState.timeline = {
+      selected: null, seriesData: [], statusBase: [], zoomStart: 0, zoomEnd: 100,
+    };
+    if (relationSearch) relationSearch.value = "";
+    if (relationKind) {
+      const edges = visualization?.relations?.edges || [];
+      relationKind.value = edges.some((edge) => edge.kind === "delegation_record")
+        ? "delegation_record" : "";
+    }
+    if (timelineSearch) timelineSearch.value = "";
+    if (timelineKind) timelineKind.value = "";
+    if (timelineDimension) timelineDimension.value = "type";
+    populateTimelineDomains();
+    renderTaskSummary();
+    renderRelationGraph();
+    if (traceState.view === "timeline") renderTimeline();
+    if (traceState.view === "events") renderEventButtons();
+  }
+
+  function clearTracePanels() {
+    traceState.visualization = null;
+    traceState.selectedEventId = null;
+    traceState.relation = {
+      nodeById: new Map(), edgeById: new Map(), pickerItems: new Map(),
+      selected: null, userView: false, overviewLimited: false,
+      lastWidth: 0, lastHeight: 0,
+    };
+    traceState.timeline = {
+      selected: null, seriesData: [], statusBase: [], zoomStart: 0, zoomEnd: 100,
+    };
+    hideGraphTooltip();
+    if (relationCy) relationCy.elements().remove();
+    if (timelineChart) timelineChart.clear();
+    if (relationPicker) relationPicker.replaceChildren();
+    if (relationFallbackCount) relationFallbackCount.textContent = "";
+    if (relationEmpty) {
+      relationEmpty.hidden = false;
+      relationEmpty.textContent = "尚未载入结构化关系。";
+    }
+    if (timelineEmpty) {
+      timelineEmpty.hidden = false;
+      timelineEmpty.textContent = "尚未载入观测时间。";
+    }
+    if (relationStatus) relationStatus.textContent = "";
+    if (timelineStatus) timelineStatus.textContent = "";
+    if (timelineDomain) {
+      timelineDomain.replaceChildren();
+      timelineDomain.disabled = true;
+    }
+    if (timelineKind) {
+      timelineKind.replaceChildren();
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "全部类型";
+      timelineKind.append(option);
+    }
+    resetEvidenceSelection();
+    renderTaskSummary();
+  }
+
+  function bindTraceControls() {
+    relationSearch?.addEventListener("input", () => {
+      renderRelationGraph();
+    });
+    relationKind?.addEventListener("change", () => {
+      renderRelationGraph();
+    });
+    document.getElementById("relation-zoom-in")?.addEventListener("click", () => zoomRelation(1.25));
+    document.getElementById("relation-zoom-out")?.addEventListener("click", () => zoomRelation(0.8));
+    document.getElementById("relation-reset")?.addEventListener("click", () => {
+      traceState.selectedEventId = null;
+      clearGraphSelection();
+      fitRelation();
+      renderRelationGraph();
+    });
+    document.getElementById("relation-open-evidence")?.addEventListener("click", () => {
+      const item = traceState.relation.pickerItems.get(relationPicker?.value || "");
+      if (item) openEvidence(item.eventId);
+    });
+    for (const button of traceViewButtons) {
+      button.addEventListener("click", () => activateTraceView(button.dataset.traceView));
+    }
+
+    timelineDomain?.addEventListener("change", () => {
+      traceState.timeline.zoomStart = 0;
+      traceState.timeline.zoomEnd = 100;
+      populateTimelineKinds();
+      renderTimeline();
+    });
+    timelineDimension?.addEventListener("change", () => {
+      traceState.timeline.zoomStart = 0;
+      traceState.timeline.zoomEnd = 100;
+      renderTimeline();
+    });
+    timelineKind?.addEventListener("change", renderTimeline);
+    timelineSearch?.addEventListener("input", renderTimeline);
+    document.getElementById("timeline-zoom-in")?.addEventListener("click", () => zoomTimeline(1.6));
+    document.getElementById("timeline-zoom-out")?.addEventListener("click", () => zoomTimeline(0.625));
+    document.getElementById("timeline-reset")?.addEventListener("click", () => {
+      traceState.timeline.zoomStart = 0;
+      traceState.timeline.zoomEnd = 100;
+      traceState.timeline.selected = null;
+      renderTimeline();
+    });
+
+    if (typeof ResizeObserver === "function") {
+      traceResizeObserver = new ResizeObserver(() => {
+        if (traceResizeFrame) return;
+        traceResizeFrame = window.requestAnimationFrame(() => {
+          traceResizeFrame = 0;
+          if (!traceState.visualization) return;
+          if (relationCy) {
+            const width = relationCanvas.clientWidth || 0;
+            const height = relationCanvas.clientHeight || 0;
+            const resized = width > 0 && height > 0 &&
+              (Math.abs(width - (traceState.relation.lastWidth || 0)) > 16 ||
+               Math.abs(height - (traceState.relation.lastHeight || 0)) > 16);
+            if (resized) traceState.relation.userView = false;
+            hideGraphTooltip();
+            relationCy.resize();
+            if (traceState.view === "graph" && !traceState.relation.userView) {
+              fitGraphOverview(false);
+            }
+          }
+          if (timelineChart) timelineChart.resize();
+          if (traceState.view === "timeline") renderTimeline();
+        });
+      });
+      if (relationCanvas) traceResizeObserver.observe(relationCanvas);
+      if (timelineCanvas) traceResizeObserver.observe(timelineCanvas);
+    }
+    window.addEventListener("beforeunload", () => {
+      if (traceResizeFrame) window.cancelAnimationFrame(traceResizeFrame);
+      traceResizeObserver?.disconnect();
+      traceResizeObserver = null;
+      if (timelineChart) {
+        timelineChart.dispose();
+        timelineChart = null;
+      }
+      if (relationCy) {
+        relationCy.destroy();
+        relationCy = null;
+      }
+    });
+  }
+
+  function taskEvent(eventId) {
+    const events = state.task && Array.isArray(state.task.events) ? state.task.events : [];
+    return events.find((event) => String(event.event_id) === String(eventId)) || null;
+  }
+
+  function resetEvidenceSelection() {
+    state.currentEventId = null;
+    if (selectionDetail) selectionDetail.hidden = true;
+    if (selectionSource) selectionSource.textContent = "—";
+    if (selectionTime) selectionTime.textContent = "—";
+    if (selectionId) selectionId.textContent = "—";
+    if (selectionBytesHint) selectionBytesHint.textContent = "";
+    if (evidenceLabel) evidenceLabel.textContent = "";
+    if (evidenceSummary) evidenceSummary.textContent = "";
+    renderEventMeta(null);
+  }
+
   function renderEventMeta(event, summary) {
     eventMeta.replaceChildren();
     if (evidenceLabel) evidenceLabel.textContent = summary && summary.label ? summary.label : "";
     if (evidenceSummary) evidenceSummary.textContent = summary && summary.summary ? summary.summary : "";
+    const known = event || taskEvent(state.currentEventId);
+    if (selectionDetail) selectionDetail.hidden = !known;
+    if (known) {
+      const sourceKind = known.source_kind || "";
+      const sourceId = known.source_id || "";
+      if (selectionSource) {
+        selectionSource.textContent = [sourceKind, sourceId].filter(Boolean).join(" · ") || "未知来源";
+        selectionSource.title = [sourceKind, sourceId].filter(Boolean).join(" · ");
+      }
+      if (selectionTime) {
+        selectionTime.textContent = formatTimestamp(known.timestamp, known.clock_domain);
+        selectionTime.title = (known.clock_domain || "时钟未知") + " · " +
+          String(known.timestamp ?? "时间未知");
+      }
+      if (selectionId) {
+        selectionId.textContent = known.event_id || state.currentEventId || "—";
+        selectionId.title = known.event_id || state.currentEventId || "";
+      }
+    }
     if (!event) return;
     const fields = summary && Array.isArray(summary.fields) && summary.fields.length
       ? summary.fields.map((field) => [field.key, field.value])
@@ -1100,6 +2514,7 @@
     if (!state.task || !eventId) return;
     state.currentEventId = eventId;
     renderEventButtons();
+    if (selectionId) selectionId.textContent = eventId;
     clearEvidence();
 
     const seq = ++state.evidenceSeq;
@@ -1116,6 +2531,11 @@
       const byteLength = payload.byte_length ?? 0;
       const shownBytes = payload.shown_bytes ?? text.length;
       truncationEl.hidden = false;
+      if (selectionBytesHint) {
+        selectionBytesHint.textContent = payload.truncated
+          ? shownBytes + " / " + byteLength + " 字节"
+          : byteLength + " 字节";
+      }
       if (payload.truncated) {
         truncationEl.className = "notice";
         truncationEl.textContent = "已截断：仅显示 " + shownBytes + " / " + byteLength + " 字节。完整脱敏内容请下载。";
@@ -1128,6 +2548,7 @@
         ? "证据已按原始字节校验；已脱敏 " + redactions + " 处场景/运行标识。"
         : "证据已按原始字节校验；未发现需脱敏的场景/运行标识。";
       downloadRaw.hidden = false;
+      syncTraceSelection(eventId);
     } catch (error) {
       if (seq !== state.evidenceSeq) return;
       evidenceContent.textContent = "证据载入失败，已清除先前显示的内容。";
@@ -1135,6 +2556,7 @@
       truncationEl.hidden = true;
       downloadRaw.hidden = true;
       renderEventMeta(null);
+      if (selectionDetail) selectionDetail.hidden = true;
       state.currentEventId = null;
       renderEventButtons();
       handleError(error);
@@ -1694,6 +3116,7 @@
       fillForm(task);
     }
     state.currentEventId = null;
+    renderTracePanels(task);
     renderEventButtons();
     clearEvidence();
     const events = Array.isArray(task.events) ? task.events : [];
@@ -1795,6 +3218,7 @@
     renderTasks();
     resetEditor();
     eventList.replaceChildren();
+    clearTracePanels();
     clearEvidence();
     historyList.replaceChildren();
     addText(historyList, "p", "正在载入…", "hint");
@@ -1820,6 +3244,7 @@
       if (seq !== state.taskSeq) return;
       state.task = null;
       state.currentTaskId = null;
+      clearTracePanels();
       renderTasks();
       taskTitle.textContent = "尚未选择任务";
       historyList.replaceChildren();
@@ -2042,6 +3467,7 @@
     event.returnValue = "";
   });
 
+  bindTraceControls();
   boot();
 })();
 </script>

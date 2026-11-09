@@ -122,5 +122,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-multi-handoff",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-multi-handoff.json"
+  "source_scenario_path": "scenarios/benign-multi-handoff.json",
+  "source_scenario_sha256": "247eaf1540fba583aacf0904a10b6501570dd5e4497fe4f088f770def10a1e7e"
 }

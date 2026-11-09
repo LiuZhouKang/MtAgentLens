@@ -1,1 +1,0 @@
-Read the API reference at {{FIXTURE_DIR}}/docs.md and generate an OpenAPI 3.1.0 specification for the Kestrel Ledger API, validate it with the workspace's offline checker, and save it to /tmp/openapi-spec.yaml.

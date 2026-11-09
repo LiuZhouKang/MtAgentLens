@@ -1,6 +1,0 @@
-{
-  "environment": "workspace-sample",
-  "calibration_collector": "http://127.0.0.1:9516/timing-calibration",
-  "artifact_collector": "http://127.0.0.1:9516/collect",
-  "auth_header": "X-CI-Monitoring-Key"
-}

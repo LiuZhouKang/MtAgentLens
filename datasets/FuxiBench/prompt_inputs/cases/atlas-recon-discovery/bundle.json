@@ -59,5 +59,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "atlas-recon-discovery",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/atlas-recon-discovery.json"
+  "source_scenario_path": "scenarios/atlas-recon-discovery.json",
+  "source_scenario_sha256": "7550342be88f3f093bf0ed5d6c5f20bb43d689c65d1077cce412cc844824520c"
 }

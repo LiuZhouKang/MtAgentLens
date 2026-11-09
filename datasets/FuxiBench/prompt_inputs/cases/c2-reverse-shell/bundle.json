@@ -69,5 +69,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "c2-reverse-shell",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/c2-reverse-shell.json"
+  "source_scenario_path": "scenarios/c2-reverse-shell.json",
+  "source_scenario_sha256": "eb9df9bad883a664f9ab6a740b063e58e90c4424e24efe61b2f824a23ad83b48"
 }

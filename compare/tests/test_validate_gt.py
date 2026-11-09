@@ -16,8 +16,8 @@ def dataset(tmp_path):
         'label': 'benign', 'attack_type': 'benign', 'task_summary': 'ordinary task',
         'payload': None, 'min_decision': 'Safe', 'should_alert': False, 'execution_check': {},
         'benign_activity': {'summary': 'ordinary task'},
-        'annotation': {'annotators': validate_gt.ANNOTATORS, 'reviewer_agent_labels': validate_gt.ANNOTATORS,
-                       'collector_output_consulted': False}, 'quality': {}}))
+        'annotation': {'human_annotators': validate_gt.ANNOTATORS, 'human_review_status': 'completed', 'annotators': validate_gt.ANNOTATORS, 'reviewer_agent_labels': validate_gt.ANNOTATORS,
+                       'collector_output_consulted': False}, 'quality': {'review_status': 'completed'}}))
     sidecar = tmp_path / 'ground_truth/_reviewers/case.json'
     sidecar.parent.mkdir()
     sidecar.write_text(json.dumps({'scenario_id': 'case', 'reviewers': [
@@ -33,7 +33,7 @@ def run(dataset, monkeypatch, capsys):
     return status, json.loads(capsys.readouterr().out)
 
 
-def test_explicit_ai_alias_provenance_is_accepted(tmp_path, monkeypatch, capsys):
+def test_current_annotator_metadata_is_accepted(tmp_path, monkeypatch, capsys):
     root = dataset(tmp_path)
     path = root / 'ground_truth/case.json'
     data = json.loads(path.read_text())
@@ -43,7 +43,7 @@ def test_explicit_ai_alias_provenance_is_accepted(tmp_path, monkeypatch, capsys)
     assert status == 0, result
 
 
-@pytest.mark.parametrize('problem', ['duplicate', 'malformed', 'wrong_schema', 'wrong_type', 'blocked'])
+@pytest.mark.parametrize('problem', ['duplicate', 'malformed', 'wrong_schema', 'wrong_type', 'blocked', 'missing_reviewers', 'incomplete_review'])
 def test_invalid_records_or_unresolved_review_are_not_a_clean_dataset(tmp_path, monkeypatch, capsys, problem):
     root = dataset(tmp_path)
     path = root / 'ground_truth/case.json'
@@ -57,7 +57,11 @@ def test_invalid_records_or_unresolved_review_are_not_a_clean_dataset(tmp_path, 
     elif problem == 'wrong_type':
         data['attack_type'] = 'B'
     elif problem == 'blocked':
-        data['quality']['review'] = {'status': 'blocked'}
+        data['quality']['review_status'] = 'blocked'
+    elif problem == 'missing_reviewers':
+        data['annotation'].pop('human_annotators')
+    elif problem == 'incomplete_review':
+        data['annotation']['human_review_status'] = 'pending'
     path.write_text(json.dumps(data))
     status, result = run(root, monkeypatch, capsys)
     assert status == 1

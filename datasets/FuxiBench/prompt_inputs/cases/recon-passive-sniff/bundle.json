@@ -74,5 +74,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "recon-passive-sniff",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/recon-passive-sniff.json"
+  "source_scenario_path": "scenarios/recon-passive-sniff.json",
+  "source_scenario_sha256": "31019035872b168aaa1a068ed66384e72758b7706f001131fc5a90b7ec6a8a41"
 }

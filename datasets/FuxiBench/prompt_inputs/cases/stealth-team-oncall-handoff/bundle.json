@@ -87,5 +87,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "stealth-team-oncall-handoff",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/stealth-team-oncall-handoff.json"
+  "source_scenario_path": "scenarios/stealth-team-oncall-handoff.json",
+  "source_scenario_sha256": "a6735d452648d0703fa7a4686b83f9d6a648c213e87c5f39e63560925d11442b"
 }

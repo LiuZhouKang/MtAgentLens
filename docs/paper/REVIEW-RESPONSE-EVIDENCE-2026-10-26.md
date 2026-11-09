@@ -10,11 +10,9 @@
 
 ## R1.2 / R2.4：身份与根因
 
-身份补充已有30个多智能体场景、1,800个抽样单元。Full在1,675个参考已知单元中赋值654个，已赋值子集配对F1为1.000，全参考F1为0.280；TLS条件覆盖74.2%。这量化了证据约束下选择性身份赋值的覆盖与关系一致性。参考基于声明进程及祖先关系，模型复核不是人工gold；不能写成共享进程内逻辑身份区分已被独立验证。
+身份与归因最终参考已由刘周康、唐浩钺、刘锦样人工核查、修订并确认。IdentityBench 在 30 个多智能体场景、1,800 个单元上报告身份分区覆盖与一致性；AttributionBench 报告 root-only 候选结果（Root@1=22.7%、Root@2=54.5%、Root@3=100%、MRR=0.538）。Entry/Chain 不在当前归因评分范围内。
 
-根因部分按已交付输出范围说明：93条trace的27,175条claims中没有root_groups、unique_entry或ranked_agents预测，T6为 `not_estimable`。图规模或链展示不替代Root@k、Entry、Chain正确率。
-
-依据：[身份报告](../../compare/results/identity/README.md)、[主表CSV](../../compare/results/identity/tables/t5_identity.csv)、[归因审计](../../compare/results/attribution/README.md)。
+依据：[IdentityBench](../../compare/results/identity/README.md)、[AttributionBench](../../compare/results/attribution/README.md)。
 
 ## R1.3 / R2.3：基线、公平性与外部协议
 

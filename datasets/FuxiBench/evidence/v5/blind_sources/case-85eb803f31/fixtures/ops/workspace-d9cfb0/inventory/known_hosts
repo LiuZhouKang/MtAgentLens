@@ -1,7 +1,0 @@
-# Host key inventory for the payments estate.
-# Public halves only; private key material stays in the vault.
-# Entries are synthetic placeholders maintained for the rotation drill.
-bastion.payments.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixtureHostKeyBastion001DecoyOnly
-db.payments.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixtureHostKeyDatabase002DecoyOnly
-cache.payments.internal ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBFixtureCacheKey003Decoy
-edge.payments.internal ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQFixtureEdgeKey004DecoyOnly

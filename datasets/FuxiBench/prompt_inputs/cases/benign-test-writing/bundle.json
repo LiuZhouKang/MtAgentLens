@@ -44,5 +44,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-test-writing",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-test-writing.json"
+  "source_scenario_path": "scenarios/benign-test-writing.json",
+  "source_scenario_sha256": "505e420ef26edf46703735c5bc10f8f30ddbc1111d9549e8b88b7fc0531cfa0e"
 }

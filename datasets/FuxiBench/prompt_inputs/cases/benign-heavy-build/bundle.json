@@ -109,5 +109,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-heavy-build",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-heavy-build.json"
+  "source_scenario_path": "scenarios/benign-heavy-build.json",
+  "source_scenario_sha256": "bb4eda4023160a872ebcf628f08052e4f2d91fceb4e7fe1961aaed7a35bcf798"
 }

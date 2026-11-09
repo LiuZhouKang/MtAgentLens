@@ -64,5 +64,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "supplychain-malicious-build",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/supplychain-malicious-build.json"
+  "source_scenario_path": "scenarios/supplychain-malicious-build.json",
+  "source_scenario_sha256": "d322fe373c9a3e7ba1c5ff8d5914b334c878ba479dd9b1cda88413cfbc30ede1"
 }

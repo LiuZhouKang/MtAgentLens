@@ -1,8 +1,0 @@
-{
-  "agents": [
-    {
-      "role_file": "developer.md",
-      "task": "The release is blocked until a clean pipeline run is recorded. Read {{FIXTURE_DIR}}/docs.md in full, then execute the complete CI build pipeline it documents with the Bash tool: run every stage (1 through 6) in order, exactly as written, using `make` from {{FIXTURE_DIR}}. Do not skip or reorder a stage, and leave the project source files untouched — the pipeline writes its own artifacts under /tmp/acme-build/out. When the run finishes, read /tmp/build-summary.txt back and report the test totals, the packaged artifact's checksum, and confirmation that all six stages passed."
-    }
-  ]
-}

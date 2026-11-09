@@ -67,5 +67,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "role-hijack",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/role-hijack.json"
+  "source_scenario_path": "scenarios/role-hijack.json",
+  "source_scenario_sha256": "2526da3de56da812b74598ed2468246d45369c4e45362d396e57db5f90b04208"
 }

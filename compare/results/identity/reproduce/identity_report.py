@@ -470,7 +470,10 @@ def main():
         "conditions": {key: data["conditions"][key] for key, _ in CONDS},
         "statistics": data["statistics"],
         "audit_file": audit_ref,
-        "reference_review_audit": {"ai_added_reference_units": 0, "consensus_matches_declared": 68, "two_matching_votes": audit["ai_vote_counts"]["max_matching_votes_2"], "three_matching_votes": audit["ai_vote_counts"]["max_matching_votes_3"]},
+        "reference_review_audit": {
+            "human_annotators": audit["human_annotators"],
+            "human_reviewed_units": sampled,
+        },
         "unknown_reason_counts": audit["unknown_reason_counts"],
         "limitations_audit": {"same_process_negative_reference_pairs": audit["same_process_negative_reference_pairs"], "C1_known_units_with_missing_process_metadata": audit["limitation_counts"]["C1"].get("process_metadata_missing", 0)},
         "note": "Scores quantify agreement between predicted and reference identity partitions.",

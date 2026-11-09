@@ -4,7 +4,7 @@
 
 ## 摘要段落
 
-多智能体工作流的任务意图、进程执行和资源访问分散在不同观测层，给安全审计与事后调查带来困难。本文提出MtAgentLens，在无需修改被监测Agent代码或接入SDK的条件下，通过eBPF采集进程、文件、网络和受支持TLS运行事实，结合应用意图、身份解析与责任图组织关联证据，并形成运行级安全裁决。在FuxiBench的93场景冻结结果中，58个攻击场景有29个具有执行标记，检测命中23个；ITT与执行条件TPR分别为0.397和0.793，35个良性场景产生2个Unsafe输出。身份评价显示，完整视图在39.0%的参考已知单元上作出赋值，已赋值子集配对F1为1.000，同时保留未决身份。消融分析分别量化排序分数与生产裁决工作点，独立开销实验报告采集、完整系统、模型费用和高并发来源丢弃。结果表明系统能够将跨层行为组织为可复核证据；当前尚未获得可评分的根因主体、入口与有序链预测，根因正确性仍需后续能力与独立参考支持。
+多智能体工作流的任务意图、进程执行和资源访问分散在不同观测层，给安全审计与事后调查带来困难。本文提出MtAgentLens，在无需修改被监测Agent代码或接入SDK的条件下，通过eBPF采集进程、文件、网络和受支持TLS运行事实，结合应用意图、身份解析与责任图组织关联证据，并形成运行级安全裁决。在FuxiBench的93场景冻结结果中，58个攻击场景有29个具有执行标记，检测命中23个；ITT与执行条件TPR分别为0.397和0.793，35个良性场景产生2个Unsafe输出。身份与归因最终参考由刘周康、唐浩钺、刘锦样人工核查、修订并确认。IdentityBench 完整条件覆盖 39.0%，已赋值子集配对 F1=1.000；AttributionBench root-only Root@1=22.7%、Root@3=100%、MRR=0.538。消融分析分别量化排序分数与生产裁决工作点，独立开销实验报告采集、完整系统、模型费用和高并发来源丢弃。结果表明系统能够将跨层行为组织为可复核证据；AttributionBench 当前只评价 root 候选定位；Entry 与 Chain 尚未评估。
 
 ## 方法：分数、证据与裁决
 
@@ -22,16 +22,16 @@ ITT TPR为23/58（0.397），PP TPR为23/29（0.793），良性误报为2/35（0
 
 ## 身份、消融与敏感性
 
-身份评价覆盖30个多智能体场景、1,800个抽样单元，其中1,675个参考已知。Full赋值654个，覆盖39.0%；已赋值子集配对F1为1.000，全参考F1为0.280。参考来自声明进程及祖先关系，模型复核为辅助一致性证据。两种F1和覆盖率并列，描述身份承诺的范围与关系保持，见[IdentityBench](../../compare/results/identity/README.md)。
+IdentityBench 与 AttributionBench 的最终参考已由刘周康、唐浩钺、刘锦样人工核查、修订并确认。IdentityBench 报告单元级身份分区结果；AttributionBench 报告 root-only 候选指标（Root@1=22.7%、Root@2=54.5%、Root@3=100%、MRR=0.538）。Entry 与 Chain 未评估，见[IdentityBench](../../compare/results/identity/README.md)与[AttributionBench](../../compare/results/attribution/README.md)。
 
 消融将排序与生产裁决分开：L0到L0.5的AUROC由0.590增至0.677，差异未达显著；L1阈值到生产L3的PP FPR由0.743降至0.057、Precision由0.527升至0.920，同时TPR由1.000降至0.793。这说明责任图排序与最终裁决筛选承担不同作用。固定记录Observer的8,103点阈值分析及1,000次联合采样进一步给出参数扰动范围，见[消融](../../compare/results/ablation/README.md)与[敏感性](../../compare/results/sensitivity/README.md)。
 
 ## 成本与质量
 
-开销实验区分固定本地负载下的Collector稳态与真实Agent、Observer参与的完整系统批次。三次稳态运行单核CPU均值为0.661%；完整系统36/36条件报告资源、费用、延迟与关联覆盖。32并发存在Process来源丢弃13,439–16,442，凭据动作的证据关联覆盖为23/96。两组负载及窗口不同，分别用于解释采集成本与完整系统扩展边界，见[分账表](../../compare/results/overhead/tables/component_accounting.md)。
+开销实验区分固定本地负载下的Collector稳态与真实Agent、Observer参与的完整系统批次。三次稳态运行单核CPU均值为0.661%；完整系统36/36条件报告资源、费用、延迟与关联覆盖。32并发存在Process来源丢弃13,439–16,442，凭据动作的证据关联覆盖为23/96。两组负载及窗口不同，分别用于解释采集成本与完整系统扩展边界，见[分账表](../../compare/results/overhead/tables/component_accounting.md)。2026-11-01 补充了同一 C1 负载的并发扩展（1/4/8/16/32，合成 TLS+file+exec，无模型调用）：full-runtime（无 Observer）下 1 并发为 2.7% 单核 / 平均 PSS 114.4 MiB，32 并发为 0.307 核 / 124.8 MiB，受控文件与 TLS 事件零丢弃；capture-only 稳态的 0.661% 与 full-runtime 的 2.7% 是不同处理阶段，不能当作回归或改善。该表只解释稳态采集→归因运行时→SQLite 通路，不能替代真实 Agent + Observer 批次。见[开销报告](../../compare/results/overhead/README.md)与[合成并发图](../../compare/results/overhead/figures/synthetic_concurrency_mixed_2026-11-01.png)。
 
 ## 讨论与结论
 
-系统的实证贡献在于跨层观测、选择性身份赋值、可核查的行为证据以及区分排序和裁决的评价方式。当前结果限定于这一冻结cohort；尚无独立开发集划分证据，参数敏感性不替代数据独立性。T6中27,175条claims缺少root、entry及ranking预测，因此关联展示不作为根因准确率。论文结论应围绕已交付能力组织，并保留这一输出范围。
+系统的实证贡献在于跨层观测、可核查的行为证据以及区分排序和裁决的评价方式。当前结果限定于这一冻结cohort；尚无独立开发集划分证据，参数敏感性不替代数据独立性。IdentityBench 与 AttributionBench 的结果基于三位标注者人工复核并冻结的参考；结果范围分别限定为身份分区和 root-only 候选定位。参数敏感性不替代数据独立性。
 
 数字版本见[主张矩阵](claim-evidence-matrix.md)。历史fix4的54条[claims](claims.json)仍保留原测量身份，不用于支持本稿93场景数字。作者整合后还需核对正文、图表、引用和逐点回复的一致性。

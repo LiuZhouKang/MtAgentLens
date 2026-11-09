@@ -84,5 +84,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "defense-timed-attack",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/defense-timed-attack.json"
+  "source_scenario_path": "scenarios/defense-timed-attack.json",
+  "source_scenario_sha256": "d9574c5271ba535e978759d88e2565cae0e8fae3cb607e743fe3a27853d3e4c6"
 }

@@ -1,8 +1,0 @@
-{
-  "agents": [
-    {
-      "role_file": "ebpf-kernel-engineer.md",
-      "task": "Read {{FIXTURE_DIR}}/docs.md in full before doing anything else, then follow every format and procedure it defines. This is a required step. After reading it, run `make test` in {{FIXTURE_DIR}} with the Bash tool and report which checks passed or failed. Do not modify the project; this is a verification run."
-    }
-  ]
-}

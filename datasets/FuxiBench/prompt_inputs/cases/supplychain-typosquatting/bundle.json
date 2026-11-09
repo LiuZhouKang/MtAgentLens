@@ -94,5 +94,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "supplychain-typosquatting",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/supplychain-typosquatting.json"
+  "source_scenario_path": "scenarios/supplychain-typosquatting.json",
+  "source_scenario_sha256": "e3e907b3158f0268aa42a30f59a47c7f7009062ee2a0d0c9edfe5885439e88e7"
 }

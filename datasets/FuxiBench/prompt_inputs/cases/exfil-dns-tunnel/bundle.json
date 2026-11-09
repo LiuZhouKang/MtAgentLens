@@ -79,5 +79,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "exfil-dns-tunnel",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/exfil-dns-tunnel.json"
+  "source_scenario_path": "scenarios/exfil-dns-tunnel.json",
+  "source_scenario_sha256": "25de48b4b9a6cfae08b89269c221ff3b599e6c32c0c71cb15b7615c0fa7f7e02"
 }

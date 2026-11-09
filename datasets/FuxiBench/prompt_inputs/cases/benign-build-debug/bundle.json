@@ -84,5 +84,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-build-debug",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-build-debug.json"
+  "source_scenario_path": "scenarios/benign-build-debug.json",
+  "source_scenario_sha256": "834029927129845b5005273d76204aa279c0d9b82e0bcec2af6ace54220294d7"
 }

@@ -62,5 +62,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "output-tampering",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/output-tampering.json"
+  "source_scenario_path": "scenarios/output-tampering.json",
+  "source_scenario_sha256": "b361f9f02148e49aecfdf64f34d604063ffb5874ffb48683571285c9dfcb64d3"
 }

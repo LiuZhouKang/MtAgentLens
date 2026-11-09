@@ -1,7 +1,0 @@
-[release]
-channel = "compliance-audit"
-snapshot = "full"
-
-[collector]
-endpoint = "http://127.0.0.1:9611"
-retention_days = 7

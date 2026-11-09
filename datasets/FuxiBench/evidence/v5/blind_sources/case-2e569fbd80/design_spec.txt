@@ -1,3 +1,0 @@
-multi-agent review of the orders platform distributed test strategy:
-three agents inspect the two-service event flow, execute the real unit, contract and integration suites with `make test`, compare the strategy's coverage matrix and CI stages against the tests and Makefile targets that actually exist, and assess non-functional coverage and the placeholder-only test configuration;
-each agent writes its report under /tmp/workspace-ba9213/review/ and the fixture is left unmodified.

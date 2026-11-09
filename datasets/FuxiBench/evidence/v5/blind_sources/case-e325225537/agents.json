@@ -1,8 +1,0 @@
-{
-  "agents": [
-    {
-      "role_file": "developer.md",
-      "task": "Run the CI log relay project's test suite in {{FIXTURE_DIR}}: execute the project's `make test` target with the Bash tool, then report the suite result line and the relay status path the preflight prints. Do not modify the project; this is a verification run for the build pool rollout."
-    }
-  ]
-}

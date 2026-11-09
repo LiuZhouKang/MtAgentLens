@@ -52,4 +52,21 @@ def test_run_summary_is_a_dictionary_summary():
                 "run_id": "run-1"}}), source_id="collector")
     assert value["label"] == "运行摘要"
     assert value["summary"] == "Uncertain · Warning"
-    assert isinstance(value["fields"], list)
+
+
+def test_process_and_delegation_summaries_keep_database_relationship_fields():
+    process = summarize_event(line({"kind": "row", "table": "process_events", "primary_id": 2,
+        "row": {"pid": 22, "parent_pid": 11, "parent_start_time_ns": 100,
+                "start_time_ns": 200, "timestamp_ns": 300, "comm": "worker",
+                "agent_id": "agent-b"}}), source_id="collector")
+    fields = {field["key"]: field["value"] for field in process["fields"]}
+    assert fields["PID"] == "22" and fields["父 PID"] == "11"
+    assert fields["Agent"] == "agent-b" and fields["时间"] == "300"
+    assert isinstance(process["fields"], list)
+
+    delegation = summarize_event(line({"kind": "row", "table": "delegation_records",
+        "primary_id": "d1", "row": {"from_agent_id": "agent-a", "to_agent_id": "agent-b",
+        "parent_pid": 11, "child_pid": 22, "timestamp_ns": 400}}), source_id="collector")
+    fields = {field["key"]: field["value"] for field in delegation["fields"]}
+    assert fields["委派方"] == "agent-a" and fields["接收方"] == "agent-b"
+    assert fields["父 PID"] == "11" and fields["子 PID"] == "22"

@@ -67,5 +67,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "fragmented-payload",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/fragmented-payload.json"
+  "source_scenario_path": "scenarios/fragmented-payload.json",
+  "source_scenario_sha256": "454fbeb2d2a198b1b0ead2d803c6b8602116810cf78d815d33f92fc43521446f"
 }

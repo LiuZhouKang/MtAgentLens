@@ -69,5 +69,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "credential-keylogger",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/credential-keylogger.json"
+  "source_scenario_path": "scenarios/credential-keylogger.json",
+  "source_scenario_sha256": "f6a3a400ff314b0c7943073ed794b6b2feb44b953a2b78f983c187f90c718f67"
 }

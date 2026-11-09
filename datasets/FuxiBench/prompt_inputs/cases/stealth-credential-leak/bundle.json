@@ -94,5 +94,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "stealth-credential-leak",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/stealth-credential-leak.json"
+  "source_scenario_path": "scenarios/stealth-credential-leak.json",
+  "source_scenario_sha256": "a3ddf5c74f25f48035fb2ccd09ab9204b2986d34b5a26dca84f37c51dcbd0298"
 }

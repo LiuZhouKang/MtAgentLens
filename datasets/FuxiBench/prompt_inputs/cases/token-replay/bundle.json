@@ -67,5 +67,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "token-replay",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/token-replay.json"
+  "source_scenario_path": "scenarios/token-replay.json",
+  "source_scenario_sha256": "c07e7d760a95b4681181adc086a720241f94c40e9d7d85ce15e7239ed1d30279"
 }

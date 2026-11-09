@@ -97,5 +97,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "mirror-poisoning",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/mirror-poisoning.json"
+  "source_scenario_path": "scenarios/mirror-poisoning.json",
+  "source_scenario_sha256": "c35dada882633e893e7010bc3f490b347f0d1f56d6606bfbe75bcdb54e4211fc"
 }

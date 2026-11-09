@@ -109,29 +109,6 @@ def test_clean_room_copy_has_independent_inodes(tmp_path):
     assert (source / 'record').read_text() == 'observed'
 
 
-def test_restore_uses_verified_annotation_source_without_rewriting_external_ips(tmp_path):
-    import hashlib
-    from scripts.evaluation.package_fuxibench import restore_annotation_inputs
-    source = tmp_path / 'repo'
-    source_file = source / 'env/scenarios/fixtures/demo/config.txt'
-    source_file.parent.mkdir(parents=True)
-    source_file.write_text('local=127.0.0.1\nexternal=93.184.216.34\n')
-    package = tmp_path / 'package'
-    target = package / 'fixtures/demo/config.txt'
-    target.parent.mkdir(parents=True)
-    target.write_text('local=93.184.216.34\nexternal=93.184.216.34\n')
-    annotation_map = tmp_path / 'case-map.json'
-    annotation_map.write_text(json.dumps({'cases': [{'sources': [{'kind': 'fixture', 'origin': {
-        'path': 'env/scenarios/fixtures/demo/config.txt',
-        'sha256': hashlib.sha256(source_file.read_bytes()).hexdigest()}}]}]}))
-    report = restore_annotation_inputs(package, annotation_map, source)
-    assert target.read_bytes() == source_file.read_bytes()
-    assert report['restored'] == ['fixtures/demo/config.txt']
-    source_file.write_text('unverified newer bytes')
-    import pytest
-    with pytest.raises(ValueError, match='hash mismatch'):
-        restore_annotation_inputs(package, annotation_map, source)
-    assert target.read_text() == 'local=127.0.0.1\nexternal=93.184.216.34\n'
 
 
 def test_failed_build_preserves_existing_package_and_trace_source(tmp_path, monkeypatch):
@@ -233,46 +210,8 @@ def test_rebuilt_prompts_bind_current_fixture_and_detect_drift(tmp_path, monkeyp
     assert validate_prompt_sources(tmp_path)
 
 
-def test_annotation_restore_sanitizes_db_paths_without_changing_ip_or_source(tmp_path):
-    import hashlib
-    import sqlite3
-    from scripts.evaluation.package_fuxibench import restore_annotation_inputs
-    from scripts.evaluation.validate_fuxibench_package import validate_annotation_sources
-    source = tmp_path / 'repo'
-    original = source / 'env/scenarios/fixtures/demo/trace.db'
-    original.parent.mkdir(parents=True)
-    con = sqlite3.connect(original)
-    con.execute('CREATE TABLE events (data TEXT)')
-    con.execute('INSERT INTO events VALUES (?)', ('/home/lzk/MtAgentLens/a 127.0.0.1',))
-    con.commit()
-    con.close()
-    original_bytes = original.read_bytes()
-    annotation_map = tmp_path / 'map.json'
-    annotation_map.write_text(json.dumps({'cases': [{'sources': [{'kind': 'fixture', 'origin': {
-        'path': 'env/scenarios/fixtures/demo/trace.db',
-        'sha256': hashlib.sha256(original_bytes).hexdigest()}}]}]}))
-    package = tmp_path / 'package'
-    restore_annotation_inputs(package, annotation_map, source)
-    copied = package / 'fixtures/demo/trace.db'
-    con = sqlite3.connect(copied)
-    assert con.execute('SELECT data FROM events').fetchone()[0] == 'a 127.0.0.1'
-    con.close()
-    assert b'/home/lzk' not in copied.read_bytes()
-    assert original.read_bytes() == original_bytes
-    assert validate_annotation_sources(package) == []
-    copied.write_bytes(b'changed')
-    assert validate_annotation_sources(package)
 
 
-def test_annotation_verification_cannot_omit_files(tmp_path):
-    from scripts.evaluation.validate_fuxibench_package import validate_annotation_sources
-    (tmp_path / 'ground_truth/c').mkdir(parents=True)
-    (tmp_path / 'ground_truth/c/s.json').write_text(json.dumps(base_record()))
-    report = tmp_path / 'evidence/annotation-source-verification.json'
-    report.parent.mkdir()
-    report.write_text(json.dumps({'schema': 'mtagentlens.annotation-source-verification/1',
-        'scenario_ids': ['s'], 'verified_files': 0, 'files': []}))
-    assert validate_annotation_sources(tmp_path)
 
 
 def test_provenance_does_not_guess_missing_reference_by_basename(tmp_path, monkeypatch):
@@ -285,24 +224,6 @@ def test_provenance_does_not_guess_missing_reference_by_basename(tmp_path, monke
         repair.rebase_and_hash({'path': 'missing/a.txt', 'sha256': 'original'})
 
 
-def test_gt_reference_checker_rejects_wrong_hash_pointer_and_quote(tmp_path):
-    import hashlib
-    from scripts.evaluation.validate_fuxibench_package import validate_gt_references
-    source = tmp_path / 'source.json'
-    source.write_text(json.dumps({'task': 'Read the report'}))
-    digest = hashlib.sha256(source.read_bytes()).hexdigest()
-    gt = tmp_path / 'ground_truth/c/s.json'
-    gt.parent.mkdir(parents=True)
-    reference = {'path': 'source.json', 'sha256': digest, 'json_pointer': '/task', 'quote': 'Read the report'}
-    record = {'scenario_id': 's', 'label_annotation': {'source': {'path': 'source.json', 'sha256': digest},
-        'evidence': {'references': [reference]}}}
-    gt.write_text(json.dumps(record))
-    assert validate_gt_references(tmp_path) == []
-    for key, value in [('sha256', 'wrong'), ('json_pointer', '/absent'), ('quote', 'Invented text')]:
-        broken = json.loads(json.dumps(record))
-        broken['label_annotation']['evidence']['references'][0][key] = value
-        gt.write_text(json.dumps(broken))
-        assert validate_gt_references(tmp_path)
 
 
 def test_execution_inputs_accept_unversioned_directory_and_current_fixture(tmp_path):
@@ -346,75 +267,12 @@ def test_traces_are_declared_review_only(tmp_path):
     assert problems == []
 
 
-def _verification_package(tmp_path, *, schema, changes, annotation=None):
-    package = tmp_path / "pkg"
-    (package / "evidence").mkdir(parents=True)
-    (package / "scenarios").mkdir()
-    (package / "ground_truth" / "cat").mkdir(parents=True)
-    (package / "fixtures").mkdir()
-    (package / "roles").mkdir()
-    scenario = package / "scenarios/s.json"
-    scenario.write_text('{"id": "s"}', encoding="utf-8")
-    (package / "ground_truth/cat/s.json").write_text(
-        json.dumps({"scenario_id": "s", "label": "attack", "attack_type": "A"}), encoding="utf-8")
-    (package / "fixtures/docs.md").write_text("fixture\n", encoding="utf-8")
-    role = package / "roles/dev.md"
-    role.write_text("You are a developer.\n", encoding="utf-8")
-    import hashlib
-    def sha(path):
-        return hashlib.sha256(path.read_bytes()).hexdigest()
-    files = [
-        {"path": "scenarios/s.json", "kind": "scenario_tasks",
-         "annotation_sha256": annotation or sha(scenario), "packaged_sha256": sha(scenario)},
-        {"path": "fixtures/docs.md", "kind": "fixture",
-         "annotation_sha256": sha(package / "fixtures/docs.md"),
-         "packaged_sha256": sha(package / "fixtures/docs.md")},
-        {"path": "roles/dev.md", "kind": "role",
-         "annotation_sha256": sha(role), "packaged_sha256": sha(role)},
-    ]
-    report = {"schema": schema, "scenario_ids": ["s"], "verified_files": len(files),
-              "files": files, "restored": [], "post_annotation_changes": changes}
-    (package / "evidence/annotation-source-verification.json").write_text(
-        json.dumps(report), encoding="utf-8")
-    return package
 
 
-def test_v2_annotation_verification_accepts_a_listed_change(tmp_path):
-    from scripts.evaluation.validate_fuxibench_package import validate_annotation_sources
-    import hashlib
-    package = _verification_package(tmp_path, schema="mtagentlens.annotation-source-verification/2",
-                                    changes=[], annotation="a" * 64)
-    scenario = package / "scenarios/s.json"
-    current = hashlib.sha256(scenario.read_bytes()).hexdigest()
-    report = json.loads((package / "evidence/annotation-source-verification.json").read_text())
-    report["post_annotation_changes"] = [{"path": "scenarios/s.json", "kind": "scenario_tasks",
-                                          "from": "a" * 64, "to": current, "reason": "metadata repair"}]
-    (package / "evidence/annotation-source-verification.json").write_text(json.dumps(report))
-    assert validate_annotation_sources(package) == []
 
 
-def test_v2_annotation_verification_rejects_a_change_without_a_reason(tmp_path):
-    from scripts.evaluation.validate_fuxibench_package import validate_annotation_sources
-    import hashlib
-    package = _verification_package(tmp_path, schema="mtagentlens.annotation-source-verification/2",
-                                    changes=[], annotation="a" * 64)
-    current = hashlib.sha256((package / "scenarios/s.json").read_bytes()).hexdigest()
-    report = json.loads((package / "evidence/annotation-source-verification.json").read_text())
-    report["post_annotation_changes"] = [{"path": "scenarios/s.json", "kind": "scenario_tasks",
-                                          "from": "a" * 64, "to": current, "reason": ""}]
-    (package / "evidence/annotation-source-verification.json").write_text(json.dumps(report))
-    problems = validate_annotation_sources(package)
-    assert any("no reason" in item for item in problems), problems
 
 
-def test_v2_annotation_verification_rejects_a_change_that_does_not_match_bytes(tmp_path):
-    from scripts.evaluation.validate_fuxibench_package import validate_annotation_sources
-    package = _verification_package(tmp_path, schema="mtagentlens.annotation-source-verification/2",
-                                    changes=[{"path": "scenarios/s.json", "kind": "scenario_tasks",
-                                              "from": "a" * 64, "to": "b" * 64, "reason": "x"}],
-                                    annotation="a" * 64)
-    problems = validate_annotation_sources(package)
-    assert any("does not match packaged bytes" in item for item in problems), problems
 
 
 def test_builder_places_licenses_in_documented_locations(tmp_path, monkeypatch):

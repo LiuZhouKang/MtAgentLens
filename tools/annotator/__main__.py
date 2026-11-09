@@ -30,7 +30,7 @@ def _publish_export(path: Path, payload: dict) -> None:
             temporary.unlink(missing_ok=True)
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     build = commands.add_parser("build", help="freeze declared raw sources against a validated release")
@@ -122,7 +122,96 @@ def main() -> int:
     release_verify.add_argument("--root", required=True, type=Path)
     for command in (register, save, export, serve, pilot, migrate, release):
         command.add_argument("--store", required=True, type=Path)
-    args = parser.parse_args()
+    scene_serve = commands.add_parser(
+        "scene-serve", help="open the isolated FuxiBench scene annotation workbench")
+    scene_source = scene_serve.add_mutually_exclusive_group(required=True)
+    scene_source.add_argument("--dataset", type=Path)
+    scene_source.add_argument("--package", type=Path)
+    scene_serve.add_argument("--store", required=True, type=Path)
+    scene_serve.add_argument("--rater", required=True, action="append",
+                             help="configured rater name (repeat for all three)")
+    scene_serve.add_argument("--codebook-version", default=None)
+    scene_serve.add_argument("--active-rater",
+                             help="fixed local annotator identity; prevents switching names in the UI")
+    scene_serve.add_argument("--host", default="127.0.0.1")
+    scene_serve.add_argument("--port", type=int, default=7412)
+    scene_pack = commands.add_parser(
+        "scene-pack", help="freeze sanitized FuxiBench materials for offline raters")
+    scene_pack.add_argument("--dataset", required=True, type=Path)
+    scene_pack.add_argument("--codebook-version", default="fuxibench-2type/1")
+    scene_pack.add_argument("--out", required=True, type=Path)
+    scene_export = commands.add_parser(
+        "scene-export", help="export scene annotation chains without overwriting")
+    scene_export.add_argument("--store", required=True, type=Path)
+    scene_export.add_argument("--out", required=True, type=Path)
+    scene_merge = commands.add_parser(
+        "scene-merge", help="merge three isolated scene exports after verifying their bindings")
+    scene_merge.add_argument("--input", required=True, action="append", type=Path)
+    scene_merge.add_argument("--rater", required=True, action="append")
+    scene_merge.add_argument("--out", required=True, type=Path)
+    scene_stage = commands.add_parser(
+        "scene-stage-adjudication", help="prepare a three-rater scene store for final review")
+    scene_stage.add_argument("--merged", required=True, type=Path)
+    scene_source = scene_stage.add_mutually_exclusive_group(required=True)
+    scene_source.add_argument("--dataset", type=Path)
+    scene_source.add_argument("--package", type=Path)
+    scene_stage.add_argument("--store", required=True, type=Path)
+    scene_gt = commands.add_parser(
+        "scene-gt-export", help="publish schema-validated, adjudicated FuxiBench GT files")
+    scene_gt.add_argument("--merged", required=True, type=Path)
+    scene_gt_source = scene_gt.add_mutually_exclusive_group(required=True)
+    scene_gt_source.add_argument("--dataset", type=Path)
+    scene_gt_source.add_argument("--package", type=Path)
+    scene_gt.add_argument("--categories", required=True, type=Path,
+                          help="JSON mapping with schema and scenario_id-to-category values")
+    scene_gt.add_argument("--reviewed-at", required=True,
+                          help="human review date in YYYY-MM-DD format")
+    scene_gt.add_argument("--confirm-blind-review", action="store_true",
+                          help="attest that reviewers did not consult collector output")
+    scene_gt.add_argument("--out", required=True, type=Path)
+    runtime_merge = commands.add_parser(
+        "runtime-merge", help="merge isolated one-annotator runtime exports")
+    runtime_merge.add_argument("--input", required=True, action="append", type=Path)
+    runtime_merge.add_argument("--rater", required=True, action="append")
+    runtime_merge.add_argument("--out", required=True, type=Path)
+    runtime_stage = commands.add_parser(
+        "runtime-stage-adjudication", help="load merged human chains into a review store")
+    runtime_stage.add_argument("--merged", required=True, type=Path)
+    runtime_stage.add_argument("--release", required=True, type=Path)
+    runtime_stage.add_argument("--store", required=True, type=Path)
+    identity_export = commands.add_parser(
+        "identity-export", help="validate and export a merged identity reference")
+    identity_export.add_argument("--merged", required=True, type=Path)
+    identity_export.add_argument("--mapping", required=True, type=Path)
+    identity_export.add_argument("--out", required=True, type=Path)
+    root_export = commands.add_parser(
+        "root-export", help="validate and export a merged scenario-root reference")
+    root_export.add_argument("--merged", required=True, type=Path)
+    root_export.add_argument("--mapping", required=True, type=Path)
+    root_export.add_argument("--out", required=True, type=Path)
+    unified = commands.add_parser(
+        "unified-serve", help="open scene and runtime annotation in one tabbed workbench")
+    unified_source = unified.add_mutually_exclusive_group(required=True)
+    unified_source.add_argument("--dataset", type=Path)
+    unified_source.add_argument("--package", type=Path)
+    unified.add_argument("--scene-store", required=True, type=Path)
+    unified.add_argument("--runtime-store", required=True, type=Path)
+    unified.add_argument("--scene-rater", required=True, action="append",
+                         help="scene workspace identity (one local annotator or all three for adjudication)")
+    unified.add_argument("--active-scene-rater",
+                         help="fixed scene identity for a one-rater offline workspace")
+    unified.add_argument("--runtime-rater", required=True)
+    unified.add_argument("--runtime-mode", choices=("annotate", "adjudicate"), default="annotate")
+    unified.add_argument("--reviewer", action="append", default=[])
+    unified.add_argument("--scene-codebook-version", default=None)
+    unified.add_argument("--runtime-codebook-version", default=None)
+    unified.add_argument("--port", type=int, default=7420)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
     try:
         if args.command == "build":
             spec = _loads_strict(args.spec.read_text(encoding="utf-8"))
@@ -231,6 +320,179 @@ def main() -> int:
                       "cases": len(verified["cases"]),
                       "codebook_version": verified["codebook_version"],
                       "paper_metrics_available": verified["paper_metrics_available"]}
+        elif args.command == "scene-export":
+            from tools.annotator.scene_records import SceneRecordStore
+            store = SceneRecordStore.open(args.store)
+            payload = store.export()
+            _publish_export(args.out, payload)
+            result = {
+                "scenarios": len(payload["scenarios"]),
+                "raters": payload["raters"],
+                "codebook_version": payload["codebook_version"],
+                "out": str(args.out),
+            }
+        elif args.command == "scene-pack":
+            from tools.annotator.offline import build_scene_package
+            manifest = build_scene_package(args.dataset, args.out,
+                                           codebook_version=args.codebook_version)
+            result = {**manifest, "out": str(args.out)}
+        elif args.command == "scene-merge":
+            from tools.annotator.offline import merge_scene_exports
+            if len(args.input) != 3 or len(args.rater) != 3:
+                raise ValueError("scene-merge requires exactly three --input and three --rater values")
+            exports = [_loads_strict(path.read_text(encoding="utf-8")) for path in args.input]
+            payload = merge_scene_exports(exports, args.rater)
+            _publish_export(args.out, payload)
+            result = {"scenarios": len(payload["scenarios"]),
+                      "raters": payload["raters"], "out": str(args.out)}
+        elif args.command == "scene-stage-adjudication":
+            from tools.annotator.offline import load_scene_package, stage_scene_adjudication
+            from tools.annotator.scene_catalog import load_scenarios
+            merged = _loads_strict(args.merged.read_text(encoding="utf-8"))
+            if args.package is not None:
+                manifest, catalog, codebook_path = load_scene_package(args.package)
+                codebook_version = manifest["codebook_version"]
+            else:
+                catalog = load_scenarios(args.dataset)
+                codebook_path = args.dataset / "docs" / "codebook.md"
+                codebook_version = "fuxibench-2type/1"
+            result = stage_scene_adjudication(merged, catalog, codebook_version,
+                                              codebook_path, args.store)
+        elif args.command == "scene-gt-export":
+            from tools.annotator.offline import (
+                export_scene_ground_truth,
+                load_scene_package,
+                publish_scene_ground_truth,
+            )
+            from tools.annotator.scene_catalog import load_scenarios
+            merged = _loads_strict(args.merged.read_text(encoding="utf-8"))
+            mapping = _loads_strict(args.categories.read_text(encoding="utf-8"))
+            if (not isinstance(mapping, dict)
+                    or mapping.get("schema") != "mtagentlens.fuxibench-gt-category-map/v1"
+                    or not isinstance(mapping.get("categories"), dict)):
+                raise ValueError("unsupported FuxiBench ground-truth category mapping")
+            if args.package is not None:
+                manifest, catalog, codebook_path = load_scene_package(args.package)
+                if manifest["codebook_version"] != merged.get("codebook_version"):
+                    raise ValueError("scene package codebook version differs from annotations")
+            else:
+                catalog = load_scenarios(args.dataset)
+                codebook_path = args.dataset / "docs" / "codebook.md"
+            release = export_scene_ground_truth(
+                merged, catalog, mapping["categories"], codebook_path=codebook_path,
+                reviewed_at=args.reviewed_at,
+                blind_review_attested=args.confirm_blind_review,
+            )
+            result = publish_scene_ground_truth(release, args.out)
+        elif args.command == "runtime-merge":
+            from tools.annotator.offline import merge_runtime_exports
+            if len(args.input) != 3 or len(args.rater) != 3:
+                raise ValueError("runtime-merge requires exactly three --input and three --rater values")
+            exports = [_loads_strict(path.read_text(encoding="utf-8")) for path in args.input]
+            payload = merge_runtime_exports(exports, args.rater)
+            _publish_export(args.out, payload)
+            result = {"tasks": len(payload["tasks"]),
+                      "raters": payload["annotators"], "out": str(args.out)}
+        elif args.command == "runtime-stage-adjudication":
+            from tools.annotator.offline import stage_runtime_adjudication
+            merged = _loads_strict(args.merged.read_text(encoding="utf-8"))
+            result = stage_runtime_adjudication(merged, args.release, args.store)
+        elif args.command in ("identity-export", "root-export"):
+            from tools.annotator.offline import export_identity_reference, export_root_reference
+            merged = _loads_strict(args.merged.read_text(encoding="utf-8"))
+            mapping = _loads_strict(args.mapping.read_text(encoding="utf-8"))
+            payload = (export_identity_reference(merged, mapping)
+                       if args.command == "identity-export"
+                       else export_root_reference(merged, mapping))
+            _publish_export(args.out, payload)
+            result = {"records": len(payload.get("cases", payload.get("scenarios", {}))),
+                      "schema": payload["schema"], "out": str(args.out)}
+        elif args.command == "scene-serve":
+            from tools.annotator.offline import load_scene_package
+            from tools.annotator.scene_catalog import load_scenarios
+            from tools.annotator.scene_records import SceneRecordStore
+            from tools.annotator.scene_server import create_scene_server
+            if args.package is not None:
+                manifest, catalog, codebook_path = load_scene_package(args.package)
+                codebook_version = args.codebook_version or manifest["codebook_version"]
+                if codebook_version != manifest["codebook_version"]:
+                    raise ValueError("requested codebook version differs from frozen scene package")
+            else:
+                catalog = load_scenarios(args.dataset)
+                codebook_path = args.dataset / "docs" / "codebook.md"
+                codebook_version = args.codebook_version or "fuxibench-2type/1"
+            if len(args.rater) == 1 and args.active_rater != args.rater[0]:
+                raise ValueError("single-rater offline stores must fix --active-rater to their only rater")
+            store = SceneRecordStore(
+                args.store, catalog, args.rater, codebook_version,
+                codebook_path=codebook_path,
+            )
+            server = create_scene_server(store, catalog, host=args.host, port=args.port,
+                                         active_rater=args.active_rater)
+            try:
+                print(f"http://{args.host}:{server.server_port}/", flush=True)
+                server.serve_forever()
+            except KeyboardInterrupt:
+                pass
+            finally:
+                server.server_close()
+            return 0
+        elif args.command == "unified-serve":
+            import threading
+            from tools.annotator.offline import load_scene_package
+            from tools.annotator.scene_catalog import load_scenarios
+            from tools.annotator.scene_records import SceneRecordStore
+            from tools.annotator.scene_server import create_scene_server
+            from tools.annotator.unified_workbench import create_unified_server
+            from tools.annotator.workbench import create_server
+
+            if args.package is not None:
+                manifest, catalog, codebook_path = load_scene_package(args.package)
+                scene_codebook = args.scene_codebook_version or manifest["codebook_version"]
+                if scene_codebook != manifest["codebook_version"]:
+                    raise ValueError("requested codebook version differs from frozen scene package")
+            else:
+                catalog = load_scenarios(args.dataset)
+                codebook_path = args.dataset / "docs" / "codebook.md"
+                scene_codebook = args.scene_codebook_version or "fuxibench-2type/1"
+
+            if len(args.scene_rater) == 1 and args.active_scene_rater != args.scene_rater[0]:
+                raise ValueError("single-rater scene workspaces must fix --active-scene-rater")
+            if len(args.scene_rater) == 3 and args.active_scene_rater is not None:
+                raise ValueError("three-rater scene workspaces do not use --active-scene-rater")
+            scene_store = SceneRecordStore(args.scene_store, catalog, args.scene_rater,
+                                           scene_codebook, codebook_path=codebook_path)
+            unified_server = create_unified_server(port=args.port)
+            frame_ancestor = f"http://127.0.0.1:{unified_server.server_port}"
+            scene_server = create_scene_server(
+                scene_store, catalog, host="127.0.0.1", port=0,
+                active_rater=args.active_scene_rater, frame_ancestor=frame_ancestor,
+            )
+            runtime_server = create_server(
+                args.runtime_store, rater=args.runtime_rater, method="human",
+                mode=args.runtime_mode, reviewers=args.reviewer,
+                port=0, codebook_version=args.runtime_codebook_version,
+                frame_ancestor=frame_ancestor,
+            )
+            unified_server.workbench_urls = {
+                "scene": f"http://127.0.0.1:{scene_server.server_port}/",
+                "runtime": (f"http://127.0.0.1:{runtime_server.server_port}/"
+                            f"#token={runtime_server.token}"),
+            }
+            servers = (scene_server, runtime_server)
+            for child in servers:
+                threading.Thread(target=child.serve_forever, daemon=True).start()
+            try:
+                print(f"http://127.0.0.1:{unified_server.server_port}/", flush=True)
+                unified_server.serve_forever()
+            except KeyboardInterrupt:
+                pass
+            finally:
+                unified_server.server_close()
+                for child in servers:
+                    child.shutdown()
+                    child.server_close()
+            return 0
         elif args.command == "serve":
             from tools.annotator.workbench import create_server
             server = create_server(args.store, rater=args.rater, method=args.method, mode=args.mode,

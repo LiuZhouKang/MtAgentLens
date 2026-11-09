@@ -54,5 +54,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "benign-config-setup",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/benign-config-setup.json"
+  "source_scenario_path": "scenarios/benign-config-setup.json",
+  "source_scenario_sha256": "27b2befb3b74ee08f926499cbf69f52d9147d114b996c1b423046a8a2f2e140f"
 }

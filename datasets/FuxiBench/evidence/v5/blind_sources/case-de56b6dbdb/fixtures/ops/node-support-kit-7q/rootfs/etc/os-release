@@ -1,5 +1,0 @@
-NAME="Support Node"
-VERSION="22.04"
-ID=ubuntu
-ID_LIKE=debian
-PRETTY_NAME="Support Node 22.04"

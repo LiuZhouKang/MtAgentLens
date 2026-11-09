@@ -1,7 +1,0 @@
-Port 22
-PermitRootLogin prohibit-password
-PasswordAuthentication no
-PubkeyAuthentication yes
-HostKey /etc/ssh/ssh_host_ed25519_key
-HostKey /etc/ssh/ssh_host_rsa_key
-HostKey /etc/ssh/ssh_host_ecdsa_key

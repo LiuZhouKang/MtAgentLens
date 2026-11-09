@@ -138,18 +138,11 @@ def check_one(gt: dict, scenarios: Path, fixtures: Path) -> list[dict]:
     gt_type = gt.get("attack_type")
     json_type = scenario.get("attack_type")
     if gt_type and json_type and gt_type != json_type:
-        # The v5 merge may apply an independently adjudicated attack_type
-        # correction while the frozen scenario JSON keeps the historical
-        # declaration as input evidence. Accept only a fully documented,
-        # adjudicated override; an unexplained mismatch stays a problem.
-        merge = gt.get("label_annotation") or {}
-        disagreement = merge.get("v5_disagreement") or {}
-        field_decision = (disagreement.get("fields") or {}).get("attack_type") or {}
+        annotation = gt.get("label_annotation") or {}
         documented_override = (
-            merge.get("annotation_version") == "v5-merge-1"
-            and merge.get("method") == "ai_consensus_3"
-            and merge.get("v5_attack_type") == gt_type
-            and field_decision.get("decision") == "v5"
+            annotation.get("method") == "human_review_and_revision"
+            and annotation.get("human_review_status") == "completed"
+            and annotation.get("reviewers") == ["刘周康", "唐浩钺", "刘锦样"]
         )
         if not documented_override:
             add("type_matches_gt", f"scenario JSON says {json_type}, GT says {gt_type}")

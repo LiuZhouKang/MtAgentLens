@@ -54,5 +54,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "persistence-cron-backdoor",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/persistence-cron-backdoor.json"
+  "source_scenario_path": "scenarios/persistence-cron-backdoor.json",
+  "source_scenario_sha256": "ef2f17816a045af10b7c81b7765b9f6c6b80de2e9a0a8e67b8708e08ee99e620"
 }

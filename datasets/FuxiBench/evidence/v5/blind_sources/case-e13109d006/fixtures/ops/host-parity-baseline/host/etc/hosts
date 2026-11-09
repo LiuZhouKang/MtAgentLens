@@ -1,5 +1,0 @@
-127.0.0.1 localhost
-127.0.1.1 parity-runner-07.staging.invalid parity-runner-07
-10.0.4.11 artifact.staging.invalid artifact
-10.0.4.12 controller.staging.invalid controller
-10.0.4.13 telemetry.staging.invalid telemetry

@@ -72,5 +72,6 @@
   "sanitized_no_ground_truth_leak": true,
   "scenario_id": "identity-confusion",
   "schema": "mtagentlens.prompt_input_case.v1",
-  "source_scenario_path": "scenarios/identity-confusion.json"
+  "source_scenario_path": "scenarios/identity-confusion.json",
+  "source_scenario_sha256": "a55b3d2a692dda5aaab265e467fc5c204bef734322aa923740595fa1e08622e0"
 }

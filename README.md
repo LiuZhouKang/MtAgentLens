@@ -65,7 +65,9 @@ MtAgentLens 将这些事实统一到一张**跨进程因果责任图**中，并�
 
 ## 功能演示
 
-<video src="https://github.com/user-attachments/assets/7db24091-a13e-4526-903b-28cd94300d05" controls="controls" style="max-width: 100%"></video>
+https://github.com/user-attachments/assets/7db24091-a13e-4526-903b-28cd94300d05
+
+[下载完整 MP4](https://raw.githubusercontent.com/LiuZhouKang/MtAgentLens/main/docs/materials/demo/demo.mp4)
 
 *完整功能演示（约 1 分 48 秒）：eBPF 内核级零插桩采集 → 跨进程责任图构建 → 结构化告警与证据回溯的端到端流程*
 

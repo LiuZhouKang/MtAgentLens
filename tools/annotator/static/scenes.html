@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FuxiBench 场景级人工标注</title>
+  <style>
+    :root { color-scheme: light dark; --line: #c8c8c8; --muted: #5c5c5c; --accent: #2457a7; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    header, main { max-width: 1500px; margin: 0 auto; padding: 1rem; }
+    header { border-bottom: 1px solid var(--line); }
+    h1 { font-size: 1.4rem; margin: 0 0 .4rem; }
+    h2 { font-size: 1.1rem; margin: 0 0 .6rem; }
+    .warning { border-left: 4px solid var(--accent); padding: .5rem .8rem; background: rgba(36,87,167,.08); }
+    .layout { display: grid; grid-template-columns: minmax(220px, 320px) 1fr; gap: 1rem; align-items: start; }
+    nav, section { border: 1px solid var(--line); border-radius: 8px; padding: .8rem; }
+    #scene-list { list-style: none; margin: 0; padding: 0; max-height: 60vh; overflow: auto; }
+    #scene-list button { width: 100%; text-align: left; border: 0; background: transparent; padding: .35rem; cursor: pointer; border-radius: 4px; }
+    #scene-list button[aria-current="true"] { background: rgba(36,87,167,.16); }
+    .status { color: var(--muted); font-size: .85rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .7rem; }
+    label { display: block; font-weight: 600; margin: .4rem 0 .15rem; }
+    input, select, textarea, button { font: inherit; }
+    input[type="text"], input[type="number"], select, textarea { width: 100%; padding: .35rem; border: 1px solid var(--line); border-radius: 5px; background: canvas; color: canvastext; }
+    textarea { min-height: 4.5rem; resize: vertical; font-family: ui-monospace, monospace; font-size: .88rem; }
+    fieldset { border: 1px solid var(--line); border-radius: 6px; margin: .8rem 0; padding: .6rem; }
+    legend { font-weight: 700; padding: 0 .3rem; }
+    .behavior { border: 1px dashed var(--line); border-radius: 6px; padding: .5rem; margin: .5rem 0; }
+    .behavior-head { display: flex; justify-content: space-between; gap: .5rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .7rem; }
+    button { padding: .4rem .8rem; border-radius: 5px; border: 1px solid var(--accent); background: var(--accent); color: white; cursor: pointer; }
+    button.secondary { background: transparent; color: var(--accent); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    #source-text { max-height: 30vh; overflow: auto; white-space: pre-wrap; border: 1px solid var(--line); padding: .5rem; border-radius: 5px; }
+    .source-item { margin: .2rem 0; overflow-wrap: anywhere; }
+    .source-hash { font-family: ui-monospace, monospace; color: var(--muted); font-size: .8rem; }
+    .error { color: #a11616; font-weight: 700; }
+    .ok { color: #176b2c; font-weight: 700; }
+    details { margin: .6rem 0; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+    @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>FuxiBench 场景级人工标注</h1>
+  <p class="warning">
+    请依据场景任务、角色说明、fixture、bench 脚本和标注规范填写。场景级标签描述设计预期，不代表某次运行的结果。
+  </p>
+</header>
+<main>
+  <section aria-labelledby="session-title">
+    <h2 id="session-title">标注会话</h2>
+    <div class="grid">
+      <div>
+        <label for="rater">标注者</label>
+        <select id="rater" aria-label="标注者"></select>
+      </div>
+      <div>
+        <label for="progress">进度</label>
+        <output id="progress" role="status" aria-live="polite">尚未载入</output>
+      </div>
+      <div>
+        <span class="status" id="codebook-label">规范版本：载入中</span>
+        <div class="actions">
+          <button type="button" id="refresh" class="secondary">刷新队列</button>
+          <button type="button" id="agreement" class="secondary" disabled>查看一致性报告</button>
+          <button type="button" id="export">导出 JSON</button>
+        </div>
+      </div>
+    </div>
+    <details>
+      <summary>标注要点</summary>
+      <ul>
+        <li><code>attack</code>：场景设计中存在可由材料支持的恶意目标；完整审阅后没有可证恶意目标时标为 <code>benign</code>。</li>
+        <li>攻击类型 <code>A</code> 指不可信指令或污染材料驱动；<code>B</code> 指多 Agent、交接或委派边界攻击；良性场景使用 <code>benign</code>。</li>
+        <li>每条预期行为写清主体、动作、目标、授权边界和可观察证据；命令与资源 pattern 要说明原因。</li>
+        <li>良性活动只列完成任务必需的合法操作。<code>Safe</code>、<code>Warning</code>、<code>Unsafe</code> 描述完整执行时的最低监测裁决。</li>
+        <li>证据引用选择下方材料编号；材料不足时记录不确定项，不从运行结果推断场景标签。</li>
+      </ul>
+    </details>
+    <p id="session-status" role="status" aria-live="polite"></p>
+  </section>
+
+  <div class="layout">
+    <nav aria-labelledby="queue-title">
+      <h2 id="queue-title">场景队列</h2>
+      <ul id="scene-list" aria-label="场景列表"></ul>
+    </nav>
+
+    <section aria-labelledby="scene-title">
+      <h2 id="scene-title">场景材料</h2>
+      <div id="scene-meta" class="status">请选择场景</div>
+      <details open>
+        <summary>来源材料（路径与 SHA-256）</summary>
+        <ul id="source-list" aria-label="来源材料列表"></ul>
+      </details>
+      <pre id="source-text" tabindex="0" aria-label="选中来源全文">选择上方来源查看全文。</pre>
+
+      <form id="annotation-form" novalidate>
+        <div class="grid">
+          <div>
+            <label for="label">label</label>
+            <select id="label" required aria-required="true">
+              <option value="">请选择</option>
+              <option value="attack">attack</option>
+              <option value="benign">benign</option>
+            </select>
+          </div>
+          <div>
+            <label for="attack_type">attack_type</label>
+            <select id="attack_type" required aria-required="true">
+              <option value="">请选择</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="benign">benign</option>
+            </select>
+          </div>
+          <div>
+            <label for="min_decision">min_decision</label>
+            <select id="min_decision" required aria-required="true">
+              <option value="">请选择</option>
+              <option value="Unsafe">Unsafe</option>
+              <option value="Warning">Warning</option>
+              <option value="Safe">Safe</option>
+            </select>
+          </div>
+          <div>
+            <label for="should_alert">should_alert</label>
+            <input type="checkbox" id="should_alert" aria-label="should_alert">
+          </div>
+        </div>
+
+        <label for="task_summary">task_summary（必填）</label>
+        <textarea id="task_summary" required aria-required="true" placeholder="用一句话概括场景任务与可见授权边界"></textarea>
+
+        <fieldset>
+          <legend>expected_behaviors</legend>
+          <p class="status">攻击场景填写 1–4 条；良性场景留空。behavior_id 必须为场景内唯一的 kebab-case。</p>
+          <div id="expected-behaviors"></div>
+          <button type="button" id="add-behavior" class="secondary">添加行为</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>benign_activity</legend>
+          <label for="benign-summary">summary</label>
+          <input type="text" id="benign-summary" placeholder="完成任务所需的合法活动">
+          <div class="grid">
+            <div>
+              <label for="benign-commands">expected_commands（JSON 数组）</label>
+              <textarea id="benign-commands" placeholder='[{"type":"shell_command","pattern":"...","why":"..."}]'></textarea>
+            </div>
+            <div>
+              <label for="benign-resources">expected_resources（JSON 数组）</label>
+              <textarea id="benign-resources" placeholder='[{"type":"file","pattern":"...","why":"..."}]'></textarea>
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="grid">
+          <div>
+            <label for="payload">payload（JSON 对象或 null）</label>
+            <textarea id="payload" placeholder="{}"></textarea>
+          </div>
+          <div>
+            <label for="execution_check">execution_check（JSON 对象、数组或字符串）</label>
+            <textarea id="execution_check" placeholder="{}"></textarea>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div>
+            <label for="evidence_paths">evidence_paths（每行一个来源路径）</label>
+            <textarea id="evidence_paths" placeholder="material-01"></textarea>
+          </div>
+          <div>
+            <label for="uncertainties">不确定项（每行一条）</label>
+            <textarea id="uncertainties" placeholder="不确定行为边界，需要复核 /etc/passwd 的授权"></textarea>
+          </div>
+        </div>
+
+        <label for="change_reason">修改理由（已有记录后必填）</label>
+        <input type="text" id="change_reason" placeholder="说明本次修订依据的变化">
+
+        <div class="actions">
+          <button type="button" id="save-draft" class="secondary">保存草稿</button>
+          <button type="button" id="submit">提交</button>
+        </div>
+        <p id="form-status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </div>
+
+  <section id="comparison-panel" aria-labelledby="comparison-title" hidden>
+    <h2 id="comparison-title">三人提交后比较</h2>
+    <p id="comparison-summary" class="status"></p>
+    <p id="difference-list" class="status"></p>
+    <div id="peer-list"></div>
+  </section>
+
+  <section id="agreement-panel" aria-labelledby="agreement-title" hidden>
+    <h2 id="agreement-title">全量一致性</h2>
+    <p id="agreement-summary" class="status"></p>
+    <div id="agreement-report"></div>
+    <p class="status">Fleiss’ κ 与原始一致率基于裁决前独立提交计算；它们描述标注者一致程度。</p>
+  </section>
+
+  <section id="adjudication-panel" aria-labelledby="adjudication-title" hidden>
+    <h2 id="adjudication-title">裁决</h2>
+    <p class="status">三位标注者均提交后，裁决者填写最终值、理由与依据。裁决以新记录追加，不覆盖原始链。</p>
+    <label for="adjudicator">裁决者</label>
+    <select id="adjudicator" aria-label="裁决者"></select>
+    <label for="adjudication-json">最终标注（JSON）</label>
+    <textarea id="adjudication-json" aria-label="裁决最终标注 JSON"></textarea>
+    <label for="adjudication-rationale">裁决理由（必填）</label>
+    <textarea id="adjudication-rationale" aria-label="裁决理由"></textarea>
+    <div class="actions">
+      <button type="button" id="copy-current" class="secondary">用当前表单填充最终标注</button>
+      <button type="button" id="adjudicate">保存裁决</button>
+    </div>
+    <p id="adjudication-status" role="status" aria-live="polite"></p>
+  </section>
+
+  <footer class="status">
+    场景级标签只回答“按设计完整执行时 OS 层应出现什么”，不代表任何一次运行的成功与否。
+    运行 trace、检测分数和本轮之外的标签不属于场景设计证据。
+  </footer>
+</main>
+<script>
+"use strict";
+
+const state = {
+  rater: "",
+  codebook: null,
+  current: null,
+  scenes: [],
+};
+
+const $ = (id) => document.getElementById(id);
+
+function setStatus(id, message, kind) {
+  const node = $(id);
+  node.textContent = message || "";
+  node.className = kind === "error" ? "error" : kind === "ok" ? "ok" : "";
+}
+
+async function api(path, options) {
+  const response = await fetch(path, Object.assign({
+    headers: { "Content-Type": "application/json" },
+  }, options || {}));
+  let payload = null;
+  const text = await response.text();
+  if (text) {
+    try { payload = JSON.parse(text); } catch (_) { payload = { error: text }; }
+  }
+  if (!response.ok) {
+    const message = payload && payload.error ? payload.error : ("HTTP " + response.status);
+    const error = new Error(message);
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
+  }
+  return payload;
+}
+
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+}
+
+function jsonText(value, fallback) {
+  if (value === undefined) return fallback;
+  return JSON.stringify(value, null, 2);
+}
+
+function parseJson(id, label, fallback) {
+  const raw = $(id).value.trim();
+  if (!raw) return fallback;
+  try { return JSON.parse(raw); }
+  catch (error) { throw new Error(label + " 不是有效 JSON：" + error.message); }
+}
+
+function linesOf(id) {
+  return $(id).value.split("\n").map((line) => line.trim()).filter(Boolean);
+}
+
+function option(value, selected) {
+  return '<option value="' + escapeHtml(value) + '"' +
+    (value === selected ? " selected" : "") + ">" + escapeHtml(value) + "</option>";
+}
+
+function patternRows(value) {
+  const items = Array.isArray(value) ? value : [];
+  return items.length ? JSON.stringify(items, null, 2) : "";
+}
+
+function behaviorTemplate(behavior) {
+  const b = behavior || {};
+  const patterns = (state.codebook ? state.codebook.patterns : []);
+  const boundaries = (state.codebook ? state.codebook.boundaries : []);
+  const severities = (state.codebook ? state.codebook.severities : []);
+  return '<div class="behavior" data-behavior>' +
+    '<div class="behavior-head"><strong>行为</strong><button type="button" class="secondary remove-behavior">删除</button></div>' +
+    '<div class="grid">' +
+      '<div><label>behavior_id <input type="text" class="b-id" value="' + escapeHtml(b.behavior_id || "") + '" placeholder="credential-read"></label></div>' +
+      '<div><label>attack_pattern <select class="b-pattern"><option value="">请选择</option>' + patterns.map((x) => option(x, b.attack_pattern)).join("") + '</select></label></div>' +
+      '<div><label>boundary_type <select class="b-boundary"><option value="">请选择</option>' + boundaries.map((x) => option(x, b.boundary_type)).join("") + '</select></label></div>' +
+      '<div><label>severity <select class="b-severity"><option value="">请选择</option>' + severities.map((x) => option(x, b.severity)).join("") + '</select></label></div>' +
+      '<div><label>min_agents_involved <input type="number" class="b-agents" min="1" value="' + escapeHtml(b.min_agents_involved || 1) + '"></label></div>' +
+      '<div><label>should_alert <input type="checkbox" class="b-alert"' + (b.should_alert ? " checked" : "") + '></label></div>' +
+    '</div>' +
+    '<label>description <input type="text" class="b-description" value="' + escapeHtml(b.description || "") + '"></label>' +
+    '<label>expected_commands（JSON 数组）</label><textarea class="b-commands">' + escapeHtml(patternRows(b.expected_commands)) + '</textarea>' +
+    '<label>expected_resources（JSON 数组）</label><textarea class="b-resources">' + escapeHtml(patternRows(b.expected_resources)) + '</textarea>' +
+    '<label>evidence_requirements（每行一条）</label><textarea class="b-evidence">' + escapeHtml(Array.isArray(b.evidence_requirements) ? b.evidence_requirements.join("\n") : (b.evidence_requirements || "")) + '</textarea>' +
+    '<label>rationale <input type="text" class="b-rationale" value="' + escapeHtml(b.rationale || "") + '"></label>' +
+  '</div>';
+}
+
+function addBehavior(behavior) {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = behaviorTemplate(behavior);
+  const row = wrapper.firstElementChild;
+  row.querySelector(".remove-behavior").addEventListener("click", () => row.remove());
+  $("expected-behaviors").appendChild(row);
+}
+
+function resetBehaviors(behaviors) {
+  $("expected-behaviors").replaceChildren();
+  (behaviors || []).forEach(addBehavior);
+}
+
+function gatherBehaviors() {
+  return Array.from(document.querySelectorAll("[data-behavior]")).map((row) => {
+    const commands = row.querySelector(".b-commands").value.trim();
+    const resources = row.querySelector(".b-resources").value.trim();
+    const evidence = row.querySelector(".b-evidence").value.split("\n").map((x) => x.trim()).filter(Boolean);
+    let parsedCommands = [];
+    let parsedResources = [];
+    try { parsedCommands = commands ? JSON.parse(commands) : []; }
+    catch (error) { throw new Error("behavior expected_commands 不是有效 JSON：" + error.message); }
+    try { parsedResources = resources ? JSON.parse(resources) : []; }
+    catch (error) { throw new Error("behavior expected_resources 不是有效 JSON：" + error.message); }
+    return {
+      behavior_id: row.querySelector(".b-id").value.trim(),
+      description: row.querySelector(".b-description").value.trim(),
+      attack_pattern: row.querySelector(".b-pattern").value,
+      boundary_type: row.querySelector(".b-boundary").value,
+      severity: row.querySelector(".b-severity").value,
+      should_alert: row.querySelector(".b-alert").checked,
+      min_agents_involved: Number(row.querySelector(".b-agents").value),
+      expected_commands: parsedCommands,
+      expected_resources: parsedResources,
+      evidence_requirements: evidence,
+      rationale: row.querySelector(".b-rationale").value.trim(),
+    };
+  });
+}
+
+function gatherAnnotation() {
+  const summary = $("benign-summary").value.trim();
+  const benign = {};
+  if (summary) benign.summary = summary;
+  const commands = parseJson("benign-commands", "benign_activity.expected_commands", []);
+  const resources = parseJson("benign-resources", "benign_activity.expected_resources", []);
+  if (commands.length) benign.expected_commands = commands;
+  if (resources.length) benign.expected_resources = resources;
+  return {
+    label: $("label").value,
+    attack_type: $("attack_type").value,
+    task_summary: $("task_summary").value.trim(),
+    expected_behaviors: gatherBehaviors(),
+    benign_activity: Object.keys(benign).length ? benign : null,
+    min_decision: $("min_decision").value,
+    should_alert: $("should_alert").checked,
+    payload: parseJson("payload", "payload", {}),
+    execution_check: parseJson("execution_check", "execution_check", {}),
+    taxonomy_version: state.codebook ? state.codebook.version : "",
+    evidence_paths: linesOf("evidence_paths"),
+    uncertainties: linesOf("uncertainties"),
+  };
+}
+
+function fillAnnotation(annotation) {
+  const value = annotation || {};
+  $("label").value = value.label || "";
+  $("attack_type").value = value.attack_type || "";
+  $("task_summary").value = value.task_summary || "";
+  $("min_decision").value = value.min_decision || "";
+  $("should_alert").checked = Boolean(value.should_alert);
+  $("payload").value = jsonText(value.payload, "{}");
+  $("execution_check").value = jsonText(value.execution_check, "{}");
+  const benign = value.benign_activity || {};
+  $("benign-summary").value = benign.summary || "";
+  $("benign-commands").value = benign.expected_commands ? jsonText(benign.expected_commands, "") : "";
+  $("benign-resources").value = benign.expected_resources ? jsonText(benign.expected_resources, "") : "";
+  $("evidence_paths").value = (value.evidence_paths || []).join("\n");
+  $("uncertainties").value = (value.uncertainties || []).map((item) =>
+    typeof item === "string" ? item : [item.field, item.note].filter(Boolean).join(": ")
+  ).join("\n");
+  resetBehaviors(value.expected_behaviors || []);
+  $("change_reason").value = "";
+}
+
+function renderSources(scene) {
+  const list = $("source-list");
+  list.replaceChildren();
+  (scene.sources || []).forEach((source) => {
+    const item = document.createElement("li");
+    item.className = "source-item";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary";
+    button.textContent = source.path;
+    button.addEventListener("click", () => { $("source-text").textContent = source.text; });
+    const hash = document.createElement("span");
+    hash.className = "source-hash";
+    hash.textContent = "  " + source.kind + " · " + source.sha256;
+    item.append(button, hash);
+    list.appendChild(item);
+  });
+  $("source-text").textContent = (scene.sources && scene.sources[0])
+    ? scene.sources[0].text : "没有可用来源。";
+}
+
+function renderQueue() {
+  const list = $("scene-list");
+  list.replaceChildren();
+  state.scenes.forEach((scene) => {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = scene.scenario_id + " · " + ({
+      unannotated: "未开始", draft: "草稿", submitted: "已提交",
+    }[scene.status] || scene.status);
+    button.setAttribute("aria-current", state.current && state.current.scenario_id === scene.scenario_id ? "true" : "false");
+    button.addEventListener("click", () => selectScene(scene.scenario_id));
+    item.appendChild(button);
+    list.appendChild(item);
+  });
+  const submitted = state.scenes.filter((scene) => scene.submitted).length;
+  $("progress").textContent = submitted + " / " + state.scenes.length + " 已提交";
+}
+
+function renderComparison(scene) {
+  const panel = $("comparison-panel");
+  if (!scene.comparison_visible) {
+    panel.hidden = true;
+    $("adjudication-panel").hidden = true;
+    $("peer-list").replaceChildren();
+    return;
+  }
+  panel.hidden = false;
+  const peers = scene.peers || [];
+  $("comparison-summary").textContent = "三位标注者均已提交；以下为其他两人的最新提交。";
+  const adjudication = scene.adjudication;
+  $("adjudication-rationale").value = adjudication ? (adjudication.rationale || "") : "";
+  const differences = scene.comparison && scene.comparison.different_fields
+    ? scene.comparison.different_fields : [];
+  $("difference-list").textContent = (differences.length
+    ? "分歧字段：" + differences.join("、")
+    : "按字段比较：三人完全一致。") +
+    (adjudication
+      ? " 已有裁决；理由：" + adjudication.rationale +
+        (scene.comparison && scene.comparison.adjudication_stale ? "（来源已更新，裁决可能过期）" : "")
+      : " 未裁决。请在下方记录最终值与理由。");
+  const holder = $("peer-list");
+  holder.replaceChildren();
+  peers.forEach((peer) => {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = peer.rater + " · " + peer.revision_id.slice(0, 12);
+    const pre = document.createElement("pre");
+    pre.textContent = JSON.stringify(peer.annotation, null, 2);
+    details.append(summary, pre);
+    holder.appendChild(details);
+  });
+  $("adjudication-panel").hidden = false;
+  const select = $("adjudicator");
+  select.replaceChildren();
+  (state.codebook ? state.codebook.raters : []).forEach((rater) => {
+    const opt = document.createElement("option");
+    opt.value = rater; opt.textContent = rater;
+    select.appendChild(opt);
+  });
+  if (!$("adjudication-json").value) {
+    try { $("adjudication-json").value = jsonText(gatherAnnotation(), "{}"); }
+    catch (_) { $("adjudication-json").value = "{}"; }
+  }
+}
+
+function renderScene(scene) {
+  state.current = scene;
+  $("scene-meta").textContent = scene.scenario_id + " · " + ({
+    unannotated: "未开始", draft: "草稿", submitted: "已提交",
+  }[scene.status] || scene.status) + " · 输入摘要 " + scene.input_sha256.slice(0, 16) + "…";
+  renderSources(scene);
+  fillAnnotation(scene.own ? scene.own.annotation : null);
+  if (!scene.own) addBehavior();
+  $("adjudication-json").value = "";
+  $("adjudication-status").textContent = "";
+  renderComparison(scene);
+  renderQueue();
+}
+
+async function selectScene(scenarioId) {
+  if (!state.rater) return;
+  try {
+    const scene = await api("/api/scenes/" + encodeURIComponent(scenarioId) + "?rater=" + encodeURIComponent(state.rater));
+    renderScene(scene);
+    setStatus("session-status", "已载入 " + scenarioId, "ok");
+  } catch (error) {
+    setStatus("session-status", error.message, "error");
+  }
+}
+
+async function loadQueue() {
+  if (!state.rater) return;
+  try {
+    const payload = await api("/api/scenes?rater=" + encodeURIComponent(state.rater));
+    state.codebook = payload.codebook;
+    state.scenes = payload.scenes;
+    $("codebook-label").textContent = "规范版本：" + payload.codebook_version;
+    renderQueue();
+    if (state.scenes.length) {
+      await selectScene((state.current && state.scenes.some((s) => s.scenario_id === state.current.scenario_id))
+        ? state.current.scenario_id : state.scenes[0].scenario_id);
+    }
+    $("export").disabled = !state.scenes.every((scene) => scene.submitted);
+    $("agreement").disabled = !state.scenes.every((scene) => scene.submitted);
+    setStatus("session-status", "队列已载入", "ok");
+  } catch (error) {
+    setStatus("session-status", error.message, "error");
+  }
+}
+
+async function showAgreement() {
+  try {
+    const report = await api("/api/agreement");
+    const panel = $("agreement-panel");
+    panel.hidden = false;
+    $("agreement-summary").textContent = report.n_scenarios + " 个场景 · " +
+      report.n_raters + " 位标注者 · 裁决前独立提交";
+    const holder = $("agreement-report");
+    holder.replaceChildren();
+    Object.entries(report.fields).forEach(([field, values]) => {
+      const row = document.createElement("p");
+      const agreement = (100 * values.observed_agreement).toFixed(1) + "%";
+      const statistic = values.kappa === undefined
+        ? "精确一致率（序数）"
+        : "Fleiss’ κ " + (values.kappa === null ? "未定义" : Number(values.kappa).toFixed(3));
+      row.textContent = field + "：原始一致率 " + agreement + " · " + statistic;
+      holder.appendChild(row);
+    });
+  } catch (error) {
+    setStatus("session-status", error.message, "error");
+  }
+}
+
+async function save(kind) {
+  if (!state.current) return;
+  let annotation;
+  try {
+    annotation = gatherAnnotation();
+  } catch (error) {
+    setStatus("form-status", error.message, "error");
+    return;
+  }
+  const current = state.current.own;
+  const reason = $("change_reason").value.trim();
+  if (current && !reason) {
+    setStatus("form-status", "已有记录，修改必须填写修改理由。", "error");
+    return;
+  }
+  const body = {
+    rater: state.rater,
+    annotation: annotation,
+    expected_revision: current ? current.revision_id : null,
+    change_reason: reason || null,
+  };
+  try {
+    const result = await api("/api/scenes/" + encodeURIComponent(state.current.scenario_id) + "/" + kind, {
+      method: "POST", body: JSON.stringify(body),
+    });
+    state.current = result.scene;
+    renderScene(result.scene);
+    await loadQueue();
+    setStatus("form-status", kind === "draft" ? "草稿已追加保存。" : "已提交；此记录不可静默覆盖。", "ok");
+  } catch (error) {
+    setStatus("form-status", error.message, "error");
+  }
+}
+
+async function adjudicate() {
+  if (!state.current) return;
+  let annotation;
+  try { annotation = JSON.parse($("adjudication-json").value); }
+  catch (error) { setStatus("adjudication-status", "最终标注不是有效 JSON：" + error.message, "error"); return; }
+  const body = {
+    adjudicator: $("adjudicator").value,
+    annotation: annotation,
+    rationale: $("adjudication-rationale").value.trim(),
+  };
+  if (!body.rationale) {
+    setStatus("adjudication-status", "裁决理由不能为空。", "error");
+    return;
+  }
+  try {
+    const result = await api("/api/scenes/" + encodeURIComponent(state.current.scenario_id) + "/adjudicate", {
+      method: "POST", body: JSON.stringify(body),
+    });
+    state.current = result.scene;
+    renderScene(result.scene);
+    setStatus("adjudication-status", "裁决已追加保存。", "ok");
+  } catch (error) {
+    setStatus("adjudication-status", error.message, "error");
+  }
+}
+
+async function exportJson() {
+  try {
+    const payload = await api("/api/export");
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "fuxibench-scene-export.json";
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setStatus("session-status", "导出已生成；只有全部提交后才可导出。", "ok");
+  } catch (error) {
+    setStatus("session-status", error.message, "error");
+  }
+}
+
+async function boot() {
+  try {
+    const codebook = await api("/api/codebook");
+    state.codebook = codebook;
+    $("codebook-label").textContent = "规范版本：" + codebook.version;
+    const select = $("rater");
+    select.replaceChildren();
+    codebook.raters.forEach((rater) => {
+      const opt = document.createElement("option");
+      opt.value = rater; opt.textContent = rater;
+      select.appendChild(opt);
+    });
+    state.rater = select.value;
+    select.addEventListener("change", () => { state.rater = select.value; state.current = null; loadQueue(); });
+    $("refresh").addEventListener("click", loadQueue);
+$("agreement").addEventListener("click", showAgreement);
+    $("add-behavior").addEventListener("click", () => addBehavior());
+    $("save-draft").addEventListener("click", () => save("draft"));
+    $("submit").addEventListener("click", () => save("submit"));
+    $("adjudicate").addEventListener("click", adjudicate);
+    $("export").addEventListener("click", exportJson);
+    $("copy-current").addEventListener("click", () => {
+      try { $("adjudication-json").value = jsonText(gatherAnnotation(), "{}"); }
+      catch (error) { setStatus("adjudication-status", error.message, "error"); }
+    });
+    await loadQueue();
+  } catch (error) {
+    setStatus("session-status", error.message, "error");
+  }
+}
+
+boot();
+</script>
+</body>
+</html>

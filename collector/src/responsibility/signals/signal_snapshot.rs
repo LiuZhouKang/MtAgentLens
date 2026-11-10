@@ -210,17 +210,11 @@ impl SignalSnapshot {
             let parent = match self.parent_map.get(&current) {
                 Some(&p) => p,
                 None => {
-                    // Parent EXEC was missed (BPF probe startup window).
-                    // The placeholder is a VALUE in parent_map from a
-                    // captured child. If any other child of this parent
-                    // reaches the ancestor, this intermediate node is
-                    // in the chain.
-                    if self.parent_map.values().any(|v| v.pid == current.pid) {
-                        // Intermediate node confirmed — continue walking
-                        // upward. We don't know the exact parent ProcessId,
-                        // but if any ancestor exists we'll find it.
-                        return self.parent_map.values().any(|v| *v == ancestor);
-                    }
+                    // A missing parent edge leaves ancestry unresolved. The
+                    // presence of an ancestor elsewhere in parent_map does not
+                    // establish a path from this process to that ancestor.
+                    // In particular, unrelated process trees must not become
+                    // eligible for cross-process intent/action correlation.
                     return false;
                 }
             };
@@ -289,15 +283,10 @@ impl SignalSnapshot {
             let parent = match self.parent_map.get(&current) {
                 Some(&p) => p,
                 None => {
-                    // Parent EXEC event was missed (e.g. BPF probe startup
-                    // window).  The placeholder was created by observe_exec()
-                    // with the child's ppid.  If the parent appears as a
-                    // VALUE anywhere in parent_map (i.e. some captured child
-                    // references it), it is part of the agent's process tree
-                    // — BPF only captures processes in the filtered tree.
-                    if self.parent_map.values().any(|v| v.pid == current.pid) {
-                        return true;
-                    }
+                    // A process appearing as some other child's parent does
+                    // not prove that it is an agent. Only a positively
+                    // identified process on this ancestor chain can establish
+                    // agent ancestry; otherwise leave ownership unresolved.
                     return false;
                 }
             };
@@ -560,5 +549,51 @@ mod tests {
         };
         // Cycle should be detected, return false
         assert!(!snap.is_descendant_or_same(pid(3, 3), pid(1, 1)));
+    }
+
+    /// Missing parent metadata must not connect independent process trees.
+    /// The previous global parent_map.values() fallback produced a false
+    /// ancestor whenever any other child referenced the requested root.
+    #[test]
+    fn missing_parent_edge_does_not_correlate_unrelated_trees() {
+        let root_a = pid(100, 10);
+        let child_a = pid(101, 11);
+        let root_b = pid(200, 20);
+        let child_b = pid(201, 21);
+
+        let mut parent_map = HashMap::new();
+        parent_map.insert(child_a, root_a);
+        parent_map.insert(child_b, root_b);
+
+        let snap = SignalSnapshot {
+            processes: HashMap::new(),
+            parent_map,
+            child_map: HashMap::new(),
+            tls_to_process: HashMap::new(),
+            tls_participants: HashMap::new(),
+            tls_to_messages: HashMap::new(),
+            conversation_to_processes: HashMap::new(),
+            process_to_conversations: HashMap::new(),
+            direct_process_messages: HashMap::new(),
+            message_conversation_bindings: Vec::new(),
+            native_tool_call_observations: Vec::new(),
+            thread_to_process: HashMap::new(),
+            metrics: SignalMetrics {
+                process_count: 0,
+                tls_session_count: 0,
+                message_count: 0,
+                orphan_count: 0,
+                lost_event_count: 0,
+            },
+        };
+
+        // A path exists only from child_a to root_a.
+        assert!(snap.is_descendant_or_same(child_a, root_a));
+        assert!(!snap.is_descendant_or_same(child_a, root_b));
+        assert!(!snap.can_correlate(root_b, child_a));
+
+        // No process is positively identified as an agent. A parent-map
+        // placeholder cannot independently establish agent ancestry.
+        assert!(!snap.has_agent_ancestry(child_a));
     }
 }

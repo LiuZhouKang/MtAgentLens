@@ -43,7 +43,7 @@ TRUSTED_BRIDGE_PRODUCERS = frozenset({"instrumented_dispatch", "trusted_harness"
 class ProcessKey:
     pid: int
     start_time_ns: int
-    namespace_id: str = "host"
+    namespace_id: str = "unknown"
 
     def __post_init__(self) -> None:
         if self.pid <= 0 or self.start_time_ns < 0 or not self.namespace_id:
@@ -51,7 +51,7 @@ class ProcessKey:
 
     @property
     def complete(self) -> bool:
-        return self.start_time_ns > 0
+        return self.start_time_ns > 0 and self.namespace_id != "unknown"
 
 
 @dataclass(frozen=True)
@@ -62,8 +62,8 @@ class IntentFact:
     resource: Optional[str] = None
     tool_call_id: Optional[str] = None
     clock_domain: str = "monotonic_boot"
-    tier: EvidenceTier = EvidenceTier.OBSERVED
-    capture: CaptureStatus = CaptureStatus.HEALTHY
+    tier: EvidenceTier = EvidenceTier.HYPOTHESIZED
+    capture: CaptureStatus = CaptureStatus.UNKNOWN
 
 
 @dataclass(frozen=True)
@@ -74,8 +74,8 @@ class ActionFact:
     resource: Optional[str] = None
     tool_call_id: Optional[str] = None
     clock_domain: str = "monotonic_boot"
-    tier: EvidenceTier = EvidenceTier.OBSERVED
-    capture: CaptureStatus = CaptureStatus.HEALTHY
+    tier: EvidenceTier = EvidenceTier.HYPOTHESIZED
+    capture: CaptureStatus = CaptureStatus.UNKNOWN
 
 
 @dataclass(frozen=True)

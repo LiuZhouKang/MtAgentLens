@@ -203,7 +203,7 @@ else
   WAM_RC=$?
   printf '%s\n' "$WAM_OUT" > /tmp/verify_wam_reference.log
   WAM_RAN=$(printf '%s\n' "$WAM_OUT" | sed -nE 's/^Ran ([0-9]+) tests? in .*/\1/p' | tail -1)
-  if [ "$WAM_RC" -eq 0 ] && [ "${WAM_RAN:-0}" -ge 23 ]; then
+  if [ "$WAM_RC" -eq 0 ] && [ "${WAM_RAN:-0}" -ge 25 ]; then
     ok "M2 WAM reference contracts: ${WAM_RAN} tests"
   else
     bad "WAM reference gate failed or silently skipped (ran=${WAM_RAN:-0}, rc=$WAM_RC; see /tmp/verify_wam_reference.log)"

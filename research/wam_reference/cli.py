@@ -15,7 +15,7 @@ def _process(obj):
     if obj is None:
         return None
     return ProcessKey(int(obj["pid"]), int(obj["start_time_ns"]),
-                      obj.get("namespace_id", "host"))
+                      obj.get("namespace_id", "unknown"))
 
 
 def _intent(obj):
@@ -23,8 +23,8 @@ def _intent(obj):
                       process=_process(obj.get("process")), resource=obj.get("resource"),
                       tool_call_id=obj.get("tool_call_id"),
                       clock_domain=obj.get("clock_domain", "monotonic_boot"),
-                      tier=EvidenceTier(obj.get("tier", "observed")),
-                      capture=CaptureStatus(obj.get("capture", "healthy")))
+                      tier=EvidenceTier(obj.get("tier", "hypothesized")),
+                      capture=CaptureStatus(obj.get("capture", "unknown")))
 
 
 def _action(obj):
@@ -32,8 +32,8 @@ def _action(obj):
                       process=_process(obj.get("process")), resource=obj.get("resource"),
                       tool_call_id=obj.get("tool_call_id"),
                       clock_domain=obj.get("clock_domain", "monotonic_boot"),
-                      tier=EvidenceTier(obj.get("tier", "observed")),
-                      capture=CaptureStatus(obj.get("capture", "healthy")))
+                      tier=EvidenceTier(obj.get("tier", "hypothesized")),
+                      capture=CaptureStatus(obj.get("capture", "unknown")))
 
 
 def _witness(obj, cls):

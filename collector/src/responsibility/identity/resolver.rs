@@ -125,7 +125,12 @@ impl IdentityResolver {
         for tls in tls_sessions {
             // Look up which process owns this TLS session
             if let Some(owner) = snapshot.process_for_tls(tls) {
-                // Check if owner has a known agent
+                // A process cannot be evidence of sharing a TLS session
+                // with another process when it is its own recorded owner.
+                if owner == process_id {
+                    continue;
+                }
+                // Check if another owner has a known agent
                 if let Some(existing) = self.provisional_map.get(&owner) {
                     let agent_id = existing.agent_id.clone();
                     let updated = ProvisionalIdentity {
@@ -147,19 +152,23 @@ impl IdentityResolver {
         // the process was previously assigned a low-confidence identity and
         // TLS arrives later upgrading it.
         if let Some(existing) = self.provisional_map.get(&process_id) {
-            // Process already has a provisional identity; upgrade confidence
-            // if it was low and this is new TLS evidence
-            if existing.confidence < 0.70 {
-                let upgraded = ProvisionalIdentity {
-                    agent_id: existing.agent_id.clone(),
-                    process_ids: existing.process_ids.clone(),
-                    primary_signal: IdentitySignal::TlsSessionNew,
-                    confidence: 0.70,
-                };
-                self.provisional_map.insert(process_id, upgraded.clone());
-                return upgraded;
+            // Re-reading the same TLS evidence must not create an
+            // independent signal or inflate confidence. When the existing
+            // label is non-TLS, TLS is new evidence and may replace it.
+            if matches!(
+                existing.primary_signal,
+                IdentitySignal::TlsSessionNew | IdentitySignal::TlsSessionShared
+            ) {
+                return existing.clone();
             }
-            return existing.clone();
+            let upgraded = ProvisionalIdentity {
+                agent_id: existing.agent_id.clone(),
+                process_ids: existing.process_ids.clone(),
+                primary_signal: IdentitySignal::TlsSessionNew,
+                confidence: existing.confidence.max(0.50),
+            };
+            self.provisional_map.insert(process_id, upgraded.clone());
+            return upgraded;
         }
 
         // Heuristic 2: new agent with TLS
@@ -355,6 +364,62 @@ mod tests {
         assert_eq!(result.primary_signal, IdentitySignal::TlsSessionNew);
         assert_eq!(result.confidence, 0.50);
         assert!(result.process_ids.contains(&p));
+    }
+
+    /// Re-processing a single owned TLS session is not a shared-session
+    /// observation, nor is it independent evidence that improves confidence.
+    #[test]
+    fn repeated_sole_tls_owner_does_not_gain_shared_confidence() {
+        let mut g = SignalGraph::new();
+        let p = pid(100, 1);
+        g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "claude".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        g.observe_tls(p, tls("sole-session"), 10);
+        let snapshot = g.snapshot();
+        let mut resolver = IdentityResolver::new();
+
+        let first = resolver.resolve_provisional(p, &snapshot);
+        let second = resolver.resolve_provisional(p, &snapshot);
+        assert_eq!(first.agent_id, second.agent_id);
+        assert_eq!(second.primary_signal, IdentitySignal::TlsSessionNew);
+        assert_eq!(first.confidence, second.confidence);
+        assert_eq!(second.confidence, 0.50);
+    }
+
+    #[test]
+    fn tls_arrival_upgrades_unknown_once_without_identity_change() {
+        let mut g = SignalGraph::new();
+        let p = pid(150, 1);
+        g.observe_exec(
+            p,
+            pid(1, 0),
+            ProcessExecInfo {
+                comm: "unknown-tool".into(),
+                ..Default::default()
+            },
+            None,
+            1,
+        );
+        let mut resolver = IdentityResolver::new();
+        let unknown = resolver.resolve_provisional(p, &g.snapshot());
+        assert_eq!(unknown.confidence, 0.25);
+
+        g.observe_tls(p, tls("later-session"), 10);
+        let tls_observation = resolver.resolve_provisional(p, &g.snapshot());
+        assert_eq!(tls_observation.agent_id, unknown.agent_id);
+        assert_eq!(tls_observation.primary_signal, IdentitySignal::TlsSessionNew);
+        assert_eq!(tls_observation.confidence, 0.50);
+
+        let repeated = resolver.resolve_provisional(p, &g.snapshot());
+        assert_eq!(repeated.confidence, 0.50);
     }
 
     #[test]

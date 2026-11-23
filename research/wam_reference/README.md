@@ -38,7 +38,8 @@ will never claim a MUST merely from a caller-supplied string.
 `rank` is a deterministic interpretability/tie-break tuple, **not** a
 calibrated confidence, Bayesian posterior or ground truth. Duplicate evidence
 IDs and reordering cannot increase scores. Numeric ranks cannot promote MAY to
-MUST. Parent paths must use full `(pid, start_time_ns, namespace)` keys.
+MUST. Parent paths must use full `(pid, start_time_ns, namespace)` keys;
+missing namespace, source tier and capture health default to UNKNOWN, not healthy.
 
 ## Scope and non-goals
 

@@ -1177,6 +1177,23 @@ mod tests {
         assert_eq!(sessions.len(), 2);
     }
 
+    /// A shared TLS session has two observed participants. Its last-writer
+    /// owner index cannot erase the earlier participant's evidence.
+    #[test]
+    fn shared_tls_sessions_visible_to_every_observed_participant() {
+        let mut graph = SignalGraph::new();
+        let parent = pid(300, 30);
+        let child = pid(301, 31);
+        let shared = tls("shared-socket");
+        graph.observe_tls(parent, shared.clone(), 100);
+        graph.observe_tls(child, shared.clone(), 200);
+        let snapshot = graph.snapshot();
+
+        assert_eq!(snapshot.process_for_tls(&shared), Some(child));
+        assert_eq!(snapshot.tls_sessions_for_process(parent), vec![shared.clone()]);
+        assert_eq!(snapshot.tls_sessions_for_process(child), vec![shared]);
+    }
+
     #[test]
     fn test_process_for_thread() {
         let mut g = SignalGraph::new();

@@ -830,15 +830,21 @@ pub fn resolve_process_id(
     if pid.start_time_ns != 0 {
         return pid;
     }
-    // Find the real start_time_ns from the snapshot. Intent events from HTTP
-    // layer have start_time_ns=0. The snapshot's process HashMap is keyed by
-    // ProcessId(pid, real_start) — we need to find by PID alone.
+    // A PID without a start timestamp identifies an instance only when
+    // exactly one generation is present. HashMap iteration order must not
+    // decide attribution after PID reuse: keep the unresolved (pid, 0)
+    // instead of guessing which incarnation emitted the event.
+    let mut candidate = None;
     for proc_id in snapshot.processes.keys() {
-        if proc_id.pid == pid.pid {
-            return *proc_id;
+        if proc_id.pid != pid.pid {
+            continue;
         }
+        if candidate.is_some() {
+            return pid;
+        }
+        candidate = Some(*proc_id);
     }
-    pid
+    candidate.unwrap_or(pid)
 }
 
 /// The raw body of an event that might carry an LLM request.
@@ -906,6 +912,54 @@ mod captured_llm_request_body_tests {
                 "original_source": "ssl",
             }),
         )
+    }
+
+    /// A kernel PID can be reused. Events lacking a process start timestamp
+    /// must not be assigned to an arbitrary generation of the same PID.
+    #[test]
+    fn pid_reuse_without_start_time_remains_unresolved() {
+        let mut graph = SignalGraph::new();
+        let first = ProcessId::new(777, 1000);
+        let reused = ProcessId::new(777, 2000);
+        for process in [first, reused] {
+            graph.observe_exec(
+                process,
+                ProcessId::new(1, 0),
+                ProcessExecInfo {
+                    comm: "agent".into(),
+                    ..Default::default()
+                },
+                None,
+                process.start_time_ns,
+            );
+        }
+        let snapshot = graph.snapshot();
+        assert_eq!(resolve_process_id(first, &snapshot), first);
+        assert_eq!(resolve_process_id(reused, &snapshot), reused);
+        assert_eq!(
+            resolve_process_id(ProcessId::new(777, 0), &snapshot),
+            ProcessId::new(777, 0)
+        );
+    }
+
+    #[test]
+    fn a_single_pid_generation_can_still_be_resolved() {
+        let mut graph = SignalGraph::new();
+        let instance = ProcessId::new(778, 1200);
+        graph.observe_exec(
+            instance,
+            ProcessId::new(1, 0),
+            ProcessExecInfo {
+                comm: "agent".into(),
+                ..Default::default()
+            },
+            None,
+            1200,
+        );
+        assert_eq!(
+            resolve_process_id(ProcessId::new(778, 0), &graph.snapshot()),
+            instance
+        );
     }
 
     #[test]

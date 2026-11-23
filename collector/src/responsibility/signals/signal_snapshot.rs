@@ -363,9 +363,20 @@ impl SignalSnapshot {
         let mut seen: HashSet<&str> = HashSet::new();
         let mut result = Vec::new();
 
-        // 1. Messages from TLS sessions owned by this process
+        // 1. Project TLS-only messages only when the session has a
+        // uniquely observed process participant. A shared session retains
+        // a last-writer owner for compatibility, but that owner is not
+        // evidence that it originated every message on the connection.
+        // The direct process binding below remains the captured fact.
         for (tls_session, &owner) in &self.tls_to_process {
+            let unique_owner = self
+                .tls_participants
+                .get(tls_session)
+                .is_none_or(|participants| {
+                    participants.len() == 1 && participants[0] == process_id
+                });
             if owner == process_id
+                && unique_owner
                 && let Some(msgs) = self.tls_to_messages.get(tls_session)
             {
                 for m in msgs {

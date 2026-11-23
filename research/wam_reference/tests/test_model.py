@@ -12,14 +12,18 @@ from research.wam_reference.model import (
 
 
 def p(pid=1, epoch=100):
-    return ProcessKey(pid=pid, start_time_ns=epoch)
+    return ProcessKey(pid=pid, start_time_ns=epoch, namespace_id="fixture-host")
 
 
 def i(name="i", proc=None, res="/tmp/test", ts=100, **kwargs):
+    kwargs.setdefault("tier", EvidenceTier.OBSERVED)
+    kwargs.setdefault("capture", CaptureStatus.HEALTHY)
     return IntentFact(intent_id=name, timestamp_ns=ts, process=proc or p(), resource=res, **kwargs)
 
 
 def a(name="a", proc=None, res="/tmp/test", ts=200, **kwargs):
+    kwargs.setdefault("tier", EvidenceTier.OBSERVED)
+    kwargs.setdefault("capture", CaptureStatus.HEALTHY)
     return ActionFact(action_id=name, timestamp_ns=ts, process=proc or p(), resource=res, **kwargs)
 
 
@@ -48,6 +52,22 @@ class EvidenceBoundedWamTests(unittest.TestCase):
             (a(proc=other, tool_call_id="call-4"),)))[0]
         self.assertEqual(x.status, LinkStatus.MAY)
         self.assertIsNone(x.selected_intent_id)
+
+    def test_unknown_namespace_cannot_establish_process_identity(self):
+        # A pid/start pair without namespace provenance remains incomplete.
+        raw = ProcessKey(12, 100)
+        self.assertFalse(raw.complete)
+        x = reconstruct(WitnessLedger((i(proc=raw),), (a(proc=raw),)))[0]
+        self.assertEqual(x.status, LinkStatus.INDETERMINATE)
+
+    def test_unobserved_default_endpoint_cannot_claim_unique_must(self):
+        raw = ProcessKey(1, 1)
+        left = IntentFact("i", 100, process=raw)
+        right = ActionFact("a", 200, process=raw)
+        x = reconstruct(WitnessLedger((left,), (right,), bridges=(b(),)))[0]
+        self.assertNotEqual(x.status, LinkStatus.MUST)
+        self.assertIn("capture_quality_unproven", x.pairs[0].contradictions)
+        self.assertIn("endpoint_not_observed", x.pairs[0].contradictions)
 
     def test_pid_reuse_never_equates_generations(self):
         x = reconstruct(WitnessLedger((i(proc=p(12, 100)),),

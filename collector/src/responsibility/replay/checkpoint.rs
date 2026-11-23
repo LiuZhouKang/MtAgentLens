@@ -1368,7 +1368,9 @@ mod tests {
             "binary_non_utf8",
         ] {
             let mut quality = clean_process_source();
-            quality["analysis"]["decode_status"] = serde_json::json!({ status: 1 });
+            let mut counts = serde_json::Map::new();
+            counts.insert(status.to_string(), serde_json::Value::from(1u64));
+            quality["analysis"]["decode_status"] = serde_json::Value::Object(counts);
             assert_eq!(
                 quality_status(&quality),
                 "degraded",

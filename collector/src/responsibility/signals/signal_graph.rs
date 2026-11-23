@@ -890,6 +890,29 @@ mod tests {
         assert_eq!(snap.metrics().lost_event_count, 0);
     }
 
+    /// Last-writer TLS ownership is not per-message provenance. Two
+    /// processes can use the same TLS connection while producing distinct
+    /// directly observed messages, which must not leak across identities.
+    #[test]
+    fn shared_tls_collision_does_not_project_messages_to_latest_owner() {
+        let mut g = SignalGraph::new();
+        let first = pid(100, 10);
+        let second = pid(200, 20);
+        let session = tls("shared-socket");
+        let first_message = msg("first-message");
+        let second_message = msg("second-message");
+
+        g.observe_tls(first, session.clone(), 100);
+        g.observe_message(first, Some(session.clone()), first_message.clone());
+        g.observe_tls(second, session.clone(), 200);
+        g.observe_message(second, Some(session.clone()), second_message.clone());
+
+        let snapshot = g.snapshot();
+        assert_eq!(snapshot.process_for_tls(&session), Some(second));
+        assert_eq!(snapshot.messages_for_process(first), vec![first_message.clone()]);
+        assert_eq!(snapshot.messages_for_process(second), vec![second_message.clone()]);
+    }
+
     #[test]
     fn test_orphan_message_resolved_when_tls_arrives() {
         let mut g = SignalGraph::new();

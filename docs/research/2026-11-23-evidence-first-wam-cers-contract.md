@@ -69,7 +69,8 @@ The reference implementation deliberately requires an additional `trusted_ingest
 - Multi-owner contradictions and degraded capture trigger abstention/downgrading.
 - Reconstructed action-level candidate sets with no fabricated unique winner.
 
-`research/wam_reference/tests/test_model.py`: synthetic regression and permutation tests. `cli.py`: illustrative non-privileged JSON fixture renderer; its untrusted input cannot self-assert a MUST.
+`research/wam_reference/tests/test_model.py`: synthetic regression and permutation tests. `cli.py`: illustrative non-privileged JSON fixture renderer; its untrusted input cannot self-assert a MUST. The default namespace, source tier,
+and capture health are unknown unless explicitly supported.
 
 Run (repository root):
 

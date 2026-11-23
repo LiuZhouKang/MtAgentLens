@@ -704,10 +704,23 @@ pub fn quality_status(quality: &serde_json::Value) -> &'static str {
         {
             return "degraded";
         }
-        // `partial` marks a buffered fragment whose complete message is also
-        // emitted; streaming runs always have many. Decode failures are the
-        // real evidence-quality signal.
-        if ["malformed", "transport_error"].iter().any(|key| {
+        // `partial` marks a buffered fragment whose complete message is
+        // also emitted; it is not by itself evidence loss. However the
+        // payload normalizer emits the statuses below for missing bytes,
+        // malformed framing, expired incomplete messages, or transport
+        // decoding failures. A zero ringbuf-drop count cannot override
+        // positive evidence of such losses.
+        if [
+            "malformed",
+            "malformed_head",
+            "transport_error",
+            "dropped",
+            "incomplete",
+            "lossy",
+            "binary_non_utf8",
+        ]
+        .iter()
+        .any(|key| {
             analysis
                 .get("decode_status")
                 .and_then(|status| status.get(*key))
@@ -1341,6 +1354,27 @@ mod tests {
         assert_eq!(quality_status(&quality), "degraded");
         quality["analysis"]["decode_status"] = serde_json::json!({"transport_error": 2});
         assert_eq!(quality_status(&quality), "degraded");
+    }
+
+    /// The normalizer reports payload losses separately from kernel ring
+    /// drops. No kernel loss does not imply complete HTTP/TLS evidence.
+    #[test]
+    fn normalized_payload_loss_statuses_degrade_capture_quality() {
+        for status in [
+            "malformed_head",
+            "dropped",
+            "incomplete",
+            "lossy",
+            "binary_non_utf8",
+        ] {
+            let mut quality = clean_process_source();
+            quality["analysis"]["decode_status"] = serde_json::json!({ status: 1 });
+            assert_eq!(
+                quality_status(&quality),
+                "degraded",
+                "status {status} must prevent healthy capture"
+            );
+        }
     }
 
     #[test]

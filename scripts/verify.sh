@@ -193,6 +193,23 @@ else
   bad "statistics selftest failed (see /tmp/verify_stats.log)"
 fi
 
+# M2 evidence-bounded WAM reference contract. An absent test directory must
+# fail rather than giving the false impression that the oracle was validated.
+note "research gate  M2 WAM reference oracle"
+if [ ! -s research/wam_reference/model.py ] || [ ! -s research/wam_reference/tests/test_model.py ]; then
+  bad "WAM reference source or regression tests missing"
+else
+  WAM_OUT=$("$PYTHON" -m unittest discover -s research/wam_reference/tests -p 'test_*.py' -v 2>&1)
+  WAM_RC=$?
+  printf '%s\n' "$WAM_OUT" > /tmp/verify_wam_reference.log
+  WAM_RAN=$(printf '%s\n' "$WAM_OUT" | sed -nE 's/^Ran ([0-9]+) tests? in .*/\1/p' | tail -1)
+  if [ "$WAM_RC" -eq 0 ] && [ "${WAM_RAN:-0}" -ge 23 ]; then
+    ok "M2 WAM reference contracts: ${WAM_RAN} tests"
+  else
+    bad "WAM reference gate failed or silently skipped (ran=${WAM_RAN:-0}, rc=$WAM_RC; see /tmp/verify_wam_reference.log)"
+  fi
+fi
+
 # The frontend is shipped inside the binary but was not covered by the only
 # gate. Lint, type-check and vitest are part of the artifact contract.
 if (cd frontend && npm run -s lint >/tmp/verify_frontend_lint.log 2>&1 \

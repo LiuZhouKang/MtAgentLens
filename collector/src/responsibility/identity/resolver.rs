@@ -156,7 +156,7 @@ impl IdentityResolver {
             // independent signal or inflate confidence. When the existing
             // label is non-TLS, TLS is new evidence and may replace it.
             if matches!(
-                existing.primary_signal,
+                &existing.primary_signal,
                 IdentitySignal::TlsSessionNew | IdentitySignal::TlsSessionShared
             ) {
                 return existing.clone();

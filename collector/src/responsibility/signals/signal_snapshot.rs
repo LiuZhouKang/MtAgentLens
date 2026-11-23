@@ -340,12 +340,27 @@ impl SignalSnapshot {
         self.conversation_to_processes.keys()
     }
 
+    /// TLS sessions the process participated in (not only last-writer owner).
+    ///
+    /// tls_to_process is a last-writer compatibility index. A shared TLS socket
+    /// may be observed from multiple process generations: earlier participants
+    /// must remain visible to identity and boundary checks. Return a sorted,
+    /// deduplicated union, including legacy snapshots without participants.
     pub fn tls_sessions_for_process(&self, process_id: ProcessId) -> Vec<TlsSessionId> {
-        self.tls_to_process
-            .iter()
-            .filter(|(_, pid)| **pid == process_id)
-            .map(|(session, _)| session.clone())
-            .collect()
+        let mut unique: HashSet<TlsSessionId> = HashSet::new();
+        for (session, participants) in &self.tls_participants {
+            if participants.contains(&process_id) {
+                unique.insert(session.clone());
+            }
+        }
+        for (session, owner) in &self.tls_to_process {
+            if *owner == process_id {
+                unique.insert(session.clone());
+            }
+        }
+        let mut sessions: Vec<TlsSessionId> = unique.into_iter().collect();
+        sessions.sort_by(|left, right| left.as_str().cmp(right.as_str()));
+        sessions
     }
 
     /// The process that owns a given TLS session.
